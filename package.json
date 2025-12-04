@@ -20,6 +20,22 @@
         "title": "Markdown Org: Set DONE"
       },
       {
+        "command": "markdown-org.togglePriority",
+        "title": "Markdown Org: Toggle Priority"
+      },
+      {
+        "command": "markdown-org.insertCreated",
+        "title": "Markdown Org: Insert CREATED Timestamp"
+      },
+      {
+        "command": "markdown-org.insertScheduled",
+        "title": "Markdown Org: Insert SCHEDULED Timestamp"
+      },
+      {
+        "command": "markdown-org.insertDeadline",
+        "title": "Markdown Org: Insert DEADLINE Timestamp"
+      },
+      {
         "command": "markdown-org.showAgendaDay",
         "title": "Markdown Org: Show Agenda (Day)"
       },
@@ -30,6 +46,14 @@
       {
         "command": "markdown-org.showTasks",
         "title": "Markdown Org: Show Tasks"
+      },
+      {
+        "command": "markdown-org.timestampUp",
+        "title": "Markdown Org: Timestamp Up"
+      },
+      {
+        "command": "markdown-org.timestampDown",
+        "title": "Markdown Org: Timestamp Down"
       }
     ],
     "keybindings": [
@@ -44,8 +68,38 @@
         "when": "editorTextFocus && editorLangId == markdown"
       },
       {
+        "command": "markdown-org.togglePriority",
+        "key": "ctrl+k ctrl+p",
+        "when": "editorTextFocus && editorLangId == markdown"
+      },
+      {
+        "command": "markdown-org.insertCreated",
+        "key": "ctrl+k ctrl+k ctrl+c",
+        "when": "editorTextFocus && editorLangId == markdown"
+      },
+      {
+        "command": "markdown-org.insertScheduled",
+        "key": "ctrl+k ctrl+k ctrl+s",
+        "when": "editorTextFocus && editorLangId == markdown"
+      },
+      {
+        "command": "markdown-org.insertDeadline",
+        "key": "ctrl+k ctrl+k ctrl+d",
+        "when": "editorTextFocus && editorLangId == markdown"
+      },
+      {
         "command": "markdown-org.showAgendaWeek",
         "key": "ctrl+k ctrl+w",
+        "when": "editorTextFocus && editorLangId == markdown"
+      },
+      {
+        "command": "markdown-org.timestampUp",
+        "key": "shift+up",
+        "when": "editorTextFocus && editorLangId == markdown"
+      },
+      {
+        "command": "markdown-org.timestampDown",
+        "key": "shift+down",
         "when": "editorTextFocus && editorLangId == markdown"
       }
     ],
