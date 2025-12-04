@@ -31,18 +31,33 @@ export class AgendaPanel {
     public static render(context: vscode.ExtensionContext, data: DayAgenda[] | Task[], mode: string) {
         if (AgendaPanel.currentPanel) {
             AgendaPanel.currentPanel.reveal();
-        } else {
-            AgendaPanel.currentPanel = vscode.window.createWebviewPanel(
-                'markdownOrgAgenda',
-                `Agenda: ${mode}`,
-                vscode.ViewColumn.Two,
-                { enableScripts: true }
-            );
-
-            AgendaPanel.currentPanel.onDidDispose(() => {
-                AgendaPanel.currentPanel = undefined;
-            });
+            AgendaPanel.currentPanel.webview.html = this.getHtmlContent(data, mode);
+            return;
         }
+        
+        AgendaPanel.currentPanel = vscode.window.createWebviewPanel(
+            'markdownOrgAgenda',
+            `Agenda: ${mode}`,
+            vscode.ViewColumn.Two,
+            { 
+                enableScripts: true,
+                retainContextWhenHidden: true
+            }
+        );
+
+        AgendaPanel.currentPanel.onDidDispose(() => {
+            AgendaPanel.currentPanel = undefined;
+        });
+
+        AgendaPanel.currentPanel.webview.onDidReceiveMessage(async message => {
+            if (message.command === 'openTask') {
+                const doc = await vscode.workspace.openTextDocument(message.file);
+                const pos = new vscode.Position(message.line - 1, 0);
+                await vscode.window.showTextDocument(doc, {
+                    selection: new vscode.Range(pos, pos)
+                });
+            }
+        });
 
         AgendaPanel.currentPanel.webview.html = this.getHtmlContent(data, mode);
     }
@@ -73,6 +88,10 @@ export class AgendaPanel {
             grid-template-columns: auto 140px 60px 60px 1fr;
             gap: 8px;
             margin: 2px 0;
+            cursor: pointer;
+        }
+        .task-line:hover {
+            background: #2d2d30;
         }
         .todo-label { color: #f48771; }
         .todo-keyword { color: #f48771; font-weight: bold; }
@@ -86,6 +105,18 @@ export class AgendaPanel {
 </head>
 <body>
     ${content}
+    <script>
+        const vscode = acquireVsCodeApi();
+        document.querySelectorAll('.task-line').forEach(el => {
+            el.addEventListener('click', () => {
+                vscode.postMessage({
+                    command: 'openTask',
+                    file: el.dataset.file,
+                    line: parseInt(el.dataset.line)
+                });
+            });
+        });
+    </script>
 </body>
 </html>`;
     }
@@ -113,7 +144,7 @@ export class AgendaPanel {
         const priorityClass = task.priority ? `priority-${task.priority.toLowerCase()}` : '';
         const statusClass = status === 'TODO' ? 'todo-keyword' : status === 'DONE' ? 'done-keyword' : '';
         
-        return `<div class="task-line">
+        return `<div class="task-line" data-file="${task.file}" data-line="${task.line}">
             <span class="todo-label">todo:</span>
             <span>${timeInfo}</span>
             <span class="${statusClass}">${status}</span>
@@ -167,7 +198,7 @@ export class AgendaPanel {
                 const priorityClass = task.priority ? `priority-${task.priority.toLowerCase()}` : '';
                 const statusClass = status === 'TODO' ? 'todo-keyword' : status === 'DONE' ? 'done-keyword' : '';
                 
-                html += `<div class="task-line">
+                html += `<div class="task-line" data-file="${task.file}" data-line="${task.line}">
                     <span class="todo-label">todo:</span>
                     <span></span>
                     <span class="${statusClass}">${status}</span>

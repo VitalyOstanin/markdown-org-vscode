@@ -38,7 +38,6 @@ export async function showAgenda(context: vscode.ExtensionContext, mode: 'day' |
         outputChannel.appendLine(`First item: ${JSON.stringify(data[0], null, 2)}`);
         
         AgendaPanel.render(context, data, mode);
-        outputChannel.show();
     } catch (error) {
         outputChannel.appendLine(`ERROR: ${error}`);
         outputChannel.show();
