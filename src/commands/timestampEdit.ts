@@ -1,8 +1,10 @@
 import * as vscode from 'vscode';
 
 const TIMESTAMP_REGEX = /<(\d{4})-(\d{2})-(\d{2})(?: ([А-Яа-яA-Za-z]{2,3}))?(?: (\d{2}):(\d{2}))?>/;
-const HEADING_REGEX = /^(#+)\s+(TODO|DONE)?(?:\s+\[#([A-Z])\])?\s+(.*)$/;
+const HEADING_REGEX = /^(#+)\s+(?:(TODO|DONE)\s+)?(?:\[#([A-Z])\]\s+)?(.+)$/;
 const TIMESTAMP_LINE_REGEX = /^`(CREATED|SCHEDULED|DEADLINE): (<[^>]+>)`$/;
+const PRIORITY_A_CODE = 'A'.charCodeAt(0);
+const PRIORITY_Z_CODE = 'Z'.charCodeAt(0);
 
 type TimestampPart = 'year' | 'month' | 'day' | 'weekday' | 'hour' | 'minute';
 type HeadingPart = 'status' | 'priority';
@@ -87,7 +89,7 @@ function adjustHeadingPart(match: RegExpMatchArray, part: HeadingPart, delta: nu
     } else if (part === 'priority') {
         const currentCode = priority.charCodeAt(0);
         const newCode = currentCode + delta;
-        if (newCode >= 65 && newCode <= 90) {
+        if (newCode >= PRIORITY_A_CODE && newCode <= PRIORITY_Z_CODE) {
             newPriority = String.fromCharCode(newCode);
         }
     }

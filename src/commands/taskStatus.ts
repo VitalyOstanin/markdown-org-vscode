@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { findNearestHeading } from '../utils';
 
 function formatTimestamp(date: Date): string {
     const year = date.getFullYear();
@@ -11,42 +12,6 @@ function formatTimestamp(date: Date): string {
     const weekday = dayNames[date.getDay()];
     
     return `<${year}-${month}-${day} ${weekday} ${hour}:${minute}>`;
-}
-
-async function findNearestHeading(editor: vscode.TextEditor): Promise<number | null> {
-    const symbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
-        'vscode.executeDocumentSymbolProvider',
-        editor.document.uri
-    );
-    
-    if (!symbols || symbols.length === 0) {
-        return null;
-    }
-    
-    const position = editor.selection.active;
-    
-    function findHeading(syms: vscode.DocumentSymbol[], parentLine?: number): number | null {
-        let bestMatch: number | null = parentLine ?? null;
-        
-        for (const sym of syms) {
-            if (sym.range.contains(position)) {
-                const symLine = sym.range.start.line;
-                bestMatch = symLine;
-                
-                if (sym.children && sym.children.length > 0) {
-                    const childMatch = findHeading(sym.children, symLine);
-                    if (childMatch !== null) {
-                        bestMatch = childMatch;
-                    }
-                }
-                break;
-            }
-        }
-        
-        return bestMatch;
-    }
-    
-    return findHeading(symbols);
 }
 
 export async function setTaskStatus(status: 'TODO' | 'DONE') {
@@ -62,23 +27,29 @@ export async function setTaskStatus(status: 'TODO' | 'DONE') {
 
     const line = editor.document.lineAt(headingLine);
     const text = line.text;
-    const match = text.match(/^(#+)\s+(TODO|DONE)?\s*(?:\[#[A-Z]\]\s*)?(.+)$/);
+    const match = text.match(/^(#+)\s+(?:(TODO|DONE)\s+)?(?:\[#([A-Z])\]\s+)?(.+)$/);
     
     if (!match) {
         return;
     }
 
-    const [, hashes, currentStatus, title] = match;
-    const priorityMatch = text.match(/\[#[A-Z]\]/);
-    const priority = priorityMatch ? priorityMatch[0] + ' ' : '';
+    const [, hashes, currentStatus, priority, title] = match;
     
     let newText: string;
     if (currentStatus === status) {
-        // Remove status and priority
-        newText = `${hashes} ${title.replace(/^\[#[A-Z]\]\s*/, '')}`;
+        // Remove status, keep priority if exists
+        newText = `${hashes} `;
+        if (priority) {
+            newText += `[#${priority}] `;
+        }
+        newText += title;
     } else {
-        // Set status, keep priority
-        newText = `${hashes} ${status} ${priority}${title.replace(/^\[#[A-Z]\]\s*/, '')}`;
+        // Set status, keep priority if exists
+        newText = `${hashes} ${status} `;
+        if (priority) {
+            newText += `[#${priority}] `;
+        }
+        newText += title;
     }
 
     editor.edit(editBuilder => {
@@ -99,7 +70,7 @@ export async function togglePriority() {
 
     const line = editor.document.lineAt(headingLine);
     const text = line.text;
-    const match = text.match(/^(#+)\s+(TODO|DONE)?\s*(?:\[#([A-Z])\]\s*)?(.+)$/);
+    const match = text.match(/^(#+)\s+(?:(TODO|DONE)\s+)?(?:\[#([A-Z])\]\s+)?(.+)$/);
     
     if (!match) {
         return;
@@ -114,7 +85,7 @@ export async function togglePriority() {
     if (!currentPriority) {
         newText += `[#A] `;
     }
-    newText += title.replace(/^\[#[A-Z]\]\s*/, '');
+    newText += title;
 
     editor.edit(editBuilder => {
         editBuilder.replace(line.range, newText);
@@ -134,13 +105,10 @@ export async function insertCreatedTimestamp() {
     
     const nextLineNum = headingLine + 1;
     
+    // Check if CREATED already exists - don't delete it
     if (nextLineNum < editor.document.lineCount) {
         const nextLine = editor.document.lineAt(nextLineNum);
         if (nextLine.text.match(/^`CREATED: <[^>]+>`$/)) {
-            editor.edit(editBuilder => {
-                const deleteRange = new vscode.Range(nextLineNum, 0, nextLineNum + 1, 0);
-                editBuilder.delete(deleteRange);
-            });
             return;
         }
     }

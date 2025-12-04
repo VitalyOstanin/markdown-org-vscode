@@ -2,7 +2,12 @@
   "name": "markdown-org",
   "displayName": "Markdown Org",
   "description": "Org-style task management for Markdown files",
-  "version": "0.0.1",
+  "version": "0.1.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/VitalyOstanin/markdown-org"
+  },
+  "license": "MIT",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -84,7 +89,7 @@
       },
       {
         "command": "markdown-org.insertDeadline",
-        "key": "ctrl+k ctrl+k ctrl+d",
+        "key": "ctrl+k ctrl+k d",
         "when": "editorTextFocus && editorLangId == markdown"
       },
       {

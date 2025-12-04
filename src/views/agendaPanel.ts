@@ -25,13 +25,15 @@ interface DayAgenda {
     upcoming: TaskWithOffset[];
 }
 
+type AgendaData = DayAgenda[] | Task[];
+
 export class AgendaPanel {
     private static currentPanel?: vscode.WebviewPanel;
     private static watcher?: vscode.FileSystemWatcher;
     private static debounceTimer?: NodeJS.Timeout;
     private static refreshCallback?: () => Promise<void>;
 
-    public static render(context: vscode.ExtensionContext, data: DayAgenda[] | Task[], mode: string, refreshCallback?: () => Promise<void>) {
+    public static render(context: vscode.ExtensionContext, data: AgendaData, mode: string, refreshCallback?: () => Promise<void>) {
         if (refreshCallback) {
             AgendaPanel.refreshCallback = refreshCallback;
         }
@@ -56,6 +58,7 @@ export class AgendaPanel {
                 AgendaPanel.refreshCallback = undefined;
                 if (AgendaPanel.debounceTimer) {
                     clearTimeout(AgendaPanel.debounceTimer);
+                    AgendaPanel.debounceTimer = undefined;
                 }
             });
 
@@ -90,10 +93,8 @@ export class AgendaPanel {
         }
     }
 
-    private static getHtmlContent(data: DayAgenda[] | Task[], mode: string): string {
-        const content = mode === 'tasks' 
-            ? this.renderTasks(data as Task[]) 
-            : this.renderAgenda(data as DayAgenda[]);
+    private static getHtmlContent(data: AgendaData, mode: string): string {
+        const dataJson = JSON.stringify(data).replace(/</g, '\\u003c').replace(/>/g, '\\u003e');
         
         return `<!DOCTYPE html>
 <html>
@@ -132,9 +133,17 @@ export class AgendaPanel {
     </style>
 </head>
 <body>
-    <div id="content">${content}</div>
+    <div id="content"></div>
     <script>
         const vscode = acquireVsCodeApi();
+        const initialData = ${dataJson};
+        const initialMode = ${JSON.stringify(mode)};
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
         
         function attachListeners() {
             document.querySelectorAll('.task-line').forEach(el => {
@@ -147,8 +156,6 @@ export class AgendaPanel {
                 });
             });
         }
-        
-        attachListeners();
         
         window.addEventListener('message', event => {
             const message = event.data;
@@ -167,7 +174,7 @@ export class AgendaPanel {
         function renderAgenda(days) {
             let html = '';
             days.forEach(day => {
-                html += '<div class="day-header">' + formatDayHeader(day.date) + '</div>';
+                html += '<div class="day-header">' + escapeHtml(formatDayHeader(day.date)) + '</div>';
                 (day.overdue || []).forEach(task => html += renderTask(task, task.days_offset));
                 (day.scheduled_timed || []).forEach(task => html += renderTask(task, task.days_offset));
                 (day.scheduled_no_time || []).forEach(task => html += renderTask(task, task.days_offset));
@@ -183,7 +190,7 @@ export class AgendaPanel {
                 const filtered = tasks.filter(t => (t.priority || '') === priority);
                 if (filtered.length === 0) return;
                 const header = priority ? 'Priority [#' + priority + ']' : 'No priority';
-                html += '<div class="day-header">' + header + '</div>';
+                html += '<div class="day-header">' + escapeHtml(header) + '</div>';
                 filtered.forEach(task => html += renderTask(task));
             });
             return html;
@@ -196,12 +203,12 @@ export class AgendaPanel {
             const priorityClass = task.priority ? 'priority-' + task.priority.toLowerCase() : '';
             const statusClass = status === 'TODO' ? 'todo-keyword' : status === 'DONE' ? 'done-keyword' : '';
             
-            return '<div class="task-line" data-file="' + task.file + '" data-line="' + task.line + '">' +
+            return '<div class="task-line" data-file="' + escapeHtml(task.file) + '" data-line="' + task.line + '">' +
                 '<span class="todo-label">todo:</span>' +
                 '<span>' + timeInfo + '</span>' +
-                '<span class="' + statusClass + '">' + status + '</span>' +
-                '<span class="' + priorityClass + '">' + priority + '</span>' +
-                '<span>' + task.heading + '</span>' +
+                '<span class="' + statusClass + '">' + escapeHtml(status) + '</span>' +
+                '<span class="' + priorityClass + '">' + escapeHtml(priority) + '</span>' +
+                '<span>' + escapeHtml(task.heading) + '</span>' +
                 '</div>';
         }
         
@@ -209,9 +216,9 @@ export class AgendaPanel {
             if (task.timestamp_time) {
                 const type = task.timestamp_type;
                 if (type && type !== 'PLAIN') {
-                    return '<span class="time-display">' + task.timestamp_time + '</span>...... <span class="timestamp-type">' + type + ':</span>';
+                    return '<span class="time-display">' + escapeHtml(task.timestamp_time) + '</span>...... <span class="timestamp-type">' + escapeHtml(type) + ':</span>';
                 }
-                return '<span class="time-display">' + task.timestamp_time + '</span>......';
+                return '<span class="time-display">' + escapeHtml(task.timestamp_time) + '</span>......';
             }
             if (daysOffset !== undefined) {
                 if (daysOffset < 0) {
@@ -227,7 +234,7 @@ export class AgendaPanel {
             }
             const type = task.timestamp_type;
             if (type && type !== 'PLAIN') {
-                return '<span class="timestamp-type">' + type + ':</span>';
+                return '<span class="timestamp-type">' + escapeHtml(type) + ':</span>';
             }
             return '<span class="timestamp-type">SCHEDULED:</span>';
         }
@@ -237,108 +244,13 @@ export class AgendaPanel {
             const options = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
             return d.toLocaleDateString(undefined, options);
         }
+        
+        // Initial render
+        const contentEl = document.getElementById('content');
+        contentEl.innerHTML = initialMode === 'tasks' ? renderTasks(initialData) : renderAgenda(initialData);
+        attachListeners();
     </script>
 </body>
 </html>`;
-    }
-
-    private static renderAgenda(days: DayAgenda[]): string {
-        if (!Array.isArray(days)) {
-            return '<div>Invalid data format</div>';
-        }
-        let html = '';
-        days.forEach(day => {
-            html += `<div class="day-header">${this.formatDayHeader(day.date)}</div>`;
-            
-            (day.overdue || []).forEach(task => html += this.renderTask(task));
-            (day.scheduled_timed || []).forEach(task => html += this.renderTask(task));
-            (day.scheduled_no_time || []).forEach(task => html += this.renderTask(task));
-            (day.upcoming || []).forEach(task => html += this.renderTask(task));
-        });
-        return html;
-    }
-
-    private static renderTask(task: TaskWithOffset): string {
-        const timeInfo = this.getTimeInfo(task, task.days_offset);
-        const status = task.task_type || '';
-        const priority = task.priority ? `[#${task.priority}]` : '';
-        const priorityClass = task.priority ? `priority-${task.priority.toLowerCase()}` : '';
-        const statusClass = status === 'TODO' ? 'todo-keyword' : status === 'DONE' ? 'done-keyword' : '';
-        
-        return `<div class="task-line" data-file="${task.file}" data-line="${task.line}">
-            <span class="todo-label">todo:</span>
-            <span>${timeInfo}</span>
-            <span class="${statusClass}">${status}</span>
-            <span class="${priorityClass}">${priority}</span>
-            <span>${task.heading}</span>
-        </div>`;
-    }
-
-    private static getTimeInfo(task: Task, daysOffset?: number): string {
-        if (task.timestamp_time) {
-            const type = task.timestamp_type;
-            if (type && type !== 'PLAIN') {
-                return `<span class="time-display">${task.timestamp_time}</span>...... <span class="timestamp-type">${type}:</span>`;
-            }
-            return `<span class="time-display">${task.timestamp_time}</span>......`;
-        }
-
-        if (daysOffset !== undefined) {
-            if (daysOffset < 0) {
-                const daysAgo = Math.abs(daysOffset);
-                if (task.timestamp_type === 'SCHEDULED') {
-                    return `Sched.${daysAgo}x:`;
-                }
-                return `${daysAgo} d. ago:`;
-            }
-            if (daysOffset > 0) {
-                return `In ${daysOffset} d.:`;
-            }
-        }
-
-        const type = task.timestamp_type;
-        if (type && type !== 'PLAIN') {
-            return `<span class="timestamp-type">${type}:</span>`;
-        }
-        return `<span class="timestamp-type">SCHEDULED:</span>`;
-    }
-
-    private static renderTasks(tasks: Task[]): string {
-        const priorities = ['A', 'B', 'C', ''];
-        let html = '';
-
-        priorities.forEach(priority => {
-            const filtered = tasks.filter(t => (t.priority || '') === priority);
-            if (filtered.length === 0) return;
-
-            const header = priority ? `Priority [#${priority}]` : 'No priority';
-            html += `<div class="day-header">${header}</div>`;
-            filtered.forEach(task => {
-                const status = task.task_type || '';
-                const pri = task.priority ? `[#${task.priority}]` : '';
-                const priorityClass = task.priority ? `priority-${task.priority.toLowerCase()}` : '';
-                const statusClass = status === 'TODO' ? 'todo-keyword' : status === 'DONE' ? 'done-keyword' : '';
-                
-                html += `<div class="task-line" data-file="${task.file}" data-line="${task.line}">
-                    <span class="todo-label">todo:</span>
-                    <span></span>
-                    <span class="${statusClass}">${status}</span>
-                    <span class="${priorityClass}">${pri}</span>
-                    <span>${task.heading}</span>
-                </div>`;
-            });
-        });
-        return html;
-    }
-
-    private static formatDayHeader(date: string): string {
-        const d = new Date(date);
-        const options: Intl.DateTimeFormatOptions = { 
-            weekday: 'long', 
-            day: 'numeric', 
-            month: 'long', 
-            year: 'numeric' 
-        };
-        return d.toLocaleDateString(undefined, options);
     }
 }

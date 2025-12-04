@@ -80,7 +80,7 @@ ln -s $(pwd) ~/.vscode/extensions/markdown-org
 **Статусы задач:**
 - `Markdown Org: Set TODO` - Пометить заголовок как TODO
 - `Markdown Org: Set DONE` - Пометить заголовок как DONE
-- `Markdown Org: Toggle Priority` - Переключить приоритет (A → B → C → нет → A)
+- `Markdown Org: Toggle Priority` - Переключить приоритет (нет → A → нет)
 
 **Временные метки:**
 - `Markdown Org: Insert CREATED Timestamp` - Вставить метку создания
@@ -99,7 +99,7 @@ ln -s $(pwd) ~/.vscode/extensions/markdown-org
 **Статусы задач:**
 - `Ctrl+K Ctrl+T` - Set TODO
 - `Ctrl+K Ctrl+D` - Set DONE
-- `Ctrl+K Ctrl+P` - Toggle Priority (A/B/C)
+- `Ctrl+K Ctrl+P` - Toggle Priority (нет → A → нет)
 
 **Временные метки:**
 - `Ctrl+K Ctrl+K Ctrl+C` - Insert CREATED timestamp
