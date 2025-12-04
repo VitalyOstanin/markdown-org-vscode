@@ -77,16 +77,38 @@ ln -s $(pwd) ~/.vscode/extensions/markdown-org
 
 ### Команды
 
+**Статусы задач:**
 - `Markdown Org: Set TODO` - Пометить заголовок как TODO
 - `Markdown Org: Set DONE` - Пометить заголовок как DONE
+- `Markdown Org: Toggle Priority` - Переключить приоритет (A → B → C → нет → A)
+
+**Временные метки:**
+- `Markdown Org: Insert CREATED Timestamp` - Вставить метку создания
+- `Markdown Org: Insert SCHEDULED Timestamp` - Вставить метку планирования
+- `Markdown Org: Insert DEADLINE Timestamp` - Вставить метку дедлайна
+- `Markdown Org: Timestamp Up` - Увеличить дату/время под курсором
+- `Markdown Org: Timestamp Down` - Уменьшить дату/время под курсором
+
+**Просмотр задач:**
 - `Markdown Org: Show Agenda (Day)` - Задачи на сегодня
 - `Markdown Org: Show Agenda (Week)` - Задачи на неделю
 - `Markdown Org: Show Tasks` - Все TODO задачи по приоритетам
 
 ### Горячие клавиши
 
+**Статусы задач:**
 - `Ctrl+K Ctrl+T` - Set TODO
 - `Ctrl+K Ctrl+D` - Set DONE
+- `Ctrl+K Ctrl+P` - Toggle Priority (A/B/C)
+
+**Временные метки:**
+- `Ctrl+K Ctrl+K Ctrl+C` - Insert CREATED timestamp
+- `Ctrl+K Ctrl+K Ctrl+S` - Insert SCHEDULED timestamp
+- `Ctrl+K Ctrl+K Ctrl+D` - Insert DEADLINE timestamp
+- `Shift+Up` - Timestamp Up (увеличить дату/время)
+- `Shift+Down` - Timestamp Down (уменьшить дату/время)
+
+**Просмотр задач:**
 - `Ctrl+K Ctrl+W` - Show Agenda (Week)
 
 ### Настройки
