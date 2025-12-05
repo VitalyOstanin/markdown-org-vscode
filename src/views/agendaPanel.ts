@@ -48,7 +48,7 @@ export class AgendaPanel {
             AgendaPanel.currentPanel = vscode.window.createWebviewPanel(
                 'markdownOrgAgenda',
                 `Agenda: ${mode}`,
-                vscode.ViewColumn.Two,
+                vscode.ViewColumn.One,
                 { 
                     enableScripts: true,
                     retainContextWhenHidden: true
@@ -101,7 +101,9 @@ export class AgendaPanel {
 
     private static getHtmlContent(data: AgendaData, mode: string): string {
         const dataJson = JSON.stringify(data).replace(/</g, '\\u003c').replace(/>/g, '\\u003e');
-        const currentDate = AgendaPanel.currentDate || new Date().toISOString().split('T')[0];
+        const today = new Date();
+        const localDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        const currentDate = AgendaPanel.currentDate || localDate;
         
         return `<!DOCTYPE html>
 <html>
@@ -111,7 +113,7 @@ export class AgendaPanel {
             font-family: 'Courier New', monospace; 
             padding: 20px;
             background: #1e1e1e;
-            color: #d4d4d4;
+            color: #e0e0e0;
             line-height: 1.6;
         }
         .nav-bar {
@@ -141,6 +143,9 @@ export class AgendaPanel {
             color: #569cd6;
             font-weight: bold;
             margin: 20px 0 5px 0;
+            display: grid;
+            grid-template-columns: 120px 30px 1fr;
+            column-gap: 1ch;
         }
         .task-line {
             display: grid;
@@ -241,7 +246,7 @@ export class AgendaPanel {
         function renderAgenda(days) {
             let html = '';
             days.forEach(day => {
-                html += '<div class="day-header">' + escapeHtml(formatDayHeader(day.date)) + '</div>';
+                html += '<div class="day-header">' + formatDayHeader(day.date) + '</div>';
                 (day.overdue || []).forEach(task => html += renderTask(task, task.days_offset));
                 (day.scheduled_timed || []).forEach(task => html += renderTask(task, task.days_offset));
                 (day.scheduled_no_time || []).forEach(task => html += renderTask(task, task.days_offset));
@@ -308,8 +313,11 @@ export class AgendaPanel {
         
         function formatDayHeader(date) {
             const d = new Date(date);
-            const options = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
-            return d.toLocaleDateString(undefined, options);
+            const weekday = d.toLocaleDateString('ru-RU', { weekday: 'long' });
+            const dayMonth = d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+            const year = d.toLocaleDateString('ru-RU', { year: 'numeric' });
+            const [day, month] = dayMonth.split(' ');
+            return '<span>' + weekday + '</span><span style="text-align: right">' + day + '</span><span>' + month + ' ' + year + '</span>';
         }
         
         // Initial render
