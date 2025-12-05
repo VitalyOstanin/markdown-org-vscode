@@ -34,13 +34,17 @@ export class AgendaPanel {
     private static refreshCallback?: (date?: string) => Promise<void>;
     private static currentDate?: string;
     private static currentMode?: string;
+    private static dayCheckInterval?: NodeJS.Timeout;
+    private static lastCheckedDay?: string;
 
     public static render(context: vscode.ExtensionContext, data: AgendaData, mode: string, date: string | undefined, refreshCallback?: (date?: string) => Promise<void>) {
         if (refreshCallback) {
             AgendaPanel.refreshCallback = refreshCallback;
         }
         AgendaPanel.currentMode = mode;
-        AgendaPanel.currentDate = date;
+        const today = new Date();
+        const localDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        AgendaPanel.currentDate = date || localDate;
 
         if (AgendaPanel.currentPanel) {
             AgendaPanel.currentPanel.webview.postMessage({ type: 'update', data, mode, date });
@@ -63,6 +67,10 @@ export class AgendaPanel {
                 if (AgendaPanel.debounceTimer) {
                     clearTimeout(AgendaPanel.debounceTimer);
                     AgendaPanel.debounceTimer = undefined;
+                }
+                if (AgendaPanel.dayCheckInterval) {
+                    clearInterval(AgendaPanel.dayCheckInterval);
+                    AgendaPanel.dayCheckInterval = undefined;
                 }
             });
 
@@ -96,6 +104,20 @@ export class AgendaPanel {
             AgendaPanel.watcher.onDidChange(triggerRefresh);
             AgendaPanel.watcher.onDidCreate(triggerRefresh);
             AgendaPanel.watcher.onDidDelete(triggerRefresh);
+        }
+
+        if (!AgendaPanel.dayCheckInterval && refreshCallback) {
+            const today = new Date();
+            AgendaPanel.lastCheckedDay = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+            
+            AgendaPanel.dayCheckInterval = setInterval(() => {
+                const now = new Date();
+                const currentDay = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+                if (currentDay !== AgendaPanel.lastCheckedDay) {
+                    AgendaPanel.lastCheckedDay = currentDay;
+                    AgendaPanel.refreshCallback?.();
+                }
+            }, 60000);
         }
     }
 
@@ -193,7 +215,7 @@ export class AgendaPanel {
             } else if (initialMode === 'month') {
                 d.setMonth(d.getMonth() + offset);
             }
-            const newDate = d.toISOString().split('T')[0];
+            const newDate = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
             vscode.postMessage({ command: 'navigate', date: newDate });
         }
         
@@ -205,7 +227,10 @@ export class AgendaPanel {
             }
             const unit = initialMode === 'day' ? 'Day' : initialMode === 'week' ? 'Week' : 'Month';
             const d = new Date(currentDate);
-            const dateStr = d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+            const weekday = d.toLocaleDateString('ru-RU', { weekday: 'long' });
+            const dayMonth = d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+            const year = d.getFullYear();
+            const dateStr = weekday + ', ' + dayMonth + ' ' + year;
             navBar.innerHTML = 
                 '<button class="nav-btn" onclick="navigate(-1)">← Prev ' + unit + '</button>' +
                 '<button class="nav-btn" onclick="navigate(0)">Today</button>' +

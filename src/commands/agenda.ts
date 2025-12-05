@@ -24,7 +24,8 @@ export async function showAgenda(context: vscode.ExtensionContext, mode: 'day' |
             currentDate = date;
         }
         if (!currentDate) {
-            currentDate = new Date().toISOString().split('T')[0];
+            const today = new Date();
+            currentDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
         }
 
         const args = ['--dir', workspaceDir, '--format', 'json'];
