@@ -175,6 +175,7 @@ export class AgendaPanel {
             gap: 8px;
             margin: 2px 0;
             cursor: pointer;
+            font-size: 1.1em;
         }
         .task-line:hover {
             background: #2d2d30;
