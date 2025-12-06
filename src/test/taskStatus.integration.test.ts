@@ -1,5 +1,6 @@
 import * as assert from 'assert';
 import * as vscode from 'vscode';
+import { suite, before, test } from 'mocha';
 
 suite('Task Status Integration Tests', () => {
     let document: vscode.TextDocument;

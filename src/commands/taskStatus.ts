@@ -37,10 +37,8 @@ export async function setTaskStatus(status: 'TODO' | 'DONE') {
     
     let newText: string;
     if (currentStatus === status) {
-        // Remove status and priority
         newText = `${hashes} ${title}`;
     } else {
-        // Set status, keep priority if exists
         newText = `${hashes} ${status} `;
         if (priority) {
             newText += `[#${priority}] `;
@@ -48,7 +46,7 @@ export async function setTaskStatus(status: 'TODO' | 'DONE') {
         newText += title;
     }
 
-    editor.edit(editBuilder => {
+    return editor.edit(editBuilder => {
         editBuilder.replace(line.range, newText);
     });
 }
@@ -83,7 +81,7 @@ export async function togglePriority() {
     }
     newText += title;
 
-    editor.edit(editBuilder => {
+    return editor.edit(editBuilder => {
         editBuilder.replace(line.range, newText);
     });
 }
@@ -101,7 +99,6 @@ export async function insertCreatedTimestamp() {
     
     const nextLineNum = headingLine + 1;
     
-    // Check if CREATED already exists - don't delete it
     if (nextLineNum < editor.document.lineCount) {
         const nextLine = editor.document.lineAt(nextLineNum);
         if (nextLine.text.match(/^`CREATED: <[^>]+>`$/)) {
@@ -113,7 +110,7 @@ export async function insertCreatedTimestamp() {
     const timestamp = formatTimestamp(new Date());
     const insertPosition = new vscode.Position(nextLineNum, 0);
     
-    editor.edit(editBuilder => {
+    return editor.edit(editBuilder => {
         editBuilder.insert(insertPosition, `${indent}\`CREATED: ${timestamp}\`\n`);
     });
 }
@@ -177,28 +174,23 @@ async function insertOrReplaceTimestamp(type: 'SCHEDULED' | 'DEADLINE') {
     
     if (foundLine !== null) {
         if (foundType === type) {
-            // Remove existing timestamp of same type
-            editor.edit(editBuilder => {
-                const deleteRange = new vscode.Range(foundLine!, 0, foundLine! + 1, 0);
+            const deleteRange = new vscode.Range(foundLine!, 0, foundLine! + 1, 0);
+            return editor.edit(editBuilder => {
                 editBuilder.delete(deleteRange);
             });
-            return;
         } else {
-            // Replace other type with current type, keep timestamp and indent
             const newText = `${foundIndent}\`${type}: ${foundTimestamp}\``;
-            editor.edit(editBuilder => {
+            return editor.edit(editBuilder => {
                 editBuilder.replace(editor.document.lineAt(foundLine!).range, newText);
             });
-            return;
         }
     }
     
-    // Insert new timestamp after heading
     const indent = getTimestampIndent(editor, headingLine);
     const timestamp = formatTimestamp(new Date());
     const insertPosition = new vscode.Position(headingLine + 1, 0);
     
-    editor.edit(editBuilder => {
+    return editor.edit(editBuilder => {
         editBuilder.insert(insertPosition, `${indent}\`${type}: ${timestamp}\`\n`);
     });
 }

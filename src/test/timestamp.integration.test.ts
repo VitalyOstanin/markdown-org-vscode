@@ -1,5 +1,6 @@
 import * as assert from 'assert';
 import * as vscode from 'vscode';
+import { suite, before, test } from 'mocha';
 
 suite('Timestamp Integration Tests', () => {
     let document: vscode.TextDocument;
@@ -102,7 +103,7 @@ suite('Timestamp Integration Tests', () => {
             language: 'markdown'
         });
         editor = await vscode.window.showTextDocument(document);
-        editor.selection = new vscode.Selection(0, 20, 0, 20); // cursor on day
+        editor.selection = new vscode.Selection(0, 22, 0, 22);
         
         await vscode.commands.executeCommand('markdown-org.timestampUp');
         
@@ -116,7 +117,7 @@ suite('Timestamp Integration Tests', () => {
             language: 'markdown'
         });
         editor = await vscode.window.showTextDocument(document);
-        editor.selection = new vscode.Selection(0, 20, 0, 20); // cursor on day
+        editor.selection = new vscode.Selection(0, 22, 0, 22);
         
         await vscode.commands.executeCommand('markdown-org.timestampDown');
         

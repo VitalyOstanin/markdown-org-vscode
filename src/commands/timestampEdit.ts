@@ -274,13 +274,12 @@ export async function adjustTimestamp(delta: number) {
     if (timestamp) {
         const newTimestamp = incrementTimestamp(timestamp.match, timestamp.part, delta);
         
-        await editor.edit(editBuilder => {
+        return editor.edit(editBuilder => {
             editBuilder.replace(timestamp.range, newTimestamp);
+        }).then(() => {
+            const newPosition = editor.selection.active;
+            editor.selection = new vscode.Selection(newPosition, newPosition);
         });
-        
-        const newPosition = editor.selection.active;
-        editor.selection = new vscode.Selection(newPosition, newPosition);
-        return;
     }
     
     const timestampType = getTimestampTypeAtCursor(editor);
@@ -288,13 +287,12 @@ export async function adjustTimestamp(delta: number) {
         const newLine = toggleTimestampType(timestampType.match);
         const lineRange = editor.document.lineAt(editor.selection.active.line).range;
         
-        await editor.edit(editBuilder => {
+        return editor.edit(editBuilder => {
             editBuilder.replace(lineRange, newLine);
+        }).then(() => {
+            const newPosition = editor.selection.active;
+            editor.selection = new vscode.Selection(newPosition, newPosition);
         });
-        
-        const newPosition = editor.selection.active;
-        editor.selection = new vscode.Selection(newPosition, newPosition);
-        return;
     }
     
     const headingPart = getHeadingPartAtCursor(editor);
@@ -302,14 +300,13 @@ export async function adjustTimestamp(delta: number) {
         const newLine = adjustHeadingPart(headingPart.match, headingPart.part, delta);
         const lineRange = editor.document.lineAt(editor.selection.active.line).range;
         
-        await editor.edit(editBuilder => {
+        return editor.edit(editBuilder => {
             editBuilder.replace(lineRange, newLine);
+        }).then(() => {
+            const newPosition = editor.selection.active;
+            editor.selection = new vscode.Selection(newPosition, newPosition);
         });
-        
-        const newPosition = editor.selection.active;
-        editor.selection = new vscode.Selection(newPosition, newPosition);
-        return;
     }
     
-    await vscode.commands.executeCommand(delta > 0 ? 'cursorUpSelect' : 'cursorDownSelect');
+    return vscode.commands.executeCommand(delta > 0 ? 'cursorUpSelect' : 'cursorDownSelect');
 }

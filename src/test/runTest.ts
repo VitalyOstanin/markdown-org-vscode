@@ -5,10 +5,12 @@ async function main() {
     try {
         const extensionDevelopmentPath = path.resolve(__dirname, '../../');
         const extensionTestsPath = path.resolve(__dirname, './suite/integration');
+        const launchArgs = [path.resolve(__dirname, '../../test-workspace')];
 
         await runTests({
             extensionDevelopmentPath,
-            extensionTestsPath
+            extensionTestsPath,
+            launchArgs
         });
     } catch (err) {
         console.error('Failed to run tests:', err);

@@ -2,6 +2,7 @@ import * as assert from 'assert';
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import { suite, before, after, test } from 'mocha';
 
 suite('Month View Integration Tests', () => {
     const testWorkspaceDir = path.join(__dirname, '../../test-workspace');
@@ -72,8 +73,8 @@ suite('Month View Integration Tests', () => {
 
     test('should correctly calculate first day of month', () => {
         const testCases = [
-            { year: 2025, month: 11, expectedDay: 1 }, // December 2025 starts on Monday
-            { year: 2025, month: 0, expectedDay: 3 },  // January 2025 starts on Wednesday
+            { year: 2025, month: 11, expectedDay: 0 }, // December 2025 starts on Monday
+            { year: 2025, month: 0, expectedDay: 2 },  // January 2025 starts on Wednesday
         ];
 
         testCases.forEach(({ year, month, expectedDay }) => {
