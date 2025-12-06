@@ -1,5 +1,7 @@
 import * as vscode from 'vscode';
 import * as cp from 'child_process';
+import * as fs from 'fs';
+import * as path from 'path';
 import { AgendaPanel } from '../views/agendaPanel';
 
 export async function showAgenda(context: vscode.ExtensionContext, mode: 'day' | 'week' | 'month' | 'tasks', initialDate?: string) {
@@ -10,6 +12,29 @@ export async function showAgenda(context: vscode.ExtensionContext, mode: 'day' |
     if (!extractorPath) {
         vscode.window.showErrorMessage('Markdown Org: Please configure markdown-org.extractorPath in settings');
         return;
+    }
+
+    // Validate extractor path
+    if (!path.isAbsolute(extractorPath)) {
+        // If relative path, check if it's in PATH by trying to execute
+        try {
+            cp.execSync(`which ${extractorPath}`, { stdio: 'pipe' });
+        } catch {
+            vscode.window.showErrorMessage(
+                `Markdown Org: Extractor '${extractorPath}' not found in PATH. ` +
+                'Please install markdown-org-extract: cargo install markdown-org-extract'
+            );
+            return;
+        }
+    } else {
+        // If absolute path, check if file exists
+        if (!fs.existsSync(extractorPath)) {
+            vscode.window.showErrorMessage(
+                `Markdown Org: Extractor not found at '${extractorPath}'. ` +
+                'Please check markdown-org.extractorPath setting or install: cargo install markdown-org-extract'
+            );
+            return;
+        }
     }
 
     if (!workspaceDir) {

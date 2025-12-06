@@ -8,10 +8,10 @@
 - [x] Add helpful error messages for missing configuration
   - extractorPath: shows error if not found
   - maintainFilePath: shows error if not configured when using Promote to Maintain
-- [ ] Add validation for extractorPath configuration
-  - Check if file exists using fs.existsSync()
-  - Show clear error message if extractor not found
-  - Suggest configuration steps
+- [x] Add validation for extractorPath configuration
+  - Check if file exists using fs.existsSync() for absolute paths
+  - Check if command exists in PATH using 'which' for relative paths
+  - Show clear error message if extractor not found with installation instructions
 
 ## Publishing
 - [x] Add publisher field to package.json
