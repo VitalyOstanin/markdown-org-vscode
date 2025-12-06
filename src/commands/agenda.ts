@@ -4,6 +4,42 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { AgendaPanel } from '../views/agendaPanel';
 
+function filterTasksByTag(data: any, tag: string, fileTags: any[]): any {
+    if (tag === 'ALL') {
+        return data;
+    }
+
+    const tagConfig = fileTags.find(t => t.name === tag);
+    if (!tagConfig) {
+        return data;
+    }
+
+    const pattern = tagConfig.pattern || '';
+    const filterFn = (task: any) => {
+        if (!pattern) {
+            return !fileTags.some(t => t.pattern && !t.pattern.startsWith('!') && task.file.includes(t.pattern));
+        }
+        if (pattern.startsWith('!')) {
+            return !task.file.includes(pattern.slice(1));
+        }
+        return task.file.includes(pattern);
+    };
+
+    if (Array.isArray(data)) {
+        if (data.length > 0 && 'date' in data[0]) {
+            return data.map(day => ({
+                ...day,
+                overdue: (day.overdue || []).filter(filterFn),
+                scheduled_timed: (day.scheduled_timed || []).filter(filterFn),
+                scheduled_no_time: (day.scheduled_no_time || []).filter(filterFn),
+                upcoming: (day.upcoming || []).filter(filterFn)
+            }));
+        }
+        return data.filter(filterFn);
+    }
+    return data;
+}
+
 export async function showAgenda(context: vscode.ExtensionContext, mode: 'day' | 'week' | 'month' | 'tasks', initialDate?: string) {
     const config = vscode.workspace.getConfiguration('markdown-org');
     const extractorPath = config.get<string>('extractorPath');
@@ -14,9 +50,7 @@ export async function showAgenda(context: vscode.ExtensionContext, mode: 'day' |
         return;
     }
 
-    // Validate extractor path
     if (!path.isAbsolute(extractorPath)) {
-        // If relative path, check if it's in PATH by trying to execute
         try {
             cp.execSync(`which ${extractorPath}`, { stdio: 'pipe' });
         } catch {
@@ -27,7 +61,6 @@ export async function showAgenda(context: vscode.ExtensionContext, mode: 'day' |
             return;
         }
     } else {
-        // If absolute path, check if file exists
         if (!fs.existsSync(extractorPath)) {
             vscode.window.showErrorMessage(
                 `Markdown Org: Extractor not found at '${extractorPath}'. ` +
@@ -63,8 +96,12 @@ export async function showAgenda(context: vscode.ExtensionContext, mode: 'day' |
 
         try {
             const result = await execCommand(extractorPath, args);
-            const data = JSON.parse(result);
-            AgendaPanel.render(context, data, mode, currentDate, loadData, userInitiated);
+            const rawData = JSON.parse(result);
+            const config = vscode.workspace.getConfiguration('markdown-org');
+            const currentTag = config.get<string>('currentTag', 'ALL');
+            const fileTags = config.get<any[]>('fileTags', []);
+            const data = filterTasksByTag(rawData, currentTag, fileTags);
+            AgendaPanel.render(context, data, mode, currentDate, loadData, userInitiated, currentTag);
         } catch (error) {
             const errorMsg = error instanceof Error ? error.message : String(error);
             vscode.window.showErrorMessage(`Failed to load agenda: ${errorMsg}`);
@@ -72,6 +109,21 @@ export async function showAgenda(context: vscode.ExtensionContext, mode: 'day' |
     };
 
     await loadData(undefined, true);
+}
+
+export async function cycleTag(context: vscode.ExtensionContext) {
+    const config = vscode.workspace.getConfiguration('markdown-org');
+    const fileTags = config.get<any[]>('fileTags', []);
+    const currentTag = config.get<string>('currentTag', 'ALL');
+    
+    const currentIndex = fileTags.findIndex(t => t.name === currentTag);
+    const nextIndex = (currentIndex + 1) % fileTags.length;
+    const nextTag = fileTags[nextIndex].name;
+    
+    await config.update('currentTag', nextTag, vscode.ConfigurationTarget.Global);
+    vscode.window.showInformationMessage(`Tag filter: ${nextTag}`);
+    
+    AgendaPanel.refreshWithCurrentTag();
 }
 
 function execCommand(command: string, args: string[]): Promise<string> {

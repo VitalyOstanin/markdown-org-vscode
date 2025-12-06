@@ -36,12 +36,14 @@ export class AgendaPanel {
     private static currentMode?: string;
     private static dayCheckInterval?: NodeJS.Timeout;
     private static lastCheckedDay?: string;
+    private static currentTag?: string;
 
-    public static render(context: vscode.ExtensionContext, data: AgendaData, mode: string, date: string | undefined, refreshCallback?: (date?: string, userInitiated?: boolean) => Promise<void>, userInitiated: boolean = true) {
+    public static render(context: vscode.ExtensionContext, data: AgendaData, mode: string, date: string | undefined, refreshCallback?: (date?: string, userInitiated?: boolean) => Promise<void>, userInitiated: boolean = true, currentTag?: string) {
         if (refreshCallback) {
             AgendaPanel.refreshCallback = refreshCallback;
         }
         AgendaPanel.currentMode = mode;
+        AgendaPanel.currentTag = currentTag;
         const today = new Date();
         const localDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
         AgendaPanel.currentDate = date || localDate;
@@ -51,7 +53,7 @@ export class AgendaPanel {
             if (userInitiated) {
                 AgendaPanel.currentPanel.reveal(vscode.ViewColumn.One);
             }
-            AgendaPanel.currentPanel.webview.postMessage({ type: 'update', data, mode, date });
+            AgendaPanel.currentPanel.webview.postMessage({ type: 'update', data, mode, date, currentTag });
         } else {
             AgendaPanel.currentPanel = vscode.window.createWebviewPanel(
                 'markdownOrgAgenda',
@@ -90,7 +92,7 @@ export class AgendaPanel {
                 }
             });
 
-            AgendaPanel.currentPanel.webview.html = this.getHtmlContent(data, mode, locale);
+            AgendaPanel.currentPanel.webview.html = this.getHtmlContent(data, mode, locale, currentTag || 'ALL');
         }
 
         if (!AgendaPanel.watcher && refreshCallback) {
@@ -125,7 +127,13 @@ export class AgendaPanel {
         }
     }
 
-    private static getHtmlContent(data: AgendaData, mode: string, locale: string): string {
+    public static refreshWithCurrentTag() {
+        if (AgendaPanel.refreshCallback) {
+            AgendaPanel.refreshCallback(AgendaPanel.currentDate, false);
+        }
+    }
+
+    private static getHtmlContent(data: AgendaData, mode: string, locale: string, currentTag: string): string {
         const dataJson = JSON.stringify(data).replace(/</g, '\\u003c').replace(/>/g, '\\u003e');
         const today = new Date();
         const localDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
@@ -164,6 +172,11 @@ export class AgendaPanel {
             color: #4fc1ff;
             font-weight: bold;
             margin: 0 10px;
+        }
+        .tag-indicator {
+            color: #dcdcaa;
+            font-weight: bold;
+            margin-left: auto;
         }
         .day-header {
             color: #4fc1ff;
@@ -207,6 +220,7 @@ export class AgendaPanel {
         const initialMode = ${JSON.stringify(mode)};
         const locale = ${JSON.stringify(locale)};
         let currentDate = ${JSON.stringify(currentDate)};
+        let currentTag = ${JSON.stringify(currentTag)};
         
         function escapeHtml(text) {
             const div = document.createElement('div');
@@ -232,7 +246,7 @@ export class AgendaPanel {
         function renderNavBar() {
             const navBar = document.getElementById('nav-bar');
             if (initialMode === 'tasks') {
-                navBar.innerHTML = '';
+                navBar.innerHTML = '<span class="tag-indicator">Tag: ' + escapeHtml(currentTag) + '</span>';
                 return;
             }
             const unit = initialMode === 'day' ? 'Day' : initialMode === 'week' ? 'Week' : 'Month';
@@ -245,7 +259,8 @@ export class AgendaPanel {
                 '<button class="nav-btn" onclick="navigate(-1)">← Prev ' + unit + '</button>' +
                 '<button class="nav-btn" onclick="navigate(0)">Today</button>' +
                 '<button class="nav-btn" onclick="navigate(1)">Next ' + unit + ' →</button>' +
-                '<span class="nav-date">' + escapeHtml(dateStr) + '</span>';
+                '<span class="nav-date">' + escapeHtml(dateStr) + '</span>' +
+                '<span class="tag-indicator">Tag: ' + escapeHtml(currentTag) + '</span>';
         }
         
         function attachListeners() {
@@ -265,6 +280,9 @@ export class AgendaPanel {
             if (message.type === 'update') {
                 if (message.date) {
                     currentDate = message.date;
+                }
+                if (message.currentTag) {
+                    currentTag = message.currentTag;
                 }
                 const scrollPos = window.scrollY;
                 renderNavBar();

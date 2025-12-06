@@ -17,11 +17,18 @@ All notable changes to the "Markdown Org" extension will be documented in this f
 - Task status and timestamp type cycling with Shift+Up/Down
 - Archive heading command (Ctrl+K Ctrl+A)
 - Promote to maintain file command (Ctrl+K Ctrl+M)
+- **Tag filtering for agenda views based on filename patterns**
+  - Support for pattern matching (e.g., "work")
+  - Support for negation patterns (e.g., "!work")
+  - Cycle through tags with keyboard shortcut
+  - Current tag persists between sessions
 - Configurable settings:
   - `markdown-org.extractorPath` - path to markdown-org-extract
   - `markdown-org.workspaceDir` - workspace directory to scan
   - `markdown-org.maintainFilePath` - maintain file path
   - `markdown-org.dateLocale` - locale for date formatting
+  - `markdown-org.fileTags` - tag definitions with filename patterns
+  - `markdown-org.currentTag` - currently active tag filter
 
 ### Commands
 - `Markdown Org: Set TODO` (Ctrl+K Ctrl+T)
@@ -38,6 +45,7 @@ All notable changes to the "Markdown Org" extension will be documented in this f
 - `Markdown Org: Show Tasks`
 - `Markdown Org: Move to Archive` (Ctrl+K Ctrl+A)
 - `Markdown Org: Promote to Maintain` (Ctrl+K Ctrl+M)
+- `Markdown Org: Cycle Tag Filter` (Ctrl+K Ctrl+K Ctrl+T)
 
 ### Dependencies
 - Requires [markdown-org-extract](https://crates.io/crates/markdown-org-extract) utility

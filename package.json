@@ -74,6 +74,10 @@
       {
         "command": "markdown-org.promoteToMaintain",
         "title": "Markdown Org: Promote to Maintain"
+      },
+      {
+        "command": "markdown-org.cycleTag",
+        "title": "Markdown Org: Cycle Tag Filter"
       }
     ],
     "keybindings": [
@@ -136,6 +140,10 @@
         "command": "markdown-org.promoteToMaintain",
         "key": "ctrl+k ctrl+k ctrl+m ctrl+p",
         "when": "editorTextFocus && editorLangId == markdown"
+      },
+      {
+        "command": "markdown-org.cycleTag",
+        "key": "ctrl+k ctrl+k ctrl+t"
       }
     ],
     "configuration": {
@@ -160,6 +168,20 @@
           "type": "string",
           "default": "en-US",
           "description": "Locale for date formatting (e.g., en-US, ru-RU, de-DE)"
+        },
+        "markdown-org.fileTags": {
+          "type": "array",
+          "default": [
+            {"name": "ALL", "pattern": ""},
+            {"name": "WORK", "pattern": "work"},
+            {"name": "PRIVATE", "pattern": "!work"}
+          ],
+          "description": "File tags based on filename patterns. Use '!' prefix for negation (e.g., '!work'). Empty pattern matches files without other patterns."
+        },
+        "markdown-org.currentTag": {
+          "type": "string",
+          "default": "ALL",
+          "description": "Currently selected tag filter for agenda view"
         }
       }
     }
