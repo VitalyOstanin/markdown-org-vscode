@@ -32,9 +32,10 @@
   - Set up format for future releases
 
 ## Testing
-- [ ] Add unit tests for core functionality
+- [x] Add unit tests for core functionality
   - Test timestamp parsing and manipulation
   - Test task status changes
   - Test priority toggling
+  - Test heading parsing and extraction
+- [x] Set up test framework (Mocha)
 - [ ] Add integration tests for commands
-- [ ] Set up test framework (e.g., Mocha, Jest)

@@ -166,14 +166,19 @@
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
+    "test": "npm run compile && node ./out/test/suite/index.js",
     "lint": "eslint src --ext ts"
   },
   "devDependencies": {
+    "@types/glob": "^8.1.0",
+    "@types/mocha": "^10.0.6",
     "@types/node": "^20.x",
     "@types/vscode": "^1.85.0",
     "@typescript-eslint/eslint-plugin": "^6.x",
     "@typescript-eslint/parser": "^6.x",
     "eslint": "^8.x",
+    "glob": "^10.3.10",
+    "mocha": "^10.2.0",
     "typescript": "^5.3.0"
   }
 }
