@@ -304,13 +304,25 @@ export class AgendaPanel {
             const priorityClass = task.priority ? 'priority-' + task.priority.toLowerCase() : '';
             const statusClass = status === 'TODO' ? 'todo-keyword' : status === 'DONE' ? 'done-keyword' : '';
             
+            const titleAttr = (daysOffset !== undefined && daysOffset !== 0 && task.timestamp_date) 
+                ? ' title="' + formatDateForTitle(task.timestamp_date) + '"' 
+                : '';
+            
             return '<div class="task-line" data-file="' + escapeHtml(task.file) + '" data-line="' + task.line + '">' +
                 '<span class="todo-label">todo:</span>' +
-                '<span>' + timeInfo + '</span>' +
+                '<span' + titleAttr + '>' + timeInfo + '</span>' +
                 '<span class="' + statusClass + '">' + escapeHtml(status) + '</span>' +
                 '<span class="' + priorityClass + '">' + escapeHtml(priority) + '</span>' +
                 '<span>' + escapeHtml(task.heading) + '</span>' +
                 '</div>';
+        }
+        
+        function formatDateForTitle(dateStr) {
+            const d = new Date(dateStr);
+            const day = String(d.getDate()).padStart(2, '0');
+            const month = String(d.getMonth() + 1).padStart(2, '0');
+            const year = d.getFullYear();
+            return day + '.' + month + '.' + year;
         }
         
         function getTimeInfo(task, daysOffset) {
