@@ -100,8 +100,8 @@ ln -s $(pwd) ~/.vscode/extensions/markdown-org-vscode
 | Command | Hotkey | Description |
 |---------|--------|-------------|
 | `Markdown Org: Insert CREATED Timestamp` | `Ctrl+K Ctrl+K Ctrl+C` | Insert CREATED timestamp at cursor |
-| `Markdown Org: Insert SCHEDULED Timestamp` | `Ctrl+K Ctrl+K Ctrl+S` | Insert SCHEDULED timestamp at cursor |
-| `Markdown Org: Insert DEADLINE Timestamp` | `Ctrl+K Ctrl+K Ctrl+D` | Insert DEADLINE timestamp at cursor |
+| `Markdown Org: Insert SCHEDULED Timestamp` | `Ctrl+K Ctrl+K Ctrl+S` | Insert/toggle SCHEDULED timestamp (replaces DEADLINE if present) |
+| `Markdown Org: Insert DEADLINE Timestamp` | `Ctrl+K Ctrl+K Ctrl+D` | Insert/toggle DEADLINE timestamp (replaces SCHEDULED if present) |
 | `Markdown Org: Timestamp Up` | `Shift+Up` | Increment date/time under cursor |
 | `Markdown Org: Timestamp Down` | `Shift+Down` | Decrement date/time under cursor |
 
