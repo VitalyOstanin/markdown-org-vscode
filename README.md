@@ -53,7 +53,7 @@ ln -s $(pwd) ~/.vscode/extensions/markdown-org-vscode
 **With tasks:**
 ```markdown
 ## TODO [#A] Important meeting
-`SCHEDULED: <2025-12-06 Fri 14:30>`
+`CREATED: <2025-12-01 Sun 09:15>`
 `DEADLINE: <2025-12-06 Fri 15:00>`
 ```
 
