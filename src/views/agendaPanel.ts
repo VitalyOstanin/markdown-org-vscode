@@ -174,7 +174,7 @@ export class AgendaPanel {
         }
         .task-line {
             display: grid;
-            grid-template-columns: auto 140px 60px 60px 1fr;
+            grid-template-columns: auto 140px 60px 60px 1fr 90px;
             gap: 8px;
             margin: 2px 0;
             cursor: pointer;
@@ -191,6 +191,8 @@ export class AgendaPanel {
         .priority-c { color: #4ec9b0; }
         .time-display { color: #4fc1ff; font-weight: bold; }
         .timestamp-type { font-weight: bold; }
+        .date-overdue { color: #808080; text-align: right; }
+        .date-upcoming { color: #4fc1ff; text-align: right; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -276,10 +278,10 @@ export class AgendaPanel {
             let html = '';
             days.forEach(day => {
                 html += '<div class="day-header">' + formatDayHeader(day.date) + '</div>';
-                (day.overdue || []).forEach(task => html += renderTask(task, task.days_offset));
+                (day.overdue || []).forEach(task => html += renderTask(task, task.days_offset, 'overdue'));
                 (day.scheduled_timed || []).forEach(task => html += renderTask(task, task.days_offset));
                 (day.scheduled_no_time || []).forEach(task => html += renderTask(task, task.days_offset));
-                (day.upcoming || []).forEach(task => html += renderTask(task, task.days_offset));
+                (day.upcoming || []).forEach(task => html += renderTask(task, task.days_offset, 'upcoming'));
             });
             return html;
         }
@@ -297,23 +299,25 @@ export class AgendaPanel {
             return html;
         }
         
-        function renderTask(task, daysOffset) {
+        function renderTask(task, daysOffset, taskType) {
             const timeInfo = getTimeInfo(task, daysOffset);
             const status = task.task_type || '';
             const priority = task.priority ? '[#' + task.priority + ']' : '';
             const priorityClass = task.priority ? 'priority-' + task.priority.toLowerCase() : '';
             const statusClass = status === 'TODO' ? 'todo-keyword' : status === 'DONE' ? 'done-keyword' : '';
             
-            const titleAttr = (daysOffset !== undefined && daysOffset !== 0 && task.timestamp_date) 
-                ? ' title="' + formatDateForTitle(task.timestamp_date) + '"' 
+            const dateDisplay = (daysOffset !== undefined && daysOffset !== 0 && task.timestamp_date) 
+                ? formatDateForTitle(task.timestamp_date) 
                 : '';
+            const dateClass = taskType === 'upcoming' ? 'date-upcoming' : 'date-overdue';
             
             return '<div class="task-line" data-file="' + escapeHtml(task.file) + '" data-line="' + task.line + '">' +
                 '<span class="todo-label">todo:</span>' +
-                '<span' + titleAttr + '>' + timeInfo + '</span>' +
+                '<span>' + timeInfo + '</span>' +
                 '<span class="' + statusClass + '">' + escapeHtml(status) + '</span>' +
                 '<span class="' + priorityClass + '">' + escapeHtml(priority) + '</span>' +
                 '<span>' + escapeHtml(task.heading) + '</span>' +
+                '<span class="' + dateClass + '">' + dateDisplay + '</span>' +
                 '</div>';
         }
         
