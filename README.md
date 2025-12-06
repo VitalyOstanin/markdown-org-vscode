@@ -2,6 +2,19 @@
 
 VS Code extension for org-style task management in Markdown files.
 
+## Features
+
+Brings [Org mode](https://orgmode.org/) task management workflow to Markdown files in VS Code:
+
+- **Task Management** - TODO/DONE statuses with priority levels ([#A])
+- **Timestamps** - SCHEDULED, DEADLINE, and CREATED timestamps with date/time
+- **Agenda Views** - Day, week, and month views with automatic task grouping
+- **Live Updates** - Agenda automatically refreshes when markdown files are saved
+- **File Watchers** - Real-time monitoring of workspace changes
+- **Timestamp Navigation** - Increment/decrement dates and times with keyboard shortcuts
+- **Heading Management** - Archive completed tasks or promote to maintain file
+- **Portable** - Configurable paths and locale settings for any environment
+
 ## Quick Start
 
 ```bash
