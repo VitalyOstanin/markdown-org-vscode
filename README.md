@@ -85,6 +85,35 @@ ln -s $(pwd) ~/.vscode/extensions/markdown-org-vscode
 - `[#A]` - High priority (shown first in agenda)
 - No priority marker - Normal priority
 
+### Repeating Tasks
+
+Timestamps support org-mode repeater syntax for recurring tasks:
+
+**Standard units:**
+- `+Nh` - repeat every N hours
+- `+Nd` - repeat every N days
+- `+Nw` - repeat every N weeks
+- `+Nm` - repeat every N months
+- `+Ny` - repeat every N years
+- `+Nwd` - **repeat every N workdays** (skips weekends and Russian holidays)
+
+**Repeater modifiers:**
+- `+` - cumulative (strict, preserves overdue)
+- `++` - catch-up (preserves day of week)
+- `.+` - restart (from completion date)
+
+**Examples:**
+```markdown
+## TODO Daily standup
+`SCHEDULED: <2025-12-06 Fri 10:00 +1d>`
+
+## TODO Weekly review
+`SCHEDULED: <2025-12-06 Fri ++1w>`
+
+## TODO Every 2 workdays
+`SCHEDULED: <2025-12-06 Fri +2wd>`
+```
+
 ## Commands
 
 ### Task Status Commands
@@ -102,8 +131,8 @@ ln -s $(pwd) ~/.vscode/extensions/markdown-org-vscode
 | `Markdown Org: Insert CREATED Timestamp` | `Ctrl+K Ctrl+K Ctrl+C` | Insert CREATED timestamp at cursor |
 | `Markdown Org: Insert SCHEDULED Timestamp` | `Ctrl+K Ctrl+K Ctrl+S` | Insert/toggle SCHEDULED timestamp (replaces DEADLINE if present) |
 | `Markdown Org: Insert DEADLINE Timestamp` | `Ctrl+K Ctrl+K Ctrl+D` | Insert/toggle DEADLINE timestamp (replaces SCHEDULED if present) |
-| `Markdown Org: Timestamp Up` | `Shift+Up` | Increment date/time under cursor |
-| `Markdown Org: Timestamp Down` | `Shift+Down` | Decrement date/time under cursor |
+| `Markdown Org: Timestamp Up` | `Shift+Up` | Increment date/time/task status/timestamp type under cursor |
+| `Markdown Org: Timestamp Down` | `Shift+Down` | Decrement date/time/task status/timestamp type under cursor |
 
 ### Agenda Commands
 
