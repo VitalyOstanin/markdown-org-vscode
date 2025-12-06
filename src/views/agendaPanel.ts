@@ -38,7 +38,7 @@ export class AgendaPanel {
     private static lastCheckedDay?: string;
     private static currentTag?: string;
 
-    public static render(context: vscode.ExtensionContext, data: AgendaData, mode: string, date: string | undefined, refreshCallback?: (date?: string, userInitiated?: boolean) => Promise<void>, userInitiated: boolean = true, currentTag?: string) {
+    public static render(context: vscode.ExtensionContext, data: AgendaData, mode: string, date: string | undefined, refreshCallback?: (date?: string, userInitiated?: boolean) => Promise<void>, userInitiated: boolean = true, currentTag?: string, holidays?: string[]) {
         if (refreshCallback) {
             AgendaPanel.refreshCallback = refreshCallback;
         }
@@ -88,11 +88,27 @@ export class AgendaPanel {
                         selection: new vscode.Range(pos, pos)
                     });
                 } else if (message.command === 'navigate') {
-                    AgendaPanel.refreshCallback?.(message.date, true);
+                    if (message.switchToDay) {
+                        AgendaPanel.currentPanel?.dispose();
+                        const { showAgenda } = require('../commands/agenda');
+                        await showAgenda(context, 'day', message.date);
+                    } else {
+                        AgendaPanel.refreshCallback?.(message.date, true);
+                    }
                 }
             });
 
-            AgendaPanel.currentPanel.webview.html = this.getHtmlContent(data, mode, locale, currentTag || 'ALL');
+            AgendaPanel.currentPanel.webview.html = this.getHtmlContent(data, mode, locale, currentTag || 'ALL', holidays || []);
+            
+            AgendaPanel.currentPanel.webview.postMessage({
+                command: 'init',
+                data: data,
+                mode: mode,
+                locale: locale,
+                currentDate: AgendaPanel.currentDate,
+                currentTag: currentTag || 'ALL',
+                holidays: holidays || []
+            });
         }
 
         if (!AgendaPanel.watcher && refreshCallback) {
@@ -133,12 +149,7 @@ export class AgendaPanel {
         }
     }
 
-    private static getHtmlContent(data: AgendaData, mode: string, locale: string, currentTag: string): string {
-        const dataJson = JSON.stringify(data).replace(/</g, '\\u003c').replace(/>/g, '\\u003e');
-        const today = new Date();
-        const localDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-        const currentDate = AgendaPanel.currentDate || localDate;
-        
+    private static getHtmlContent(data: AgendaData, mode: string, locale: string, currentTag: string, holidays: string[]): string {
         return `<!DOCTYPE html>
 <html>
 <head>
@@ -209,6 +220,57 @@ export class AgendaPanel {
         .date-overdue { color: #808080; text-align: right; }
         .date-upcoming { color: #4fc1ff; text-align: right; font-weight: bold; }
         .deadline-heading { color: #f48771; font-weight: bold; }
+        .calendar {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 2px;
+            margin: 20px 0;
+            max-width: 800px;
+        }
+        .calendar-header {
+            text-align: center;
+            font-weight: bold;
+            color: #4fc1ff;
+            padding: 8px;
+            background: #2d2d30;
+        }
+        .calendar-day {
+            aspect-ratio: 1;
+            border: 1px solid #3e3e42;
+            padding: 8px;
+            cursor: pointer;
+            background: #252526;
+            position: relative;
+        }
+        .calendar-day.weekend {
+            background: #2a2a2d;
+        }
+        .calendar-day.holiday {
+            background: #3a2a2d;
+        }
+        .calendar-day.has-tasks {
+            border-color: #4fc1ff;
+            font-weight: bold;
+        }
+        .calendar-day.today {
+            border: 2px solid #4fc1ff;
+            background: #1e3a4f;
+        }
+        .calendar-day.other-month {
+            opacity: 0.3;
+        }
+        .day-number {
+            font-size: 14px;
+        }
+        .task-indicator {
+            position: absolute;
+            bottom: 4px;
+            right: 4px;
+            width: 6px;
+            height: 6px;
+            background: #4fc1ff;
+            border-radius: 50%;
+        }
     </style>
 </head>
 <body>
@@ -216,85 +278,86 @@ export class AgendaPanel {
     <div id="content"></div>
     <script>
         const vscode = acquireVsCodeApi();
-        const initialData = ${dataJson};
-        const initialMode = ${JSON.stringify(mode)};
-        const locale = ${JSON.stringify(locale)};
-        let currentDate = ${JSON.stringify(currentDate)};
-        let currentTag = ${JSON.stringify(currentTag)};
-        
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-        
-        function navigate(offset) {
-            const d = new Date(currentDate);
-            if (offset === 0) {
-                d.setTime(new Date().getTime());
-            } else if (initialMode === 'day') {
-                d.setDate(d.getDate() + offset);
-            } else if (initialMode === 'week') {
-                d.setDate(d.getDate() + offset * 7);
-            } else if (initialMode === 'month') {
-                d.setMonth(d.getMonth() + offset);
-            }
-            const newDate = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-            vscode.postMessage({ command: 'navigate', date: newDate });
-        }
-        
-        function renderNavBar() {
-            const navBar = document.getElementById('nav-bar');
-            if (initialMode === 'tasks') {
-                navBar.innerHTML = '<span class="tag-indicator">Tag: ' + escapeHtml(currentTag) + '</span>';
-                return;
-            }
-            const unit = initialMode === 'day' ? 'Day' : initialMode === 'week' ? 'Week' : 'Month';
-            const d = new Date(currentDate);
-            const weekday = d.toLocaleDateString(locale, { weekday: 'long' });
-            const dayMonth = d.toLocaleDateString(locale, { day: 'numeric', month: 'long' });
-            const year = d.getFullYear();
-            const dateStr = weekday + ', ' + dayMonth + ' ' + year;
-            navBar.innerHTML = 
-                '<button class="nav-btn" onclick="navigate(-1)">← Prev ' + unit + '</button>' +
-                '<button class="nav-btn" onclick="navigate(0)">Today</button>' +
-                '<button class="nav-btn" onclick="navigate(1)">Next ' + unit + ' →</button>' +
-                '<span class="nav-date">' + escapeHtml(dateStr) + '</span>' +
-                '<span class="tag-indicator">Tag: ' + escapeHtml(currentTag) + '</span>';
-        }
-        
-        function attachListeners() {
-            document.querySelectorAll('.task-line').forEach(el => {
-                el.addEventListener('click', () => {
-                    vscode.postMessage({
-                        command: 'openTask',
-                        file: el.dataset.file,
-                        line: parseInt(el.dataset.line)
-                    });
-                });
-            });
-        }
+        let initialData = [];
+        let initialMode = '';
+        let locale = '';
+        let currentDate = '';
+        let currentTag = '';
+        let holidays = [];
         
         window.addEventListener('message', event => {
             const message = event.data;
-            if (message.type === 'update') {
+            if (message.command === 'init') {
+                initialData = message.data;
+                initialMode = message.mode;
+                locale = message.locale;
+                currentDate = message.currentDate;
+                currentTag = message.currentTag;
+                holidays = message.holidays;
+                renderNavBar();
+                if (initialMode === 'month') {
+                    document.getElementById('content').innerHTML = renderMonthCalendar(initialData);
+                    attachCalendarListeners();
+                } else if (initialMode === 'day' || initialMode === 'week') {
+                    document.getElementById('content').innerHTML = renderAgenda(initialData);
+                    attachTaskListeners();
+                } else if (initialMode === 'tasks') {
+                    document.getElementById('content').innerHTML = renderTasks(initialData);
+                    attachTaskListeners();
+                }
+            } else if (message.type === 'update') {
                 if (message.date) {
                     currentDate = message.date;
                 }
                 if (message.currentTag) {
                     currentTag = message.currentTag;
                 }
+                initialData = message.data;
                 const scrollPos = window.scrollY;
                 renderNavBar();
-                const contentEl = document.getElementById('content');
-                const newContent = message.mode === 'tasks' 
-                    ? renderTasks(message.data) 
-                    : renderAgenda(message.data);
-                contentEl.innerHTML = newContent;
-                attachListeners();
+                if (initialMode === 'month') {
+                    document.getElementById('content').innerHTML = renderMonthCalendar(initialData);
+                    attachCalendarListeners();
+                } else if (initialMode === 'day' || initialMode === 'week') {
+                    document.getElementById('content').innerHTML = renderAgenda(initialData);
+                    attachTaskListeners();
+                } else if (initialMode === 'tasks') {
+                    document.getElementById('content').innerHTML = renderTasks(initialData);
+                    attachTaskListeners();
+                }
                 window.scrollTo(0, scrollPos);
             }
         });
+        
+        function isHoliday(date) {
+            return holidays.includes(date);
+        }
+        
+        function navigateToDay(date) {
+            vscode.postMessage({ command: 'navigate', date: date, switchToDay: true });
+        }
+        
+        function attachCalendarListeners() {
+            document.querySelectorAll('.calendar-day').forEach(el => {
+                const date = el.getAttribute('data-date');
+                if (date) {
+                    el.addEventListener('click', () => navigateToDay(date));
+                }
+            });
+        }
+        
+        function attachTaskListeners() {
+            document.getElementById('content').addEventListener('click', (e) => {
+                const taskLine = e.target.closest('.task-line');
+                if (taskLine) {
+                    vscode.postMessage({
+                        command: 'openTask',
+                        file: taskLine.getAttribute('data-file'),
+                        line: parseInt(taskLine.getAttribute('data-line'))
+                    });
+                }
+            });
+        }
         
         function renderAgenda(days) {
             let html = '';
@@ -315,10 +378,21 @@ export class AgendaPanel {
                 const filtered = tasks.filter(t => (t.priority || '') === priority);
                 if (filtered.length === 0) return;
                 const header = priority ? 'Priority [#' + priority + ']' : 'No priority';
-                html += '<div class="day-header">' + escapeHtml(header) + '</div>';
+                html += '<div class="day-header"><span>' + escapeHtml(header) + '</span></div>';
                 filtered.forEach(task => html += renderTask(task));
             });
             return html;
+        }
+        
+        function formatDayHeader(date) {
+            const d = new Date(date);
+            const weekday = d.toLocaleDateString(locale, { weekday: 'long' });
+            const dayMonth = d.toLocaleDateString(locale, { day: 'numeric', month: 'long' });
+            const year = d.toLocaleDateString(locale, { year: 'numeric' });
+            const parts = dayMonth.split(' ');
+            const day = parts[0];
+            const month = parts.slice(1).join(' ');
+            return '<span>' + weekday + '</span><span style="text-align: right">' + day + '</span><span>' + month + ' ' + year + '</span>';
         }
         
         function renderTask(task, daysOffset, taskType) {
@@ -381,20 +455,113 @@ export class AgendaPanel {
             return '';
         }
         
-        function formatDayHeader(date) {
-            const d = new Date(date);
-            const weekday = d.toLocaleDateString(locale, { weekday: 'long' });
-            const dayMonth = d.toLocaleDateString(locale, { day: 'numeric', month: 'long' });
-            const year = d.toLocaleDateString(locale, { year: 'numeric' });
-            const [day, month] = dayMonth.split(' ');
-            return '<span>' + weekday + '</span><span style="text-align: right">' + day + '</span><span>' + month + ' ' + year + '</span>';
+        function renderMonthCalendar(days) {
+            const daysMap = {};
+            days.forEach(day => {
+                const taskCount = (day.scheduled_timed || []).length + 
+                                (day.scheduled_no_time || []).length + 
+                                (day.upcoming || []).length;
+                daysMap[day.date] = taskCount > 0;
+            });
+            
+            const firstDay = new Date(days[0].date);
+            const year = firstDay.getFullYear();
+            const month = firstDay.getMonth();
+            const firstDayOfMonth = new Date(year, month, 1);
+            const lastDayOfMonth = new Date(year, month + 1, 0);
+            
+            let startDay = firstDayOfMonth.getDay();
+            startDay = startDay === 0 ? 6 : startDay - 1;
+            
+            const today = new Date();
+            const todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
+            
+            let html = '<div class="calendar">';
+            const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+            weekdays.forEach(day => {
+                html += '<div class="calendar-header">' + day + '</div>';
+            });
+            
+            const prevMonthDays = new Date(year, month, 0).getDate();
+            for (let i = startDay - 1; i >= 0; i--) {
+                const day = prevMonthDays - i;
+                html += '<div class="calendar-day other-month"><div class="day-number">' + day + '</div></div>';
+            }
+            
+            for (let day = 1; day <= lastDayOfMonth.getDate(); day++) {
+                const dateStr = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
+                const d = new Date(year, month, day);
+                const dayOfWeek = d.getDay();
+                const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+                const isHol = isHoliday(dateStr);
+                const hasTasks = daysMap[dateStr];
+                const isToday = dateStr === todayStr;
+                
+                let classes = 'calendar-day';
+                if (isWeekend) classes += ' weekend';
+                if (isHol) classes += ' holiday';
+                if (hasTasks) classes += ' has-tasks';
+                if (isToday) classes += ' today';
+                
+                html += '<div class="' + classes + '" data-date="' + dateStr + '">' +
+                       '<div class="day-number">' + day + '</div>' +
+                       (hasTasks ? '<div class="task-indicator"></div>' : '') +
+                       '</div>';
+            }
+            
+            const remainingCells = 42 - (startDay + lastDayOfMonth.getDate());
+            for (let i = 1; i <= remainingCells; i++) {
+                html += '<div class="calendar-day other-month"><div class="day-number">' + i + '</div></div>';
+            }
+            
+            html += '</div>';
+            return html;
         }
         
-        // Initial render
-        renderNavBar();
-        const contentEl = document.getElementById('content');
-        contentEl.innerHTML = initialMode === 'tasks' ? renderTasks(initialData) : renderAgenda(initialData);
-        attachListeners();
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        function navigate(offset) {
+            const d = new Date(currentDate);
+            if (offset === 0) {
+                d.setTime(new Date().getTime());
+            } else if (initialMode === 'day') {
+                d.setDate(d.getDate() + offset);
+            } else if (initialMode === 'week') {
+                d.setDate(d.getDate() + offset * 7);
+            } else if (initialMode === 'month') {
+                d.setMonth(d.getMonth() + offset);
+            }
+            const newDate = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+            vscode.postMessage({ command: 'navigate', date: newDate });
+        }
+        
+        function renderNavBar() {
+            const navBar = document.getElementById('nav-bar');
+            if (initialMode === 'tasks') {
+                navBar.innerHTML = '<span class="tag-indicator">Tag: ' + escapeHtml(currentTag) + '</span>';
+                return;
+            }
+            const unit = initialMode === 'day' ? 'Day' : initialMode === 'week' ? 'Week' : 'Month';
+            const d = new Date(currentDate);
+            const weekday = d.toLocaleDateString(locale, { weekday: 'long' });
+            const dayMonth = d.toLocaleDateString(locale, { day: 'numeric', month: 'long' });
+            const year = d.getFullYear();
+            const dateStr = weekday + ', ' + dayMonth + ' ' + year;
+            navBar.innerHTML = 
+                '<button class="nav-btn" id="btn-prev">← Prev ' + unit + '</button>' +
+                '<button class="nav-btn" id="btn-today">Today</button>' +
+                '<button class="nav-btn" id="btn-next">Next ' + unit + ' →</button>' +
+                '<span class="nav-date">' + escapeHtml(dateStr) + '</span>' +
+                '<span class="tag-indicator">Tag: ' + escapeHtml(currentTag) + '</span>';
+            
+            document.getElementById('btn-prev').addEventListener('click', () => navigate(-1));
+            document.getElementById('btn-today').addEventListener('click', () => navigate(0));
+            document.getElementById('btn-next').addEventListener('click', () => navigate(1));
+        }
     </script>
 </body>
 </html>`;

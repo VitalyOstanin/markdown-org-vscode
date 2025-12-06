@@ -77,6 +77,15 @@ export async function showAgenda(context: vscode.ExtensionContext, mode: 'day' |
 
     let currentDate = initialDate;
 
+    const getHolidays = async (year: number): Promise<string[]> => {
+        try {
+            const result = await execCommand(extractorPath, ['--holidays', year.toString()]);
+            return JSON.parse(result);
+        } catch {
+            return [];
+        }
+    };
+
     const loadData = async (date?: string, userInitiated: boolean = false) => {
         if (date !== undefined) {
             currentDate = date;
@@ -101,7 +110,11 @@ export async function showAgenda(context: vscode.ExtensionContext, mode: 'day' |
             const currentTag = config.get<string>('currentTag', 'ALL');
             const fileTags = config.get<any[]>('fileTags', []);
             const data = filterTasksByTag(rawData, currentTag, fileTags);
-            AgendaPanel.render(context, data, mode, currentDate, loadData, userInitiated, currentTag);
+            
+            const year = currentDate ? parseInt(currentDate.split('-')[0]) : new Date().getFullYear();
+            const holidays = await getHolidays(year);
+            
+            AgendaPanel.render(context, data, mode, currentDate, loadData, userInitiated, currentTag, holidays);
         } catch (error) {
             const errorMsg = error instanceof Error ? error.message : String(error);
             vscode.window.showErrorMessage(`Failed to load agenda: ${errorMsg}`);
