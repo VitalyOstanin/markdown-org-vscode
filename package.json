@@ -44,6 +44,14 @@
         "title": "Markdown Org: Insert DEADLINE Timestamp"
       },
       {
+        "command": "markdown-org.insertClockStart",
+        "title": "Markdown Org: Insert CLOCK Start"
+      },
+      {
+        "command": "markdown-org.insertClockFinish",
+        "title": "Markdown Org: Insert CLOCK Finish"
+      },
+      {
         "command": "markdown-org.showAgendaDay",
         "title": "Markdown Org: Show Agenda (Day)"
       },
@@ -109,6 +117,16 @@
       {
         "command": "markdown-org.insertDeadline",
         "key": "ctrl+k ctrl+k d",
+        "when": "editorTextFocus && editorLangId == markdown"
+      },
+      {
+        "command": "markdown-org.insertClockStart",
+        "key": "ctrl+k ctrl+k ctrl+c ctrl+s",
+        "when": "editorTextFocus && editorLangId == markdown"
+      },
+      {
+        "command": "markdown-org.insertClockFinish",
+        "key": "ctrl+k ctrl+k ctrl+c ctrl+f",
         "when": "editorTextFocus && editorLangId == markdown"
       },
       {
@@ -182,6 +200,10 @@
           "type": "string",
           "default": "ALL",
           "description": "Currently selected tag filter for agenda view"
+        },
+        "markdown-org.clockRoundMinutes": {
+          "type": "number",
+          "description": "Round CLOCK timestamps to specified minutes (e.g., 15, 30). Leave empty to disable rounding."
         }
       }
     }

@@ -81,6 +81,32 @@ ln -s $(pwd) ~/.vscode/extensions/markdown-org-vscode
 `SCHEDULED: <2025-12-06 Fri>`
 ```
 
+### CLOCK Entries
+
+CLOCK entries track time spent on tasks. They can be open (running) or closed (with duration).
+
+**Open CLOCK (running):**
+```markdown
+## TODO Working on feature
+`CREATED: <2025-12-09 Tue 10:00>`
+`CLOCK: [2025-12-09 Tue 14:30]`
+```
+
+**Closed CLOCK (with duration):**
+```markdown
+## TODO Code review
+`CREATED: <2025-12-09 Tue 09:00>`
+`CLOCK: [2025-12-09 Tue 10:00]--[2025-12-09 Tue 11:30] =>  1:30`
+`CLOCK: [2025-12-09 Tue 14:00]--[2025-12-09 Tue 16:00] =>  2:00`
+```
+
+**Features:**
+- Multiple CLOCK entries per task
+- Automatic duration calculation
+- Optional time rounding (configurable)
+- Sorted by time (newest at bottom)
+- Placed after timestamp lines
+
 ### Priority Levels
 
 Priority markers can use any letter A-Z:
@@ -142,6 +168,13 @@ Timestamps support org-mode repeater syntax for recurring tasks:
 | `Markdown Org: Insert DEADLINE Timestamp` | `Ctrl+K Ctrl+K Ctrl+D` | Insert/toggle DEADLINE timestamp (replaces SCHEDULED if present) |
 | `Markdown Org: Timestamp Up` | `Shift+Up` | Increment date/time/task status/timestamp type under cursor |
 | `Markdown Org: Timestamp Down` | `Shift+Down` | Decrement date/time/task status/timestamp type under cursor |
+
+### CLOCK Commands
+
+| Command | Hotkey | Description |
+|---------|--------|-------------|
+| `Markdown Org: Insert CLOCK Start` | `Ctrl+K Ctrl+K Ctrl+C Ctrl+S` | Start a new CLOCK entry (opens timer) |
+| `Markdown Org: Insert CLOCK Finish` | `Ctrl+K Ctrl+K Ctrl+C Ctrl+F` | Close the open CLOCK entry and calculate duration |
 
 ### Agenda Commands
 
@@ -225,6 +258,40 @@ Locale for date formatting in agenda views.
   "markdown-org.dateLocale": "ru-RU"
 }
 ```
+
+### `markdown-org.clockRoundMinutes`
+
+**Type:** `number`  
+**Default:** `undefined` (no rounding)
+
+Round CLOCK timestamps to specified number of minutes. When set, both start and finish times are rounded.
+
+**Rounding behavior:**
+- **Start time:** Rounds down to nearest interval (e.g., 10:46 → 10:30 with 30-minute rounding)
+- **Finish time:** Rounds up to nearest interval, ensuring non-zero duration (e.g., 10:46 → 11:00 with 30-minute rounding)
+
+**Examples:**
+```json
+{
+  "markdown-org.clockRoundMinutes": 15
+}
+```
+
+With 15-minute rounding:
+- Start at 10:07 → rounds to 10:00
+- Start at 10:23 → rounds to 10:15
+- Finish at 10:46 → rounds to 11:00 (if start was 10:30)
+
+```json
+{
+  "markdown-org.clockRoundMinutes": 30
+}
+```
+
+With 30-minute rounding:
+- Start at 10:10 → rounds to 10:00
+- Start at 10:39 → rounds to 10:30
+- Finish at 10:46 → rounds to 11:00 (if start was 10:30)
 
 ## Dependencies
 
