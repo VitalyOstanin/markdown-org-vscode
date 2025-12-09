@@ -138,4 +138,124 @@ suite('Timestamp Integration Tests', () => {
         const line = document.lineAt(0).text;
         assert.ok(line.startsWith('`DEADLINE:'));
     });
+
+    test('CLOCK start hour increment', async () => {
+        document = await vscode.workspace.openTextDocument({
+            content: '`CLOCK: [2025-12-09 Mon 14:30]--[2025-12-09 Mon 16:00] =>  1:30`',
+            language: 'markdown'
+        });
+        editor = await vscode.window.showTextDocument(document);
+        editor.selection = new vscode.Selection(0, 24, 0, 24); // cursor on start hour "14"
+        
+        await vscode.commands.executeCommand('markdown-org.timestampUp');
+        
+        const line = document.lineAt(0).text;
+        assert.ok(line.includes('[2025-12-09 Tue 15:30]'), `Expected hour 15, got: ${line}`);
+        assert.ok(line.includes('=>  0:30'), `Expected duration 0:30, got: ${line}`);
+    });
+
+    test('CLOCK start minute increment', async () => {
+        document = await vscode.workspace.openTextDocument({
+            content: '`CLOCK: [2025-12-09 Mon 14:30]--[2025-12-09 Mon 16:00] =>  1:30`',
+            language: 'markdown'
+        });
+        editor = await vscode.window.showTextDocument(document);
+        editor.selection = new vscode.Selection(0, 27, 0, 27); // cursor on start minute "30"
+        
+        await vscode.commands.executeCommand('markdown-org.timestampUp');
+        
+        const line = document.lineAt(0).text;
+        assert.ok(line.includes('[2025-12-09 Tue 14:31]'), `Expected minute 31, got: ${line}`);
+        assert.ok(line.includes('=>  1:29'), `Expected duration 1:29, got: ${line}`);
+    });
+
+    test('CLOCK end hour increment', async () => {
+        document = await vscode.workspace.openTextDocument({
+            content: '`CLOCK: [2025-12-09 Mon 14:30]--[2025-12-09 Mon 16:00] =>  1:30`',
+            language: 'markdown'
+        });
+        editor = await vscode.window.showTextDocument(document);
+        editor.selection = new vscode.Selection(0, 48, 0, 48); // cursor on end hour "16"
+        
+        await vscode.commands.executeCommand('markdown-org.timestampUp');
+        
+        const line = document.lineAt(0).text;
+        assert.ok(line.includes('[2025-12-09 Tue 17:00]'), `Expected hour 17, got: ${line}`);
+        assert.ok(line.includes('=>  2:30'), `Expected duration 2:30, got: ${line}`);
+    });
+
+    test('CLOCK end minute decrement', async () => {
+        document = await vscode.workspace.openTextDocument({
+            content: '`CLOCK: [2025-12-09 Mon 14:30]--[2025-12-09 Mon 16:00] =>  1:30`',
+            language: 'markdown'
+        });
+        editor = await vscode.window.showTextDocument(document);
+        editor.selection = new vscode.Selection(0, 51, 0, 51); // cursor on end minute "00"
+        
+        await vscode.commands.executeCommand('markdown-org.timestampDown');
+        
+        const line = document.lineAt(0).text;
+        assert.ok(line.includes('[2025-12-09 Tue 15:59]'), `Expected minute 59, got: ${line}`);
+        assert.ok(line.includes('=>  1:29'), `Expected duration 1:29, got: ${line}`);
+    });
+
+    test('CLOCK with angle brackets', async () => {
+        document = await vscode.workspace.openTextDocument({
+            content: '`CLOCK: <2025-12-09 Mon 14:30>--<2025-12-09 Mon 16:00> =>  1:30`',
+            language: 'markdown'
+        });
+        editor = await vscode.window.showTextDocument(document);
+        editor.selection = new vscode.Selection(0, 24, 0, 24); // cursor on start hour
+        
+        await vscode.commands.executeCommand('markdown-org.timestampUp');
+        
+        const line = document.lineAt(0).text;
+        assert.ok(line.includes('<2025-12-09 Tue 15:30>'), `Expected angle brackets and hour 15, got: ${line}`);
+        assert.ok(line.includes('=>  0:30'), `Expected duration 0:30, got: ${line}`);
+    });
+
+    test('CLOCK with Russian short weekday', async () => {
+        document = await vscode.workspace.openTextDocument({
+            content: '`CLOCK: [2025-12-09 Пн 14:30]--[2025-12-09 Пн 16:00] =>  1:30`',
+            language: 'markdown'
+        });
+        editor = await vscode.window.showTextDocument(document);
+        editor.selection = new vscode.Selection(0, 27, 0, 27); // cursor on start minute
+        
+        await vscode.commands.executeCommand('markdown-org.timestampUp');
+        
+        const line = document.lineAt(0).text;
+        assert.ok(line.includes('[2025-12-09 Вт 14:31]'), `Expected Russian weekday Вт, got: ${line}`);
+        assert.ok(line.includes('=>  1:29'), `Expected duration 1:29, got: ${line}`);
+    });
+
+    test('CLOCK with English full weekday', async () => {
+        document = await vscode.workspace.openTextDocument({
+            content: '`CLOCK: [2025-12-09 Monday 14:30]--[2025-12-09 Monday 16:00] =>  1:30`',
+            language: 'markdown'
+        });
+        editor = await vscode.window.showTextDocument(document);
+        editor.selection = new vscode.Selection(0, 54, 0, 54); // cursor on end hour
+        
+        await vscode.commands.executeCommand('markdown-org.timestampUp');
+        
+        const line = document.lineAt(0).text;
+        assert.ok(line.includes('[2025-12-09 Tuesday 17:00]'), `Expected full weekday Tuesday, got: ${line}`);
+        assert.ok(line.includes('=>  2:30'), `Expected duration 2:30, got: ${line}`);
+    });
+
+    test('CLOCK with Russian full weekday', async () => {
+        document = await vscode.workspace.openTextDocument({
+            content: '`CLOCK: <2025-12-09 Понедельник 14:30>--<2025-12-09 Понедельник 16:00> =>  1:30`',
+            language: 'markdown'
+        });
+        editor = await vscode.window.showTextDocument(document);
+        editor.selection = new vscode.Selection(0, 67, 0, 67); // cursor on end minute
+        
+        await vscode.commands.executeCommand('markdown-org.timestampDown');
+        
+        const line = document.lineAt(0).text;
+        assert.ok(line.includes('<2025-12-09 Вторник 15:59>'), `Expected full Russian weekday Вторник, got: ${line}`);
+        assert.ok(line.includes('=>  1:29'), `Expected duration 1:29, got: ${line}`);
+    });
 });

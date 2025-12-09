@@ -3,12 +3,55 @@ import * as vscode from 'vscode';
 const TIMESTAMP_REGEX = /<(\d{4})-(\d{2})-(\d{2})(?: ([А-Яа-яA-Za-z]{2,3}))?(?: (\d{2}):(\d{2}))?(?: (\+\d+[dwmy]{1,2}))?>/;
 const HEADING_REGEX = /^(#+)\s+(?:(TODO|DONE)\s+)?(?:\[#([A-Z])\]\s+)?(.+)$/;
 const TIMESTAMP_LINE_REGEX = /^(\s*)`(CREATED|SCHEDULED|DEADLINE|CLOSED): (<[^>]+>)`$/;
+const CLOCK_REGEX = /^(\s*)`CLOCK: ([\[<])(\d{4})-(\d{2})-(\d{2}) ([А-Яа-яA-Za-z]+) (\d{2}):(\d{2})([\]>])(?:--([\[<])(\d{4})-(\d{2})-(\d{2}) ([А-Яа-яA-Za-z]+) (\d{2}):(\d{2})([\]>]) => +(\d+):(\d{2}))?`$/;
 const PRIORITY_A_CODE = 'A'.charCodeAt(0);
 const PRIORITY_Z_CODE = 'Z'.charCodeAt(0);
 
 type TimestampPart = 'year' | 'month' | 'day' | 'weekday' | 'hour' | 'minute';
 type HeadingPart = 'status' | 'priority';
 type TimestampType = 'type';
+type ClockTimestampPart = 'start-hour' | 'start-minute' | 'end-hour' | 'end-minute';
+
+function getClockTimestampAtCursor(editor: vscode.TextEditor): { match: RegExpMatchArray; part: ClockTimestampPart } | null {
+    const position = editor.selection.active;
+    const line = editor.document.lineAt(position.line);
+    const lineText = line.text;
+    
+    const match = lineText.match(CLOCK_REGEX);
+    if (!match || match.index === undefined) return null;
+    
+    const fullMatch = match[0];
+    const startHourMatch = fullMatch.match(/(\d{2}):(\d{2})/);
+    if (!startHourMatch || startHourMatch.index === undefined) return null;
+    
+    const startHourPos = match.index + startHourMatch.index;
+    const startMinutePos = startHourPos + 3;
+    
+    if (position.character >= startHourPos && position.character < startHourPos + 2) {
+        return { match, part: 'start-hour' };
+    }
+    if (position.character >= startMinutePos && position.character < startMinutePos + 2) {
+        return { match, part: 'start-minute' };
+    }
+    
+    if (match[10]) {
+        const endPart = fullMatch.substring(fullMatch.indexOf('--'));
+        const endHourMatch = endPart.match(/(\d{2}):(\d{2})/);
+        if (endHourMatch && endHourMatch.index !== undefined) {
+            const endHourPos = match.index + fullMatch.indexOf('--') + endHourMatch.index;
+            const endMinutePos = endHourPos + 3;
+            
+            if (position.character >= endHourPos && position.character < endHourPos + 2) {
+                return { match, part: 'end-hour' };
+            }
+            if (position.character >= endMinutePos && position.character < endMinutePos + 2) {
+                return { match, part: 'end-minute' };
+            }
+        }
+    }
+    
+    return null;
+}
 
 function getTimestampTypeAtCursor(editor: vscode.TextEditor): { match: RegExpMatchArray; range: vscode.Range } | null {
     const position = editor.selection.active;
@@ -264,10 +307,78 @@ function getWeekdayName(date: Date, originalFormat: string): string {
     }
 }
 
+function adjustClockTimestamp(match: RegExpMatchArray, part: ClockTimestampPart, delta: number): string {
+    const indent = match[1];
+    const startBracket = match[2];
+    const endBracket = match[9];
+    let startYear = parseInt(match[3]);
+    let startMonth = parseInt(match[4]);
+    let startDay = parseInt(match[5]);
+    const startWeekday = match[6];
+    let startHour = parseInt(match[7]);
+    let startMinute = parseInt(match[8]);
+    
+    const startDate = new Date(startYear, startMonth - 1, startDay, startHour, startMinute);
+    
+    if (part === 'start-hour') {
+        startDate.setHours(startDate.getHours() + delta);
+    } else if (part === 'start-minute') {
+        startDate.setMinutes(startDate.getMinutes() + delta);
+    }
+    
+    const newStartWeekday = getWeekdayName(startDate, startWeekday);
+    const startTimestamp = `${startBracket}${startDate.getFullYear()}-${(startDate.getMonth() + 1).toString().padStart(2, '0')}-${startDate.getDate().toString().padStart(2, '0')} ${newStartWeekday} ${startDate.getHours().toString().padStart(2, '0')}:${startDate.getMinutes().toString().padStart(2, '0')}${endBracket}`;
+    
+    if (!match[10]) {
+        return `${indent}\`CLOCK: ${startTimestamp}\``;
+    }
+    
+    const endStartBracket = match[10];
+    const endEndBracket = match[17];
+    let endYear = parseInt(match[11]);
+    let endMonth = parseInt(match[12]);
+    let endDay = parseInt(match[13]);
+    const endWeekday = match[14];
+    let endHour = parseInt(match[15]);
+    let endMinute = parseInt(match[16]);
+    
+    const endDate = new Date(endYear, endMonth - 1, endDay, endHour, endMinute);
+    
+    if (part === 'end-hour') {
+        endDate.setHours(endDate.getHours() + delta);
+    } else if (part === 'end-minute') {
+        endDate.setMinutes(endDate.getMinutes() + delta);
+    }
+    
+    const newEndWeekday = getWeekdayName(endDate, endWeekday);
+    const endTimestamp = `${endStartBracket}${endDate.getFullYear()}-${(endDate.getMonth() + 1).toString().padStart(2, '0')}-${endDate.getDate().toString().padStart(2, '0')} ${newEndWeekday} ${endDate.getHours().toString().padStart(2, '0')}:${endDate.getMinutes().toString().padStart(2, '0')}${endEndBracket}`;
+    
+    const diffMs = endDate.getTime() - startDate.getTime();
+    const diffMinutes = Math.floor(diffMs / 60000);
+    const hours = Math.floor(diffMinutes / 60);
+    const minutes = diffMinutes % 60;
+    const duration = `${hours.toString().padStart(2, ' ')}:${minutes.toString().padStart(2, '0')}`;
+    
+    return `${indent}\`CLOCK: ${startTimestamp}--${endTimestamp} => ${duration}\``;
+}
+
 export async function adjustTimestamp(delta: number) {
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
         return;
+    }
+    
+    const clockTimestamp = getClockTimestampAtCursor(editor);
+    if (clockTimestamp) {
+        const newLine = adjustClockTimestamp(clockTimestamp.match, clockTimestamp.part, delta);
+        const lineRange = editor.document.lineAt(editor.selection.active.line).range;
+        
+        return editor.edit(editBuilder => {
+            editBuilder.replace(lineRange, newLine);
+        }).then(() => {
+            const newPosition = editor.selection.active;
+            editor.selection = new vscode.Selection(newPosition, newPosition);
+        });
     }
     
     const timestamp = getTimestampAtCursor(editor);
