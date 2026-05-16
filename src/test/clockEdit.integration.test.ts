@@ -35,73 +35,73 @@ suite('CLOCK Timestamp Editing Integration Tests', () => {
         });
 
         test('Year increment', async () => {
-            editor.selection = new vscode.Selection(1, 7, 1, 7);
+            editor.selection = new vscode.Selection(1, 10, 1, 10);
             await vscode.commands.executeCommand('markdown-org.timestampUp');
             assert.ok(editor.document.lineAt(1).text.includes('[2026-12-09'));
         });
 
         test('Year decrement', async () => {
-            editor.selection = new vscode.Selection(1, 7, 1, 7);
+            editor.selection = new vscode.Selection(1, 10, 1, 10);
             await vscode.commands.executeCommand('markdown-org.timestampDown');
             assert.ok(editor.document.lineAt(1).text.includes('[2024-12-09'));
         });
 
         test('Month increment', async () => {
-            editor.selection = new vscode.Selection(1, 11, 1, 11);
+            editor.selection = new vscode.Selection(1, 14, 1, 14);
             await vscode.commands.executeCommand('markdown-org.timestampUp');
             assert.ok(editor.document.lineAt(1).text.includes('[2026-01-09'));
         });
 
         test('Month decrement', async () => {
-            editor.selection = new vscode.Selection(1, 11, 1, 11);
+            editor.selection = new vscode.Selection(1, 14, 1, 14);
             await vscode.commands.executeCommand('markdown-org.timestampDown');
             assert.ok(editor.document.lineAt(1).text.includes('[2025-11-09'));
         });
 
         test('Day increment', async () => {
-            editor.selection = new vscode.Selection(1, 14, 1, 14);
+            editor.selection = new vscode.Selection(1, 17, 1, 17);
             await vscode.commands.executeCommand('markdown-org.timestampUp');
             assert.ok(editor.document.lineAt(1).text.includes('[2025-12-10 Ср'));
         });
 
         test('Day decrement', async () => {
-            editor.selection = new vscode.Selection(1, 14, 1, 14);
+            editor.selection = new vscode.Selection(1, 17, 1, 17);
             await vscode.commands.executeCommand('markdown-org.timestampDown');
             assert.ok(editor.document.lineAt(1).text.includes('[2025-12-08 Пн'));
         });
 
         test('Weekday increment', async () => {
-            editor.selection = new vscode.Selection(1, 16, 1, 16);
+            editor.selection = new vscode.Selection(1, 20, 1, 20);
             await vscode.commands.executeCommand('markdown-org.timestampUp');
             assert.ok(editor.document.lineAt(1).text.includes('[2025-12-10 Ср'));
         });
 
         test('Weekday decrement', async () => {
-            editor.selection = new vscode.Selection(1, 16, 1, 16);
+            editor.selection = new vscode.Selection(1, 20, 1, 20);
             await vscode.commands.executeCommand('markdown-org.timestampDown');
             assert.ok(editor.document.lineAt(1).text.includes('[2025-12-08 Пн'));
         });
 
         test('Hour increment', async () => {
-            editor.selection = new vscode.Selection(1, 17, 1, 17);
+            editor.selection = new vscode.Selection(1, 23, 1, 23);
             await vscode.commands.executeCommand('markdown-org.timestampUp');
             assert.ok(editor.document.lineAt(1).text.includes('[2025-12-09 Вт 18:00]'));
         });
 
         test('Hour decrement', async () => {
-            editor.selection = new vscode.Selection(1, 17, 1, 17);
+            editor.selection = new vscode.Selection(1, 23, 1, 23);
             await vscode.commands.executeCommand('markdown-org.timestampDown');
             assert.ok(editor.document.lineAt(1).text.includes('[2025-12-09 Вт 16:00]'));
         });
 
         test('Minute increment', async () => {
-            editor.selection = new vscode.Selection(1, 20, 1, 20);
+            editor.selection = new vscode.Selection(1, 26, 1, 26);
             await vscode.commands.executeCommand('markdown-org.timestampUp');
             assert.ok(editor.document.lineAt(1).text.includes('[2025-12-09 Вт 17:01]'));
         });
 
         test('Minute decrement', async () => {
-            editor.selection = new vscode.Selection(1, 20, 1, 20);
+            editor.selection = new vscode.Selection(1, 26, 1, 26);
             await vscode.commands.executeCommand('markdown-org.timestampDown');
             assert.ok(editor.document.lineAt(1).text.includes('[2025-12-09 Вт 16:59]'));
         });
@@ -113,73 +113,73 @@ suite('CLOCK Timestamp Editing Integration Tests', () => {
         });
 
         test('Year increment', async () => {
-            editor.selection = new vscode.Selection(1, 30, 1, 30);
+            editor.selection = new vscode.Selection(1, 33, 1, 33);
             await vscode.commands.executeCommand('markdown-org.timestampUp');
             assert.ok(editor.document.lineAt(1).text.includes('--[2026-12-09'));
         });
 
         test('Year decrement', async () => {
-            editor.selection = new vscode.Selection(1, 30, 1, 30);
+            editor.selection = new vscode.Selection(1, 33, 1, 33);
             await vscode.commands.executeCommand('markdown-org.timestampDown');
             assert.ok(editor.document.lineAt(1).text.includes('--[2024-12-09'));
         });
 
         test('Month increment', async () => {
-            editor.selection = new vscode.Selection(1, 34, 1, 34);
+            editor.selection = new vscode.Selection(1, 37, 1, 37);
             await vscode.commands.executeCommand('markdown-org.timestampUp');
             assert.ok(editor.document.lineAt(1).text.includes('--[2026-01-09'));
         });
 
         test('Month decrement', async () => {
-            editor.selection = new vscode.Selection(1, 34, 1, 34);
+            editor.selection = new vscode.Selection(1, 37, 1, 37);
             await vscode.commands.executeCommand('markdown-org.timestampDown');
             assert.ok(editor.document.lineAt(1).text.includes('--[2025-11-09'));
         });
 
         test('Day increment', async () => {
-            editor.selection = new vscode.Selection(1, 37, 1, 37);
+            editor.selection = new vscode.Selection(1, 40, 1, 40);
             await vscode.commands.executeCommand('markdown-org.timestampUp');
             assert.ok(editor.document.lineAt(1).text.includes('--[2025-12-10 Ср'));
         });
 
         test('Day decrement', async () => {
-            editor.selection = new vscode.Selection(1, 37, 1, 37);
+            editor.selection = new vscode.Selection(1, 40, 1, 40);
             await vscode.commands.executeCommand('markdown-org.timestampDown');
             assert.ok(editor.document.lineAt(1).text.includes('--[2025-12-08 Пн'));
         });
 
         test('Weekday increment', async () => {
-            editor.selection = new vscode.Selection(1, 39, 1, 39);
+            editor.selection = new vscode.Selection(1, 43, 1, 43);
             await vscode.commands.executeCommand('markdown-org.timestampUp');
             assert.ok(editor.document.lineAt(1).text.includes('--[2025-12-10 Ср'));
         });
 
         test('Weekday decrement', async () => {
-            editor.selection = new vscode.Selection(1, 39, 1, 39);
+            editor.selection = new vscode.Selection(1, 43, 1, 43);
             await vscode.commands.executeCommand('markdown-org.timestampDown');
             assert.ok(editor.document.lineAt(1).text.includes('--[2025-12-08 Пн'));
         });
 
         test('Hour increment', async () => {
-            editor.selection = new vscode.Selection(1, 40, 1, 40);
+            editor.selection = new vscode.Selection(1, 46, 1, 46);
             await vscode.commands.executeCommand('markdown-org.timestampUp');
             assert.ok(editor.document.lineAt(1).text.includes('--[2025-12-09 Вт 21:30]'));
         });
 
         test('Hour decrement', async () => {
-            editor.selection = new vscode.Selection(1, 40, 1, 40);
+            editor.selection = new vscode.Selection(1, 46, 1, 46);
             await vscode.commands.executeCommand('markdown-org.timestampDown');
             assert.ok(editor.document.lineAt(1).text.includes('--[2025-12-09 Вт 19:30]'));
         });
 
         test('Minute increment', async () => {
-            editor.selection = new vscode.Selection(1, 43, 1, 43);
+            editor.selection = new vscode.Selection(1, 49, 1, 49);
             await vscode.commands.executeCommand('markdown-org.timestampUp');
             assert.ok(editor.document.lineAt(1).text.includes('--[2025-12-09 Вт 20:31]'));
         });
 
         test('Minute decrement', async () => {
-            editor.selection = new vscode.Selection(1, 43, 1, 43);
+            editor.selection = new vscode.Selection(1, 49, 1, 49);
             await vscode.commands.executeCommand('markdown-org.timestampDown');
             assert.ok(editor.document.lineAt(1).text.includes('--[2025-12-09 Вт 20:29]'));
         });
@@ -191,73 +191,73 @@ suite('CLOCK Timestamp Editing Integration Tests', () => {
         });
 
         test('Year increment', async () => {
-            editor.selection = new vscode.Selection(1, 7, 1, 7);
+            editor.selection = new vscode.Selection(1, 10, 1, 10);
             await vscode.commands.executeCommand('markdown-org.timestampUp');
             assert.ok(editor.document.lineAt(1).text.includes('<2026-12-09'));
         });
 
         test('Year decrement', async () => {
-            editor.selection = new vscode.Selection(1, 7, 1, 7);
+            editor.selection = new vscode.Selection(1, 10, 1, 10);
             await vscode.commands.executeCommand('markdown-org.timestampDown');
             assert.ok(editor.document.lineAt(1).text.includes('<2024-12-09'));
         });
 
         test('Month increment', async () => {
-            editor.selection = new vscode.Selection(1, 11, 1, 11);
+            editor.selection = new vscode.Selection(1, 14, 1, 14);
             await vscode.commands.executeCommand('markdown-org.timestampUp');
             assert.ok(editor.document.lineAt(1).text.includes('<2026-01-09'));
         });
 
         test('Month decrement', async () => {
-            editor.selection = new vscode.Selection(1, 11, 1, 11);
+            editor.selection = new vscode.Selection(1, 14, 1, 14);
             await vscode.commands.executeCommand('markdown-org.timestampDown');
             assert.ok(editor.document.lineAt(1).text.includes('<2025-11-09'));
         });
 
         test('Day increment', async () => {
-            editor.selection = new vscode.Selection(1, 14, 1, 14);
+            editor.selection = new vscode.Selection(1, 17, 1, 17);
             await vscode.commands.executeCommand('markdown-org.timestampUp');
             assert.ok(editor.document.lineAt(1).text.includes('<2025-12-10 Ср'));
         });
 
         test('Day decrement', async () => {
-            editor.selection = new vscode.Selection(1, 14, 1, 14);
+            editor.selection = new vscode.Selection(1, 17, 1, 17);
             await vscode.commands.executeCommand('markdown-org.timestampDown');
             assert.ok(editor.document.lineAt(1).text.includes('<2025-12-08 Пн'));
         });
 
         test('Weekday increment', async () => {
-            editor.selection = new vscode.Selection(1, 16, 1, 16);
+            editor.selection = new vscode.Selection(1, 20, 1, 20);
             await vscode.commands.executeCommand('markdown-org.timestampUp');
             assert.ok(editor.document.lineAt(1).text.includes('<2025-12-10 Ср'));
         });
 
         test('Weekday decrement', async () => {
-            editor.selection = new vscode.Selection(1, 16, 1, 16);
+            editor.selection = new vscode.Selection(1, 20, 1, 20);
             await vscode.commands.executeCommand('markdown-org.timestampDown');
             assert.ok(editor.document.lineAt(1).text.includes('<2025-12-08 Пн'));
         });
 
         test('Hour increment', async () => {
-            editor.selection = new vscode.Selection(1, 17, 1, 17);
+            editor.selection = new vscode.Selection(1, 23, 1, 23);
             await vscode.commands.executeCommand('markdown-org.timestampUp');
             assert.ok(editor.document.lineAt(1).text.includes('<2025-12-09 Вт 18:00>'));
         });
 
         test('Hour decrement', async () => {
-            editor.selection = new vscode.Selection(1, 17, 1, 17);
+            editor.selection = new vscode.Selection(1, 23, 1, 23);
             await vscode.commands.executeCommand('markdown-org.timestampDown');
             assert.ok(editor.document.lineAt(1).text.includes('<2025-12-09 Вт 16:00>'));
         });
 
         test('Minute increment', async () => {
-            editor.selection = new vscode.Selection(1, 20, 1, 20);
+            editor.selection = new vscode.Selection(1, 26, 1, 26);
             await vscode.commands.executeCommand('markdown-org.timestampUp');
             assert.ok(editor.document.lineAt(1).text.includes('<2025-12-09 Вт 17:01>'));
         });
 
         test('Minute decrement', async () => {
-            editor.selection = new vscode.Selection(1, 20, 1, 20);
+            editor.selection = new vscode.Selection(1, 26, 1, 26);
             await vscode.commands.executeCommand('markdown-org.timestampDown');
             assert.ok(editor.document.lineAt(1).text.includes('<2025-12-09 Вт 16:59>'));
         });
@@ -269,73 +269,73 @@ suite('CLOCK Timestamp Editing Integration Tests', () => {
         });
 
         test('Year increment', async () => {
-            editor.selection = new vscode.Selection(1, 30, 1, 30);
+            editor.selection = new vscode.Selection(1, 33, 1, 33);
             await vscode.commands.executeCommand('markdown-org.timestampUp');
             assert.ok(editor.document.lineAt(1).text.includes('--<2026-12-09'));
         });
 
         test('Year decrement', async () => {
-            editor.selection = new vscode.Selection(1, 30, 1, 30);
+            editor.selection = new vscode.Selection(1, 33, 1, 33);
             await vscode.commands.executeCommand('markdown-org.timestampDown');
             assert.ok(editor.document.lineAt(1).text.includes('--<2024-12-09'));
         });
 
         test('Month increment', async () => {
-            editor.selection = new vscode.Selection(1, 34, 1, 34);
+            editor.selection = new vscode.Selection(1, 37, 1, 37);
             await vscode.commands.executeCommand('markdown-org.timestampUp');
             assert.ok(editor.document.lineAt(1).text.includes('--<2026-01-09'));
         });
 
         test('Month decrement', async () => {
-            editor.selection = new vscode.Selection(1, 34, 1, 34);
+            editor.selection = new vscode.Selection(1, 37, 1, 37);
             await vscode.commands.executeCommand('markdown-org.timestampDown');
             assert.ok(editor.document.lineAt(1).text.includes('--<2025-11-09'));
         });
 
         test('Day increment', async () => {
-            editor.selection = new vscode.Selection(1, 37, 1, 37);
+            editor.selection = new vscode.Selection(1, 40, 1, 40);
             await vscode.commands.executeCommand('markdown-org.timestampUp');
             assert.ok(editor.document.lineAt(1).text.includes('--<2025-12-10 Ср'));
         });
 
         test('Day decrement', async () => {
-            editor.selection = new vscode.Selection(1, 37, 1, 37);
+            editor.selection = new vscode.Selection(1, 40, 1, 40);
             await vscode.commands.executeCommand('markdown-org.timestampDown');
             assert.ok(editor.document.lineAt(1).text.includes('--<2025-12-08 Пн'));
         });
 
         test('Weekday increment', async () => {
-            editor.selection = new vscode.Selection(1, 39, 1, 39);
+            editor.selection = new vscode.Selection(1, 43, 1, 43);
             await vscode.commands.executeCommand('markdown-org.timestampUp');
             assert.ok(editor.document.lineAt(1).text.includes('--<2025-12-10 Ср'));
         });
 
         test('Weekday decrement', async () => {
-            editor.selection = new vscode.Selection(1, 39, 1, 39);
+            editor.selection = new vscode.Selection(1, 43, 1, 43);
             await vscode.commands.executeCommand('markdown-org.timestampDown');
             assert.ok(editor.document.lineAt(1).text.includes('--<2025-12-08 Пн'));
         });
 
         test('Hour increment', async () => {
-            editor.selection = new vscode.Selection(1, 40, 1, 40);
+            editor.selection = new vscode.Selection(1, 46, 1, 46);
             await vscode.commands.executeCommand('markdown-org.timestampUp');
             assert.ok(editor.document.lineAt(1).text.includes('--<2025-12-09 Вт 21:30>'));
         });
 
         test('Hour decrement', async () => {
-            editor.selection = new vscode.Selection(1, 40, 1, 40);
+            editor.selection = new vscode.Selection(1, 46, 1, 46);
             await vscode.commands.executeCommand('markdown-org.timestampDown');
             assert.ok(editor.document.lineAt(1).text.includes('--<2025-12-09 Вт 19:30>'));
         });
 
         test('Minute increment', async () => {
-            editor.selection = new vscode.Selection(1, 43, 1, 43);
+            editor.selection = new vscode.Selection(1, 49, 1, 49);
             await vscode.commands.executeCommand('markdown-org.timestampUp');
             assert.ok(editor.document.lineAt(1).text.includes('--<2025-12-09 Вт 20:31>'));
         });
 
         test('Minute decrement', async () => {
-            editor.selection = new vscode.Selection(1, 43, 1, 43);
+            editor.selection = new vscode.Selection(1, 49, 1, 49);
             await vscode.commands.executeCommand('markdown-org.timestampDown');
             assert.ok(editor.document.lineAt(1).text.includes('--<2025-12-09 Вт 20:29>'));
         });
@@ -344,28 +344,28 @@ suite('CLOCK Timestamp Editing Integration Tests', () => {
     suite('Duration Recalculation', () => {
         test('[] - Start hour increment recalculates duration', async () => {
             await setupTest(`# Test\n\`CLOCK: [2025-12-09 Вт 17:00]--[2025-12-09 Вт 20:30] =>  3:30\`\n`);
-            editor.selection = new vscode.Selection(1, 17, 1, 17);
+            editor.selection = new vscode.Selection(1, 23, 1, 23);
             await vscode.commands.executeCommand('markdown-org.timestampUp');
             assert.ok(editor.document.lineAt(1).text.includes('=>  2:30'));
         });
 
         test('[] - End hour increment recalculates duration', async () => {
             await setupTest(`# Test\n\`CLOCK: [2025-12-09 Вт 17:00]--[2025-12-09 Вт 20:30] =>  3:30\`\n`);
-            editor.selection = new vscode.Selection(1, 40, 1, 40);
+            editor.selection = new vscode.Selection(1, 46, 1, 46);
             await vscode.commands.executeCommand('markdown-org.timestampUp');
             assert.ok(editor.document.lineAt(1).text.includes('=>  4:30'));
         });
 
         test('<> - Start hour increment recalculates duration', async () => {
             await setupTest(`# Test\n\`CLOCK: <2025-12-09 Вт 17:00>--<2025-12-09 Вт 20:30> =>  3:30\`\n`);
-            editor.selection = new vscode.Selection(1, 17, 1, 17);
+            editor.selection = new vscode.Selection(1, 23, 1, 23);
             await vscode.commands.executeCommand('markdown-org.timestampUp');
             assert.ok(editor.document.lineAt(1).text.includes('=>  2:30'));
         });
 
         test('<> - End hour increment recalculates duration', async () => {
             await setupTest(`# Test\n\`CLOCK: <2025-12-09 Вт 17:00>--<2025-12-09 Вт 20:30> =>  3:30\`\n`);
-            editor.selection = new vscode.Selection(1, 40, 1, 40);
+            editor.selection = new vscode.Selection(1, 46, 1, 46);
             await vscode.commands.executeCommand('markdown-org.timestampUp');
             assert.ok(editor.document.lineAt(1).text.includes('=>  4:30'));
         });
@@ -376,7 +376,7 @@ suite('CLOCK Timestamp Editing Integration Tests', () => {
             await setupTest(
                 `# Test\n\`CLOCK: [2025-12-09 Вт 17:00]--[2025-12-09 Вт 20:30] =>  3:30\`\n\`CLOCK: [2025-12-09 Вт 21:00]--[2025-12-09 Вт 20:30] => -1:-30\`\n`
             );
-            editor.selection = new vscode.Selection(2, 17, 2, 17);
+            editor.selection = new vscode.Selection(2, 23, 2, 23);
             await vscode.commands.executeCommand('markdown-org.timestampDown');
             assert.ok(editor.document.lineAt(2).text.includes('[2025-12-09 Вт 20:00]'));
             assert.ok(editor.document.lineAt(2).text.includes('=>  0:30'));
@@ -386,7 +386,7 @@ suite('CLOCK Timestamp Editing Integration Tests', () => {
             await setupTest(
                 `# Test\n\`CLOCK: <2025-12-09 Вт 17:00>--<2025-12-09 Вт 20:30> =>  3:30\`\n\`CLOCK: <2025-12-09 Вт 21:00>--<2025-12-09 Вт 20:30> => -1:-30\`\n`
             );
-            editor.selection = new vscode.Selection(2, 40, 2, 40);
+            editor.selection = new vscode.Selection(2, 46, 2, 46);
             await vscode.commands.executeCommand('markdown-org.timestampUp');
             assert.ok(editor.document.lineAt(2).text.includes('--<2025-12-09 Вт 21:30>'));
             assert.ok(editor.document.lineAt(2).text.includes('=>  0:30'));
@@ -396,7 +396,7 @@ suite('CLOCK Timestamp Editing Integration Tests', () => {
     suite('Negative Duration Fix', () => {
         test('[] - Fix by decrementing start hour', async () => {
             await setupTest(`# Test\n\`CLOCK: [2025-12-09 Вт 22:00]--[2025-12-09 Вт 21:30] => -1:-30\`\n`);
-            editor.selection = new vscode.Selection(1, 17, 1, 17);
+            editor.selection = new vscode.Selection(1, 23, 1, 23);
             await vscode.commands.executeCommand('markdown-org.timestampDown');
             assert.ok(editor.document.lineAt(1).text.includes('[2025-12-09 Вт 21:00]'));
             assert.ok(editor.document.lineAt(1).text.includes('=>  0:30'));
@@ -404,7 +404,7 @@ suite('CLOCK Timestamp Editing Integration Tests', () => {
 
         test('[] - Fix by incrementing end hour', async () => {
             await setupTest(`# Test\n\`CLOCK: [2025-12-09 Вт 22:00]--[2025-12-09 Вт 21:30] => -1:-30\`\n`);
-            editor.selection = new vscode.Selection(1, 40, 1, 40);
+            editor.selection = new vscode.Selection(1, 46, 1, 46);
             await vscode.commands.executeCommand('markdown-org.timestampUp');
             assert.ok(editor.document.lineAt(1).text.includes('--[2025-12-09 Вт 22:30]'));
             assert.ok(editor.document.lineAt(1).text.includes('=>  0:30'));
@@ -412,7 +412,7 @@ suite('CLOCK Timestamp Editing Integration Tests', () => {
 
         test('<> - Fix by decrementing start hour', async () => {
             await setupTest(`# Test\n\`CLOCK: <2025-12-09 Вт 22:00>--<2025-12-09 Вт 21:30> => -1:-30\`\n`);
-            editor.selection = new vscode.Selection(1, 17, 1, 17);
+            editor.selection = new vscode.Selection(1, 23, 1, 23);
             await vscode.commands.executeCommand('markdown-org.timestampDown');
             assert.ok(editor.document.lineAt(1).text.includes('<2025-12-09 Вт 21:00>'));
             assert.ok(editor.document.lineAt(1).text.includes('=>  0:30'));
@@ -420,7 +420,7 @@ suite('CLOCK Timestamp Editing Integration Tests', () => {
 
         test('<> - Fix by incrementing end hour', async () => {
             await setupTest(`# Test\n\`CLOCK: <2025-12-09 Вт 22:00>--<2025-12-09 Вт 21:30> => -1:-30\`\n`);
-            editor.selection = new vscode.Selection(1, 40, 1, 40);
+            editor.selection = new vscode.Selection(1, 46, 1, 46);
             await vscode.commands.executeCommand('markdown-org.timestampUp');
             assert.ok(editor.document.lineAt(1).text.includes('--<2025-12-09 Вт 22:30>'));
             assert.ok(editor.document.lineAt(1).text.includes('=>  0:30'));
@@ -428,7 +428,7 @@ suite('CLOCK Timestamp Editing Integration Tests', () => {
 
         test('<> - Fix by incrementing end minute', async () => {
             await setupTest(`# Test\n\`CLOCK: <2025-12-09 Вт 22:00>--<2025-12-09 Вт 21:30> => -1:-30\`\n`);
-            editor.selection = new vscode.Selection(1, 43, 1, 43);
+            editor.selection = new vscode.Selection(1, 49, 1, 49);
             await vscode.commands.executeCommand('markdown-org.timestampUp');
             assert.ok(editor.document.lineAt(1).text.includes('--<2025-12-09 Вт 21:31>'));
             assert.ok(editor.document.lineAt(1).text.includes('=> -1:-29'));
@@ -436,7 +436,7 @@ suite('CLOCK Timestamp Editing Integration Tests', () => {
 
         test('<> - Fix by decrementing start minute', async () => {
             await setupTest(`# Test\n\`CLOCK: <2025-12-09 Вт 22:00>--<2025-12-09 Вт 21:30> => -1:-30\`\n`);
-            editor.selection = new vscode.Selection(1, 20, 1, 20);
+            editor.selection = new vscode.Selection(1, 26, 1, 26);
             await vscode.commands.executeCommand('markdown-org.timestampDown');
             assert.ok(editor.document.lineAt(1).text.includes('<2025-12-09 Вт 21:59>'));
             assert.ok(editor.document.lineAt(1).text.includes('=> -1:-29'));
