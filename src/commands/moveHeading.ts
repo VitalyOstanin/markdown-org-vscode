@@ -202,11 +202,13 @@ export async function promoteToMaintain() {
         }
     }
 
+    const delta = 2 - heading.level;
     const newHeading = '## ' + heading.text;
     const newContent = heading.content.slice(1).map((line) => {
         const match = line.match(/^(#+)\s+(.+)$/);
         if (match) {
-            return '#'.repeat(match[1].length + 1) + ' ' + match[2];
+            const newLevel = Math.min(6, Math.max(1, match[1].length + delta));
+            return '#'.repeat(newLevel) + ' ' + match[2];
         }
         return line;
     });

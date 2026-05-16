@@ -367,6 +367,11 @@ export class AgendaPanel {
             }
         });
         
+        function parseLocalDate(str) {
+            const [y, m, d] = str.split('-').map(Number);
+            return new Date(y, m - 1, d);
+        }
+
         function isHoliday(date) {
             return holidays.includes(date);
         }
@@ -423,7 +428,7 @@ export class AgendaPanel {
         }
         
         function formatDayHeader(date) {
-            const d = new Date(date);
+            const d = parseLocalDate(date);
             const weekday = d.toLocaleDateString(locale, { weekday: 'long' });
             const dayMonth = d.toLocaleDateString(locale, { day: 'numeric', month: 'long' });
             const year = d.toLocaleDateString(locale, { year: 'numeric' });
@@ -457,7 +462,7 @@ export class AgendaPanel {
         }
         
         function formatDateForTitle(dateStr) {
-            const d = new Date(dateStr);
+            const d = parseLocalDate(dateStr);
             const day = String(d.getDate()).padStart(2, '0');
             const month = String(d.getMonth() + 1).padStart(2, '0');
             const year = d.getFullYear();
@@ -502,7 +507,7 @@ export class AgendaPanel {
                 daysMap[day.date] = taskCount > 0;
             });
             
-            const firstDay = new Date(days[0].date);
+            const firstDay = parseLocalDate(days[0].date);
             const year = firstDay.getFullYear();
             const month = firstDay.getMonth();
             const firstDayOfMonth = new Date(year, month, 1);
@@ -563,7 +568,7 @@ export class AgendaPanel {
         }
         
         function navigate(offset) {
-            const d = new Date(currentDate);
+            const d = parseLocalDate(currentDate);
             if (offset === 0) {
                 d.setTime(new Date().getTime());
             } else if (initialMode === 'day') {
@@ -587,7 +592,7 @@ export class AgendaPanel {
                 return;
             }
             const unit = initialMode === 'day' ? 'Day' : initialMode === 'week' ? 'Week' : 'Month';
-            const d = new Date(currentDate);
+            const d = parseLocalDate(currentDate);
             const weekday = d.toLocaleDateString(locale, { weekday: 'long' });
             const dayMonth = d.toLocaleDateString(locale, { day: 'numeric', month: 'long' });
             const year = d.getFullYear();

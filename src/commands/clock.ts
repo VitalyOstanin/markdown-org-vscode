@@ -176,6 +176,9 @@ export async function insertClockFinish() {
     const roundMinutes = config.get<number>('clockRoundMinutes');
 
     const now = new Date();
+    if (now < startDate) {
+        vscode.window.showWarningMessage('Markdown Org: open CLOCK starts in the future; finishing anyway');
+    }
     const endDate = roundEndTime(startDate, now, roundMinutes);
     const endTimestamp = formatTimestamp(endDate);
 
