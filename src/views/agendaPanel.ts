@@ -59,6 +59,7 @@ export class AgendaPanel {
             if (userInitiated) {
                 AgendaPanel.currentPanel.reveal(vscode.ViewColumn.One);
             }
+            AgendaPanel.currentPanel.title = `Agenda: ${mode}`;
             AgendaPanel.currentPanel.webview.postMessage({ type: 'update', data, mode, date, currentTag });
         } else {
             AgendaPanel.currentPanel = vscode.window.createWebviewPanel(
@@ -110,6 +111,20 @@ export class AgendaPanel {
                     }
                 } else if (message.command === 'cycleTag') {
                     await vscode.commands.executeCommand('markdown-org.cycleTag');
+                } else if (message.command === 'switchMode') {
+                    const targetCommand =
+                        message.mode === 'day'
+                            ? 'markdown-org.showAgendaDay'
+                            : message.mode === 'week'
+                              ? 'markdown-org.showAgendaWeek'
+                              : message.mode === 'month'
+                                ? 'markdown-org.showAgendaMonth'
+                                : message.mode === 'tasks'
+                                  ? 'markdown-org.showTasks'
+                                  : null;
+                    if (targetCommand) {
+                        await vscode.commands.executeCommand(targetCommand, AgendaPanel.currentDate);
+                    }
                 }
             });
 
@@ -214,6 +229,31 @@ export class AgendaPanel {
         }
         .nav-btn:hover {
             background: #1177bb;
+        }
+        .mode-switch {
+            display: inline-flex;
+            margin-right: 8px;
+        }
+        .mode-btn {
+            background: #2d2d30;
+            color: #d4d4d4;
+            border: 1px solid #3e3e42;
+            padding: 5px 10px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 13px;
+        }
+        .mode-btn + .mode-btn {
+            border-left: none;
+        }
+        .mode-btn:hover {
+            background: #3e3e42;
+        }
+        .mode-btn.active {
+            background: #0e639c;
+            color: #fff;
+            border-color: #0e639c;
+            font-weight: bold;
         }
         .nav-date {
             color: #4fc1ff;
@@ -351,6 +391,9 @@ export class AgendaPanel {
                 }
                 if (message.currentTag) {
                     currentTag = message.currentTag;
+                }
+                if (message.mode) {
+                    initialMode = message.mode;
                 }
                 initialData = message.data;
                 const scrollPos = window.scrollY;
@@ -584,31 +627,60 @@ export class AgendaPanel {
             vscode.postMessage({ command: 'navigate', date: newDate });
         }
         
+        function renderModeSwitch() {
+            const modes = [
+                { id: 'day', label: 'Day' },
+                { id: 'week', label: 'Week' },
+                { id: 'month', label: 'Month' },
+                { id: 'tasks', label: 'Tasks' }
+            ];
+            return '<span class="mode-switch">' +
+                modes.map(m =>
+                    '<button class="mode-btn' + (m.id === initialMode ? ' active' : '') +
+                    '" data-mode="' + m.id + '">' + m.label + '</button>'
+                ).join('') +
+                '</span>';
+        }
+
+        function attachModeSwitchListeners() {
+            document.querySelectorAll('.mode-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const target = btn.getAttribute('data-mode');
+                    if (target && target !== initialMode) {
+                        vscode.postMessage({ command: 'switchMode', mode: target });
+                    }
+                });
+            });
+        }
+
         function renderNavBar() {
             const navBar = document.getElementById('nav-bar');
+            const modeSwitchHtml = renderModeSwitch();
+            const tagHtml = '<span class="tag-indicator" id="tag-indicator">Tag: ' + escapeHtml(currentTag) + '</span>';
+
             if (initialMode === 'tasks') {
-                navBar.innerHTML = '<span class="tag-indicator" id="tag-indicator">Tag: ' + escapeHtml(currentTag) + '</span>';
-                document.getElementById('tag-indicator').addEventListener('click', () => {
-                    vscode.postMessage({ command: 'cycleTag' });
-                });
-                return;
+                navBar.innerHTML = modeSwitchHtml + tagHtml;
+            } else {
+                const unit = initialMode === 'day' ? 'Day' : initialMode === 'week' ? 'Week' : 'Month';
+                const d = parseLocalDate(currentDate);
+                const weekday = d.toLocaleDateString(locale, { weekday: 'long' });
+                const dayMonth = d.toLocaleDateString(locale, { day: 'numeric', month: 'long' });
+                const year = d.getFullYear();
+                const dateStr = weekday + ', ' + dayMonth + ' ' + year;
+                navBar.innerHTML =
+                    modeSwitchHtml +
+                    '<button class="nav-btn" id="btn-prev">← Prev ' + unit + '</button>' +
+                    '<button class="nav-btn" id="btn-today">Today</button>' +
+                    '<button class="nav-btn" id="btn-next">Next ' + unit + ' →</button>' +
+                    '<span class="nav-date">' + escapeHtml(dateStr) + '</span>' +
+                    tagHtml;
+
+                document.getElementById('btn-prev').addEventListener('click', () => navigate(-1));
+                document.getElementById('btn-today').addEventListener('click', () => navigate(0));
+                document.getElementById('btn-next').addEventListener('click', () => navigate(1));
             }
-            const unit = initialMode === 'day' ? 'Day' : initialMode === 'week' ? 'Week' : 'Month';
-            const d = parseLocalDate(currentDate);
-            const weekday = d.toLocaleDateString(locale, { weekday: 'long' });
-            const dayMonth = d.toLocaleDateString(locale, { day: 'numeric', month: 'long' });
-            const year = d.getFullYear();
-            const dateStr = weekday + ', ' + dayMonth + ' ' + year;
-            navBar.innerHTML = 
-                '<button class="nav-btn" id="btn-prev">← Prev ' + unit + '</button>' +
-                '<button class="nav-btn" id="btn-today">Today</button>' +
-                '<button class="nav-btn" id="btn-next">Next ' + unit + ' →</button>' +
-                '<span class="nav-date">' + escapeHtml(dateStr) + '</span>' +
-                '<span class="tag-indicator" id="tag-indicator">Tag: ' + escapeHtml(currentTag) + '</span>';
-            
-            document.getElementById('btn-prev').addEventListener('click', () => navigate(-1));
-            document.getElementById('btn-today').addEventListener('click', () => navigate(0));
-            document.getElementById('btn-next').addEventListener('click', () => navigate(1));
+
+            attachModeSwitchListeners();
             document.getElementById('tag-indicator').addEventListener('click', () => {
                 vscode.postMessage({ command: 'cycleTag' });
             });
