@@ -2,13 +2,19 @@
 
 ## Overview
 
-Tag filtering allows you to organize and filter tasks in agenda views based on filename patterns.
+Tag filtering organizes and filters tasks in agenda views by matching the
+filename **basename** against a configured pattern.
+
+The match is **case-sensitive substring** on `path.basename(task.file)`, not on
+the full absolute path. A pattern like `"work"` will not match a file inside
+`/home/me/networking/...` just because the directory contains "work" — only the
+file name itself is checked.
 
 ## Configuration
 
 ### Settings
 
-**`markdown-org.fileTags`** - Array of tag definitions:
+**`markdown-org.fileTags`** — array of tag definitions:
 
 ```json
 {
@@ -20,56 +26,77 @@ Tag filtering allows you to organize and filter tasks in agenda views based on f
 }
 ```
 
-- `name` - Tag name displayed in UI
-- `pattern` - Substring to match in filename
-    - `"text"` - matches files containing "text"
-    - `"!text"` - matches files NOT containing "text" (negation)
-    - `""` - matches files without other non-negated patterns
+- `name` — tag name displayed in UI (the name has no special meaning to the
+  filter; you can call the "show everything" tag `ALL`, `*`, or anything else).
+- `pattern` — controls which task files are kept when this tag is active:
+    - `""` (empty) — filter disabled, **all** tasks are shown.
+    - `"text"` — basename contains `"text"`.
+    - `"!..."` — basename does **not** match any _positive_ pattern from
+      `fileTags`. The text after `!` is only a marker that this is a negation
+      tag; its content is ignored.
 
-**`markdown-org.currentTag`** - Currently active tag filter (default: "ALL")
+**`markdown-org.currentTag`** — name of the currently active tag (default:
+`"ALL"`). Stored at workspace scope when a workspace is open, otherwise global.
 
 ## Usage
 
 ### Cycle Tag Filter
 
-**Command:** `Markdown Org: Cycle Tag Filter`  
+**Command:** `Markdown Org: Cycle Tag Filter`
 **Hotkey:** `Ctrl+K Ctrl+K Ctrl+T`
 
-Cycles through configured tags: ALL → WORK → PRIVATE → ALL...
+Cycles through configured tags in the order they appear in `fileTags`. Current
+tag is shown in the agenda navigation bar and clicking it also cycles.
 
-Current tag is displayed in agenda view navigation bar and persists between sessions.
+If `currentTag` is not present in `fileTags` (e.g., after editing the list),
+the filter is treated as disabled and all tasks are shown.
 
 ## Examples
 
-### Default Configuration
-
-- **ALL** - Shows all tasks
-- **WORK** - Shows tasks from files containing "work"
-- **PRIVATE** - Shows tasks from files NOT containing "work"
-
-### Custom Configuration
+### Default configuration
 
 ```json
-{
-    "markdown-org.fileTags": [
-        { "name": "ALL", "pattern": "" },
-        { "name": "PROJECT_A", "pattern": "proj-a" },
-        { "name": "NOT_PROJECT_A", "pattern": "!proj-a" },
-        { "name": "URGENT", "pattern": "urgent" },
-        { "name": "OTHER", "pattern": "" }
-    ]
-}
+[
+    { "name": "ALL", "pattern": "" },
+    { "name": "WORK", "pattern": "work" },
+    { "name": "PRIVATE", "pattern": "!work" }
+]
 ```
 
-Files:
+- **ALL** — shows everything (pattern is empty).
+- **WORK** — shows tasks whose filename contains `work`.
+- **PRIVATE** — shows tasks whose filename does **not** match any positive
+  pattern. With this configuration that's everything outside WORK, since WORK
+  is the only positive pattern.
 
-- `proj-a-tasks.md` → PROJECT_A
-- `urgent-meeting.md` → URGENT, NOT_PROJECT_A
-- `shopping.md` → NOT_PROJECT_A, OTHER
-- All files → ALL
+### Multi-positive configuration
 
-### Pattern Matching Rules
+```json
+[
+    { "name": "ALL", "pattern": "" },
+    { "name": "WORK", "pattern": "work" },
+    { "name": "PROJECT", "pattern": "project" },
+    { "name": "OTHER", "pattern": "!" }
+]
+```
 
-1. `"work"` - file path contains "work"
-2. `"!work"` - file path does NOT contain "work"
-3. `""` - file path doesn't match any non-negated pattern from other tags
+- **WORK** — basename contains `work`.
+- **PROJECT** — basename contains `project`.
+- **OTHER** — basename matches **neither** `work` **nor** `project`. The
+  marker `"!"` could equally be `"!whatever"`; only the leading `!` matters.
+
+## Pattern matching rules — summary
+
+| Pattern  | Meaning                                                      |
+| -------- | ------------------------------------------------------------ |
+| `""`     | filter disabled; show every task                             |
+| `"text"` | `basename(file).includes("text")`                            |
+| `"!..."` | `basename(file)` does not match any positive pattern in tags |
+
+Notes:
+
+- Matching is **substring**, not glob and not regex.
+- Negation pattern is symmetric: with N positive patterns, all `!`-tags behave
+  the same way ("none of the positives match"). The text after `!` is ignored.
+- Filter state is persisted per workspace when possible, so different projects
+  can have different active tags.

@@ -229,12 +229,12 @@
               "pattern": "!work"
             }
           ],
-          "description": "File tags based on filename patterns. Use '!' prefix for negation (e.g., '!work'). Empty pattern matches files without other patterns."
+          "description": "File tags. Pattern is matched (substring) against the file's basename. Empty pattern disables the filter (show all). '!'-prefix means 'not matching any positive pattern' — the text after '!' is ignored."
         },
         "markdown-org.currentTag": {
           "type": "string",
           "default": "ALL",
-          "description": "Currently selected tag filter for agenda view"
+          "description": "Currently selected tag filter for agenda view. Stored per workspace when a workspace is open."
         },
         "markdown-org.clockRoundMinutes": {
           "type": "number",
