@@ -1,6 +1,48 @@
+# VS Code / extension host workspace state
 .vscode/**
 .vscode-test/**
+
+# VCS / CI / tooling state
+.git/**
+.github/**
+.claude/**
+
+# Sources and build artifacts
 src/**
-.gitignore
-tsconfig.json
+out/test/**
+**/*.map
 node_modules/**
+
+# Linter / formatter / language config
+.editorconfig
+.eslintignore
+.gitignore
+.nvmrc
+.prettierignore
+.prettierrc.json
+.vscodeignore
+eslint.config.mjs
+tsconfig.json
+
+# npm lockfile — included via the published `package.json` already; shipping
+# the lockfile inflates the VSIX without changing what the user installs.
+package-lock.json
+
+# Dev-only directories
+docs/**
+examples/**
+test-workspace/**
+
+# Internal design / process notes that aren't user docs
+CLOCK_IMPLEMENTATION.md
+CLOCK_TESTING.md
+CLOCK_USAGE.md
+HOLIDAYS_INTEGRATION.md
+MONTH_VIEW_CHANGES.md
+MONTH_VIEW_TESTS.md
+TODO.md
+demo.md
+test-tasks.md
+
+# Build outputs
+*.vsix
