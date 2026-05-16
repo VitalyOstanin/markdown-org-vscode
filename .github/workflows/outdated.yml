@@ -1,0 +1,43 @@
+name: Dependencies
+
+on:
+  schedule:
+    # Weekly, Monday 06:00 UTC. Outdated checks aren't latency-sensitive;
+    # the schedule keeps signal out of the per-PR CI path.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: outdated-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  outdated:
+    name: npm outdated (non-blocking)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # Informational. Failures here must not block merges.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: Install dependencies (lockfile only)
+        run: npm ci --ignore-scripts
+
+      - name: npm outdated
+        # `--long` includes the package type (dependency/devDependency) which
+        # helps distinguish runtime churn from dev-only churn at a glance.
+        # `|| true` keeps the step from failing the workflow — this is purely
+        # informational; the job-level continue-on-error already covers a
+        # failure here but we want the step itself to render as success so the
+        # summary stays readable.
+        run: npm outdated --long || true

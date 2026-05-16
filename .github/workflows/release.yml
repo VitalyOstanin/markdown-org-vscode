@@ -4,31 +4,47 @@ on:
   push:
     tags:
       - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to publish (e.g. v0.3.0). Must already exist on the repository.'
+        required: true
+        type: string
+      dry_run:
+        description: 'If true, run tests and build the VSIX but skip the GitHub Release step.'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: write
 
-jobs:
-  release:
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v6
+concurrency:
+  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+  cancel-in-progress: false
 
-      - uses: actions/setup-node@v6
+jobs:
+  test:
+    name: Test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'
 
-      - name: Verify tag matches package.json version
-        run: |
-          PKG_VERSION="$(node -p "require('./package.json').version")"
-          TAG_VERSION="${GITHUB_REF_NAME#v}"
-          if [ "$PKG_VERSION" != "$TAG_VERSION" ]; then
-            echo "Tag $GITHUB_REF_NAME does not match package.json version $PKG_VERSION"
-            exit 1
-          fi
-
-      - run: npm ci --ignore-scripts
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
 
       - name: Lint
         run: npm run lint
@@ -39,14 +55,58 @@ jobs:
       - name: Run unit tests
         run: npm test
 
-      - name: Run integration tests
+      - name: Run integration tests (Linux)
+        if: runner.os == 'Linux'
         run: xvfb-run -a npm run test:integration
+
+      - name: Run integration tests (macOS / Windows)
+        if: runner.os != 'Linux'
+        run: npm run test:integration
+
+  publish:
+    name: Publish VSIX
+    needs: test
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: Verify tag matches package.json version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG_VERSION="${{ inputs.tag }}"
+            TAG_VERSION="${TAG_VERSION#v}"
+          else
+            TAG_VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          PKG_VERSION="$(node -p 'require("./package.json").version')"
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::Tag v$TAG_VERSION does not match package.json version $PKG_VERSION"
+            exit 1
+          fi
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Compile
+        run: npm run compile
 
       - name: Package VSIX
         run: npm run package
 
-      - uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
+      - name: Attach VSIX to GitHub Release
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.dry_run == false }}
+        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
         with:
           files: '*.vsix'
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

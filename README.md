@@ -333,7 +333,7 @@ Then reload the VS Code window.
 - Node.js 20+ (see `.nvmrc` for the project-wide version)
 - npm
 - VS Code 1.85+
-- For integration tests on Linux: `xvfb-run` (e.g. `apt install xvfb`)
+- For running integration tests on **headless Linux** (CI, remote machines without an X server): `xvfb-run` (e.g. `apt install xvfb`). Not required on macOS, Windows, or Linux with a graphical session.
 
 ### Build
 
@@ -349,7 +349,9 @@ npm test                # unit tests via Mocha (no VS Code host required)
 npm run test:integration   # integration tests via @vscode/test-electron (downloads VS Code)
 ```
 
-On headless Linux, prefix integration tests with `xvfb-run -a`.
+On headless Linux, prefix integration tests with `xvfb-run -a`. On macOS and Windows the integration runner uses the native display.
+
+CI runs the full lint + unit + integration suite on Ubuntu, macOS, and Windows (`.github/workflows/ci.yml`). The release workflow re-runs the same matrix before packaging the VSIX.
 
 ### Lint and format
 
