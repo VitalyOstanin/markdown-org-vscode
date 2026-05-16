@@ -10,7 +10,8 @@
   },
   "license": "MIT",
   "engines": {
-    "vscode": "^1.85.0"
+    "vscode": "^1.85.0",
+    "node": ">=20"
   },
   "categories": [
     "Other"
@@ -238,7 +239,11 @@
     "watch": "tsc -watch -p ./",
     "test": "npm run compile && node ./out/test/suite/index.js",
     "test:integration": "npm run compile && node ./out/test/runTest.js",
-    "lint": "eslint src --ext ts"
+    "lint": "eslint src",
+    "lint:fix": "eslint src --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "package": "vsce package"
   },
   "devDependencies": {
     "@types/glob": "^8.1.0",

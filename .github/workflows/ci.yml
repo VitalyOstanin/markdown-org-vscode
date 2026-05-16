@@ -2,28 +2,45 @@ name: CI
 
 on:
   push:
-    branches: [ master ]
+    branches: [master]
   pull_request:
-    branches: [ master ]
+    branches: [master]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
-      
+        uses: actions/checkout@v6
+
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v6
         with:
-          node-version: '20'
-      
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
       - name: Install dependencies
-        run: npm install
-      
+        run: npm ci --ignore-scripts
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Format check
+        run: npm run format:check
+
       - name: Compile
         run: npm run compile
-      
+
       - name: Run unit tests
         run: npm test
+
+      - name: Run integration tests
+        run: xvfb-run -a npm run test:integration
