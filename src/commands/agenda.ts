@@ -143,10 +143,14 @@ export async function cycleTag(_context: vscode.ExtensionContext) {
     const nextIndex = (currentIndex + 1) % fileTags.length;
     const nextTag = fileTags[nextIndex].name;
 
-    await config.update('currentTag', nextTag, vscode.ConfigurationTarget.Global);
+    const target =
+        (vscode.workspace.workspaceFolders?.length ?? 0) > 0
+            ? vscode.ConfigurationTarget.Workspace
+            : vscode.ConfigurationTarget.Global;
+    await config.update('currentTag', nextTag, target);
     vscode.window.showInformationMessage(`Tag filter: ${nextTag}`);
 
-    AgendaPanel.refreshWithCurrentTag();
+    AgendaPanel.refresh();
 }
 
 function execCommand(command: string, args: string[]): Promise<string> {

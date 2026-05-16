@@ -23,9 +23,7 @@ export class AgendaPanel {
     private static debounceTimer?: NodeJS.Timeout;
     private static refreshCallback?: (date?: string, userInitiated?: boolean) => Promise<void>;
     private static currentDate?: string;
-    private static currentMode?: string;
     private static dayCheckTimer?: NodeJS.Timeout;
-    private static currentTag?: string;
 
     private static scheduleNextDayCheck() {
         AgendaPanel.dayCheckTimer = setTimeout(() => {
@@ -49,8 +47,6 @@ export class AgendaPanel {
         if (refreshCallback) {
             AgendaPanel.refreshCallback = refreshCallback;
         }
-        AgendaPanel.currentMode = mode;
-        AgendaPanel.currentTag = currentTag;
         const today = new Date();
         const localDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
         AgendaPanel.currentDate = date || localDate;
@@ -196,7 +192,8 @@ export class AgendaPanel {
         }
     }
 
-    public static refreshWithCurrentTag() {
+    /** Reload data into the panel without re-focusing it. Re-reads settings (including tag filter). */
+    public static refresh() {
         if (AgendaPanel.refreshCallback) {
             AgendaPanel.refreshCallback(AgendaPanel.currentDate, false);
         }
