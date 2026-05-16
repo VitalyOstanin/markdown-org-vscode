@@ -1,19 +1,9 @@
 import * as vscode from 'vscode';
-import { findNearestHeading } from '../utils';
-
-const CLOCK_REGEX = /^(\s*)`CLOCK: ([\[<])(\d{4})-(\d{2})-(\d{2}) ([^\]>]+)([\]>])(?:--([\[<])(\d{4})-(\d{2})-(\d{2}) ([^\]>]+)([\]>]) => +(-?\d+):(-?\d+))?`$/;
+import { findNearestHeading, formatOrgTimestamp, getTimestampIndent } from '../utils';
+import { CLOCK_REGEX, TIMESTAMP_LINE_REGEX } from '../orgPatterns';
 
 function formatTimestamp(date: Date): string {
-    const year = date.getFullYear();
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const day = date.getDate().toString().padStart(2, '0');
-    const hour = date.getHours().toString().padStart(2, '0');
-    const minute = date.getMinutes().toString().padStart(2, '0');
-    
-    const dayNames = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
-    const weekday = dayNames[date.getDay()];
-    
-    return `[${year}-${month}-${day} ${weekday} ${hour}:${minute}]`;
+    return formatOrgTimestamp(date, 'square');
 }
 
 function roundTime(date: Date, roundMinutes: number | undefined): Date {
@@ -59,20 +49,6 @@ function calculateDuration(start: Date, end: Date): string {
     return `${hours.toString().padStart(2, ' ')}:${minutes.toString().padStart(2, '0')}`;
 }
 
-function getClockIndent(editor: vscode.TextEditor, headingLine: number): string {
-    const timestampRegex = /^(\s*)`(CREATED|SCHEDULED|DEADLINE|CLOSED): <[^>]+>`$/;
-    
-    if (headingLine + 1 < editor.document.lineCount) {
-        const line = editor.document.lineAt(headingLine + 1);
-        const match = line.text.match(timestampRegex);
-        if (match) {
-            return match[1];
-        }
-    }
-    
-    return '';
-}
-
 function findClockLines(editor: vscode.TextEditor, headingLine: number): number[] {
     const clockLines: number[] = [];
 
@@ -80,7 +56,7 @@ function findClockLines(editor: vscode.TextEditor, headingLine: number): number[
         const line = editor.document.lineAt(i);
         const text = line.text;
 
-        if (text.match(/^(\s*)`(CREATED|SCHEDULED|DEADLINE|CLOSED): <[^>]+>`$/)) {
+        if (text.match(TIMESTAMP_LINE_REGEX)) {
             continue;
         }
 
@@ -137,7 +113,7 @@ export async function insertClockStart() {
     const rounded = roundTime(now, roundMinutes);
     const timestamp = formatTimestamp(rounded);
     
-    const indent = getClockIndent(editor, headingLine);
+    const indent = getTimestampIndent(editor, headingLine);
     const newLine = `${indent}\`CLOCK: ${timestamp}\``;
     
     let insertLine: number;
@@ -147,7 +123,7 @@ export async function insertClockStart() {
         let lastTimestampLine = headingLine;
         for (let i = headingLine + 1; i < editor.document.lineCount; i++) {
             const line = editor.document.lineAt(i);
-            if (line.text.match(/^(\s*)`(CREATED|SCHEDULED|DEADLINE|CLOSED): <[^>]+>`$/)) {
+            if (line.text.match(TIMESTAMP_LINE_REGEX)) {
                 lastTimestampLine = i;
             } else {
                 break;

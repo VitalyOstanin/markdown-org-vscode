@@ -1,5 +1,38 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
+import { TIMESTAMP_LINE_REGEX } from './orgPatterns';
+
+export const DAY_NAMES_SHORT = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+
+export function formatOrgTimestamp(date: Date, bracket: 'angle' | 'square'): string {
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    const hour = date.getHours().toString().padStart(2, '0');
+    const minute = date.getMinutes().toString().padStart(2, '0');
+    const weekday = DAY_NAMES_SHORT[date.getDay()];
+    const open = bracket === 'angle' ? '<' : '[';
+    const close = bracket === 'angle' ? '>' : ']';
+    return `${open}${year}-${month}-${day} ${weekday} ${hour}:${minute}${close}`;
+}
+
+export function toIsoDate(date: Date): string {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
+export function getTimestampIndent(editor: vscode.TextEditor, headingLine: number): string {
+    if (headingLine + 1 < editor.document.lineCount) {
+        const line = editor.document.lineAt(headingLine + 1);
+        const match = line.text.match(TIMESTAMP_LINE_REGEX);
+        if (match) {
+            return match[1];
+        }
+    }
+    return '';
+}
 
 export function isPathInsideWorkspace(filePath: string): boolean {
     const folders = vscode.workspace.workspaceFolders;

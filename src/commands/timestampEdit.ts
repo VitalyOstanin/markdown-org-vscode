@@ -1,15 +1,16 @@
 import * as vscode from 'vscode';
+import { HEADING_REGEX, TIMESTAMP_LINE_REGEX } from '../orgPatterns';
 
 const TIMESTAMP_REGEX = /<(\d{4})-(\d{2})-(\d{2})(?: ([А-Яа-яA-Za-z]{2,3}))?(?: (\d{2}):(\d{2}))?(?: (\+\d+[dwmy]{1,2}))?>/;
-const HEADING_REGEX = /^(#+)\s+(?:(TODO|DONE)\s+)?(?:\[#([A-Z])\]\s+)?(.+)$/;
-const TIMESTAMP_LINE_REGEX = /^(\s*)`(CREATED|SCHEDULED|DEADLINE|CLOSED): (<[^>]+>)`$/;
+// Local variant of the CLOCK regex with weekday and time as separate groups
+// so cursor offsets can target individual parts; orgPatterns.CLOCK_REGEX uses
+// a broader `[^\]>]+` form for general matching.
 const CLOCK_REGEX = /^(\s*)`CLOCK: ([\[<])(\d{4})-(\d{2})-(\d{2}) ([А-Яа-яA-Za-z]+) (\d{2}):(\d{2})([\]>])(?:--([\[<])(\d{4})-(\d{2})-(\d{2}) ([А-Яа-яA-Za-z]+) (\d{2}):(\d{2})([\]>]) => +(-?\d+):(-?\d+))?`$/;
 const PRIORITY_A_CODE = 'A'.charCodeAt(0);
 const PRIORITY_Z_CODE = 'Z'.charCodeAt(0);
 
 type TimestampPart = 'year' | 'month' | 'day' | 'weekday' | 'hour' | 'minute';
 type HeadingPart = 'status' | 'priority';
-type TimestampType = 'type';
 type ClockTimestampPart = 'start-year' | 'start-month' | 'start-day' | 'start-weekday' | 'start-hour' | 'start-minute' | 'end-year' | 'end-month' | 'end-day' | 'end-weekday' | 'end-hour' | 'end-minute';
 
 function getClockTimestampAtCursor(editor: vscode.TextEditor): { match: RegExpMatchArray; part: ClockTimestampPart } | null {

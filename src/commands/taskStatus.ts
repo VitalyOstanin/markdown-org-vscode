@@ -1,17 +1,9 @@
 import * as vscode from 'vscode';
-import { findNearestHeading } from '../utils';
+import { findNearestHeading, formatOrgTimestamp, getTimestampIndent } from '../utils';
+import { HEADING_REGEX, TIMESTAMP_LINE_REGEX } from '../orgPatterns';
 
 function formatTimestamp(date: Date): string {
-    const year = date.getFullYear();
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const day = date.getDate().toString().padStart(2, '0');
-    const hour = date.getHours().toString().padStart(2, '0');
-    const minute = date.getMinutes().toString().padStart(2, '0');
-    
-    const dayNames = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
-    const weekday = dayNames[date.getDay()];
-    
-    return `<${year}-${month}-${day} ${weekday} ${hour}:${minute}>`;
+    return formatOrgTimestamp(date, 'angle');
 }
 
 export async function setTaskStatus(status: 'TODO' | 'DONE') {
@@ -27,14 +19,14 @@ export async function setTaskStatus(status: 'TODO' | 'DONE') {
 
     const line = editor.document.lineAt(headingLine);
     const text = line.text;
-    const match = text.match(/^(#+)\s+(?:(TODO|DONE)\s+)?(?:\[#([A-Z])\]\s+)?(.+)$/);
-    
+    const match = text.match(HEADING_REGEX);
+
     if (!match) {
         return;
     }
 
     const [, hashes, currentStatus, priority, title] = match;
-    
+
     let newText = `${hashes} `;
     if (currentStatus !== status) {
         newText += `${status} `;
@@ -62,8 +54,8 @@ export async function togglePriority() {
 
     const line = editor.document.lineAt(headingLine);
     const text = line.text;
-    const match = text.match(/^(#+)\s+(?:(TODO|DONE)\s+)?(?:\[#([A-Z])\]\s+)?(.+)$/);
-    
+    const match = text.match(HEADING_REGEX);
+
     if (!match) {
         return;
     }
@@ -95,10 +87,9 @@ export async function insertCreatedTimestamp() {
         return;
     }
     
-    const timestampLineRegex = /^(\s*)`(CREATED|SCHEDULED|DEADLINE|CLOSED): <[^>]+>`$/;
     for (let i = headingLine + 1; i < editor.document.lineCount; i++) {
         const lineText = editor.document.lineAt(i).text;
-        const tsMatch = lineText.match(timestampLineRegex);
+        const tsMatch = lineText.match(TIMESTAMP_LINE_REGEX);
         if (!tsMatch) {
             break;
         }
@@ -114,20 +105,6 @@ export async function insertCreatedTimestamp() {
     return editor.edit(editBuilder => {
         editBuilder.insert(insertPosition, `${indent}\`CREATED: ${timestamp}\`\n`);
     });
-}
-
-function getTimestampIndent(editor: vscode.TextEditor, headingLine: number): string {
-    const timestampRegex = /^(\s*)`(CREATED|SCHEDULED|DEADLINE|CLOSED): <[^>]+>`$/;
-    
-    if (headingLine + 1 < editor.document.lineCount) {
-        const line = editor.document.lineAt(headingLine + 1);
-        const match = line.text.match(timestampRegex);
-        if (match) {
-            return match[1];
-        }
-    }
-    
-    return '';
 }
 
 export async function insertScheduledTimestamp() {
@@ -157,7 +134,7 @@ async function insertOrReplaceTimestamp(type: 'SCHEDULED' | 'DEADLINE') {
 
     for (let i = headingLine + 1; i < editor.document.lineCount; i++) {
         const line = editor.document.lineAt(i);
-        const match = line.text.match(/^(\s*)`(CREATED|SCHEDULED|DEADLINE): (<[^>]+>)`$/);
+        const match = line.text.match(TIMESTAMP_LINE_REGEX);
         if (!match) {
             break;
         }

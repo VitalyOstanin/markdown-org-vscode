@@ -2,37 +2,11 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { randomBytes } from 'crypto';
 import { isPathInsideWorkspace } from '../utils';
+import { AgendaData } from '../types';
 
 function generateNonce(): string {
     return randomBytes(16).toString('base64');
 }
-
-interface Task {
-    file: string;
-    line: number;
-    heading: string;
-    content: string;
-    task_type?: string;
-    priority?: string;
-    timestamp?: string;
-    timestamp_date?: string;
-    timestamp_time?: string;
-    timestamp_type?: string;
-}
-
-interface TaskWithOffset extends Task {
-    days_offset?: number;
-}
-
-interface DayAgenda {
-    date: string;
-    overdue: TaskWithOffset[];
-    scheduled_timed: TaskWithOffset[];
-    scheduled_no_time: TaskWithOffset[];
-    upcoming: TaskWithOffset[];
-}
-
-type AgendaData = DayAgenda[] | Task[];
 
 export class AgendaPanel {
     private static currentPanel?: vscode.WebviewPanel;
@@ -45,7 +19,7 @@ export class AgendaPanel {
     private static lastCheckedDay?: string;
     private static currentTag?: string;
 
-    public static render(context: vscode.ExtensionContext, data: AgendaData, mode: string, date: string | undefined, refreshCallback?: (date?: string, userInitiated?: boolean) => Promise<void>, userInitiated: boolean = true, currentTag?: string, holidays?: string[]) {
+    public static render(_context: vscode.ExtensionContext, data: AgendaData, mode: string, date: string | undefined, refreshCallback?: (date?: string, userInitiated?: boolean) => Promise<void>, userInitiated: boolean = true, currentTag?: string, holidays?: string[]) {
         if (refreshCallback) {
             AgendaPanel.refreshCallback = refreshCallback;
         }
@@ -105,14 +79,12 @@ export class AgendaPanel {
                 } else if (message.command === 'navigate') {
                     if (message.switchToDay) {
                         AgendaPanel.currentPanel?.dispose();
-                        const { showAgenda } = require('../commands/agenda');
-                        await showAgenda(context, 'day', message.date);
+                        await vscode.commands.executeCommand('markdown-org.showAgendaDay', message.date);
                     } else {
                         AgendaPanel.refreshCallback?.(message.date, true);
                     }
                 } else if (message.command === 'cycleTag') {
-                    const { cycleTag } = require('../commands/agenda');
-                    await cycleTag(context);
+                    await vscode.commands.executeCommand('markdown-org.cycleTag');
                 }
             });
 
