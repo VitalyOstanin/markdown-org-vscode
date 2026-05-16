@@ -69,7 +69,7 @@ suite('Timestamp Integration Tests', () => {
         assert.strictEqual(document.lineAt(0).text, '## TODO Task title');
     });
 
-    test('SCHEDULED replaces DEADLINE', async () => {
+    test('SCHEDULED preserves existing DEADLINE', async () => {
         document = await vscode.workspace.openTextDocument({
             content: '## TODO Task title\n`DEADLINE: <2025-12-06 Fri>`\n',
             language: 'markdown'
@@ -79,11 +79,11 @@ suite('Timestamp Integration Tests', () => {
 
         await vscode.commands.executeCommand('markdown-org.insertScheduled');
 
-        const line1 = document.lineAt(1).text;
-        assert.ok(line1.startsWith('`SCHEDULED: <'));
+        assert.ok(document.lineAt(1).text.startsWith('`DEADLINE: <'));
+        assert.ok(document.lineAt(2).text.startsWith('`SCHEDULED: <'));
     });
 
-    test('DEADLINE replaces SCHEDULED', async () => {
+    test('DEADLINE preserves existing SCHEDULED', async () => {
         document = await vscode.workspace.openTextDocument({
             content: '## TODO Task title\n`SCHEDULED: <2025-12-06 Fri>`\n',
             language: 'markdown'
@@ -93,8 +93,8 @@ suite('Timestamp Integration Tests', () => {
 
         await vscode.commands.executeCommand('markdown-org.insertDeadline');
 
-        const line1 = document.lineAt(1).text;
-        assert.ok(line1.startsWith('`DEADLINE: <'));
+        assert.ok(document.lineAt(1).text.startsWith('`SCHEDULED: <'));
+        assert.ok(document.lineAt(2).text.startsWith('`DEADLINE: <'));
     });
 
     test('Timestamp Up increments day', async () => {
