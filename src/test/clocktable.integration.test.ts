@@ -5,12 +5,14 @@ import * as fs from 'fs';
 import * as sinon from 'sinon';
 import type * as cp from 'child_process';
 import { exec } from '../utils/exec';
+import { extractor } from '../utils/extractor';
 
 suite('CLOCK Table Integration Tests', () => {
     let testFilePath: string;
     let testDocument: vscode.TextDocument;
     let editor: vscode.TextEditor;
     let execFileStub: sinon.SinonStub;
+    let resolveExtractorStub: sinon.SinonStub;
 
     type ExecFileCallback = (error: Error | null, stdout: string, stderr: string) => void;
     function makeExecFileFake(stdout: string, stderr: string, code: number) {
@@ -74,10 +76,12 @@ suite('CLOCK Table Integration Tests', () => {
         editor = await vscode.window.showTextDocument(testDocument);
 
         execFileStub = sinon.stub(exec, 'execFile');
+        resolveExtractorStub = sinon.stub(extractor, 'resolveExtractorPath').resolves('markdown-org-extract');
     });
 
     teardown(async () => {
         execFileStub.restore();
+        resolveExtractorStub.restore();
 
         if (testDocument) {
             await vscode.commands.executeCommand('workbench.action.closeActiveEditor');

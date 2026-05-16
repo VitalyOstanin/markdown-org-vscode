@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import { formatDurationHM, requireActiveEditor } from '../utils';
 import { exec } from '../utils/exec';
+import { extractor } from '../utils/extractor';
 
 const EXTRACTOR_TIMEOUT_MS = 30_000;
 const EXTRACTOR_MAX_BUFFER_BYTES = 10 * 1024 * 1024;
@@ -12,13 +13,7 @@ interface Task {
     total_clock_time?: string;
 }
 
-function getExtractorPath(): string {
-    const config = vscode.workspace.getConfiguration('markdown-org');
-    return config.get<string>('extractorPath') || 'markdown-org-extract';
-}
-
-function parseClockData(filePath: string): Promise<Task[]> {
-    const extractorPath = getExtractorPath();
+function parseClockData(extractorPath: string, filePath: string): Promise<Task[]> {
     return new Promise((resolve, reject) => {
         exec.execFile(
             extractorPath,
@@ -99,10 +94,15 @@ export async function insertClockTable() {
         return;
     }
 
+    const extractorPath = await extractor.resolveExtractorPath();
+    if (!extractorPath) {
+        return;
+    }
+
     const filePath = editor.document.uri.fsPath;
 
     try {
-        const tasks = await parseClockData(filePath);
+        const tasks = await parseClockData(extractorPath, filePath);
         const table = buildClockTable(tasks);
 
         await editor.edit((editBuilder) => {
