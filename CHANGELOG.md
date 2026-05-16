@@ -2,7 +2,7 @@
 
 All notable changes to the "Markdown Org" extension will be documented in this file.
 
-## [Unreleased]
+## [0.3.0] - 2026-05-17
 
 ### Added
 
