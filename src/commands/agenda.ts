@@ -3,48 +3,12 @@ import * as cp from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
 import { AgendaPanel } from '../views/agendaPanel';
-import { AgendaData, DayAgenda, FileTag, Task } from '../types';
+import { FileTag } from '../types';
 import { toIsoDate } from '../utils';
+import { filterTasksByTag } from '../utils/tagFilter';
 
 const EXTRACTOR_TIMEOUT_MS = 30_000;
 const WHICH_TIMEOUT_MS = 5_000;
-
-function filterTasksByTag(data: AgendaData, tag: string, fileTags: FileTag[]): AgendaData {
-    if (tag === 'ALL') {
-        return data;
-    }
-
-    const tagConfig = fileTags.find((t) => t.name === tag);
-    if (!tagConfig) {
-        return data;
-    }
-
-    const pattern = tagConfig.pattern || '';
-    const filterFn = (task: Task) => {
-        if (!pattern) {
-            return !fileTags.some((t) => t.pattern && !t.pattern.startsWith('!') && task.file.includes(t.pattern));
-        }
-        if (pattern.startsWith('!')) {
-            return !task.file.includes(pattern.slice(1));
-        }
-        return task.file.includes(pattern);
-    };
-
-    const isDayAgendaArray = (value: AgendaData): value is DayAgenda[] => {
-        return value.length > 0 && 'date' in value[0];
-    };
-
-    if (isDayAgendaArray(data)) {
-        return data.map((day) => ({
-            ...day,
-            overdue: day.overdue.filter(filterFn),
-            scheduled_timed: day.scheduled_timed.filter(filterFn),
-            scheduled_no_time: day.scheduled_no_time.filter(filterFn),
-            upcoming: day.upcoming.filter(filterFn)
-        }));
-    }
-    return (data as Task[]).filter(filterFn);
-}
 
 /**
  * Open the agenda webview for the given mode (day/week/month/tasks).
