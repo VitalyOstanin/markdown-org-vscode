@@ -19,21 +19,25 @@ suite('Tag Filter Integration Tests', () => {
 
         const config = vscode.workspace.getConfiguration('markdown-org');
         await config.update('workspaceDir', testWorkspaceDir, vscode.ConfigurationTarget.Workspace);
-        await config.update('fileTags', [
-            { name: 'ALL', pattern: '' },
-            { name: 'WORK', pattern: 'work' },
-            { name: 'PERSONAL', pattern: 'personal' }
-        ], vscode.ConfigurationTarget.Workspace);
+        await config.update(
+            'fileTags',
+            [
+                { name: 'ALL', pattern: '' },
+                { name: 'WORK', pattern: 'work' },
+                { name: 'PERSONAL', pattern: 'personal' }
+            ],
+            vscode.ConfigurationTarget.Workspace
+        );
         await config.update('currentTag', 'ALL', vscode.ConfigurationTarget.Global);
     });
 
     after(async () => {
-        [testFile1, testFile2].forEach(f => fs.existsSync(f) && fs.unlinkSync(f));
+        [testFile1, testFile2].forEach((f) => fs.existsSync(f) && fs.unlinkSync(f));
         const config = vscode.workspace.getConfiguration('markdown-org');
         await config.update('currentTag', 'ALL', vscode.ConfigurationTarget.Global);
     });
 
-    test('cycleTag command switches between tags', async function() {
+    test('cycleTag command switches between tags', async function () {
         this.timeout(5000);
 
         await vscode.commands.executeCommand('markdown-org.cycleTag');

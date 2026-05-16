@@ -39,6 +39,7 @@ markdown-org-extract --holidays <YEAR>
 ### Получение праздников
 
 `src/commands/agenda.ts`:
+
 ```typescript
 const getHolidays = async (year: number): Promise<string[]> => {
     try {
@@ -61,6 +62,7 @@ AgendaPanel.render(context, data, mode, currentDate, loadData, userInitiated, cu
 ### Использование в WebView
 
 `src/views/agendaPanel.ts`:
+
 ```javascript
 const holidays = ${JSON.stringify(holidays)};
 
@@ -77,11 +79,18 @@ function isHoliday(date) {
 
 ```typescript
 const mockHolidays2025 = [
-    '2025-01-01', '2025-01-02', '2025-01-03', '2025-01-04', 
-    '2025-01-05', '2025-01-06', '2025-01-07', '2025-01-08',
+    '2025-01-01',
+    '2025-01-02',
+    '2025-01-03',
+    '2025-01-04',
+    '2025-01-05',
+    '2025-01-06',
+    '2025-01-07',
+    '2025-01-08',
     '2025-02-23',
     '2025-03-08',
-    '2025-05-01', '2025-05-09',
+    '2025-05-01',
+    '2025-05-09',
     '2025-06-12',
     '2025-11-04'
 ];
@@ -105,5 +114,5 @@ const mockHolidays2025 = [
 
 ## Fallback
 
-Если `markdown-org-extract --holidays` не работает, возвращается пустой массив `[]`, 
+Если `markdown-org-extract --holidays` не работает, возвращается пустой массив `[]`,
 и календарь отображается без выделения праздников.

@@ -9,19 +9,19 @@ suite('CLOCK Timestamp Editing Integration Tests', () => {
     async function setupTest(content: string) {
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
         const testFilePath = path.join(workspaceFolder!.uri.fsPath, 'test-clock-edit.md');
-        
+
         const uri = vscode.Uri.file(testFilePath);
         const edit = new vscode.WorkspaceEdit();
         edit.createFile(uri, { overwrite: true });
         await vscode.workspace.applyEdit(edit);
-        
+
         document = await vscode.workspace.openTextDocument(uri);
         await vscode.window.showTextDocument(document);
-        
+
         const fullEdit = new vscode.WorkspaceEdit();
         fullEdit.insert(uri, new vscode.Position(0, 0), content);
         await vscode.workspace.applyEdit(fullEdit);
-        
+
         editor = vscode.window.activeTextEditor!;
     }
 
@@ -373,7 +373,9 @@ suite('CLOCK Timestamp Editing Integration Tests', () => {
 
     suite('Multiple CLOCK Lines', () => {
         test('[] - Second line editing works', async () => {
-            await setupTest(`# Test\n\`CLOCK: [2025-12-09 Вт 17:00]--[2025-12-09 Вт 20:30] =>  3:30\`\n\`CLOCK: [2025-12-09 Вт 21:00]--[2025-12-09 Вт 20:30] => -1:-30\`\n`);
+            await setupTest(
+                `# Test\n\`CLOCK: [2025-12-09 Вт 17:00]--[2025-12-09 Вт 20:30] =>  3:30\`\n\`CLOCK: [2025-12-09 Вт 21:00]--[2025-12-09 Вт 20:30] => -1:-30\`\n`
+            );
             editor.selection = new vscode.Selection(2, 17, 2, 17);
             await vscode.commands.executeCommand('markdown-org.timestampDown');
             assert.ok(editor.document.lineAt(2).text.includes('[2025-12-09 Вт 20:00]'));
@@ -381,7 +383,9 @@ suite('CLOCK Timestamp Editing Integration Tests', () => {
         });
 
         test('<> - Second line editing works', async () => {
-            await setupTest(`# Test\n\`CLOCK: <2025-12-09 Вт 17:00>--<2025-12-09 Вт 20:30> =>  3:30\`\n\`CLOCK: <2025-12-09 Вт 21:00>--<2025-12-09 Вт 20:30> => -1:-30\`\n`);
+            await setupTest(
+                `# Test\n\`CLOCK: <2025-12-09 Вт 17:00>--<2025-12-09 Вт 20:30> =>  3:30\`\n\`CLOCK: <2025-12-09 Вт 21:00>--<2025-12-09 Вт 20:30> => -1:-30\`\n`
+            );
             editor.selection = new vscode.Selection(2, 40, 2, 40);
             await vscode.commands.executeCommand('markdown-org.timestampUp');
             assert.ok(editor.document.lineAt(2).text.includes('--<2025-12-09 Вт 21:30>'));

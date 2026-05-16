@@ -36,7 +36,7 @@ export async function setTaskStatus(status: 'TODO' | 'DONE') {
     }
     newText += title;
 
-    return editor.edit(editBuilder => {
+    return editor.edit((editBuilder) => {
         editBuilder.replace(line.range, newText);
     });
 }
@@ -61,7 +61,7 @@ export async function togglePriority() {
     }
 
     const [, hashes, status, currentPriority, title] = match;
-    
+
     let newText = `${hashes} `;
     if (status) {
         newText += `${status} `;
@@ -71,7 +71,7 @@ export async function togglePriority() {
     }
     newText += title;
 
-    return editor.edit(editBuilder => {
+    return editor.edit((editBuilder) => {
         editBuilder.replace(line.range, newText);
     });
 }
@@ -86,7 +86,7 @@ export async function insertCreatedTimestamp() {
     if (headingLine === null) {
         return;
     }
-    
+
     for (let i = headingLine + 1; i < editor.document.lineCount; i++) {
         const lineText = editor.document.lineAt(i).text;
         const tsMatch = lineText.match(TIMESTAMP_LINE_REGEX);
@@ -101,8 +101,8 @@ export async function insertCreatedTimestamp() {
     const indent = getTimestampIndent(editor, headingLine);
     const timestamp = formatTimestamp(new Date());
     const insertPosition = new vscode.Position(headingLine + 1, 0);
-    
-    return editor.edit(editBuilder => {
+
+    return editor.edit((editBuilder) => {
         editBuilder.insert(insertPosition, `${indent}\`CREATED: ${timestamp}\`\n`);
     });
 }
@@ -146,7 +146,7 @@ async function insertOrReplaceTimestamp(type: 'SCHEDULED' | 'DEADLINE') {
 
     if (existingLine !== null) {
         const deleteRange = new vscode.Range(existingLine, 0, existingLine + 1, 0);
-        return editor.edit(editBuilder => {
+        return editor.edit((editBuilder) => {
             editBuilder.delete(deleteRange);
         });
     }
@@ -155,7 +155,7 @@ async function insertOrReplaceTimestamp(type: 'SCHEDULED' | 'DEADLINE') {
     const timestamp = formatTimestamp(new Date());
     const insertPosition = new vscode.Position(blockEnd, 0);
 
-    return editor.edit(editBuilder => {
+    return editor.edit((editBuilder) => {
         editBuilder.insert(insertPosition, `${indent}\`${type}: ${timestamp}\`\n`);
     });
 }

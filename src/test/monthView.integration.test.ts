@@ -39,15 +39,15 @@ suite('Month View Integration Tests', () => {
         }
     });
 
-    test('should render month view with calendar grid', async function() {
+    test('should render month view with calendar grid', async function () {
         this.timeout(10000);
 
         const config = vscode.workspace.getConfiguration('markdown-org');
         await config.update('workspaceDir', testWorkspaceDir, vscode.ConfigurationTarget.Workspace);
 
         await vscode.commands.executeCommand('markdown-org.showAgendaMonth');
-        
-        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        await new Promise((resolve) => setTimeout(resolve, 2000));
 
         const panels = vscode.window.visibleTextEditors;
         assert.ok(panels.length >= 0, 'Agenda panel should be created');
@@ -55,14 +55,29 @@ suite('Month View Integration Tests', () => {
 
     test('should identify days with tasks correctly', () => {
         const mockAgendaData = [
-            { date: '2025-12-01', scheduled_timed: [], scheduled_no_time: [{ heading: 'Task 1' }], upcoming: [], overdue: [] },
+            {
+                date: '2025-12-01',
+                scheduled_timed: [],
+                scheduled_no_time: [{ heading: 'Task 1' }],
+                upcoming: [],
+                overdue: []
+            },
             { date: '2025-12-02', scheduled_timed: [], scheduled_no_time: [], upcoming: [], overdue: [] },
-            { date: '2025-12-06', scheduled_timed: [{ heading: 'Task 2' }], scheduled_no_time: [], upcoming: [], overdue: [] }
+            {
+                date: '2025-12-06',
+                scheduled_timed: [{ heading: 'Task 2' }],
+                scheduled_no_time: [],
+                upcoming: [],
+                overdue: []
+            }
         ];
 
-        const daysWithTasks = mockAgendaData.filter(day => {
-            const taskCount = (day.overdue || []).length + (day.scheduled_timed || []).length + 
-                            (day.scheduled_no_time || []).length + (day.upcoming || []).length;
+        const daysWithTasks = mockAgendaData.filter((day) => {
+            const taskCount =
+                (day.overdue || []).length +
+                (day.scheduled_timed || []).length +
+                (day.scheduled_no_time || []).length +
+                (day.upcoming || []).length;
             return taskCount > 0;
         });
 
@@ -74,7 +89,7 @@ suite('Month View Integration Tests', () => {
     test('should correctly calculate first day of month', () => {
         const testCases = [
             { year: 2025, month: 11, expectedDay: 0 }, // December 2025 starts on Monday
-            { year: 2025, month: 0, expectedDay: 2 },  // January 2025 starts on Wednesday
+            { year: 2025, month: 0, expectedDay: 2 } // January 2025 starts on Wednesday
         ];
 
         testCases.forEach(({ year, month, expectedDay }) => {
@@ -87,7 +102,7 @@ suite('Month View Integration Tests', () => {
 
     test('should handle month navigation correctly', () => {
         const currentDate = new Date('2025-12-06');
-        
+
         // Next month
         const nextMonth = new Date(currentDate);
         nextMonth.setMonth(nextMonth.getMonth() + 1);

@@ -19,7 +19,16 @@ export class AgendaPanel {
     private static lastCheckedDay?: string;
     private static currentTag?: string;
 
-    public static render(_context: vscode.ExtensionContext, data: AgendaData, mode: string, date: string | undefined, refreshCallback?: (date?: string, userInitiated?: boolean) => Promise<void>, userInitiated: boolean = true, currentTag?: string, holidays?: string[]) {
+    public static render(
+        _context: vscode.ExtensionContext,
+        data: AgendaData,
+        mode: string,
+        date: string | undefined,
+        refreshCallback?: (date?: string, userInitiated?: boolean) => Promise<void>,
+        userInitiated: boolean = true,
+        currentTag?: string,
+        holidays?: string[]
+    ) {
         if (refreshCallback) {
             AgendaPanel.refreshCallback = refreshCallback;
         }
@@ -62,7 +71,7 @@ export class AgendaPanel {
                 }
             });
 
-            AgendaPanel.currentPanel.webview.onDidReceiveMessage(async message => {
+            AgendaPanel.currentPanel.webview.onDidReceiveMessage(async (message) => {
                 if (message.command === 'openTask') {
                     if (typeof message.file !== 'string' || typeof message.line !== 'number') {
                         return;
@@ -90,8 +99,16 @@ export class AgendaPanel {
 
             const nonce = generateNonce();
             const cspSource = AgendaPanel.currentPanel.webview.cspSource;
-            AgendaPanel.currentPanel.webview.html = this.getHtmlContent(data, mode, locale, currentTag || 'ALL', holidays || [], nonce, cspSource);
-            
+            AgendaPanel.currentPanel.webview.html = this.getHtmlContent(
+                data,
+                mode,
+                locale,
+                currentTag || 'ALL',
+                holidays || [],
+                nonce,
+                cspSource
+            );
+
             AgendaPanel.currentPanel.webview.postMessage({
                 command: 'init',
                 data: data,
@@ -108,9 +125,11 @@ export class AgendaPanel {
 
             const ignored = (uri: vscode.Uri) => {
                 const fsPath = uri.fsPath;
-                return fsPath.endsWith('.archive.md')
-                    || fsPath.includes(`${path.sep}.git${path.sep}`)
-                    || fsPath.includes(`${path.sep}node_modules${path.sep}`);
+                return (
+                    fsPath.endsWith('.archive.md') ||
+                    fsPath.includes(`${path.sep}.git${path.sep}`) ||
+                    fsPath.includes(`${path.sep}node_modules${path.sep}`)
+                );
             };
 
             const triggerRefresh = (uri: vscode.Uri) => {
@@ -133,7 +152,7 @@ export class AgendaPanel {
         if (!AgendaPanel.dayCheckInterval && refreshCallback) {
             const today = new Date();
             AgendaPanel.lastCheckedDay = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-            
+
             AgendaPanel.dayCheckInterval = setInterval(() => {
                 const now = new Date();
                 const currentDay = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -151,7 +170,15 @@ export class AgendaPanel {
         }
     }
 
-    private static getHtmlContent(data: AgendaData, mode: string, locale: string, currentTag: string, holidays: string[], nonce: string, cspSource: string): string {
+    private static getHtmlContent(
+        data: AgendaData,
+        mode: string,
+        locale: string,
+        currentTag: string,
+        holidays: string[],
+        nonce: string,
+        cspSource: string
+    ): string {
         return `<!DOCTYPE html>
 <html>
 <head>

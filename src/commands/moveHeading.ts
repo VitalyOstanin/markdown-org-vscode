@@ -49,7 +49,7 @@ interface HeadingInfo {
 
 function findHeadingAtCursor(document: vscode.TextDocument, position: vscode.Position): HeadingInfo | null {
     const currentLine = position.line;
-    
+
     for (let i = currentLine; i >= 0; i--) {
         const line = document.lineAt(i).text;
         const match = line.match(/^(#+)\s+(.+)$/);
@@ -65,7 +65,7 @@ function findHeadingAtCursor(document: vscode.TextDocument, position: vscode.Pos
 
 function extractHeadingContent(document: vscode.TextDocument, startLine: number, level: number): string[] {
     const lines: string[] = [document.lineAt(startLine).text];
-    
+
     for (let i = startLine + 1; i < document.lineCount; i++) {
         const line = document.lineAt(i).text;
         const match = line.match(/^(#+)\s+/);
@@ -80,7 +80,7 @@ function extractHeadingContent(document: vscode.TextDocument, startLine: number,
 function getAncestorChain(document: vscode.TextDocument, startLine: number, targetLevel: number): HeadingInfo[] {
     const ancestors: HeadingInfo[] = [];
     let currentLevel = targetLevel;
-    
+
     for (let i = startLine - 1; i >= 0; i--) {
         const line = document.lineAt(i).text;
         const match = line.match(/^(#+)\s+(.+)$/);
@@ -98,15 +98,15 @@ function getAncestorChain(document: vscode.TextDocument, startLine: number, targ
 
 function buildArchiveContent(ancestors: HeadingInfo[], heading: HeadingInfo): string {
     let content = '';
-    
-    ancestors.forEach(ancestor => {
+
+    ancestors.forEach((ancestor) => {
         content += '#'.repeat(ancestor.level) + ' ' + ancestor.text + '\n';
     });
-    
-    heading.content.forEach(line => {
+
+    heading.content.forEach((line) => {
         content += line + '\n';
     });
-    
+
     return content;
 }
 
@@ -137,7 +137,7 @@ export async function moveToArchive() {
     const ancestors = getAncestorChain(document, heading.line, heading.level);
     const archiveContent = buildArchiveContent(ancestors, heading);
 
-    let existingContent = await readIfExists(archivePath) ?? '';
+    let existingContent = (await readIfExists(archivePath)) ?? '';
     if (existingContent && !existingContent.endsWith('\n\n')) {
         existingContent += existingContent.endsWith('\n') ? '\n' : '\n\n';
     }
@@ -174,7 +174,9 @@ export async function promoteToMaintain() {
 
     const maintainPath = resolveWorkspacePath(rawMaintainPath);
     if (!isPathInsideWorkspace(maintainPath)) {
-        vscode.window.showErrorMessage(`Markdown Org: maintainFilePath '${rawMaintainPath}' must be inside the workspace`);
+        vscode.window.showErrorMessage(
+            `Markdown Org: maintainFilePath '${rawMaintainPath}' must be inside the workspace`
+        );
         return;
     }
     if (await refuseIfSymlink(maintainPath)) {
@@ -190,7 +192,7 @@ export async function promoteToMaintain() {
         return;
     }
 
-    let maintainContent = await readIfExists(maintainPath) ?? '';
+    let maintainContent = (await readIfExists(maintainPath)) ?? '';
 
     const lines = maintainContent.split('\n');
     let incomingIndex = -1;
@@ -203,7 +205,7 @@ export async function promoteToMaintain() {
     }
 
     const newHeading = '## ' + heading.text;
-    const newContent = heading.content.slice(1).map(line => {
+    const newContent = heading.content.slice(1).map((line) => {
         const match = line.match(/^(#+)\s+(.+)$/);
         if (match) {
             return '#'.repeat(match[1].length + 1) + ' ' + match[2];

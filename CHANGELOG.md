@@ -5,21 +5,23 @@ All notable changes to the "Markdown Org" extension will be documented in this f
 ## [0.2.0] - 2025-12-06
 
 ### Added
+
 - **Tag filtering for agenda views based on filename patterns**
-  - Support for pattern matching (e.g., "work")
-  - Support for negation patterns (e.g., "!work")
-  - Cycle through tags with keyboard shortcut (Ctrl+K Ctrl+K Ctrl+T)
-  - Current tag persists between sessions
-  - Tag indicator displayed in agenda navigation bar
+    - Support for pattern matching (e.g., "work")
+    - Support for negation patterns (e.g., "!work")
+    - Cycle through tags with keyboard shortcut (Ctrl+K Ctrl+K Ctrl+T)
+    - Current tag persists between sessions
+    - Tag indicator displayed in agenda navigation bar
 - New settings:
-  - `markdown-org.fileTags` - tag definitions with filename patterns
-  - `markdown-org.currentTag` - currently active tag filter
+    - `markdown-org.fileTags` - tag definitions with filename patterns
+    - `markdown-org.currentTag` - currently active tag filter
 - New command:
-  - `Markdown Org: Cycle Tag Filter` (Ctrl+K Ctrl+K Ctrl+T)
+    - `Markdown Org: Cycle Tag Filter` (Ctrl+K Ctrl+K Ctrl+T)
 
 ## [0.1.0] - 2025-12-06
 
 ### Added
+
 - Task management with TODO/DONE statuses
 - Priority levels support ([#A] through [#Z])
 - Timestamp support (CREATED, SCHEDULED, DEADLINE, CLOSED)
@@ -33,12 +35,13 @@ All notable changes to the "Markdown Org" extension will be documented in this f
 - Archive heading command (Ctrl+K Ctrl+A)
 - Promote to maintain file command (Ctrl+K Ctrl+M)
 - Configurable settings:
-  - `markdown-org.extractorPath` - path to markdown-org-extract
-  - `markdown-org.workspaceDir` - workspace directory to scan
-  - `markdown-org.maintainFilePath` - maintain file path
-  - `markdown-org.dateLocale` - locale for date formatting
+    - `markdown-org.extractorPath` - path to markdown-org-extract
+    - `markdown-org.workspaceDir` - workspace directory to scan
+    - `markdown-org.maintainFilePath` - maintain file path
+    - `markdown-org.dateLocale` - locale for date formatting
 
 ### Commands
+
 - `Markdown Org: Set TODO` (Ctrl+K Ctrl+T)
 - `Markdown Org: Set DONE` (Ctrl+K Ctrl+D)
 - `Markdown Org: Toggle Priority` (Ctrl+K Ctrl+P)
@@ -55,4 +58,5 @@ All notable changes to the "Markdown Org" extension will be documented in this f
 - `Markdown Org: Promote to Maintain` (Ctrl+K Ctrl+M)
 
 ### Dependencies
+
 - Requires [markdown-org-extract](https://crates.io/crates/markdown-org-extract) utility

@@ -4,7 +4,7 @@ suite('Task Status Tests', () => {
     test('Parse heading with TODO status', () => {
         const heading = '## TODO Task title';
         const match = heading.match(/^(#+)\s+(?:(TODO|DONE)\s+)?(?:\[#([A-Z])\]\s+)?(.+)$/);
-        
+
         assert.ok(match);
         assert.strictEqual(match[1], '##');
         assert.strictEqual(match[2], 'TODO');
@@ -15,7 +15,7 @@ suite('Task Status Tests', () => {
     test('Parse heading with DONE status', () => {
         const heading = '## DONE Task title';
         const match = heading.match(/^(#+)\s+(?:(TODO|DONE)\s+)?(?:\[#([A-Z])\]\s+)?(.+)$/);
-        
+
         assert.ok(match);
         assert.strictEqual(match[2], 'DONE');
     });
@@ -23,7 +23,7 @@ suite('Task Status Tests', () => {
     test('Parse heading with priority', () => {
         const heading = '## TODO [#A] High priority task';
         const match = heading.match(/^(#+)\s+(?:(TODO|DONE)\s+)?(?:\[#([A-Z])\]\s+)?(.+)$/);
-        
+
         assert.ok(match);
         assert.strictEqual(match[2], 'TODO');
         assert.strictEqual(match[3], 'A');
@@ -33,7 +33,7 @@ suite('Task Status Tests', () => {
     test('Parse heading without status', () => {
         const heading = '## Regular heading';
         const match = heading.match(/^(#+)\s+(?:(TODO|DONE)\s+)?(?:\[#([A-Z])\]\s+)?(.+)$/);
-        
+
         assert.ok(match);
         assert.strictEqual(match[1], '##');
         assert.strictEqual(match[2], undefined);
@@ -43,11 +43,11 @@ suite('Task Status Tests', () => {
 
     test('Parse heading with different priority levels', () => {
         const priorities = ['A', 'B', 'C', 'Z'];
-        
-        priorities.forEach(priority => {
+
+        priorities.forEach((priority) => {
             const heading = `## TODO [#${priority}] Task`;
             const match = heading.match(/^(#+)\s+(?:(TODO|DONE)\s+)?(?:\[#([A-Z])\]\s+)?(.+)$/);
-            
+
             assert.ok(match);
             assert.strictEqual(match[3], priority);
         });
@@ -58,7 +58,7 @@ suite('Task Status Tests', () => {
         const status = 'TODO';
         const priority = 'A';
         const title = 'Task title';
-        
+
         const result = `${hashes} ${status} [#${priority}] ${title}`;
         assert.strictEqual(result, '## TODO [#A] Task title');
     });
@@ -67,7 +67,7 @@ suite('Task Status Tests', () => {
         const statuses = ['TODO', 'DONE'];
         const currentIndex = statuses.indexOf('TODO');
         const newIndex = (currentIndex + 1) % statuses.length;
-        
+
         assert.strictEqual(statuses[newIndex], 'DONE');
     });
 
@@ -75,7 +75,7 @@ suite('Task Status Tests', () => {
         const statuses = ['TODO', 'DONE'];
         const currentIndex = statuses.indexOf('DONE');
         const newIndex = (currentIndex + 1) % statuses.length;
-        
+
         assert.strictEqual(statuses[newIndex], 'TODO');
     });
 });

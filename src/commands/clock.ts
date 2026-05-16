@@ -10,14 +10,14 @@ function roundTime(date: Date, roundMinutes: number | undefined): Date {
     if (!roundMinutes) {
         return date;
     }
-    
+
     const result = new Date(date);
     const minutes = result.getMinutes();
     const rounded = Math.floor(minutes / roundMinutes) * roundMinutes;
     result.setMinutes(rounded);
     result.setSeconds(0);
     result.setMilliseconds(0);
-    
+
     return result;
 }
 
@@ -25,18 +25,18 @@ function roundEndTime(startDate: Date, endDate: Date, roundMinutes: number | und
     if (!roundMinutes) {
         return endDate;
     }
-    
+
     const result = new Date(endDate);
     const minutes = result.getMinutes();
     const rounded = Math.ceil(minutes / roundMinutes) * roundMinutes;
     result.setMinutes(rounded);
     result.setSeconds(0);
     result.setMilliseconds(0);
-    
+
     if (result <= startDate) {
         result.setMinutes(result.getMinutes() + roundMinutes);
     }
-    
+
     return result;
 }
 
@@ -45,7 +45,7 @@ function calculateDuration(start: Date, end: Date): string {
     const diffMinutes = Math.floor(diffMs / 60000);
     const hours = Math.floor(diffMinutes / 60);
     const minutes = diffMinutes % 60;
-    
+
     return `${hours.toString().padStart(2, ' ')}:${minutes.toString().padStart(2, '0')}`;
 }
 
@@ -97,25 +97,25 @@ export async function insertClockStart() {
     if (headingLine === null) {
         return;
     }
-    
+
     const clockLines = findClockLines(editor, headingLine);
     const openClockLine = findOpenClock(editor, clockLines);
-    
+
     if (openClockLine !== null) {
         vscode.window.showWarningMessage('There is already an open CLOCK entry');
         return;
     }
-    
+
     const config = vscode.workspace.getConfiguration('markdown-org');
     const roundMinutes = config.get<number>('clockRoundMinutes');
-    
+
     const now = new Date();
     const rounded = roundTime(now, roundMinutes);
     const timestamp = formatTimestamp(rounded);
-    
+
     const indent = getTimestampIndent(editor, headingLine);
     const newLine = `${indent}\`CLOCK: ${timestamp}\``;
-    
+
     let insertLine: number;
     if (clockLines.length > 0) {
         insertLine = clockLines[clockLines.length - 1] + 1;
@@ -131,10 +131,10 @@ export async function insertClockStart() {
         }
         insertLine = lastTimestampLine + 1;
     }
-    
+
     const insertPosition = new vscode.Position(insertLine, 0);
-    
-    return editor.edit(editBuilder => {
+
+    return editor.edit((editBuilder) => {
         editBuilder.insert(insertPosition, `${newLine}\n`);
     });
 }
@@ -149,21 +149,21 @@ export async function insertClockFinish() {
     if (headingLine === null) {
         return;
     }
-    
+
     const clockLines = findClockLines(editor, headingLine);
     const openClockLine = findOpenClock(editor, clockLines);
-    
+
     if (openClockLine === null) {
         vscode.window.showWarningMessage('No open CLOCK entry found');
         return;
     }
-    
+
     const line = editor.document.lineAt(openClockLine);
     const match = line.text.match(CLOCK_REGEX);
     if (!match) {
         return;
     }
-    
+
     const indent = match[1];
     const startYear = parseInt(match[3]);
     const startMonth = parseInt(match[4]);
@@ -176,20 +176,20 @@ export async function insertClockFinish() {
     const startHour = parseInt(timeMatch[1]);
     const startMinute = parseInt(timeMatch[2]);
     const startDate = new Date(startYear, startMonth - 1, startDay, startHour, startMinute);
-    
+
     const config = vscode.workspace.getConfiguration('markdown-org');
     const roundMinutes = config.get<number>('clockRoundMinutes');
-    
+
     const now = new Date();
     const endDate = roundEndTime(startDate, now, roundMinutes);
     const endTimestamp = formatTimestamp(endDate);
-    
+
     const duration = calculateDuration(startDate, endDate);
     const startTimestamp = formatTimestamp(startDate);
-    
+
     const newLine = `${indent}\`CLOCK: ${startTimestamp}--${endTimestamp} => ${duration}\``;
-    
-    return editor.edit(editBuilder => {
+
+    return editor.edit((editBuilder) => {
         editBuilder.replace(line.range, newLine);
     });
 }

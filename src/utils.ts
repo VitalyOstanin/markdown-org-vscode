@@ -40,7 +40,7 @@ export function isPathInsideWorkspace(filePath: string): boolean {
         return false;
     }
     const resolved = path.resolve(filePath);
-    return folders.some(folder => {
+    return folders.some((folder) => {
         const folderPath = path.resolve(folder.uri.fsPath);
         if (resolved === folderPath) {
             return true;
@@ -66,18 +66,18 @@ export async function findNearestHeading(editor: vscode.TextEditor): Promise<num
         'vscode.executeDocumentSymbolProvider',
         editor.document.uri
     );
-    
+
     const position = editor.selection.active;
-    
+
     if (symbols && symbols.length > 0) {
         function findHeading(syms: vscode.DocumentSymbol[], parentLine?: number): number | null {
             let bestMatch: number | null = parentLine ?? null;
-            
+
             for (const sym of syms) {
                 if (sym.range.contains(position)) {
                     const symLine = sym.range.start.line;
                     bestMatch = symLine;
-                    
+
                     if (sym.children && sym.children.length > 0) {
                         const childMatch = findHeading(sym.children, symLine);
                         if (childMatch !== null) {
@@ -87,13 +87,13 @@ export async function findNearestHeading(editor: vscode.TextEditor): Promise<num
                     break;
                 }
             }
-            
+
             return bestMatch;
         }
-        
+
         return findHeading(symbols);
     }
-    
+
     // Fallback if symbols not available
     for (let line = position.line; line >= 0; line--) {
         const text = editor.document.lineAt(line).text;
@@ -101,6 +101,6 @@ export async function findNearestHeading(editor: vscode.TextEditor): Promise<num
             return line;
         }
     }
-    
+
     return null;
 }

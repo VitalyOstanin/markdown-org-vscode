@@ -11,7 +11,7 @@ function filterTasksByTag(data: AgendaData, tag: string, fileTags: FileTag[]): A
         return data;
     }
 
-    const tagConfig = fileTags.find(t => t.name === tag);
+    const tagConfig = fileTags.find((t) => t.name === tag);
     if (!tagConfig) {
         return data;
     }
@@ -19,7 +19,7 @@ function filterTasksByTag(data: AgendaData, tag: string, fileTags: FileTag[]): A
     const pattern = tagConfig.pattern || '';
     const filterFn = (task: Task) => {
         if (!pattern) {
-            return !fileTags.some(t => t.pattern && !t.pattern.startsWith('!') && task.file.includes(t.pattern));
+            return !fileTags.some((t) => t.pattern && !t.pattern.startsWith('!') && task.file.includes(t.pattern));
         }
         if (pattern.startsWith('!')) {
             return !task.file.includes(pattern.slice(1));
@@ -32,7 +32,7 @@ function filterTasksByTag(data: AgendaData, tag: string, fileTags: FileTag[]): A
     };
 
     if (isDayAgendaArray(data)) {
-        return data.map(day => ({
+        return data.map((day) => ({
             ...day,
             overdue: day.overdue.filter(filterFn),
             scheduled_timed: day.scheduled_timed.filter(filterFn),
@@ -43,7 +43,11 @@ function filterTasksByTag(data: AgendaData, tag: string, fileTags: FileTag[]): A
     return (data as Task[]).filter(filterFn);
 }
 
-export async function showAgenda(context: vscode.ExtensionContext, mode: 'day' | 'week' | 'month' | 'tasks', initialDate?: string) {
+export async function showAgenda(
+    context: vscode.ExtensionContext,
+    mode: 'day' | 'week' | 'month' | 'tasks',
+    initialDate?: string
+) {
     if (!vscode.workspace.isTrusted) {
         vscode.window.showWarningMessage('Markdown Org: agenda is disabled in untrusted workspaces');
         return;
@@ -73,7 +77,7 @@ export async function showAgenda(context: vscode.ExtensionContext, mode: 'day' |
         } catch {
             vscode.window.showErrorMessage(
                 `Markdown Org: Extractor '${extractorPath}' not found in PATH. ` +
-                'Please install markdown-org-extract: cargo install markdown-org-extract'
+                    'Please install markdown-org-extract: cargo install markdown-org-extract'
             );
             return;
         }
@@ -83,14 +87,16 @@ export async function showAgenda(context: vscode.ExtensionContext, mode: 'day' |
         } catch {
             vscode.window.showErrorMessage(
                 `Markdown Org: Extractor not found or not executable at '${extractorPath}'. ` +
-                'Please check markdown-org.extractorPath setting or install: cargo install markdown-org-extract'
+                    'Please check markdown-org.extractorPath setting or install: cargo install markdown-org-extract'
             );
             return;
         }
     }
 
     if (!workspaceDir) {
-        vscode.window.showErrorMessage('Markdown Org: Please open a workspace folder or configure markdown-org.workspaceDir');
+        vscode.window.showErrorMessage(
+            'Markdown Org: Please open a workspace folder or configure markdown-org.workspaceDir'
+        );
         return;
     }
 
@@ -135,10 +141,10 @@ export async function showAgenda(context: vscode.ExtensionContext, mode: 'day' |
             const currentTag = config.get<string>('currentTag', 'ALL');
             const fileTags = config.get<FileTag[]>('fileTags', []);
             const data = filterTasksByTag(rawData, currentTag, fileTags);
-            
+
             const year = currentDate ? parseInt(currentDate.split('-')[0]) : new Date().getFullYear();
             const holidays = await getHolidays(year);
-            
+
             AgendaPanel.render(context, data, mode, currentDate, loadData, userInitiated, currentTag, holidays);
         } catch (error) {
             const errorMsg = error instanceof Error ? error.message : String(error);
@@ -159,7 +165,7 @@ export async function cycleTag(_context: vscode.ExtensionContext) {
         return;
     }
 
-    const currentIndex = fileTags.findIndex(t => t.name === currentTag);
+    const currentIndex = fileTags.findIndex((t) => t.name === currentTag);
     const nextIndex = (currentIndex + 1) % fileTags.length;
     const nextTag = fileTags[nextIndex].name;
 

@@ -10,6 +10,7 @@
 
 ```markdown
 ## TODO Working on feature
+
 `CREATED: <2025-12-09 Tue 10:00>`
 `CLOCK: [2025-12-09 Tue 14:30]`
 ```
@@ -22,6 +23,7 @@
 
 ```markdown
 ## TODO Working on feature
+
 `CREATED: <2025-12-09 Tue 10:00>`
 `CLOCK: [2025-12-09 Tue 14:30]--[2025-12-09 Tue 16:45] =>  2:15`
 ```
@@ -34,11 +36,12 @@ CLOCK entries use exact current time:
 
 ```json
 {
-  "markdown-org.clockRoundMinutes": undefined
+    "markdown-org.clockRoundMinutes": undefined
 }
 ```
 
 Result:
+
 ```markdown
 `CLOCK: [2025-12-09 Tue 14:37]--[2025-12-09 Tue 16:42] =>  2:05`
 ```
@@ -47,16 +50,18 @@ Result:
 
 ```json
 {
-  "markdown-org.clockRoundMinutes": 15
+    "markdown-org.clockRoundMinutes": 15
 }
 ```
 
 Examples:
+
 - Start at 14:37 → rounds to 14:30
 - Start at 14:46 → rounds to 14:45
 - Finish at 16:42 → rounds to 16:45 (ensures non-zero duration)
 
 Result:
+
 ```markdown
 `CLOCK: [2025-12-09 Tue 14:30]--[2025-12-09 Tue 16:45] =>  2:15`
 ```
@@ -65,16 +70,18 @@ Result:
 
 ```json
 {
-  "markdown-org.clockRoundMinutes": 30
+    "markdown-org.clockRoundMinutes": 30
 }
 ```
 
 Examples:
+
 - Start at 14:10 → rounds to 14:00
 - Start at 14:39 → rounds to 14:30
 - Finish at 16:46 → rounds to 17:00 (if start was 16:30)
 
 Result:
+
 ```markdown
 `CLOCK: [2025-12-09 Tue 14:30]--[2025-12-09 Tue 17:00] =>  2:30`
 ```
@@ -85,6 +92,7 @@ You can have multiple CLOCK entries per task. They are automatically sorted by t
 
 ```markdown
 ## TODO Code review
+
 `CREATED: <2025-12-09 Tue 09:00>`
 `CLOCK: [2025-12-09 Tue 10:00]--[2025-12-09 Tue 11:30] =>  1:30`
 `CLOCK: [2025-12-09 Tue 14:00]--[2025-12-09 Tue 16:00] =>  2:00`
@@ -94,13 +102,16 @@ You can have multiple CLOCK entries per task. They are automatically sorted by t
 ## Placement Rules
 
 CLOCK entries are placed:
+
 1. After all timestamp lines (`CREATED`, `SCHEDULED`, `DEADLINE`, `CLOSED`)
 2. Before any content
 3. Grouped together
 
 Example:
+
 ```markdown
 ## TODO Important task
+
 `CREATED: <2025-12-09 Tue 09:00>`
 `SCHEDULED: <2025-12-10 Wed 10:00>`
 `CLOCK: [2025-12-09 Tue 10:00]--[2025-12-09 Tue 11:00] =>  1:00`
@@ -114,6 +125,7 @@ Task description and notes go here.
 ### Cannot Start When Open CLOCK Exists
 
 If you try to start a new CLOCK when one is already open:
+
 - Warning message: "There is already an open CLOCK entry"
 - No new CLOCK is created
 - Close the existing CLOCK first
@@ -121,6 +133,7 @@ If you try to start a new CLOCK when one is already open:
 ### Cannot Finish Without Open CLOCK
 
 If you try to finish when no open CLOCK exists:
+
 - Warning message: "No open CLOCK entry found"
 - Start a CLOCK first
 
@@ -129,6 +142,7 @@ If you try to finish when no open CLOCK exists:
 Duration is automatically calculated and formatted as `HH:MM`:
 
 Examples:
+
 - 1 hour 30 minutes → `1:30`
 - 30 minutes → `0:30`
 - 2 hours → `2:00`
@@ -144,6 +158,7 @@ The CLOCK format is compatible with Emacs Org-mode:
 ```
 
 This allows you to:
+
 - Share files between VS Code and Emacs
 - Use org-mode's time reporting features
 - Maintain consistent time tracking across editors

@@ -6,23 +6,28 @@
 
 1. Open a markdown file in VS Code
 2. Create a heading:
-   ```markdown
-   ## TODO Test task
-   ```
+    ```markdown
+    ## TODO Test task
+    ```
 3. Place cursor on the heading
 4. Press `Ctrl+K Ctrl+K Ctrl+C Ctrl+S` to start CLOCK
 5. Verify open CLOCK entry appears:
-   ```markdown
-   ## TODO Test task
-   CLOCK: [2025-12-09 Tue 17:30]`
-   ```
+
+    ```markdown
+    ## TODO Test task
+
+    CLOCK: [2025-12-09 Tue 17:30]`
+    ```
+
 6. Wait a few seconds
 7. Press `Ctrl+K Ctrl+K Ctrl+C Ctrl+F` to finish CLOCK
 8. Verify closed CLOCK with duration:
-   ```markdown
-   ## TODO Test task
-   CLOCK: [2025-12-09 Tue 17:30]--[2025-12-09 Tue 17:31] =>  0:01
-   ```
+
+    ```markdown
+    ## TODO Test task
+
+    CLOCK: [2025-12-09 Tue 17:30]--[2025-12-09 Tue 17:31] => 0:01
+    ```
 
 ### 2. Test Time Rounding
 
@@ -37,10 +42,13 @@
 ### 3. Test Multiple CLOCK Entries
 
 1. Create a heading with CREATED timestamp:
-   ```markdown
-   ## TODO Multi-clock task
-   `CREATED: <2025-12-09 Tue 10:00>`
-   ```
+
+    ```markdown
+    ## TODO Multi-clock task
+
+    `CREATED: <2025-12-09 Tue 10:00>`
+    ```
+
 2. Start and finish first CLOCK
 3. Start and finish second CLOCK
 4. Verify both entries exist and are sorted by time
@@ -48,12 +56,14 @@
 ### 4. Test Error Handling
 
 **Test: Cannot start when open CLOCK exists**
+
 1. Start a CLOCK entry
 2. Try to start another CLOCK (without finishing first)
 3. Verify warning message appears
 4. Verify no duplicate CLOCK is created
 
 **Test: Cannot finish without open CLOCK**
+
 1. Create a heading without CLOCK
 2. Try to finish CLOCK
 3. Verify warning message appears
@@ -61,11 +71,14 @@
 ### 5. Test CLOCK Placement
 
 1. Create a heading with multiple timestamps:
-   ```markdown
-   ## TODO Placement test
-   `CREATED: <2025-12-09 Tue 10:00>`
-   `SCHEDULED: <2025-12-10 Wed 14:00>`
-   ```
+
+    ```markdown
+    ## TODO Placement test
+
+    `CREATED: <2025-12-09 Tue 10:00>`
+    `SCHEDULED: <2025-12-10 Wed 14:00>`
+    ```
+
 2. Start CLOCK
 3. Verify CLOCK appears after all timestamp lines
 
@@ -79,6 +92,7 @@ npm run test:integration
 ```
 
 Expected output:
+
 ```
 CLOCK Integration Tests
   ✔ Insert CLOCK start without rounding
@@ -99,10 +113,11 @@ CLOCK Integration Tests
 
 ```markdown
 ## TODO Write documentation
+
 `CREATED: <2025-12-09 Tue 09:00>`
 `CLOCK: [2025-12-09 Tue 10:00]--[2025-12-09 Tue 11:30] =>  1:30
-`CLOCK: [2025-12-09 Tue 14:00]--[2025-12-09 Tue 16:00] =>  2:00
-`CLOCK: [2025-12-09 Tue 16:30]--[2025-12-09 Tue 17:00] =>  0:30
+`CLOCK: [2025-12-09 Tue 14:00]--[2025-12-09 Tue 16:00] => 2:00
+`CLOCK: [2025-12-09 Tue 16:30]--[2025-12-09 Tue 17:00] => 0:30
 
 Total: 4 hours
 ```
@@ -111,9 +126,10 @@ Total: 4 hours
 
 ```markdown
 ## TODO Code review
+
 `CREATED: <2025-12-09 Tue 09:00>`
 `CLOCK: [2025-12-09 Tue 10:00]--[2025-12-09 Tue 11:30] =>  1:30
-`CLOCK: [2025-12-09 Tue 14:00]--[2025-12-09 Tue 16:30] =>  2:30
+`CLOCK: [2025-12-09 Tue 14:00]--[2025-12-09 Tue 16:30] => 2:30
 
 Total: 4 hours (rounded)
 ```
@@ -122,6 +138,7 @@ Total: 4 hours (rounded)
 
 ```markdown
 ## TODO Current task
+
 `CREATED: <2025-12-09 Tue 16:00>`
 `CLOCK: [2025-12-09 Tue 16:30]`
 

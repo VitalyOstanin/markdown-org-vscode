@@ -3,10 +3,18 @@ import * as assert from 'assert';
 suite('Month View Calendar', () => {
     suite('isHoliday', () => {
         const mockHolidays2025 = [
-            '2025-01-01', '2025-01-02', '2025-01-03', '2025-01-04', '2025-01-05', '2025-01-06', '2025-01-07', '2025-01-08',
+            '2025-01-01',
+            '2025-01-02',
+            '2025-01-03',
+            '2025-01-04',
+            '2025-01-05',
+            '2025-01-06',
+            '2025-01-07',
+            '2025-01-08',
             '2025-02-23',
             '2025-03-08',
-            '2025-05-01', '2025-05-09',
+            '2025-05-01',
+            '2025-05-09',
             '2025-06-12',
             '2025-11-04',
             '2025-12-31'
@@ -43,22 +51,22 @@ suite('Month View Calendar', () => {
             const month = 11; // December (0-indexed)
             const firstDayOfMonth = new Date(year, month, 1);
             const lastDayOfMonth = new Date(year, month + 1, 0);
-            
+
             let startDay = firstDayOfMonth.getDay();
             startDay = startDay === 0 ? 6 : startDay - 1; // Monday = 0
-            
+
             const totalCells = startDay + lastDayOfMonth.getDate();
             const expectedRows = Math.ceil(totalCells / 7);
-            
+
             assert.strictEqual(expectedRows, 5);
             assert.strictEqual(lastDayOfMonth.getDate(), 31);
         });
 
         test('should correctly identify weekends', () => {
             const testDates = [
-                { date: new Date(2025, 11, 6), isWeekend: true },  // Saturday
-                { date: new Date(2025, 11, 7), isWeekend: true },  // Sunday
-                { date: new Date(2025, 11, 8), isWeekend: false }, // Monday
+                { date: new Date(2025, 11, 6), isWeekend: true }, // Saturday
+                { date: new Date(2025, 11, 7), isWeekend: true }, // Sunday
+                { date: new Date(2025, 11, 8), isWeekend: false } // Monday
             ];
 
             testDates.forEach(({ date, isWeekend }) => {
@@ -78,9 +86,12 @@ suite('Month View Calendar', () => {
             ];
 
             const daysMap: Record<string, boolean> = {};
-            mockDays.forEach(day => {
-                const taskCount = (day.overdue || []).length + (day.scheduled_timed || []).length + 
-                                (day.scheduled_no_time || []).length + (day.upcoming || []).length;
+            mockDays.forEach((day) => {
+                const taskCount =
+                    (day.overdue || []).length +
+                    (day.scheduled_timed || []).length +
+                    (day.scheduled_no_time || []).length +
+                    (day.upcoming || []).length;
                 daysMap[day.date] = taskCount > 0;
             });
 
