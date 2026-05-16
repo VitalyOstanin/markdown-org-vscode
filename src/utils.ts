@@ -4,6 +4,7 @@ import { TIMESTAMP_LINE_REGEX } from './orgPatterns';
 
 export const DAY_NAMES_SHORT = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
 
+/** Format a Date as `<YYYY-MM-DD Ru HH:MM>` (angle) or `[...]` (square) in org-mode style. */
 export function formatOrgTimestamp(date: Date, bracket: 'angle' | 'square'): string {
     const year = date.getFullYear();
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
@@ -16,6 +17,7 @@ export function formatOrgTimestamp(date: Date, bracket: 'angle' | 'square'): str
     return `${open}${year}-${month}-${day} ${weekday} ${hour}:${minute}${close}`;
 }
 
+/** Format a duration in ms as `H:MM`; pad hours with leading space for table alignment if requested. */
 export function formatDurationHM(durationMs: number, opts?: { padHoursWithSpace?: boolean }): string {
     const totalMinutes = Math.floor(durationMs / 60_000);
     const hours = Math.floor(totalMinutes / 60);
@@ -24,6 +26,7 @@ export function formatDurationHM(durationMs: number, opts?: { padHoursWithSpace?
     return `${hoursStr}:${minutes.toString().padStart(2, '0')}`;
 }
 
+/** Format a Date as a local `YYYY-MM-DD` string (no timezone conversion). */
 export function toIsoDate(date: Date): string {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -31,6 +34,7 @@ export function toIsoDate(date: Date): string {
     return `${year}-${month}-${day}`;
 }
 
+/** Detect the indent (leading whitespace) of an existing timestamp line below the heading, or empty. */
 export function getTimestampIndent(editor: vscode.TextEditor, headingLine: number): string {
     if (headingLine + 1 < editor.document.lineCount) {
         const line = editor.document.lineAt(headingLine + 1);
@@ -42,6 +46,7 @@ export function getTimestampIndent(editor: vscode.TextEditor, headingLine: numbe
     return '';
 }
 
+/** Check that an absolute path is contained within any open workspace folder. */
 export function isPathInsideWorkspace(filePath: string): boolean {
     const folders = vscode.workspace.workspaceFolders;
     if (!folders || folders.length === 0) {
@@ -58,6 +63,7 @@ export function isPathInsideWorkspace(filePath: string): boolean {
     });
 }
 
+/** Resolve a possibly-relative path against the first workspace folder; absolute paths pass through. */
 export function resolveWorkspacePath(p: string): string {
     if (path.isAbsolute(p)) {
         return p;
@@ -69,6 +75,7 @@ export function resolveWorkspacePath(p: string): string {
     return path.resolve(root, p);
 }
 
+/** Return the active editor or null; shows 'No active editor' message. With markdownOnly, silently returns null for non-markdown. */
 export function requireActiveEditor(opts?: { markdownOnly?: boolean }): vscode.TextEditor | null {
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
@@ -81,6 +88,7 @@ export function requireActiveEditor(opts?: { markdownOnly?: boolean }): vscode.T
     return editor;
 }
 
+/** Find the nearest heading containing the cursor and return its line, or null after showing 'No heading found'. */
 export async function requireHeadingAtCursor(editor: vscode.TextEditor): Promise<number | null> {
     const headingLine = await findNearestHeading(editor);
     if (headingLine === null) {
@@ -90,6 +98,10 @@ export async function requireHeadingAtCursor(editor: vscode.TextEditor): Promise
     return headingLine;
 }
 
+/**
+ * Find the innermost heading whose document symbol contains the cursor.
+ * Falls back to a manual upward scan if no document symbols are available.
+ */
 export async function findNearestHeading(editor: vscode.TextEditor): Promise<number | null> {
     const symbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
         'vscode.executeDocumentSymbolProvider',

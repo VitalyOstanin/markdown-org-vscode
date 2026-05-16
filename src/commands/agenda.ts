@@ -46,6 +46,11 @@ function filterTasksByTag(data: AgendaData, tag: string, fileTags: FileTag[]): A
     return (data as Task[]).filter(filterFn);
 }
 
+/**
+ * Open the agenda webview for the given mode (day/week/month/tasks).
+ * Validates the extractor path, then loads data via the extractor process.
+ * Disabled in untrusted workspaces.
+ */
 export async function showAgenda(
     context: vscode.ExtensionContext,
     mode: 'day' | 'week' | 'month' | 'tasks',
@@ -159,6 +164,7 @@ export async function showAgenda(
     await loadData(undefined, true);
 }
 
+/** Advance the file-tag filter (`markdown-org.currentTag`) to the next entry in `markdown-org.fileTags`. */
 export async function cycleTag(_context: vscode.ExtensionContext) {
     const config = vscode.workspace.getConfiguration('markdown-org');
     const fileTags = config.get<FileTag[]>('fileTags', []);

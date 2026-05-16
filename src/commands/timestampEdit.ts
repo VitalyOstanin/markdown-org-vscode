@@ -394,6 +394,11 @@ function adjustClockTimestamp(match: RegExpMatchArray, part: ClockTimestampPart,
     return `${indent}\`CLOCK: ${startTimestamp}--${endTimestamp} => ${duration}\``;
 }
 
+/**
+ * Increment (delta=+1) or decrement (delta=-1) the value under the cursor:
+ * a date/time/weekday in a timestamp, a CLOCK timestamp part, a `SCHEDULED`/`DEADLINE` type,
+ * or a TODO/priority on a heading. Falls back to cursor-select line motion.
+ */
 export async function adjustTimestamp(delta: number) {
     const editor = vscode.window.activeTextEditor;
     if (!editor) {

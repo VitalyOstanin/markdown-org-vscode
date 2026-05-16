@@ -6,6 +6,7 @@ function formatTimestamp(date: Date): string {
     return formatOrgTimestamp(date, 'angle');
 }
 
+/** Toggle the TODO/DONE keyword on the nearest heading; preserves priority. Silent if no active markdown editor. */
 export async function setTaskStatus(status: 'TODO' | 'DONE') {
     const editor = vscode.window.activeTextEditor;
     if (!editor || editor.document.languageId !== 'markdown') {
@@ -41,6 +42,7 @@ export async function setTaskStatus(status: 'TODO' | 'DONE') {
     });
 }
 
+/** Toggle priority `[#A]` on the nearest heading; preserves TODO/DONE keyword. */
 export async function togglePriority() {
     const editor = vscode.window.activeTextEditor;
     if (!editor || editor.document.languageId !== 'markdown') {
@@ -76,6 +78,7 @@ export async function togglePriority() {
     });
 }
 
+/** Insert a `CREATED:` timestamp under the heading. No-op if any CREATED line already exists in the timestamp block. */
 export async function insertCreatedTimestamp() {
     const editor = vscode.window.activeTextEditor;
     if (!editor || editor.document.languageId !== 'markdown') {
@@ -107,10 +110,12 @@ export async function insertCreatedTimestamp() {
     });
 }
 
+/** Insert a `SCHEDULED:` timestamp; repeating the call removes it (toggle). DEADLINE on the heading is preserved. */
 export async function insertScheduledTimestamp() {
     await insertOrReplaceTimestamp('SCHEDULED');
 }
 
+/** Insert a `DEADLINE:` timestamp; repeating the call removes it (toggle). SCHEDULED on the heading is preserved. */
 export async function insertDeadlineTimestamp() {
     await insertOrReplaceTimestamp('DEADLINE');
 }

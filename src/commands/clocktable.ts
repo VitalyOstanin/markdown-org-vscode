@@ -84,6 +84,11 @@ function buildClockTable(tasks: Task[]): string {
     return lines.join('\n');
 }
 
+/**
+ * Insert a CLOCK summary table for the current file at the cursor position.
+ * Runs markdown-org-extract over the file to aggregate clocks per heading.
+ * Disabled in untrusted workspaces.
+ */
 export async function insertClockTable() {
     if (!vscode.workspace.isTrusted) {
         vscode.window.showWarningMessage('Markdown Org: clock table is disabled in untrusted workspaces');

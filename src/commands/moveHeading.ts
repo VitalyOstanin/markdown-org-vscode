@@ -110,6 +110,11 @@ function buildArchiveContent(ancestors: HeadingInfo[], heading: HeadingInfo): st
     return content;
 }
 
+/**
+ * Cut the nearest heading and append it to a sibling `<file>.archive.md` file,
+ * preserving the ancestor chain. Atomic write; refuses to follow symlinks.
+ * Disabled in untrusted workspaces.
+ */
 export async function moveToArchive() {
     if (!vscode.workspace.isTrusted) {
         vscode.window.showWarningMessage('Markdown Org: archive is disabled in untrusted workspaces');
@@ -150,6 +155,11 @@ export async function moveToArchive() {
     vscode.window.showInformationMessage(`Moved to ${path.basename(archivePath)}`);
 }
 
+/**
+ * Cut the nearest heading and move it into `markdown-org.maintainFilePath` under the `# incoming`
+ * section, normalizing all heading levels relative to a new `## ` root. Atomic write; refuses
+ * symlinks; the maintain file must be inside the workspace. Disabled in untrusted workspaces.
+ */
 export async function promoteToMaintain() {
     if (!vscode.workspace.isTrusted) {
         vscode.window.showWarningMessage('Markdown Org: maintain promotion is disabled in untrusted workspaces');
