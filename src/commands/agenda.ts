@@ -124,18 +124,23 @@ export async function showAgenda(context: vscode.ExtensionContext, mode: 'day' |
     await loadData(undefined, true);
 }
 
-export async function cycleTag(context: vscode.ExtensionContext) {
+export async function cycleTag(_context: vscode.ExtensionContext) {
     const config = vscode.workspace.getConfiguration('markdown-org');
     const fileTags = config.get<any[]>('fileTags', []);
     const currentTag = config.get<string>('currentTag', 'ALL');
-    
+
+    if (fileTags.length === 0) {
+        vscode.window.showWarningMessage('Markdown Org: No file tags configured (markdown-org.fileTags)');
+        return;
+    }
+
     const currentIndex = fileTags.findIndex(t => t.name === currentTag);
     const nextIndex = (currentIndex + 1) % fileTags.length;
     const nextTag = fileTags[nextIndex].name;
-    
+
     await config.update('currentTag', nextTag, vscode.ConfigurationTarget.Global);
     vscode.window.showInformationMessage(`Tag filter: ${nextTag}`);
-    
+
     AgendaPanel.refreshWithCurrentTag();
 }
 

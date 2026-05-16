@@ -75,37 +75,36 @@ function getClockIndent(editor: vscode.TextEditor, headingLine: number): string 
 
 function findClockLines(editor: vscode.TextEditor, headingLine: number): number[] {
     const clockLines: number[] = [];
-    let lastTimestampLine = headingLine;
-    
+
     for (let i = headingLine + 1; i < editor.document.lineCount; i++) {
         const line = editor.document.lineAt(i);
         const text = line.text;
-        
+
         if (text.match(/^(\s*)`(CREATED|SCHEDULED|DEADLINE|CLOSED): <[^>]+>`$/)) {
-            lastTimestampLine = i;
             continue;
         }
-        
+
         if (text.match(CLOCK_REGEX)) {
             clockLines.push(i);
             continue;
         }
-        
+
         if (text.trim() === '' && clockLines.length > 0) {
             continue;
         }
-        
+
         break;
     }
-    
+
     return clockLines;
 }
 
 function findOpenClock(editor: vscode.TextEditor, clockLines: number[]): number | null {
+    // match[8] is the optional end-bracket group; if absent, the CLOCK entry is open
     for (const lineNum of clockLines) {
         const line = editor.document.lineAt(lineNum);
         const match = line.text.match(CLOCK_REGEX);
-        if (match && !match[5]) {
+        if (match && !match[8]) {
             return lineNum;
         }
     }
@@ -190,17 +189,16 @@ export async function insertClockFinish() {
     }
     
     const indent = match[1];
-    const startYear = parseInt(match[2]);
-    const startMonth = parseInt(match[3]);
-    const startDay = parseInt(match[4]);
-    
-    const startTimestampMatch = line.text.match(/\[(\d{4})-(\d{2})-(\d{2}) [^\s]+ (\d{2}):(\d{2})\]/);
-    if (!startTimestampMatch) {
+    const startYear = parseInt(match[3]);
+    const startMonth = parseInt(match[4]);
+    const startDay = parseInt(match[5]);
+
+    const timeMatch = match[6].match(/(\d{2}):(\d{2})$/);
+    if (!timeMatch) {
         return;
     }
-    
-    const startHour = parseInt(startTimestampMatch[4]);
-    const startMinute = parseInt(startTimestampMatch[5]);
+    const startHour = parseInt(timeMatch[1]);
+    const startMinute = parseInt(timeMatch[2]);
     const startDate = new Date(startYear, startMonth - 1, startDay, startHour, startMinute);
     
     const config = vscode.workspace.getConfiguration('markdown-org');
