@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import * as path from 'path';
 import { randomBytes } from 'crypto';
 import { isPathInsideWorkspace } from '../utils';
 
@@ -132,8 +133,18 @@ export class AgendaPanel {
 
         if (!AgendaPanel.watcher && refreshCallback) {
             AgendaPanel.watcher = vscode.workspace.createFileSystemWatcher('**/*.md');
-            
-            const triggerRefresh = () => {
+
+            const ignored = (uri: vscode.Uri) => {
+                const fsPath = uri.fsPath;
+                return fsPath.endsWith('.archive.md')
+                    || fsPath.includes(`${path.sep}.git${path.sep}`)
+                    || fsPath.includes(`${path.sep}node_modules${path.sep}`);
+            };
+
+            const triggerRefresh = (uri: vscode.Uri) => {
+                if (ignored(uri)) {
+                    return;
+                }
                 if (AgendaPanel.debounceTimer) {
                     clearTimeout(AgendaPanel.debounceTimer);
                 }

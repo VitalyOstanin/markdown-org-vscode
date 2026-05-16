@@ -92,11 +92,18 @@ export async function showAgenda(context: vscode.ExtensionContext, mode: 'day' |
     }
 
     let currentDate = initialDate;
+    const holidaysCache = new Map<number, string[]>();
 
     const getHolidays = async (year: number): Promise<string[]> => {
+        const cached = holidaysCache.get(year);
+        if (cached) {
+            return cached;
+        }
         try {
             const result = await execCommand(extractorPath, ['--holidays', year.toString()]);
-            return JSON.parse(result);
+            const parsed: string[] = JSON.parse(result);
+            holidaysCache.set(year, parsed);
+            return parsed;
         } catch {
             return [];
         }

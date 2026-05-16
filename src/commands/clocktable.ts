@@ -1,6 +1,9 @@
 import * as vscode from 'vscode';
-import * as child_process from 'child_process';
+import * as cp from 'child_process';
 import * as path from 'path';
+
+const EXTRACTOR_TIMEOUT_MS = 30_000;
+const EXTRACTOR_MAX_BUFFER_BYTES = 10 * 1024 * 1024;
 
 interface Task {
     heading: string;
@@ -13,23 +16,30 @@ function getExtractorPath(): string {
     return config.get<string>('extractorPath') || 'markdown-org-extract';
 }
 
-function parseClockData(filePath: string): Task[] {
+function parseClockData(filePath: string): Promise<Task[]> {
     const extractorPath = getExtractorPath();
-    const result = child_process.spawnSync(extractorPath, [
-        '--dir', path.dirname(filePath),
-        '--glob', path.basename(filePath),
-        '--format', 'json',
-        '--tasks'
-    ], { encoding: 'utf-8', maxBuffer: 10 * 1024 * 1024 });
-
-    if (result.error) {
-        throw new Error(`Failed to run markdown-org-extract: ${result.error.message}`);
-    }
-    if (result.status !== 0) {
-        throw new Error(`markdown-org-extract failed: ${result.stderr}`);
-    }
-
-    return JSON.parse(result.stdout);
+    return new Promise((resolve, reject) => {
+        cp.execFile(extractorPath, [
+            '--dir', path.dirname(filePath),
+            '--glob', path.basename(filePath),
+            '--format', 'json',
+            '--tasks'
+        ], {
+            encoding: 'utf-8',
+            maxBuffer: EXTRACTOR_MAX_BUFFER_BYTES,
+            timeout: EXTRACTOR_TIMEOUT_MS
+        }, (error, stdout, stderr) => {
+            if (error) {
+                reject(new Error(stderr || error.message || `markdown-org-extract failed`));
+                return;
+            }
+            try {
+                resolve(JSON.parse(stdout));
+            } catch (parseError) {
+                reject(parseError);
+            }
+        });
+    });
 }
 
 function formatDuration(minutes: number): string {
@@ -90,7 +100,7 @@ export async function insertClockTable() {
     const filePath = editor.document.uri.fsPath;
     
     try {
-        const tasks = parseClockData(filePath);
+        const tasks = await parseClockData(filePath);
         const table = buildClockTable(tasks);
         
         await editor.edit(editBuilder => {
