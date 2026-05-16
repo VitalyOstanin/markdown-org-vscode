@@ -5,8 +5,12 @@ import { isPathInsideWorkspace } from '../utils';
 import { AgendaData } from '../types';
 
 const REFRESH_DEBOUNCE_MS = 500;
-const DAY_CHECK_INTERVAL_MS = 60_000;
 const CALENDAR_GRID_CELLS = 6 * 7;
+
+function msUntilNextLocalMidnight(now: Date): number {
+    const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0);
+    return next.getTime() - now.getTime();
+}
 
 function generateNonce(): string {
     return randomBytes(16).toString('base64');
@@ -19,9 +23,20 @@ export class AgendaPanel {
     private static refreshCallback?: (date?: string, userInitiated?: boolean) => Promise<void>;
     private static currentDate?: string;
     private static currentMode?: string;
-    private static dayCheckInterval?: NodeJS.Timeout;
-    private static lastCheckedDay?: string;
+    private static dayCheckTimer?: NodeJS.Timeout;
     private static currentTag?: string;
+
+    private static scheduleNextDayCheck() {
+        AgendaPanel.dayCheckTimer = setTimeout(
+            () => {
+                AgendaPanel.refreshCallback?.();
+                if (AgendaPanel.currentPanel) {
+                    AgendaPanel.scheduleNextDayCheck();
+                }
+            },
+            msUntilNextLocalMidnight(new Date())
+        );
+    }
 
     public static render(
         _context: vscode.ExtensionContext,
@@ -69,9 +84,9 @@ export class AgendaPanel {
                     clearTimeout(AgendaPanel.debounceTimer);
                     AgendaPanel.debounceTimer = undefined;
                 }
-                if (AgendaPanel.dayCheckInterval) {
-                    clearInterval(AgendaPanel.dayCheckInterval);
-                    AgendaPanel.dayCheckInterval = undefined;
+                if (AgendaPanel.dayCheckTimer) {
+                    clearTimeout(AgendaPanel.dayCheckTimer);
+                    AgendaPanel.dayCheckTimer = undefined;
                 }
             });
 
@@ -153,18 +168,8 @@ export class AgendaPanel {
             AgendaPanel.watcher.onDidDelete(triggerRefresh);
         }
 
-        if (!AgendaPanel.dayCheckInterval && refreshCallback) {
-            const today = new Date();
-            AgendaPanel.lastCheckedDay = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-
-            AgendaPanel.dayCheckInterval = setInterval(() => {
-                const now = new Date();
-                const currentDay = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-                if (currentDay !== AgendaPanel.lastCheckedDay) {
-                    AgendaPanel.lastCheckedDay = currentDay;
-                    AgendaPanel.refreshCallback?.();
-                }
-            }, DAY_CHECK_INTERVAL_MS);
+        if (!AgendaPanel.dayCheckTimer && refreshCallback) {
+            AgendaPanel.scheduleNextDayCheck();
         }
     }
 

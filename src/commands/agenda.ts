@@ -56,9 +56,10 @@ export async function showAgenda(
         return;
     }
 
-    const config = vscode.workspace.getConfiguration('markdown-org');
-    const extractorPath = config.get<string>('extractorPath');
-    const workspaceDir = config.get<string>('workspaceDir') || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const startupConfig = vscode.workspace.getConfiguration('markdown-org');
+    const extractorPath = startupConfig.get<string>('extractorPath');
+    const workspaceDir =
+        startupConfig.get<string>('workspaceDir') || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 
     if (!extractorPath) {
         vscode.window.showErrorMessage('Markdown Org: Please configure markdown-org.extractorPath in settings');

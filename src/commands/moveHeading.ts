@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { isPathInsideWorkspace, requireActiveEditor, resolveWorkspacePath } from '../utils';
+import { findNearestHeading, isPathInsideWorkspace, requireActiveEditor, resolveWorkspacePath } from '../utils';
 
 async function readIfExists(filePath: string): Promise<string | null> {
     try {
@@ -47,20 +47,20 @@ interface HeadingInfo {
     content: string[];
 }
 
-function findHeadingAtCursor(document: vscode.TextDocument, position: vscode.Position): HeadingInfo | null {
-    const currentLine = position.line;
-
-    for (let i = currentLine; i >= 0; i--) {
-        const line = document.lineAt(i).text;
-        const match = line.match(/^(#+)\s+(.+)$/);
-        if (match) {
-            const level = match[1].length;
-            const text = match[2];
-            const content = extractHeadingContent(document, i, level);
-            return { level, text, line: i, content };
-        }
+async function findHeadingAtCursor(editor: vscode.TextEditor): Promise<HeadingInfo | null> {
+    const headingLine = await findNearestHeading(editor);
+    if (headingLine === null) {
+        return null;
     }
-    return null;
+    const lineText = editor.document.lineAt(headingLine).text;
+    const match = lineText.match(/^(#+)\s+(.+)$/);
+    if (!match) {
+        return null;
+    }
+    const level = match[1].length;
+    const text = match[2];
+    const content = extractHeadingContent(editor.document, headingLine, level);
+    return { level, text, line: headingLine, content };
 }
 
 function extractHeadingContent(document: vscode.TextDocument, startLine: number, level: number): string[] {
@@ -121,9 +121,7 @@ export async function moveToArchive() {
     }
 
     const document = editor.document;
-    const position = editor.selection.active;
-
-    const heading = findHeadingAtCursor(document, position);
+    const heading = await findHeadingAtCursor(editor);
     if (!heading) {
         vscode.window.showErrorMessage('No heading found');
         return;
@@ -182,9 +180,7 @@ export async function promoteToMaintain() {
     }
 
     const document = editor.document;
-    const position = editor.selection.active;
-
-    const heading = findHeadingAtCursor(document, position);
+    const heading = await findHeadingAtCursor(editor);
     if (!heading) {
         vscode.window.showErrorMessage('No heading found');
         return;
