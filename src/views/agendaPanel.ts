@@ -561,65 +561,101 @@ export class AgendaPanel {
             return '';
         }
         
+        function formatLocalDate(d) {
+            return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+        }
+
+        function resolveFirstDayOffset() {
+            // 0 = Sunday-first, 1 = Monday-first (only these two supported in UI).
+            if (firstDayOfWeek === 'sunday') return 0;
+            if (firstDayOfWeek === 'monday') return 1;
+            try {
+                const info = new Intl.Locale(locale).weekInfo;
+                if (info && info.firstDay === 7) return 0;
+                if (info && info.firstDay >= 1 && info.firstDay <= 6) return 1;
+            } catch (e) { /* unsupported locale or API -- fall through */ }
+            return 1;
+        }
+
+        function buildWeekdayLabels(firstOffset) {
+            // Reference week starting Sun 2024-01-07 lets us pick weekday names by locale.
+            const labels = [];
+            for (let i = 0; i < 7; i++) {
+                const ref = new Date(2024, 0, 7 + ((i + firstOffset) % 7));
+                labels.push(ref.toLocaleDateString(locale, { weekday: 'short' }));
+            }
+            return labels;
+        }
+
         function renderMonthCalendar(days) {
             const daysMap = {};
-            days.forEach(day => {
-                const taskCount = (day.scheduled_timed || []).length + 
-                                (day.scheduled_no_time || []).length + 
-                                (day.upcoming || []).length;
+            (days || []).forEach(day => {
+                const taskCount = (day.scheduled_timed || []).length +
+                                (day.scheduled_no_time || []).length +
+                                (day.upcoming || []).length +
+                                (day.overdue || []).length;
                 daysMap[day.date] = taskCount > 0;
             });
-            
-            const firstDay = parseLocalDate(days[0].date);
-            const year = firstDay.getFullYear();
-            const month = firstDay.getMonth();
+
+            const target = currentDate ? parseLocalDate(currentDate) : new Date();
+            const year = target.getFullYear();
+            const month = target.getMonth();
             const firstDayOfMonth = new Date(year, month, 1);
             const lastDayOfMonth = new Date(year, month + 1, 0);
-            
-            let startDay = firstDayOfMonth.getDay();
-            startDay = startDay === 0 ? 6 : startDay - 1;
-            
+
+            const firstOffset = resolveFirstDayOffset();
+            // JS getDay(): 0=Sun..6=Sat. Convert to leading-empty-cells count.
+            const startDay = (firstDayOfMonth.getDay() - firstOffset + 7) % 7;
+
             const today = new Date();
-            const todayStr = today.getFullYear() + '-' + String(today.getMonth() + 1).padStart(2, '0') + '-' + String(today.getDate()).padStart(2, '0');
-            
+            const todayStr = formatLocalDate(today);
+
             let html = '<div class="calendar">';
-            const weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-            weekdays.forEach(day => {
-                html += '<div class="calendar-header">' + day + '</div>';
+            buildWeekdayLabels(firstOffset).forEach(label => {
+                html += '<div class="calendar-header">' + escapeHtml(label) + '</div>';
             });
-            
-            const prevMonthDays = new Date(year, month, 0).getDate();
+
+            const prevMonthLast = new Date(year, month, 0);
+            const prevMonthDays = prevMonthLast.getDate();
             for (let i = startDay - 1; i >= 0; i--) {
                 const day = prevMonthDays - i;
-                html += '<div class="calendar-day other-month"><div class="day-number">' + day + '</div></div>';
+                const d = new Date(year, month - 1, day);
+                const dateStr = formatLocalDate(d);
+                html += '<div class="calendar-day other-month" data-date="' + dateStr + '">' +
+                       '<div class="day-number">' + day + '</div></div>';
             }
-            
+
             for (let day = 1; day <= lastDayOfMonth.getDate(); day++) {
-                const dateStr = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
                 const d = new Date(year, month, day);
+                const dateStr = formatLocalDate(d);
                 const dayOfWeek = d.getDay();
                 const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
                 const isHol = isHoliday(dateStr);
                 const hasTasks = daysMap[dateStr];
                 const isToday = dateStr === todayStr;
-                
+
                 let classes = 'calendar-day';
                 if (isWeekend) classes += ' weekend';
                 if (isHol) classes += ' holiday';
                 if (hasTasks) classes += ' has-tasks';
                 if (isToday) classes += ' today';
-                
+
                 html += '<div class="' + classes + '" data-date="' + dateStr + '">' +
                        '<div class="day-number">' + day + '</div>' +
                        (hasTasks ? '<div class="task-indicator"></div>' : '') +
                        '</div>';
             }
-            
-            const remainingCells = ${CALENDAR_GRID_CELLS} - (startDay + lastDayOfMonth.getDate());
-            for (let i = 1; i <= remainingCells; i++) {
-                html += '<div class="calendar-day other-month"><div class="day-number">' + i + '</div></div>';
+
+            // Pad trailing cells up to the next full week boundary -- gives 4/5/6 rows naturally.
+            const used = startDay + lastDayOfMonth.getDate();
+            const trailingCells = (${CALENDAR_COLS} - (used % ${CALENDAR_COLS})) % ${CALENDAR_COLS};
+            for (let i = 1; i <= trailingCells; i++) {
+                const d = new Date(year, month + 1, i);
+                const dateStr = formatLocalDate(d);
+                html += '<div class="calendar-day other-month" data-date="' + dateStr + '">' +
+                       '<div class="day-number">' + i + '</div></div>';
             }
-            
+
             html += '</div>';
             return html;
         }
