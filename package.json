@@ -203,6 +203,16 @@
           "default": "en-US",
           "description": "Locale for date formatting (e.g., en-US, ru-RU, de-DE)"
         },
+        "markdown-org.firstDayOfWeek": {
+          "type": "string",
+          "enum": [
+            "monday",
+            "sunday",
+            "auto"
+          ],
+          "default": "monday",
+          "description": "First day of week in month calendar. 'auto' uses locale's default via Intl.Locale.weekInfo (falls back to monday if unsupported)."
+        },
         "markdown-org.fileTags": {
           "type": "array",
           "default": [

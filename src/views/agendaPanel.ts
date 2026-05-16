@@ -5,7 +5,8 @@ import { isPathInsideWorkspace } from '../utils';
 import { AgendaData } from '../types';
 
 const REFRESH_DEBOUNCE_MS = 500;
-const CALENDAR_GRID_CELLS = 6 * 7;
+const CALENDAR_COLS = 7;
+type FirstDayOfWeek = 'monday' | 'sunday' | 'auto';
 
 function msUntilNextLocalMidnight(now: Date): number {
     const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0);
@@ -53,14 +54,23 @@ export class AgendaPanel {
         const today = new Date();
         const localDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
         AgendaPanel.currentDate = date || localDate;
-        const locale = vscode.workspace.getConfiguration('markdown-org').get<string>('dateLocale', 'en-US');
+        const config = vscode.workspace.getConfiguration('markdown-org');
+        const locale = config.get<string>('dateLocale', 'en-US');
+        const firstDayOfWeek = config.get<FirstDayOfWeek>('firstDayOfWeek', 'monday');
 
         if (AgendaPanel.currentPanel) {
             if (userInitiated) {
                 AgendaPanel.currentPanel.reveal(vscode.ViewColumn.One);
             }
             AgendaPanel.currentPanel.title = `Agenda: ${mode}`;
-            AgendaPanel.currentPanel.webview.postMessage({ type: 'update', data, mode, date, currentTag });
+            AgendaPanel.currentPanel.webview.postMessage({
+                type: 'update',
+                data,
+                mode,
+                date,
+                currentTag,
+                firstDayOfWeek
+            });
         } else {
             AgendaPanel.currentPanel = vscode.window.createWebviewPanel(
                 'markdownOrgAgenda',
@@ -147,7 +157,8 @@ export class AgendaPanel {
                 locale: locale,
                 currentDate: AgendaPanel.currentDate,
                 currentTag: currentTag || 'ALL',
-                holidays: holidays || []
+                holidays: holidays || [],
+                firstDayOfWeek: firstDayOfWeek
             });
         }
 
@@ -364,6 +375,7 @@ export class AgendaPanel {
         let currentDate = '';
         let currentTag = '';
         let holidays = [];
+        let firstDayOfWeek = 'monday';
         
         window.addEventListener('message', event => {
             const message = event.data;
@@ -374,6 +386,9 @@ export class AgendaPanel {
                 currentDate = message.currentDate;
                 currentTag = message.currentTag;
                 holidays = message.holidays;
+                if (message.firstDayOfWeek) {
+                    firstDayOfWeek = message.firstDayOfWeek;
+                }
                 renderNavBar();
                 if (initialMode === 'month') {
                     document.getElementById('content').innerHTML = renderMonthCalendar(initialData);
@@ -394,6 +409,9 @@ export class AgendaPanel {
                 }
                 if (message.mode) {
                     initialMode = message.mode;
+                }
+                if (message.firstDayOfWeek) {
+                    firstDayOfWeek = message.firstDayOfWeek;
                 }
                 initialData = message.data;
                 const scrollPos = window.scrollY;
