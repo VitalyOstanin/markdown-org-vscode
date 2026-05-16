@@ -1,6 +1,6 @@
 import * as assert from 'assert';
 import * as vscode from 'vscode';
-import { suite, before, test } from 'mocha';
+import { suite, test } from 'mocha';
 
 suite('Timestamp Integration Tests', () => {
     let document: vscode.TextDocument;
@@ -17,9 +17,9 @@ suite('Timestamp Integration Tests', () => {
         });
         editor = await vscode.window.showTextDocument(document);
         editor.selection = new vscode.Selection(0, 0, 0, 0);
-        
+
         await vscode.commands.executeCommand('markdown-org.insertCreated');
-        
+
         const line1 = document.lineAt(1).text;
         assert.ok(line1.startsWith('`CREATED: <'));
         assert.ok(line1.endsWith('>`'));
@@ -32,9 +32,9 @@ suite('Timestamp Integration Tests', () => {
         });
         editor = await vscode.window.showTextDocument(document);
         editor.selection = new vscode.Selection(0, 0, 0, 0);
-        
+
         await vscode.commands.executeCommand('markdown-org.insertScheduled');
-        
+
         const line1 = document.lineAt(1).text;
         assert.ok(line1.startsWith('`SCHEDULED: <'));
         assert.ok(line1.endsWith('>`'));
@@ -47,9 +47,9 @@ suite('Timestamp Integration Tests', () => {
         });
         editor = await vscode.window.showTextDocument(document);
         editor.selection = new vscode.Selection(0, 0, 0, 0);
-        
+
         await vscode.commands.executeCommand('markdown-org.insertDeadline');
-        
+
         const line1 = document.lineAt(1).text;
         assert.ok(line1.startsWith('`DEADLINE: <'));
         assert.ok(line1.endsWith('>`'));
@@ -62,9 +62,9 @@ suite('Timestamp Integration Tests', () => {
         });
         editor = await vscode.window.showTextDocument(document);
         editor.selection = new vscode.Selection(0, 0, 0, 0);
-        
+
         await vscode.commands.executeCommand('markdown-org.insertScheduled');
-        
+
         assert.strictEqual(document.lineCount, 2);
         assert.strictEqual(document.lineAt(0).text, '## TODO Task title');
     });
@@ -76,9 +76,9 @@ suite('Timestamp Integration Tests', () => {
         });
         editor = await vscode.window.showTextDocument(document);
         editor.selection = new vscode.Selection(0, 0, 0, 0);
-        
+
         await vscode.commands.executeCommand('markdown-org.insertScheduled');
-        
+
         const line1 = document.lineAt(1).text;
         assert.ok(line1.startsWith('`SCHEDULED: <'));
     });
@@ -90,9 +90,9 @@ suite('Timestamp Integration Tests', () => {
         });
         editor = await vscode.window.showTextDocument(document);
         editor.selection = new vscode.Selection(0, 0, 0, 0);
-        
+
         await vscode.commands.executeCommand('markdown-org.insertDeadline');
-        
+
         const line1 = document.lineAt(1).text;
         assert.ok(line1.startsWith('`DEADLINE: <'));
     });
@@ -104,9 +104,9 @@ suite('Timestamp Integration Tests', () => {
         });
         editor = await vscode.window.showTextDocument(document);
         editor.selection = new vscode.Selection(0, 22, 0, 22);
-        
+
         await vscode.commands.executeCommand('markdown-org.timestampUp');
-        
+
         const line = document.lineAt(0).text;
         assert.ok(line.includes('2025-12-07'));
     });
@@ -118,9 +118,9 @@ suite('Timestamp Integration Tests', () => {
         });
         editor = await vscode.window.showTextDocument(document);
         editor.selection = new vscode.Selection(0, 22, 0, 22);
-        
+
         await vscode.commands.executeCommand('markdown-org.timestampDown');
-        
+
         const line = document.lineAt(0).text;
         assert.ok(line.includes('2025-12-05'));
     });
@@ -132,9 +132,9 @@ suite('Timestamp Integration Tests', () => {
         });
         editor = await vscode.window.showTextDocument(document);
         editor.selection = new vscode.Selection(0, 5, 0, 5); // cursor on SCHEDULED
-        
+
         await vscode.commands.executeCommand('markdown-org.timestampUp');
-        
+
         const line = document.lineAt(0).text;
         assert.ok(line.startsWith('`DEADLINE:'));
     });
@@ -146,9 +146,9 @@ suite('Timestamp Integration Tests', () => {
         });
         editor = await vscode.window.showTextDocument(document);
         editor.selection = new vscode.Selection(0, 24, 0, 24); // cursor on start hour "14"
-        
+
         await vscode.commands.executeCommand('markdown-org.timestampUp');
-        
+
         const line = document.lineAt(0).text;
         assert.ok(line.includes('[2025-12-09 Tue 15:30]'), `Expected hour 15, got: ${line}`);
         assert.ok(line.includes('=>  0:30'), `Expected duration 0:30, got: ${line}`);
@@ -161,9 +161,9 @@ suite('Timestamp Integration Tests', () => {
         });
         editor = await vscode.window.showTextDocument(document);
         editor.selection = new vscode.Selection(0, 27, 0, 27); // cursor on start minute "30"
-        
+
         await vscode.commands.executeCommand('markdown-org.timestampUp');
-        
+
         const line = document.lineAt(0).text;
         assert.ok(line.includes('[2025-12-09 Tue 14:31]'), `Expected minute 31, got: ${line}`);
         assert.ok(line.includes('=>  1:29'), `Expected duration 1:29, got: ${line}`);
@@ -176,9 +176,9 @@ suite('Timestamp Integration Tests', () => {
         });
         editor = await vscode.window.showTextDocument(document);
         editor.selection = new vscode.Selection(0, 48, 0, 48); // cursor on end hour "16"
-        
+
         await vscode.commands.executeCommand('markdown-org.timestampUp');
-        
+
         const line = document.lineAt(0).text;
         assert.ok(line.includes('[2025-12-09 Tue 17:00]'), `Expected hour 17, got: ${line}`);
         assert.ok(line.includes('=>  2:30'), `Expected duration 2:30, got: ${line}`);
@@ -191,9 +191,9 @@ suite('Timestamp Integration Tests', () => {
         });
         editor = await vscode.window.showTextDocument(document);
         editor.selection = new vscode.Selection(0, 51, 0, 51); // cursor on end minute "00"
-        
+
         await vscode.commands.executeCommand('markdown-org.timestampDown');
-        
+
         const line = document.lineAt(0).text;
         assert.ok(line.includes('[2025-12-09 Tue 15:59]'), `Expected minute 59, got: ${line}`);
         assert.ok(line.includes('=>  1:29'), `Expected duration 1:29, got: ${line}`);
@@ -206,9 +206,9 @@ suite('Timestamp Integration Tests', () => {
         });
         editor = await vscode.window.showTextDocument(document);
         editor.selection = new vscode.Selection(0, 24, 0, 24); // cursor on start hour
-        
+
         await vscode.commands.executeCommand('markdown-org.timestampUp');
-        
+
         const line = document.lineAt(0).text;
         assert.ok(line.includes('<2025-12-09 Tue 15:30>'), `Expected angle brackets and hour 15, got: ${line}`);
         assert.ok(line.includes('=>  0:30'), `Expected duration 0:30, got: ${line}`);
@@ -221,9 +221,9 @@ suite('Timestamp Integration Tests', () => {
         });
         editor = await vscode.window.showTextDocument(document);
         editor.selection = new vscode.Selection(0, 27, 0, 27); // cursor on start minute
-        
+
         await vscode.commands.executeCommand('markdown-org.timestampUp');
-        
+
         const line = document.lineAt(0).text;
         assert.ok(line.includes('[2025-12-09 Вт 14:31]'), `Expected Russian weekday Вт, got: ${line}`);
         assert.ok(line.includes('=>  1:29'), `Expected duration 1:29, got: ${line}`);
@@ -236,9 +236,9 @@ suite('Timestamp Integration Tests', () => {
         });
         editor = await vscode.window.showTextDocument(document);
         editor.selection = new vscode.Selection(0, 54, 0, 54); // cursor on end hour
-        
+
         await vscode.commands.executeCommand('markdown-org.timestampUp');
-        
+
         const line = document.lineAt(0).text;
         assert.ok(line.includes('[2025-12-09 Tuesday 17:00]'), `Expected full weekday Tuesday, got: ${line}`);
         assert.ok(line.includes('=>  2:30'), `Expected duration 2:30, got: ${line}`);
@@ -251,9 +251,9 @@ suite('Timestamp Integration Tests', () => {
         });
         editor = await vscode.window.showTextDocument(document);
         editor.selection = new vscode.Selection(0, 67, 0, 67); // cursor on end minute
-        
+
         await vscode.commands.executeCommand('markdown-org.timestampDown');
-        
+
         const line = document.lineAt(0).text;
         assert.ok(line.includes('<2025-12-09 Вторник 15:59>'), `Expected full Russian weekday Вторник, got: ${line}`);
         assert.ok(line.includes('=>  1:29'), `Expected duration 1:29, got: ${line}`);

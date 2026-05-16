@@ -1,6 +1,6 @@
 import * as assert from 'assert';
 import * as vscode from 'vscode';
-import { suite, before, test } from 'mocha';
+import { suite, test } from 'mocha';
 
 suite('Task Status Integration Tests', () => {
     let document: vscode.TextDocument;
@@ -16,9 +16,9 @@ suite('Task Status Integration Tests', () => {
             language: 'markdown'
         });
         editor = await vscode.window.showTextDocument(document);
-        
+
         await vscode.commands.executeCommand('markdown-org.setTodo');
-        
+
         assert.strictEqual(document.lineAt(0).text, '## TODO Task title');
     });
 
@@ -28,9 +28,9 @@ suite('Task Status Integration Tests', () => {
             language: 'markdown'
         });
         editor = await vscode.window.showTextDocument(document);
-        
+
         await vscode.commands.executeCommand('markdown-org.setDone');
-        
+
         assert.strictEqual(document.lineAt(0).text, '## DONE Task title');
     });
 
@@ -40,9 +40,9 @@ suite('Task Status Integration Tests', () => {
             language: 'markdown'
         });
         editor = await vscode.window.showTextDocument(document);
-        
+
         await vscode.commands.executeCommand('markdown-org.setTodo');
-        
+
         assert.strictEqual(document.lineAt(0).text, '## TODO [#A] Task title');
     });
 
@@ -52,9 +52,9 @@ suite('Task Status Integration Tests', () => {
             language: 'markdown'
         });
         editor = await vscode.window.showTextDocument(document);
-        
+
         await vscode.commands.executeCommand('markdown-org.setDone');
-        
+
         assert.strictEqual(document.lineAt(0).text, '## DONE Task title');
     });
 
@@ -64,9 +64,9 @@ suite('Task Status Integration Tests', () => {
             language: 'markdown'
         });
         editor = await vscode.window.showTextDocument(document);
-        
+
         await vscode.commands.executeCommand('markdown-org.togglePriority');
-        
+
         assert.strictEqual(document.lineAt(0).text, '## TODO [#A] Task title');
     });
 
@@ -76,9 +76,9 @@ suite('Task Status Integration Tests', () => {
             language: 'markdown'
         });
         editor = await vscode.window.showTextDocument(document);
-        
+
         await vscode.commands.executeCommand('markdown-org.togglePriority');
-        
+
         assert.strictEqual(document.lineAt(0).text, '## TODO Task title');
     });
 
@@ -89,9 +89,9 @@ suite('Task Status Integration Tests', () => {
         });
         editor = await vscode.window.showTextDocument(document);
         editor.selection = new vscode.Selection(0, 5, 0, 5);
-        
+
         await vscode.commands.executeCommand('markdown-org.setTodo');
-        
+
         assert.strictEqual(document.lineAt(0).text, '## TODO Task title');
     });
 
@@ -102,9 +102,9 @@ suite('Task Status Integration Tests', () => {
         });
         editor = await vscode.window.showTextDocument(document);
         editor.selection = new vscode.Selection(2, 0, 2, 0);
-        
+
         await vscode.commands.executeCommand('markdown-org.setTodo');
-        
+
         assert.strictEqual(document.lineAt(0).text, '## TODO Task title');
     });
 
@@ -114,9 +114,9 @@ suite('Task Status Integration Tests', () => {
             language: 'markdown'
         });
         editor = await vscode.window.showTextDocument(document);
-        
+
         await vscode.commands.executeCommand('markdown-org.setTodo');
-        
+
         assert.strictEqual(document.lineAt(0).text, '## Task title');
     });
 
@@ -126,9 +126,9 @@ suite('Task Status Integration Tests', () => {
             language: 'markdown'
         });
         editor = await vscode.window.showTextDocument(document);
-        
+
         await vscode.commands.executeCommand('markdown-org.setDone');
-        
+
         assert.strictEqual(document.lineAt(0).text, '## Task title');
     });
 });

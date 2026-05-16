@@ -3,13 +3,23 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as sinon from 'sinon';
-import * as child_process from 'child_process';
+import * as cp from 'child_process';
 
 suite('CLOCK Table Integration Tests', () => {
     let testFilePath: string;
     let testDocument: vscode.TextDocument;
     let editor: vscode.TextEditor;
-    let spawnSyncStub: sinon.SinonStub;
+    let execFileStub: sinon.SinonStub;
+
+    type ExecFileCallback = (error: Error | null, stdout: string, stderr: string) => void;
+    function makeExecFileFake(stdout: string, stderr: string, code: number) {
+        return (..._args: unknown[]) => {
+            const callback = _args[_args.length - 1] as ExecFileCallback;
+            const error = code === 0 ? null : Object.assign(new Error(stderr || `exit ${code}`), { code });
+            queueMicrotask(() => callback(error, stdout, stderr));
+            return {} as unknown as cp.ChildProcess;
+        };
+    }
 
     const mockDataWithClocks = [
         {
@@ -49,52 +59,47 @@ suite('CLOCK Table Integration Tests', () => {
         }
 
         testFilePath = path.join(workspaceFolder.uri.fsPath, 'test-clocktable.md');
-        
+
         const initialContent = `## TODO Task 1
 \`CLOCK: <2025-12-09 Mon 10:00>--<2025-12-09 Mon 12:30> => 2:30\`
 
 ## TODO Task 2
 \`CLOCK: <2025-12-09 Mon 14:00>--<2025-12-09 Mon 15:45> => 1:45\`
 `;
-        
+
         fs.writeFileSync(testFilePath, initialContent, 'utf8');
-        
+
         testDocument = await vscode.workspace.openTextDocument(testFilePath);
         editor = await vscode.window.showTextDocument(testDocument);
 
-        spawnSyncStub = sinon.stub(child_process, 'spawnSync');
+        execFileStub = sinon.stub(cp, 'execFile');
     });
 
     teardown(async () => {
-        spawnSyncStub.restore();
-        
+        execFileStub.restore();
+
         if (testDocument) {
             await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
         }
-        
+
         if (fs.existsSync(testFilePath)) {
             fs.unlinkSync(testFilePath);
         }
     });
 
-    test('Insert clock table with tasks', async function() {
+    test('Insert clock table with tasks', async function () {
         this.timeout(5000);
-        
-        spawnSyncStub.returns({
-            status: 0,
-            stdout: JSON.stringify(mockDataWithClocks),
-            stderr: '',
-            error: undefined
-        });
+
+        execFileStub.callsFake(makeExecFileFake(JSON.stringify(mockDataWithClocks), '', 0));
 
         const position = new vscode.Position(6, 0);
         editor.selection = new vscode.Selection(position, position);
-        
+
         await vscode.commands.executeCommand('markdown-org.insertClockTable');
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
         const text = editor.document.getText();
-        
+
         assert.ok(text.includes('| Heading'), 'Should contain table header');
         assert.ok(text.includes('| Time'), 'Should contain Time column');
         assert.ok(text.includes('| Task 1'), 'Should contain Task 1');
@@ -105,56 +110,48 @@ suite('CLOCK Table Integration Tests', () => {
         assert.ok(text.includes('**4:15**'), 'Should contain total time 4:15');
     });
 
-    test('Insert clock table with no CLOCK entries', async function() {
+    test('Insert clock table with no CLOCK entries', async function () {
         this.timeout(5000);
-        
-        spawnSyncStub.returns({
-            status: 0,
-            stdout: JSON.stringify(mockDataWithoutClocks),
-            stderr: '',
-            error: undefined
-        });
+
+        execFileStub.callsFake(makeExecFileFake(JSON.stringify(mockDataWithoutClocks), '', 0));
 
         const emptyContent = `## TODO Task without clocks
 Some content here
 `;
-        await editor.edit(editBuilder => {
+        await editor.edit((editBuilder) => {
             const fullRange = new vscode.Range(
                 editor.document.positionAt(0),
                 editor.document.positionAt(editor.document.getText().length)
             );
             editBuilder.replace(fullRange, emptyContent);
         });
-        
+
         const position = new vscode.Position(3, 0);
         editor.selection = new vscode.Selection(position, position);
-        
+
         await vscode.commands.executeCommand('markdown-org.insertClockTable');
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
         const text = editor.document.getText();
-        assert.ok(text.includes('No CLOCK entries') || text.includes('0:00'), 
-            'Should show no entries message or zero time');
+        assert.ok(
+            text.includes('No CLOCK entries') || text.includes('0:00'),
+            'Should show no entries message or zero time'
+        );
     });
 
-    test('Handle extractor error', async function() {
+    test('Handle extractor error', async function () {
         this.timeout(5000);
-        
-        spawnSyncStub.returns({
-            status: 1,
-            stdout: '',
-            stderr: 'Extractor error',
-            error: undefined
-        });
+
+        execFileStub.callsFake(makeExecFileFake('', 'Extractor error', 1));
 
         const showErrorStub = sinon.stub(vscode.window, 'showErrorMessage');
 
         const position = new vscode.Position(6, 0);
         editor.selection = new vscode.Selection(position, position);
-        
+
         await vscode.commands.executeCommand('markdown-org.insertClockTable');
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
+        await new Promise((resolve) => setTimeout(resolve, 100));
+
         assert.ok(showErrorStub.called, 'Should show error message');
         showErrorStub.restore();
     });

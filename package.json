@@ -245,19 +245,25 @@
     "format:check": "prettier --check .",
     "package": "vsce package"
   },
+  "overrides": {
+    "diff": "^9.0.0",
+    "serialize-javascript": "^7.0.5"
+  },
   "devDependencies": {
-    "@types/glob": "^8.1.0",
-    "@types/mocha": "^10.0.6",
-    "@types/node": "^20.x",
-    "@types/sinon": "^21.0.0",
+    "@eslint/js": "^10.0.1",
+    "@types/glob": "^9.0.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "^22.0.0",
+    "@types/sinon": "^21.0.1",
     "@types/vscode": "^1.85.0",
-    "@typescript-eslint/eslint-plugin": "^6.x",
-    "@typescript-eslint/parser": "^6.x",
     "@vscode/test-electron": "^2.5.2",
-    "eslint": "^8.x",
-    "glob": "^10.3.10",
-    "mocha": "^10.2.0",
-    "sinon": "^21.0.0",
-    "typescript": "^5.3.0"
+    "@vscode/vsce": "^3.9.1",
+    "eslint": "^10.4.0",
+    "glob": "^13.0.6",
+    "mocha": "^11.7.5",
+    "prettier": "^3.8.3",
+    "sinon": "^22.0.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.59.3"
   }
 }
