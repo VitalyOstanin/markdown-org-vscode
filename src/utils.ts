@@ -16,6 +16,14 @@ export function formatOrgTimestamp(date: Date, bracket: 'angle' | 'square'): str
     return `${open}${year}-${month}-${day} ${weekday} ${hour}:${minute}${close}`;
 }
 
+export function formatDurationHM(durationMs: number, opts?: { padHoursWithSpace?: boolean }): string {
+    const totalMinutes = Math.floor(durationMs / 60_000);
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    const hoursStr = opts?.padHoursWithSpace ? hours.toString().padStart(2, ' ') : hours.toString();
+    return `${hoursStr}:${minutes.toString().padStart(2, '0')}`;
+}
+
 export function toIsoDate(date: Date): string {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');

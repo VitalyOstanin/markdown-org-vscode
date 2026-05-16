@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { findNearestHeading, formatOrgTimestamp, getTimestampIndent } from '../utils';
+import { findNearestHeading, formatDurationHM, formatOrgTimestamp, getTimestampIndent } from '../utils';
 import { CLOCK_REGEX, TIMESTAMP_LINE_REGEX } from '../orgPatterns';
 
 function formatTimestamp(date: Date): string {
@@ -41,12 +41,7 @@ function roundEndTime(startDate: Date, endDate: Date, roundMinutes: number | und
 }
 
 function calculateDuration(start: Date, end: Date): string {
-    const diffMs = end.getTime() - start.getTime();
-    const diffMinutes = Math.floor(diffMs / 60000);
-    const hours = Math.floor(diffMinutes / 60);
-    const minutes = diffMinutes % 60;
-
-    return `${hours.toString().padStart(2, ' ')}:${minutes.toString().padStart(2, '0')}`;
+    return formatDurationHM(end.getTime() - start.getTime(), { padHoursWithSpace: true });
 }
 
 function findClockLines(editor: vscode.TextEditor, headingLine: number): number[] {

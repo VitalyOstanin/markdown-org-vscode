@@ -6,6 +6,9 @@ import { AgendaPanel } from '../views/agendaPanel';
 import { AgendaData, DayAgenda, FileTag, Task } from '../types';
 import { toIsoDate } from '../utils';
 
+const EXTRACTOR_TIMEOUT_MS = 30_000;
+const WHICH_TIMEOUT_MS = 5_000;
+
 function filterTasksByTag(data: AgendaData, tag: string, fileTags: FileTag[]): AgendaData {
     if (tag === 'ALL') {
         return data;
@@ -66,7 +69,7 @@ export async function showAgenda(
         const whichBin = process.platform === 'win32' ? 'where' : 'which';
         try {
             await new Promise<void>((resolve, reject) => {
-                cp.execFile(whichBin, [extractorPath], { timeout: 5000 }, (error) => {
+                cp.execFile(whichBin, [extractorPath], { timeout: WHICH_TIMEOUT_MS }, (error) => {
                     if (error) {
                         reject(error);
                     } else {
@@ -178,13 +181,13 @@ export async function cycleTag(_context: vscode.ExtensionContext) {
 function execCommand(command: string, args: string[]): Promise<string> {
     return new Promise((resolve, reject) => {
         const timeout = setTimeout(() => {
-            reject(new Error('Command timeout after 30 seconds'));
-        }, 30000);
+            reject(new Error(`Command timeout after ${EXTRACTOR_TIMEOUT_MS / 1000} seconds`));
+        }, EXTRACTOR_TIMEOUT_MS);
 
         cp.execFile(command, args, (error, stdout, stderr) => {
             clearTimeout(timeout);
             if (error) {
-                reject(stderr || error.message);
+                reject(new Error(stderr || error.message || 'Unknown error'));
             } else {
                 resolve(stdout);
             }

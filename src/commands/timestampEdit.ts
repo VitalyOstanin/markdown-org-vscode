@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import { HEADING_REGEX, TIMESTAMP_LINE_REGEX } from '../orgPatterns';
+import { formatDurationHM } from '../utils';
 
 const TIMESTAMP_REGEX =
     /<(\d{4})-(\d{2})-(\d{2})(?: ([А-Яа-яA-Za-z]{2,3}))?(?: (\d{2}):(\d{2}))?(?: (\+\d+[dwmy]{1,2}))?>/;
@@ -388,11 +389,7 @@ function adjustClockTimestamp(match: RegExpMatchArray, part: ClockTimestampPart,
     const newEndWeekday = getWeekdayName(endDate, endWeekday);
     const endTimestamp = `${endStartBracket}${endDate.getFullYear()}-${(endDate.getMonth() + 1).toString().padStart(2, '0')}-${endDate.getDate().toString().padStart(2, '0')} ${newEndWeekday} ${endDate.getHours().toString().padStart(2, '0')}:${endDate.getMinutes().toString().padStart(2, '0')}${endEndBracket}`;
 
-    const diffMs = endDate.getTime() - startDate.getTime();
-    const diffMinutes = Math.floor(diffMs / 60000);
-    const hours = Math.floor(diffMinutes / 60);
-    const minutes = diffMinutes % 60;
-    const duration = `${hours.toString().padStart(2, ' ')}:${minutes.toString().padStart(2, '0')}`;
+    const duration = formatDurationHM(endDate.getTime() - startDate.getTime(), { padHoursWithSpace: true });
 
     return `${indent}\`CLOCK: ${startTimestamp}--${endTimestamp} => ${duration}\``;
 }

@@ -4,6 +4,10 @@ import { randomBytes } from 'crypto';
 import { isPathInsideWorkspace } from '../utils';
 import { AgendaData } from '../types';
 
+const REFRESH_DEBOUNCE_MS = 500;
+const DAY_CHECK_INTERVAL_MS = 60_000;
+const CALENDAR_GRID_CELLS = 6 * 7;
+
 function generateNonce(): string {
     return randomBytes(16).toString('base64');
 }
@@ -141,7 +145,7 @@ export class AgendaPanel {
                 }
                 AgendaPanel.debounceTimer = setTimeout(() => {
                     AgendaPanel.refreshCallback?.();
-                }, 500);
+                }, REFRESH_DEBOUNCE_MS);
             };
 
             AgendaPanel.watcher.onDidChange(triggerRefresh);
@@ -160,7 +164,7 @@ export class AgendaPanel {
                     AgendaPanel.lastCheckedDay = currentDay;
                     AgendaPanel.refreshCallback?.();
                 }
-            }, 60000);
+            }, DAY_CHECK_INTERVAL_MS);
         }
     }
 
@@ -543,7 +547,7 @@ export class AgendaPanel {
                        '</div>';
             }
             
-            const remainingCells = 42 - (startDay + lastDayOfMonth.getDate());
+            const remainingCells = ${CALENDAR_GRID_CELLS} - (startDay + lastDayOfMonth.getDate());
             for (let i = 1; i <= remainingCells; i++) {
                 html += '<div class="calendar-day other-month"><div class="day-number">' + i + '</div></div>';
             }

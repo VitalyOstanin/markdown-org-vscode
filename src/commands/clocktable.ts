@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as cp from 'child_process';
 import * as path from 'path';
+import { formatDurationHM } from '../utils';
 
 const EXTRACTOR_TIMEOUT_MS = 30_000;
 const EXTRACTOR_MAX_BUFFER_BYTES = 10 * 1024 * 1024;
@@ -43,9 +44,7 @@ function parseClockData(filePath: string): Promise<Task[]> {
 }
 
 function formatDuration(minutes: number): string {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return `${hours}:${mins.toString().padStart(2, '0')}`;
+    return formatDurationHM(minutes * 60_000);
 }
 
 function parseDuration(duration: string): number {
