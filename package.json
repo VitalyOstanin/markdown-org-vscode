@@ -17,6 +17,12 @@
   ],
   "activationEvents": [],
   "main": "./out/extension.js",
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "In an untrusted workspace, configured executable paths (e.g. markdown-org.extractorPath) and file paths (markdown-org.maintainFilePath) are not used."
+    }
+  },
   "contributes": {
     "commands": [
       {

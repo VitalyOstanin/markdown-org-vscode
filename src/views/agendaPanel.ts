@@ -1,4 +1,20 @@
 import * as vscode from 'vscode';
+import { randomBytes } from 'crypto';
+
+function generateNonce(): string {
+    return randomBytes(16).toString('base64');
+}
+
+function isPathInsideWorkspace(filePath: string): boolean {
+    const folders = vscode.workspace.workspaceFolders;
+    if (!folders || folders.length === 0) {
+        return false;
+    }
+    return folders.some(folder => {
+        const folderPath = folder.uri.fsPath;
+        return filePath === folderPath || filePath.startsWith(folderPath + '/') || filePath.startsWith(folderPath + '\\');
+    });
+}
 
 interface Task {
     file: string;
@@ -59,9 +75,10 @@ export class AgendaPanel {
                 'markdownOrgAgenda',
                 `Agenda: ${mode}`,
                 vscode.ViewColumn.One,
-                { 
+                {
                     enableScripts: true,
-                    retainContextWhenHidden: true
+                    retainContextWhenHidden: true,
+                    localResourceRoots: []
                 }
             );
 
@@ -82,8 +99,15 @@ export class AgendaPanel {
 
             AgendaPanel.currentPanel.webview.onDidReceiveMessage(async message => {
                 if (message.command === 'openTask') {
+                    if (typeof message.file !== 'string' || typeof message.line !== 'number') {
+                        return;
+                    }
+                    if (!isPathInsideWorkspace(message.file)) {
+                        vscode.window.showWarningMessage('Markdown Org: refused to open file outside workspace');
+                        return;
+                    }
                     const doc = await vscode.workspace.openTextDocument(message.file);
-                    const pos = new vscode.Position(message.line - 1, 0);
+                    const pos = new vscode.Position(Math.max(0, message.line - 1), 0);
                     await vscode.window.showTextDocument(doc, {
                         selection: new vscode.Range(pos, pos)
                     });
@@ -101,7 +125,9 @@ export class AgendaPanel {
                 }
             });
 
-            AgendaPanel.currentPanel.webview.html = this.getHtmlContent(data, mode, locale, currentTag || 'ALL', holidays || []);
+            const nonce = generateNonce();
+            const cspSource = AgendaPanel.currentPanel.webview.cspSource;
+            AgendaPanel.currentPanel.webview.html = this.getHtmlContent(data, mode, locale, currentTag || 'ALL', holidays || [], nonce, cspSource);
             
             AgendaPanel.currentPanel.webview.postMessage({
                 command: 'init',
@@ -152,11 +178,12 @@ export class AgendaPanel {
         }
     }
 
-    private static getHtmlContent(data: AgendaData, mode: string, locale: string, currentTag: string, holidays: string[]): string {
+    private static getHtmlContent(data: AgendaData, mode: string, locale: string, currentTag: string, holidays: string[], nonce: string, cspSource: string): string {
         return `<!DOCTYPE html>
 <html>
 <head>
-    <style>
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'nonce-${nonce}'; script-src 'nonce-${nonce}';">
+    <style nonce="${nonce}">
         body { 
             font-family: 'Courier New', monospace; 
             padding: 20px;
@@ -283,7 +310,7 @@ export class AgendaPanel {
 <body>
     <div class="nav-bar" id="nav-bar"></div>
     <div id="content"></div>
-    <script>
+    <script nonce="${nonce}">
         const vscode = acquireVsCodeApi();
         let initialData = [];
         let initialMode = '';

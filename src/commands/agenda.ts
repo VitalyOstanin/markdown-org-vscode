@@ -41,6 +41,11 @@ function filterTasksByTag(data: any, tag: string, fileTags: any[]): any {
 }
 
 export async function showAgenda(context: vscode.ExtensionContext, mode: 'day' | 'week' | 'month' | 'tasks', initialDate?: string) {
+    if (!vscode.workspace.isTrusted) {
+        vscode.window.showWarningMessage('Markdown Org: agenda is disabled in untrusted workspaces');
+        return;
+    }
+
     const config = vscode.workspace.getConfiguration('markdown-org');
     const extractorPath = config.get<string>('extractorPath');
     const workspaceDir = config.get<string>('workspaceDir') || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
@@ -51,8 +56,17 @@ export async function showAgenda(context: vscode.ExtensionContext, mode: 'day' |
     }
 
     if (!path.isAbsolute(extractorPath)) {
+        const whichBin = process.platform === 'win32' ? 'where' : 'which';
         try {
-            cp.execSync(`which ${extractorPath}`, { stdio: 'pipe' });
+            await new Promise<void>((resolve, reject) => {
+                cp.execFile(whichBin, [extractorPath], { timeout: 5000 }, (error) => {
+                    if (error) {
+                        reject(error);
+                    } else {
+                        resolve();
+                    }
+                });
+            });
         } catch {
             vscode.window.showErrorMessage(
                 `Markdown Org: Extractor '${extractorPath}' not found in PATH. ` +
@@ -61,9 +75,11 @@ export async function showAgenda(context: vscode.ExtensionContext, mode: 'day' |
             return;
         }
     } else {
-        if (!fs.existsSync(extractorPath)) {
+        try {
+            await fs.promises.access(extractorPath, fs.constants.X_OK);
+        } catch {
             vscode.window.showErrorMessage(
-                `Markdown Org: Extractor not found at '${extractorPath}'. ` +
+                `Markdown Org: Extractor not found or not executable at '${extractorPath}'. ` +
                 'Please check markdown-org.extractorPath setting or install: cargo install markdown-org-extract'
             );
             return;

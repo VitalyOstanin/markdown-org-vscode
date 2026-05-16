@@ -77,6 +77,10 @@ function buildClockTable(tasks: Task[]): string {
 }
 
 export async function insertClockTable() {
+    if (!vscode.workspace.isTrusted) {
+        vscode.window.showWarningMessage('Markdown Org: clock table is disabled in untrusted workspaces');
+        return;
+    }
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
         vscode.window.showErrorMessage('No active editor');
