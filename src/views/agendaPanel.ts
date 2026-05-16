@@ -27,15 +27,12 @@ export class AgendaPanel {
     private static currentTag?: string;
 
     private static scheduleNextDayCheck() {
-        AgendaPanel.dayCheckTimer = setTimeout(
-            () => {
-                AgendaPanel.refreshCallback?.();
-                if (AgendaPanel.currentPanel) {
-                    AgendaPanel.scheduleNextDayCheck();
-                }
-            },
-            msUntilNextLocalMidnight(new Date())
-        );
+        AgendaPanel.dayCheckTimer = setTimeout(() => {
+            AgendaPanel.refreshCallback?.();
+            if (AgendaPanel.currentPanel) {
+                AgendaPanel.scheduleNextDayCheck();
+            }
+        }, msUntilNextLocalMidnight(new Date()));
     }
 
     public static render(
