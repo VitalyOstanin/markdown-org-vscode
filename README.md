@@ -253,19 +253,38 @@ Locale for date formatting in agenda views.
 }
 ```
 
+### `markdown-org.firstDayOfWeek`
+
+**Type:** `"monday" | "sunday" | "auto"`
+**Default:** `"monday"`
+
+First day of week in the month calendar. `"auto"` resolves the first day from the locale via `Intl.Locale.weekInfo`, falling back to `"monday"` when the API is unavailable.
+
+```json
+{
+    "markdown-org.firstDayOfWeek": "auto"
+}
+```
+
 ### `markdown-org.fileTags`
 
 **Type:** `{ name: string; pattern: string }[]`
 **Default:** `[{ "name": "ALL", "pattern": "" }, { "name": "WORK", "pattern": "work" }, { "name": "PRIVATE", "pattern": "!work" }]`
 
-File tag filters applied in agenda. `pattern` is a substring matched against the file path. Prefix with `!` to invert. Empty pattern matches files that do not match any other (non-negated) pattern. Cycle the active tag with `Cycle Tag Filter`.
+File tag filters applied in agenda. `pattern` is a case-sensitive substring matched against the file's **basename** (not the full path), so a pattern like `"work"` does not accidentally match files inside a `networking/` directory.
+
+- `""` (empty) — filter disabled; all tasks are shown. The tag's name has no special meaning.
+- `"text"` — basename contains `"text"`.
+- `"!..."` — basename matches **none** of the positive patterns in `fileTags`. The text after `!` is only a marker and is ignored, so `"!"`, `"!work"`, and `"!xyz"` all behave the same way.
+
+See [TAG_FILTERING.md](TAG_FILTERING.md) for examples. Cycle the active tag with `Cycle Tag Filter`.
 
 ### `markdown-org.currentTag`
 
 **Type:** `string`
 **Default:** `"ALL"`
 
-Currently selected tag filter. Usually updated by `Cycle Tag Filter`.
+Currently selected tag filter. Usually updated by `Cycle Tag Filter`. Stored at workspace scope when a workspace is open, otherwise globally.
 
 ### `markdown-org.clockRoundMinutes`
 

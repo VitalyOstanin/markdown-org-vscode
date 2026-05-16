@@ -2,6 +2,62 @@
 
 All notable changes to the "Markdown Org" extension will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- New setting `markdown-org.firstDayOfWeek` (`"monday"` | `"sunday"` | `"auto"`) controlling the first day of week in the month calendar. `"auto"` uses the locale's default via `Intl.Locale.weekInfo`.
+- Mode switcher inside the agenda webview: Day / Week / Month / Tasks buttons in the navigation bar; the panel title updates when the active mode changes.
+- Other-month cells in the month calendar are now clickable and navigate to the corresponding day.
+
+### Changed
+
+- **Tag filter semantics reworked.** Patterns are now matched against `path.basename(file)` instead of the full path, so `"work"` no longer accidentally matches files inside a `networking/` directory. An empty pattern always means "show everything" regardless of the tag's name (the previous special-case for the literal name `ALL` is gone). A `!`-prefixed pattern means "does not match any positive pattern in `fileTags`" — the text after `!` is only a marker and is ignored.
+- `markdown-org.currentTag` is now persisted at workspace scope when a workspace is open (was: always global), so different projects can keep different active tags.
+- Month calendar rendering:
+    - Target month is derived from the navigation date, not from the first entry in the agenda data, so empty months and back/forward navigation render correctly.
+    - Weekday headers are localized via `toLocaleDateString` instead of hardcoded English `Mon`/`Tue`/…
+    - The grid now adapts to 4–6 rows depending on the month's length instead of always rendering 6 rows.
+    - Tasks marked as overdue now contribute to the day's "has tasks" indicator.
+- Documented tag filter semantics in [TAG_FILTERING.md](TAG_FILTERING.md) and README.
+
+### Fixed
+
+- Re-running `Show Agenda (Day/Week/Month)` or `Show Tasks` on an already-open agenda panel now correctly switches the mode instead of being ignored.
+- Calendar no longer crashes on an empty `days[]` array.
+
+### Internal
+
+- Extracted the tag filter into `src/utils/tagFilter.ts` so it can be unit-tested without the `vscode` runtime.
+- Added unit tests for `filterTasksByTag` covering basename matching, negation symmetry, empty-pattern semantics, unknown-tag fallback, and per-day data shape.
+- Extended integration tests for `cycleTag`: workspace-scope persistence, recovery from an unknown current tag, and the empty-`fileTags` warning path.
+- Removed dead static fields `AgendaPanel.currentMode` and `AgendaPanel.currentTag`; renamed `AgendaPanel.refreshWithCurrentTag()` to `refresh()`.
+- Wrapped `child_process.execFile` in `src/utils/exec.ts` so it can be stubbed in tests without redefining the non-configurable `cp.execFile` descriptor in newer Node.
+
+## [0.2.4] - 2025-12-09
+
+### Fixed
+
+- Release workflow: grant write permissions so the GitHub release can be published from CI.
+
+## [0.2.3] - 2025-12-09
+
+### Fixed
+
+- VSIX build now pinned to Node.js 20 to match the runtime declared in `engines.node`.
+
+## [0.2.2] - 2025-12-09
+
+### Internal
+
+- Release-pipeline retry; no user-visible changes.
+
+## [0.2.1] - 2025-12-09
+
+### Internal
+
+- Version bump for marketplace re-publish; no user-visible changes.
+
 ## [0.2.0] - 2025-12-06
 
 ### Added
