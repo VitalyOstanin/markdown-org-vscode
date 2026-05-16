@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
-import { isPathInsideWorkspace, resolveWorkspacePath } from '../utils';
+import { isPathInsideWorkspace, requireActiveEditor, resolveWorkspacePath } from '../utils';
 
 async function readIfExists(filePath: string): Promise<string | null> {
     try {
@@ -115,9 +115,8 @@ export async function moveToArchive() {
         vscode.window.showWarningMessage('Markdown Org: archive is disabled in untrusted workspaces');
         return;
     }
-    const editor = vscode.window.activeTextEditor;
+    const editor = requireActiveEditor();
     if (!editor) {
-        vscode.window.showErrorMessage('No active editor');
         return;
     }
 
@@ -158,9 +157,8 @@ export async function promoteToMaintain() {
         vscode.window.showWarningMessage('Markdown Org: maintain promotion is disabled in untrusted workspaces');
         return;
     }
-    const editor = vscode.window.activeTextEditor;
+    const editor = requireActiveEditor();
     if (!editor) {
-        vscode.window.showErrorMessage('No active editor');
         return;
     }
 

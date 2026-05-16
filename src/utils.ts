@@ -69,6 +69,27 @@ export function resolveWorkspacePath(p: string): string {
     return path.resolve(root, p);
 }
 
+export function requireActiveEditor(opts?: { markdownOnly?: boolean }): vscode.TextEditor | null {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) {
+        vscode.window.showErrorMessage('No active editor');
+        return null;
+    }
+    if (opts?.markdownOnly && editor.document.languageId !== 'markdown') {
+        return null;
+    }
+    return editor;
+}
+
+export async function requireHeadingAtCursor(editor: vscode.TextEditor): Promise<number | null> {
+    const headingLine = await findNearestHeading(editor);
+    if (headingLine === null) {
+        vscode.window.showErrorMessage('No heading found');
+        return null;
+    }
+    return headingLine;
+}
+
 export async function findNearestHeading(editor: vscode.TextEditor): Promise<number | null> {
     const symbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
         'vscode.executeDocumentSymbolProvider',

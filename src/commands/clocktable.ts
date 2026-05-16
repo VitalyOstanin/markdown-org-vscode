@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import * as cp from 'child_process';
 import * as path from 'path';
-import { formatDurationHM } from '../utils';
+import { formatDurationHM, requireActiveEditor } from '../utils';
 
 const EXTRACTOR_TIMEOUT_MS = 30_000;
 const EXTRACTOR_MAX_BUFFER_BYTES = 10 * 1024 * 1024;
@@ -89,9 +89,8 @@ export async function insertClockTable() {
         vscode.window.showWarningMessage('Markdown Org: clock table is disabled in untrusted workspaces');
         return;
     }
-    const editor = vscode.window.activeTextEditor;
+    const editor = requireActiveEditor();
     if (!editor) {
-        vscode.window.showErrorMessage('No active editor');
         return;
     }
 
