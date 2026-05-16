@@ -1,19 +1,9 @@
 import * as vscode from 'vscode';
 import { randomBytes } from 'crypto';
+import { isPathInsideWorkspace } from '../utils';
 
 function generateNonce(): string {
     return randomBytes(16).toString('base64');
-}
-
-function isPathInsideWorkspace(filePath: string): boolean {
-    const folders = vscode.workspace.workspaceFolders;
-    if (!folders || folders.length === 0) {
-        return false;
-    }
-    return folders.some(folder => {
-        const folderPath = folder.uri.fsPath;
-        return filePath === folderPath || filePath.startsWith(folderPath + '/') || filePath.startsWith(folderPath + '\\');
-    });
 }
 
 interface Task {
