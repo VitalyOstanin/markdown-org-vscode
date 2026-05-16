@@ -1,14 +1,12 @@
 import * as vscode from 'vscode';
 import * as cp from 'child_process';
-import * as fs from 'fs';
-import * as path from 'path';
 import { AgendaPanel } from '../views/agendaPanel';
 import { FileTag } from '../types';
 import { toIsoDate } from '../utils';
 import { filterTasksByTag } from '../utils/tagFilter';
+import { extractor } from '../utils/extractor';
 
 const EXTRACTOR_TIMEOUT_MS = 30_000;
-const WHICH_TIMEOUT_MS = 5_000;
 
 /**
  * Open the agenda webview for the given mode (day/week/month/tasks).
@@ -25,46 +23,14 @@ export async function showAgenda(
         return;
     }
 
-    const startupConfig = vscode.workspace.getConfiguration('markdown-org');
-    const extractorPath = startupConfig.get<string>('extractorPath');
-    const workspaceDir =
-        startupConfig.get<string>('workspaceDir') || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-
+    const extractorPath = await extractor.resolveExtractorPath();
     if (!extractorPath) {
-        vscode.window.showErrorMessage('Markdown Org: Please configure markdown-org.extractorPath in settings');
         return;
     }
 
-    if (!path.isAbsolute(extractorPath)) {
-        const whichBin = process.platform === 'win32' ? 'where' : 'which';
-        try {
-            await new Promise<void>((resolve, reject) => {
-                cp.execFile(whichBin, [extractorPath], { timeout: WHICH_TIMEOUT_MS }, (error) => {
-                    if (error) {
-                        reject(error);
-                    } else {
-                        resolve();
-                    }
-                });
-            });
-        } catch {
-            vscode.window.showErrorMessage(
-                `Markdown Org: Extractor '${extractorPath}' not found in PATH. ` +
-                    'Please install markdown-org-extract: cargo install markdown-org-extract'
-            );
-            return;
-        }
-    } else {
-        try {
-            await fs.promises.access(extractorPath, fs.constants.X_OK);
-        } catch {
-            vscode.window.showErrorMessage(
-                `Markdown Org: Extractor not found or not executable at '${extractorPath}'. ` +
-                    'Please check markdown-org.extractorPath setting or install: cargo install markdown-org-extract'
-            );
-            return;
-        }
-    }
+    const startupConfig = vscode.workspace.getConfiguration('markdown-org');
+    const workspaceDir =
+        startupConfig.get<string>('workspaceDir') || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 
     if (!workspaceDir) {
         vscode.window.showErrorMessage(
