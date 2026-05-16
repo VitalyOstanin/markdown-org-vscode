@@ -1,5 +1,4 @@
 import * as vscode from 'vscode';
-import * as path from 'path';
 import { randomBytes } from 'crypto';
 import { isPathInsideWorkspace } from '../utils';
 import { AgendaData } from '../types';
@@ -162,11 +161,15 @@ export class AgendaPanel {
             AgendaPanel.watcher = vscode.workspace.createFileSystemWatcher('**/*.md');
 
             const ignored = (uri: vscode.Uri) => {
-                const fsPath = uri.fsPath;
+                // Normalize backslashes to forward slashes so the same checks
+                // work regardless of how `fsPath` is rendered on the current
+                // platform (Windows can produce either style depending on the
+                // URI source).
+                const normalized = uri.fsPath.replace(/\\/g, '/');
                 return (
-                    fsPath.endsWith('.archive.md') ||
-                    fsPath.includes(`${path.sep}.git${path.sep}`) ||
-                    fsPath.includes(`${path.sep}node_modules${path.sep}`)
+                    normalized.endsWith('.archive.md') ||
+                    normalized.includes('/.git/') ||
+                    normalized.includes('/node_modules/')
                 );
             };
 
