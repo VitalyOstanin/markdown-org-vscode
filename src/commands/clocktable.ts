@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
-import * as cp from 'child_process';
 import * as path from 'path';
 import { formatDurationHM, requireActiveEditor } from '../utils';
+import { exec } from '../utils/exec';
 
 const EXTRACTOR_TIMEOUT_MS = 30_000;
 const EXTRACTOR_MAX_BUFFER_BYTES = 10 * 1024 * 1024;
@@ -20,7 +20,7 @@ function getExtractorPath(): string {
 function parseClockData(filePath: string): Promise<Task[]> {
     const extractorPath = getExtractorPath();
     return new Promise((resolve, reject) => {
-        cp.execFile(
+        exec.execFile(
             extractorPath,
             ['--dir', path.dirname(filePath), '--glob', path.basename(filePath), '--format', 'json', '--tasks'],
             {

@@ -3,7 +3,8 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as sinon from 'sinon';
-import * as cp from 'child_process';
+import type * as cp from 'child_process';
+import { exec } from '../utils/exec';
 
 suite('CLOCK Table Integration Tests', () => {
     let testFilePath: string;
@@ -72,7 +73,7 @@ suite('CLOCK Table Integration Tests', () => {
         testDocument = await vscode.workspace.openTextDocument(testFilePath);
         editor = await vscode.window.showTextDocument(testDocument);
 
-        execFileStub = sinon.stub(cp, 'execFile');
+        execFileStub = sinon.stub(exec, 'execFile');
     });
 
     teardown(async () => {
