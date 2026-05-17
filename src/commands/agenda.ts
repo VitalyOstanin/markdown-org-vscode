@@ -65,7 +65,7 @@ export async function showAgenda(
             currentDate = toIsoDate(new Date());
         }
 
-        const args = ['--dir', workspaceDir, '--format', 'json'];
+        const args = ['--dir', workspaceDir, '--format', 'json', '--absolute-paths'];
         if (mode === 'tasks') {
             args.push('--tasks');
         } else {

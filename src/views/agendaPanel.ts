@@ -97,11 +97,7 @@ export class AgendaPanel {
                     if (typeof message.file !== 'string' || typeof message.line !== 'number') {
                         return;
                     }
-                    const doc = await vscode.workspace.openTextDocument(message.file);
-                    const pos = new vscode.Position(Math.max(0, message.line - 1), 0);
-                    await vscode.window.showTextDocument(doc, {
-                        selection: new vscode.Range(pos, pos)
-                    });
+                    await AgendaPanel.openTaskInEditor(message.file, message.line);
                 } else if (message.command === 'navigate') {
                     if (message.switchToDay) {
                         AgendaPanel.currentPanel?.dispose();
@@ -187,6 +183,28 @@ export class AgendaPanel {
 
         if (!AgendaPanel.dayCheckTimer && refreshCallback) {
             AgendaPanel.scheduleNextDayCheck();
+        }
+    }
+
+    /**
+     * Open a file at the given 1-based line in an editor. The path is expected
+     * to be absolute (the agenda passes `--absolute-paths` to
+     * `markdown-org-extract`). Failures from `openTextDocument` are surfaced
+     * via `showErrorMessage` instead of being silently swallowed.
+     *
+     * Exposed for integration tests (see CLAUDE.md for why we do not gate
+     * this path on `workspaceFolders`).
+     */
+    public static async openTaskInEditor(file: string, line: number): Promise<void> {
+        try {
+            const doc = await vscode.workspace.openTextDocument(file);
+            const pos = new vscode.Position(Math.max(0, line - 1), 0);
+            await vscode.window.showTextDocument(doc, {
+                selection: new vscode.Range(pos, pos)
+            });
+        } catch (err) {
+            const detail = err instanceof Error ? err.message : String(err);
+            vscode.window.showErrorMessage(`Markdown Org: failed to open ${file}: ${detail}`);
         }
     }
 

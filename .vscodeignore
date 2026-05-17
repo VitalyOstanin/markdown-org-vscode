@@ -6,6 +6,7 @@
 .git/**
 .github/**
 .claude/**
+CLAUDE.md
 
 # Sources and build artifacts
 src/**
