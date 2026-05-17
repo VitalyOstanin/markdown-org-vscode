@@ -2,7 +2,8 @@ import * as assert from 'assert';
 import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
-import { suite, before, after, test } from 'mocha';
+import * as sinon from 'sinon';
+import { suite, before, after, afterEach, test } from 'mocha';
 
 suite('Month View Integration Tests', () => {
     const testWorkspaceDir = path.join(__dirname, '../../test-workspace');
@@ -39,18 +40,24 @@ suite('Month View Integration Tests', () => {
         }
     });
 
-    test('should render month view with calendar grid', async function () {
+    afterEach(async () => {
+        sinon.restore();
+        await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+    });
+
+    test('should render month view without surfacing an error', async function () {
         this.timeout(10000);
 
         const config = vscode.workspace.getConfiguration('markdown-org');
         await config.update('workspaceDir', testWorkspaceDir, vscode.ConfigurationTarget.Workspace);
 
-        await vscode.commands.executeCommand('markdown-org.showAgendaMonth');
+        const showErrorStub = sinon.stub(vscode.window, 'showErrorMessage');
 
+        await vscode.commands.executeCommand('markdown-org.showAgendaMonth');
         await new Promise((resolve) => setTimeout(resolve, 2000));
 
-        const panels = vscode.window.visibleTextEditors;
-        assert.ok(panels.length >= 0, 'Agenda panel should be created');
+        const calls = showErrorStub.getCalls().map((c) => String(c.args[0]));
+        assert.deepStrictEqual(calls, [], `markdown-org.showAgendaMonth surfaced error(s): ${calls.join('; ')}`);
     });
 
     test('should identify days with tasks correctly', () => {
