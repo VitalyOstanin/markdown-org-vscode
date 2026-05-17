@@ -3,6 +3,7 @@ import { randomBytes } from 'crypto';
 import { AgendaData } from '../types';
 import { isMeaningfulSelection, resolveTaskClickIntent } from '../utils/agendaClick';
 import { rememberScroll, recallScroll } from '../utils/agendaScroll';
+import { resolveHeadingClass } from '../utils/agendaHeadingTint';
 
 const REFRESH_DEBOUNCE_MS = 500;
 const CALENDAR_COLS = 7;
@@ -261,6 +262,9 @@ export class AgendaPanel {
         // navigation round-trip fix; unit-tested in agendaScroll.test.ts.
         const rememberScrollSource = rememberScroll.toString();
         const recallScrollSource = recallScroll.toString();
+        // Heading tint resolver (DEADLINE > priority > default);
+        // unit-tested in agendaHeadingTint.test.ts.
+        const resolveHeadingClassSource = resolveHeadingClass.toString();
         return `<!DOCTYPE html>
 <html>
 <head>
@@ -354,8 +358,14 @@ export class AgendaPanel {
         .todo-keyword { color: #f48771; font-weight: bold; }
         .done-keyword { color: #73c991; font-weight: bold; }
         .priority-a { color: #f48771; font-weight: bold; }
-        .priority-b { color: #dcdcaa; }
-        .priority-c { color: #4ec9b0; }
+        .priority-b { color: #dcdcaa; font-weight: bold; }
+        .priority-c { color: #4ec9b0; font-weight: bold; }
+        /* Heading tint by priority -- same hue AND weight as the marker
+           (full font match). Loses to .deadline-heading (DEADLINE wins
+           by design -- it's the louder signal). */
+        .heading-priority-a { color: #f48771; font-weight: bold; }
+        .heading-priority-b { color: #dcdcaa; font-weight: bold; }
+        .heading-priority-c { color: #4ec9b0; font-weight: bold; }
         .time-display { color: #4fc1ff; font-weight: bold; }
         .timestamp-type { font-weight: bold; }
         .timestamp-deadline { color: #f48771; font-weight: bold; }
@@ -424,6 +434,7 @@ export class AgendaPanel {
         ${clickIntentSource}
         ${rememberScrollSource}
         ${recallScrollSource}
+        ${resolveHeadingClassSource}
         const vscode = acquireVsCodeApi();
         let initialData = [];
         let initialMode = '';
@@ -627,13 +638,14 @@ export class AgendaPanel {
             const priority = task.priority ? '[#' + task.priority + ']' : '';
             const priorityClass = task.priority ? 'priority-' + task.priority.toLowerCase() : '';
             const statusClass = status === 'TODO' ? 'todo-keyword' : status === 'DONE' ? 'done-keyword' : '';
-            
-            const dateDisplay = (daysOffset !== undefined && daysOffset !== 0 && task.timestamp_date) 
-                ? formatDateForTitle(task.timestamp_date) 
+
+            const dateDisplay = (daysOffset !== undefined && daysOffset !== 0 && task.timestamp_date)
+                ? formatDateForTitle(task.timestamp_date)
                 : '';
             const dateClass = taskType === 'upcoming' ? 'date-upcoming' : 'date-overdue';
-            const headingClass = task.timestamp_type === 'DEADLINE' ? 'deadline-heading' : '';
-            
+            // Source of truth: src/utils/agendaHeadingTint.ts -- unit tested.
+            const headingClass = resolveHeadingClass(task);
+
             return '<div class="task-line" data-file="' + escapeHtml(task.file) + '" data-line="' + task.line + '">' +
                 '<span class="todo-label">todo:</span>' +
                 '<span>' + timeInfo + '</span>' +
