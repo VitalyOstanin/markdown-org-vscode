@@ -1,8 +1,8 @@
 import * as vscode from 'vscode';
-import * as cp from 'child_process';
 import { AgendaPanel } from '../views/agendaPanel';
 import { FileTag } from '../types';
 import { toIsoDate } from '../utils';
+import { exec } from '../utils/exec';
 import { filterTasksByTag } from '../utils/tagFilter';
 import { extractor } from '../utils/extractor';
 
@@ -125,7 +125,7 @@ function execCommand(command: string, args: string[]): Promise<string> {
             reject(new Error(`Command timeout after ${EXTRACTOR_TIMEOUT_MS / 1000} seconds`));
         }, EXTRACTOR_TIMEOUT_MS);
 
-        cp.execFile(command, args, (error, stdout, stderr) => {
+        exec.execFile(command, args, (error, stdout, stderr) => {
             clearTimeout(timeout);
             if (error) {
                 reject(new Error(stderr || error.message || 'Unknown error'));
