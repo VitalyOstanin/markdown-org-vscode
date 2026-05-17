@@ -156,5 +156,21 @@ suite('Tag Filter Unit Tests', () => {
             const result = filterTasksByTag(dayAgenda(TASKS), 'WORK', TAGS) as DayAgenda[];
             assert.strictEqual(result[0].date, '2025-12-09');
         });
+
+        test('handles DayAgenda with missing buckets (week/month payloads)', () => {
+            // markdown-org-extract sometimes omits empty buckets in week/month
+            // agenda output. Cast away the missing fields to mirror what the
+            // real extractor produces over the wire.
+            const partialDay = { date: '2025-12-09', scheduled_timed: [T_WORK] } as unknown as DayAgenda;
+            const result = filterTasksByTag([partialDay], 'WORK', TAGS) as DayAgenda[];
+            assert.strictEqual(result.length, 1);
+            assert.deepStrictEqual(
+                result[0].scheduled_timed.map((t) => t.file),
+                [T_WORK.file]
+            );
+            assert.deepStrictEqual(result[0].overdue, []);
+            assert.deepStrictEqual(result[0].scheduled_no_time, []);
+            assert.deepStrictEqual(result[0].upcoming, []);
+        });
     });
 });

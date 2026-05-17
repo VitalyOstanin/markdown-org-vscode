@@ -45,12 +45,16 @@ export function filterTasksByTag(data: AgendaData, tag: string, fileTags: FileTa
     };
 
     if (isDayAgendaArray(data)) {
+        // `markdown-org-extract` omits empty buckets in some agenda modes
+        // (week/month), so a DayAgenda may arrive without all four arrays
+        // populated. Default each bucket to `[]` before filtering so the
+        // shape stays consistent and `.filter` never lands on `undefined`.
         return data.map((day) => ({
             ...day,
-            overdue: day.overdue.filter(filterFn),
-            scheduled_timed: day.scheduled_timed.filter(filterFn),
-            scheduled_no_time: day.scheduled_no_time.filter(filterFn),
-            upcoming: day.upcoming.filter(filterFn)
+            overdue: (day.overdue ?? []).filter(filterFn),
+            scheduled_timed: (day.scheduled_timed ?? []).filter(filterFn),
+            scheduled_no_time: (day.scheduled_no_time ?? []).filter(filterFn),
+            upcoming: (day.upcoming ?? []).filter(filterFn)
         }));
     }
     return (data as Task[]).filter(filterFn);
