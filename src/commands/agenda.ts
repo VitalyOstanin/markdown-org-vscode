@@ -39,7 +39,7 @@ export async function showAgenda(
         return;
     }
 
-    let currentDate = initialDate;
+    let shiftedToday = initialDate;
     const holidaysCache = new Map<number, string[]>();
 
     const getHolidays = async (year: number): Promise<string[]> => {
@@ -57,12 +57,17 @@ export async function showAgenda(
         }
     };
 
-    const loadData = async (date?: string, userInitiated: boolean = false) => {
-        if (date !== undefined) {
-            currentDate = date;
+    const loadData = async (newShiftedToday?: string, userInitiated: boolean = false) => {
+        // `newShiftedToday` is set when the user clicked Prev/Next/Today
+        // inside the webview (refreshCallback(message.date, true)) — that's
+        // an explicit jump. When it's undefined, this is the initial open
+        // or a repeated Show Agenda command, which should keep scroll.
+        const navigation = newShiftedToday !== undefined;
+        if (newShiftedToday !== undefined) {
+            shiftedToday = newShiftedToday;
         }
-        if (!currentDate) {
-            currentDate = toIsoDate(new Date());
+        if (!shiftedToday) {
+            shiftedToday = toIsoDate(new Date());
         }
 
         const args = ['--dir', workspaceDir, '--format', 'json', '--absolute-paths'];
@@ -70,7 +75,7 @@ export async function showAgenda(
             args.push('--tasks');
         } else {
             args.push('--agenda', mode);
-            args.push('--date', currentDate);
+            args.push('--date', shiftedToday);
         }
 
         try {
@@ -81,10 +86,20 @@ export async function showAgenda(
             const fileTags = config.get<FileTag[]>('fileTags', []);
             const data = filterTasksByTag(rawData, currentTag, fileTags);
 
-            const year = currentDate ? parseInt(currentDate.split('-')[0]) : new Date().getFullYear();
+            const year = shiftedToday ? parseInt(shiftedToday.split('-')[0]) : new Date().getFullYear();
             const holidays = await getHolidays(year);
 
-            AgendaPanel.render(context, data, mode, currentDate, loadData, userInitiated, currentTag, holidays);
+            AgendaPanel.render(
+                context,
+                data,
+                mode,
+                shiftedToday,
+                loadData,
+                userInitiated,
+                currentTag,
+                holidays,
+                navigation
+            );
         } catch (error) {
             const errorMsg = error instanceof Error ? error.message : String(error);
             vscode.window.showErrorMessage(`Failed to load agenda: ${errorMsg}`);

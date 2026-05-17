@@ -1,6 +1,8 @@
 import * as vscode from 'vscode';
 import { randomBytes } from 'crypto';
 import { AgendaData } from '../types';
+import { isMeaningfulSelection, resolveTaskClickIntent } from '../utils/agendaClick';
+import { rememberScroll, recallScroll } from '../utils/agendaScroll';
 
 const REFRESH_DEBOUNCE_MS = 500;
 const CALENDAR_COLS = 7;
@@ -19,9 +21,17 @@ export class AgendaPanel {
     private static currentPanel?: vscode.WebviewPanel;
     private static watcher?: vscode.FileSystemWatcher;
     private static debounceTimer?: NodeJS.Timeout;
-    private static refreshCallback?: (date?: string, userInitiated?: boolean) => Promise<void>;
-    private static currentDate?: string;
+    private static refreshCallback?: (shiftedToday?: string, userInitiated?: boolean) => Promise<void>;
+    // The "anchor" date the panel is currently built around: today + any
+    // Prev/Next offset the user has applied. Equals today on first open and
+    // after the Today button; offset elsewhere. Drives the extractor query,
+    // the navbar label, and which date the navigation buttons step from.
+    private static shiftedToday?: string;
     private static dayCheckTimer?: NodeJS.Timeout;
+
+    private static setAgendaFocusedContext(focused: boolean) {
+        vscode.commands.executeCommand('setContext', 'markdown-org.agendaFocused', focused);
+    }
 
     private static scheduleNextDayCheck() {
         AgendaPanel.dayCheckTimer = setTimeout(() => {
@@ -36,18 +46,23 @@ export class AgendaPanel {
         _context: vscode.ExtensionContext,
         data: AgendaData,
         mode: string,
-        date: string | undefined,
-        refreshCallback?: (date?: string, userInitiated?: boolean) => Promise<void>,
+        shiftedToday: string | undefined,
+        refreshCallback?: (shiftedToday?: string, userInitiated?: boolean) => Promise<void>,
         userInitiated: boolean = true,
         currentTag?: string,
-        holidays?: string[]
+        holidays?: string[],
+        // True when this render came from an explicit jump (Prev/Next/Today
+        // button or switch-mode), false for the initial open or a repeated
+        // Show Agenda command. The webview uses this to decide whether to
+        // scroll to today (jump) or keep the user's scroll (repeat).
+        navigation: boolean = false
     ) {
         if (refreshCallback) {
             AgendaPanel.refreshCallback = refreshCallback;
         }
         const today = new Date();
         const localDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-        AgendaPanel.currentDate = date || localDate;
+        AgendaPanel.shiftedToday = shiftedToday || localDate;
         const config = vscode.workspace.getConfiguration('markdown-org');
         const locale = config.get<string>('dateLocale', 'en-US');
         const firstDayOfWeek = config.get<FirstDayOfWeek>('firstDayOfWeek', 'monday');
@@ -61,9 +76,11 @@ export class AgendaPanel {
                 type: 'update',
                 data,
                 mode,
-                date,
+                shiftedToday,
                 currentTag,
-                firstDayOfWeek
+                firstDayOfWeek,
+                userInitiated,
+                navigation
             });
         } else {
             AgendaPanel.currentPanel = vscode.window.createWebviewPanel(
@@ -77,7 +94,18 @@ export class AgendaPanel {
                 }
             );
 
+            // Drives the `markdown-org.agendaFocused` when-clause so show/cycle
+            // keybindings (Ctrl+K Ctrl+W, Ctrl+K Ctrl+M, cycleTag) keep working
+            // when the user is inside the agenda webview and no markdown editor
+            // is focused.
+            AgendaPanel.setAgendaFocusedContext(true);
+
+            AgendaPanel.currentPanel.onDidChangeViewState((e) => {
+                AgendaPanel.setAgendaFocusedContext(e.webviewPanel.active);
+            });
+
             AgendaPanel.currentPanel.onDidDispose(() => {
+                AgendaPanel.setAgendaFocusedContext(false);
                 AgendaPanel.currentPanel = undefined;
                 AgendaPanel.watcher?.dispose();
                 AgendaPanel.watcher = undefined;
@@ -119,7 +147,7 @@ export class AgendaPanel {
                                   ? 'markdown-org.showTasks'
                                   : null;
                     if (targetCommand) {
-                        await vscode.commands.executeCommand(targetCommand, AgendaPanel.currentDate);
+                        await vscode.commands.executeCommand(targetCommand, AgendaPanel.shiftedToday);
                     }
                 }
             });
@@ -141,7 +169,7 @@ export class AgendaPanel {
                 data: data,
                 mode: mode,
                 locale: locale,
-                currentDate: AgendaPanel.currentDate,
+                shiftedToday: AgendaPanel.shiftedToday,
                 currentTag: currentTag || 'ALL',
                 holidays: holidays || [],
                 firstDayOfWeek: firstDayOfWeek
@@ -211,7 +239,7 @@ export class AgendaPanel {
     /** Reload data into the panel without re-focusing it. Re-reads settings (including tag filter). */
     public static refresh() {
         if (AgendaPanel.refreshCallback) {
-            AgendaPanel.refreshCallback(AgendaPanel.currentDate, false);
+            AgendaPanel.refreshCallback(AgendaPanel.shiftedToday, false);
         }
     }
 
@@ -224,6 +252,15 @@ export class AgendaPanel {
         nonce: string,
         cspSource: string
     ): string {
+        // Inline the click-handling helpers into the webview script. The
+        // same functions are unit-tested in agendaClick.test.ts (jsdom),
+        // so those tests transitively cover the webview behaviour.
+        const selectionGuardSource = isMeaningfulSelection.toString();
+        const clickIntentSource = resolveTaskClickIntent.toString();
+        // Same approach for the scroll-memory helpers used by the
+        // navigation round-trip fix; unit-tested in agendaScroll.test.ts.
+        const rememberScrollSource = rememberScroll.toString();
+        const recallScrollSource = recallScroll.toString();
         return `<!DOCTYPE html>
 <html>
 <head>
@@ -279,10 +316,11 @@ export class AgendaPanel {
             border-color: #0e639c;
             font-weight: bold;
         }
-        .nav-date {
+        .current-date {
             color: #4fc1ff;
             font-weight: bold;
-            margin: 0 10px;
+            font-size: 1.05em;
+            margin: 4px 0 16px 0;
         }
         .tag-indicator {
             color: #dcdcaa;
@@ -379,24 +417,38 @@ export class AgendaPanel {
 </head>
 <body>
     <div class="nav-bar" id="nav-bar"></div>
+    <div class="current-date" id="current-date"></div>
     <div id="content"></div>
     <script nonce="${nonce}">
+        ${selectionGuardSource}
+        ${clickIntentSource}
+        ${rememberScrollSource}
+        ${recallScrollSource}
         const vscode = acquireVsCodeApi();
         let initialData = [];
         let initialMode = '';
         let locale = '';
-        let currentDate = '';
+        // The anchor date the panel is built around: today plus any
+        // Prev/Next offset. Equals today on first open and after the Today
+        // button; can move forward/backward via navigation. Drives the
+        // navbar label, Prev/Next stepping, and the month-calendar target.
+        let shiftedToday = '';
         let currentTag = '';
         let holidays = [];
         let firstDayOfWeek = 'monday';
-        
+        // Per-anchor scroll memory. Saved on every navigate() before the
+        // postMessage and restored on navigation=true updates so that a
+        // round-trip (Next then Prev, or Prev then Next) returns the user
+        // to where they were instead of snapping back to today's header.
+        const scrollHistory = {};
+
         window.addEventListener('message', event => {
             const message = event.data;
             if (message.command === 'init') {
                 initialData = message.data;
                 initialMode = message.mode;
                 locale = message.locale;
-                currentDate = message.currentDate;
+                shiftedToday = message.shiftedToday;
                 currentTag = message.currentTag;
                 holidays = message.holidays;
                 if (message.firstDayOfWeek) {
@@ -413,9 +465,10 @@ export class AgendaPanel {
                     document.getElementById('content').innerHTML = renderTasks(initialData);
                     attachTaskListeners();
                 }
+                scrollToWeekFocus();
             } else if (message.type === 'update') {
-                if (message.date) {
-                    currentDate = message.date;
+                if (message.shiftedToday) {
+                    shiftedToday = message.shiftedToday;
                 }
                 if (message.currentTag) {
                     currentTag = message.currentTag;
@@ -427,7 +480,10 @@ export class AgendaPanel {
                     firstDayOfWeek = message.firstDayOfWeek;
                 }
                 initialData = message.data;
+                const userInitiated = message.userInitiated === true;
+                const navigation = message.navigation === true;
                 const scrollPos = window.scrollY;
+                const wasOnCurrentWeek = currentWeekIsVisible();
                 renderNavBar();
                 if (initialMode === 'month') {
                     document.getElementById('content').innerHTML = renderMonthCalendar(initialData);
@@ -439,7 +495,28 @@ export class AgendaPanel {
                     document.getElementById('content').innerHTML = renderTasks(initialData);
                     attachTaskListeners();
                 }
-                window.scrollTo(0, scrollPos);
+                if (!userInitiated) {
+                    // File-watcher / cycleTag refresh -- keep scroll.
+                    window.scrollTo(0, scrollPos);
+                } else if (initialMode !== 'week') {
+                    // Day / month / tasks have no per-day scroll anchor.
+                } else if (navigation) {
+                    // Prev/Next/Today. If we've been on this anchor before
+                    // (round-trip case), restore the user's last scroll
+                    // there; otherwise focus the week as usual.
+                    const remembered = recallScroll(scrollHistory, shiftedToday);
+                    if (remembered !== null) {
+                        window.scrollTo(0, remembered);
+                    } else {
+                        scrollToWeekFocus();
+                    }
+                } else if (wasOnCurrentWeek && currentWeekIsVisible()) {
+                    // Repeated Show Agenda (Week) on the same current week --
+                    // keep the user's place.
+                    window.scrollTo(0, scrollPos);
+                } else {
+                    scrollToWeekFocus();
+                }
             }
         });
         
@@ -467,27 +544,55 @@ export class AgendaPanel {
         
         function attachTaskListeners() {
             document.getElementById('content').addEventListener('click', (e) => {
-                const taskLine = e.target.closest('.task-line');
-                if (taskLine) {
+                // Source of truth: src/utils/agendaClick.ts -- jsdom tested.
+                const intent = resolveTaskClickIntent(e, window.getSelection());
+                if (intent) {
                     vscode.postMessage({
                         command: 'openTask',
-                        file: taskLine.getAttribute('data-file'),
-                        line: parseInt(taskLine.getAttribute('data-line'))
+                        file: intent.file,
+                        line: intent.line
                     });
                 }
             });
         }
         
         function renderAgenda(days) {
+            const today = todayLocalStr();
             let html = '';
             days.forEach(day => {
-                html += '<div class="day-header">' + formatDayHeader(day.date) + '</div>';
+                const isToday = day.date === today;
+                const headerCls = 'day-header' + (isToday ? ' day-header-today' : '');
+                html += '<div class="' + headerCls + '" data-date="' + escapeHtml(day.date) + '">' + formatDayHeader(day.date, isToday) + '</div>';
                 (day.overdue || []).forEach(task => html += renderTask(task, task.days_offset, 'overdue'));
                 (day.scheduled_timed || []).forEach(task => html += renderTask(task, task.days_offset));
                 (day.scheduled_no_time || []).forEach(task => html += renderTask(task, task.days_offset));
                 (day.upcoming || []).forEach(task => html += renderTask(task, task.days_offset, 'upcoming'));
             });
             return html;
+        }
+
+        // The week view scrolls to today's header when today is in the
+        // visible range; when the user navigates to another week (Prev/Next
+        // moved them off the current week), it starts at the top instead of
+        // landing them mid-week on the day-of-week that happens to share
+        // shiftedToday. Day/month/tasks have no equivalent per-day anchor.
+        function todayLocalStr() {
+            const t = new Date();
+            return t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0');
+        }
+        function currentWeekIsVisible() {
+            return !!document.querySelector('.day-header[data-date="' + todayLocalStr() + '"]');
+        }
+        function scrollToWeekFocus() {
+            if (initialMode !== 'week') return;
+            requestAnimationFrame(() => {
+                const target = document.querySelector('.day-header[data-date="' + todayLocalStr() + '"]');
+                if (target) {
+                    target.scrollIntoView({ block: 'start', behavior: 'auto' });
+                } else {
+                    window.scrollTo(0, 0);
+                }
+            });
         }
         
         function renderTasks(tasks) {
@@ -503,7 +608,7 @@ export class AgendaPanel {
             return html;
         }
         
-        function formatDayHeader(date) {
+        function formatDayHeader(date, isToday) {
             const d = parseLocalDate(date);
             const weekday = d.toLocaleDateString(locale, { weekday: 'long' });
             const dayMonth = d.toLocaleDateString(locale, { day: 'numeric', month: 'long' });
@@ -511,7 +616,9 @@ export class AgendaPanel {
             const parts = dayMonth.split(' ');
             const day = parts[0];
             const month = parts.slice(1).join(' ');
-            return '<span>' + weekday + '</span><span style="text-align: right">' + day + '</span><span>' + month + ' ' + year + '</span>';
+            const arrowL = isToday ? '❯ ' : '';
+            const arrowR = isToday ? ' ❮' : '';
+            return '<span>' + arrowL + weekday + '</span><span style="text-align: right">' + day + '</span><span>' + month + ' ' + year + arrowR + '</span>';
         }
         
         function renderTask(task, daysOffset, taskType) {
@@ -550,7 +657,7 @@ export class AgendaPanel {
                 const type = task.timestamp_type;
                 if (type && type !== 'PLAIN' && type !== 'SCHEDULED') {
                     const typeClass = type === 'DEADLINE' ? 'timestamp-deadline' : 'timestamp-type';
-                    return '<span class="time-display">' + escapeHtml(task.timestamp_time) + '</span>...... <span class="' + typeClass + '">' + escapeHtml(type) + ':</span>';
+                    return '<span class="time-display">' + escapeHtml(task.timestamp_time) + '</span>...... <span class="' + typeClass + '">' + escapeHtml(type) + ' ⌃</span>';
                 }
                 return '<span class="time-display">' + escapeHtml(task.timestamp_time) + '</span>......';
             }
@@ -569,7 +676,7 @@ export class AgendaPanel {
             const type = task.timestamp_type;
             if (type && type !== 'PLAIN' && type !== 'SCHEDULED') {
                 const typeClass = type === 'DEADLINE' ? 'timestamp-deadline' : 'timestamp-type';
-                return '<span class="' + typeClass + '">' + escapeHtml(type) + ':</span>';
+                return '<span class="' + typeClass + '">' + escapeHtml(type) + ' ⌃</span>';
             }
             return '';
         }
@@ -610,7 +717,7 @@ export class AgendaPanel {
                 daysMap[day.date] = taskCount > 0;
             });
 
-            const target = currentDate ? parseLocalDate(currentDate) : new Date();
+            const target = shiftedToday ? parseLocalDate(shiftedToday) : new Date();
             const year = target.getFullYear();
             const month = target.getMonth();
             const firstDayOfMonth = new Date(year, month, 1);
@@ -680,7 +787,10 @@ export class AgendaPanel {
         }
         
         function navigate(offset) {
-            const d = parseLocalDate(currentDate);
+            // Remember the scroll position for the current anchor before
+            // leaving it, so a later return to this anchor can restore it.
+            rememberScroll(scrollHistory, shiftedToday, window.scrollY);
+            const d = parseLocalDate(shiftedToday);
             if (offset === 0) {
                 d.setTime(new Date().getTime());
             } else if (initialMode === 'day') {
@@ -691,6 +801,12 @@ export class AgendaPanel {
                 d.setMonth(d.getMonth() + offset);
             }
             const newDate = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+            // Today is an explicit "snap to today" -- drop any remembered
+            // scroll for that anchor so the update handler falls back to
+            // scrollToWeekFocus() instead of restoring an old position.
+            if (offset === 0) {
+                delete scrollHistory[newDate];
+            }
             vscode.postMessage({ command: 'navigate', date: newDate });
         }
         
@@ -722,25 +838,29 @@ export class AgendaPanel {
 
         function renderNavBar() {
             const navBar = document.getElementById('nav-bar');
+            const dateEl = document.getElementById('current-date');
             const modeSwitchHtml = renderModeSwitch();
             const tagHtml = '<span class="tag-indicator" id="tag-indicator">Tag: ' + escapeHtml(currentTag) + '</span>';
 
             if (initialMode === 'tasks') {
                 navBar.innerHTML = modeSwitchHtml + tagHtml;
+                dateEl.textContent = '';
+                dateEl.style.display = 'none';
             } else {
                 const unit = initialMode === 'day' ? 'Day' : initialMode === 'week' ? 'Week' : 'Month';
-                const d = parseLocalDate(currentDate);
-                const weekday = d.toLocaleDateString(locale, { weekday: 'long' });
-                const dayMonth = d.toLocaleDateString(locale, { day: 'numeric', month: 'long' });
-                const year = d.getFullYear();
-                const dateStr = weekday + ', ' + dayMonth + ' ' + year;
                 navBar.innerHTML =
                     modeSwitchHtml +
                     '<button class="nav-btn" id="btn-prev">← Prev ' + unit + '</button>' +
                     '<button class="nav-btn" id="btn-today">Today</button>' +
                     '<button class="nav-btn" id="btn-next">Next ' + unit + ' →</button>' +
-                    '<span class="nav-date">' + escapeHtml(dateStr) + '</span>' +
                     tagHtml;
+
+                const d = parseLocalDate(shiftedToday);
+                const weekday = d.toLocaleDateString(locale, { weekday: 'long' });
+                const dayMonth = d.toLocaleDateString(locale, { day: 'numeric', month: 'long' });
+                const year = d.getFullYear();
+                dateEl.textContent = weekday + ', ' + dayMonth + ' ' + year;
+                dateEl.style.display = '';
 
                 document.getElementById('btn-prev').addEventListener('click', () => navigate(-1));
                 document.getElementById('btn-today').addEventListener('click', () => navigate(0));
