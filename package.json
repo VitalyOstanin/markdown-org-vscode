@@ -253,7 +253,8 @@
     "lint:fix": "eslint src --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "package": "vsce package"
+    "package": "vsce package",
+    "prepare": "husky"
   },
   "overrides": {
     "diff": "^9.0.0",
@@ -271,6 +272,7 @@
     "@vscode/vsce": "^3.9.1",
     "eslint": "^10.4.0",
     "glob": "^13.0.6",
+    "husky": "^9.1.7",
     "jsdom": "^29.1.1",
     "mocha": "^11.7.5",
     "prettier": "^3.8.3",
