@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
 import { randomBytes } from 'crypto';
-import { isPathInsideWorkspace } from '../utils';
 import { AgendaData } from '../types';
 
 const REFRESH_DEBOUNCE_MS = 500;
@@ -96,10 +95,6 @@ export class AgendaPanel {
             AgendaPanel.currentPanel.webview.onDidReceiveMessage(async (message) => {
                 if (message.command === 'openTask') {
                     if (typeof message.file !== 'string' || typeof message.line !== 'number') {
-                        return;
-                    }
-                    if (!isPathInsideWorkspace(message.file)) {
-                        vscode.window.showWarningMessage('Markdown Org: refused to open file outside workspace');
                         return;
                     }
                     const doc = await vscode.workspace.openTextDocument(message.file);
