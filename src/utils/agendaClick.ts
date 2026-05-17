@@ -57,10 +57,7 @@ export interface TaskRef {
  * this function's source via `.toString()`, so the jsdom test on this
  * function exercises the same code that ships to the user.
  */
-export function resolveTaskClickIntent(
-    event: ClickEventLike,
-    selection: SelectionLike | null
-): TaskRef | null {
+export function resolveTaskClickIntent(event: ClickEventLike, selection: SelectionLike | null): TaskRef | null {
     if (isMeaningfulSelection(selection)) {
         return null;
     }

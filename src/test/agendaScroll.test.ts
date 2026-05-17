@@ -73,12 +73,15 @@ suite('agendaScroll', () => {
         // recallScroll then returns null so the webview falls back to
         // scrollToWeekFocus(). This locks in the v0.4.0 fix.
         const history: ScrollMemory = {};
-        rememberScroll(history, '2026-05-17', 0);   // user was at top
-        rememberScroll(history, '2026-05-24', 0);   // arrived at Next Week
-        delete history['2026-05-17'];               // Today click resets target
+        rememberScroll(history, '2026-05-17', 0); // user was at top
+        rememberScroll(history, '2026-05-24', 0); // arrived at Next Week
+        delete history['2026-05-17']; // Today click resets target
 
-        assert.strictEqual(recallScroll(history, '2026-05-17'), null,
-            'Today must not restore the manual scroll on the current week');
+        assert.strictEqual(
+            recallScroll(history, '2026-05-17'),
+            null,
+            'Today must not restore the manual scroll on the current week'
+        );
     });
 
     test('Next-then-Prev round-trip restores the original scroll', () => {

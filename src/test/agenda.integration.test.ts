@@ -370,10 +370,7 @@ suite('Agenda webview keybindings scope', () => {
 
             const focusCalls = spy
                 .getCalls()
-                .filter(
-                    (c) =>
-                        c.args[0] === 'setContext' && c.args[1] === 'markdown-org.agendaFocused'
-                );
+                .filter((c) => c.args[0] === 'setContext' && c.args[1] === 'markdown-org.agendaFocused');
             assert.ok(
                 focusCalls.some((c) => c.args[2] === true),
                 'expected setContext(markdown-org.agendaFocused, true) on open'
@@ -384,10 +381,7 @@ suite('Agenda webview keybindings scope', () => {
 
             const afterClose = spy
                 .getCalls()
-                .filter(
-                    (c) =>
-                        c.args[0] === 'setContext' && c.args[1] === 'markdown-org.agendaFocused'
-                );
+                .filter((c) => c.args[0] === 'setContext' && c.args[1] === 'markdown-org.agendaFocused');
             assert.ok(
                 afterClose.some((c) => c.args[2] === false),
                 'expected setContext(markdown-org.agendaFocused, false) on dispose'
@@ -451,9 +445,11 @@ suite('Agenda webview keybindings scope', () => {
             // message which the panel translates into `refreshCallback(date, true)`.
             // We invoke that callback directly because driving the real DOM
             // click would require a real webview test harness.
-            const refreshCb = (AgendaPanel as unknown as {
-                refreshCallback?: (date?: string, userInitiated?: boolean) => Promise<void>;
-            }).refreshCallback;
+            const refreshCb = (
+                AgendaPanel as unknown as {
+                    refreshCallback?: (date?: string, userInitiated?: boolean) => Promise<void>;
+                }
+            ).refreshCallback;
             assert.ok(refreshCb, 'refreshCallback should be set after the panel opens');
 
             await refreshCb('2026-05-24', true);
@@ -483,9 +479,11 @@ suite('Agenda webview keybindings scope', () => {
         await vscode.commands.executeCommand('markdown-org.showAgendaWeek');
         await new Promise((resolve) => setTimeout(resolve, 300));
 
-        const refreshCb = (AgendaPanel as unknown as {
-            refreshCallback?: (date?: string, userInitiated?: boolean) => Promise<void>;
-        }).refreshCallback;
+        const refreshCb = (
+            AgendaPanel as unknown as {
+                refreshCallback?: (date?: string, userInitiated?: boolean) => Promise<void>;
+            }
+        ).refreshCallback;
         assert.ok(refreshCb, 'refreshCallback should be set after the panel opens');
 
         // Step away (imitates Next Week).
@@ -539,11 +537,7 @@ suite('Agenda webview keybindings scope', () => {
 
             assert.ok(renderSpy.callCount >= 1, 'expected AgendaPanel.render to be called on repeat');
             const navigationArg = renderSpy.lastCall.args[8];
-            assert.strictEqual(
-                navigationArg,
-                false,
-                'repeated Show Agenda (Week) should NOT be marked as navigation'
-            );
+            assert.strictEqual(navigationArg, false, 'repeated Show Agenda (Week) should NOT be marked as navigation');
         } finally {
             renderSpy.restore();
         }
