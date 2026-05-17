@@ -207,8 +207,17 @@ suite('AgendaPanel.openTaskInEditor', () => {
         const active = vscode.window.activeTextEditor;
         assert.ok(active, 'no active editor after openTaskInEditor');
         const activePath = active.document.uri.fsPath;
-        const actual = fs.realpathSync(activePath);
-        const expected = fs.realpathSync(expectedRealPath);
+        // Windows is case-insensitive at the filesystem level and VS Code
+        // sometimes hands back paths with a lower-case drive letter while
+        // `fs.realpathSync` uppercases it. Compare case-insensitively on
+        // Windows so the assertion measures "same file" rather than "same
+        // byte sequence".
+        const normalize = (p: string) => {
+            const real = fs.realpathSync(p);
+            return process.platform === 'win32' ? real.toLowerCase() : real;
+        };
+        const actual = normalize(activePath);
+        const expected = normalize(expectedRealPath);
         assert.strictEqual(actual, expected, `active editor points to ${actual}, expected ${expected}`);
     }
 
