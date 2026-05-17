@@ -1,65 +1,13 @@
 import * as assert from 'assert';
-import * as vscode from 'vscode';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as sinon from 'sinon';
-import { suite, before, after, afterEach, test } from 'mocha';
+import { suite, test } from 'mocha';
 
+// End-to-end coverage for `markdown-org.showAgendaMonth` lives in
+// `agenda.integration.test.ts`, which stubs the extractor so it does not
+// depend on `markdown-org-extract` being installed on the CI runner. The
+// remaining cases below are calendar-grid helpers that don't touch VS Code
+// commands directly — they're kept here for historical proximity to the
+// month-view feature.
 suite('Month View Integration Tests', () => {
-    const testWorkspaceDir = path.join(__dirname, '../../test-workspace');
-    const testFile = path.join(testWorkspaceDir, 'month-test.md');
-
-    before(async () => {
-        if (!fs.existsSync(testWorkspaceDir)) {
-            fs.mkdirSync(testWorkspaceDir, { recursive: true });
-        }
-
-        const testContent = `# Month View Test Tasks
-
-## TODO [#A] Task on December 1st
-\`SCHEDULED: <2025-12-01 Mon>\`
-
-## TODO Task on December 6th
-\`SCHEDULED: <2025-12-06 Sat 15:00>\`
-
-## TODO Task on December 15th
-\`DEADLINE: <2025-12-15 Mon>\`
-
-## TODO Weekend task
-\`SCHEDULED: <2025-12-07 Sun>\`
-
-## TODO Holiday task
-\`SCHEDULED: <2025-01-01 Wed>\`
-`;
-        fs.writeFileSync(testFile, testContent);
-    });
-
-    after(() => {
-        if (fs.existsSync(testFile)) {
-            fs.unlinkSync(testFile);
-        }
-    });
-
-    afterEach(async () => {
-        sinon.restore();
-        await vscode.commands.executeCommand('workbench.action.closeAllEditors');
-    });
-
-    test('should render month view without surfacing an error', async function () {
-        this.timeout(10000);
-
-        const config = vscode.workspace.getConfiguration('markdown-org');
-        await config.update('workspaceDir', testWorkspaceDir, vscode.ConfigurationTarget.Workspace);
-
-        const showErrorStub = sinon.stub(vscode.window, 'showErrorMessage');
-
-        await vscode.commands.executeCommand('markdown-org.showAgendaMonth');
-        await new Promise((resolve) => setTimeout(resolve, 2000));
-
-        const calls = showErrorStub.getCalls().map((c) => String(c.args[0]));
-        assert.deepStrictEqual(calls, [], `markdown-org.showAgendaMonth surfaced error(s): ${calls.join('; ')}`);
-    });
-
     test('should identify days with tasks correctly', () => {
         const mockAgendaData = [
             {
