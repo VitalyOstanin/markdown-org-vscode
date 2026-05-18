@@ -173,6 +173,34 @@ suite('Agenda Show Integration Tests', () => {
         }
         assertNoError();
     });
+
+    // Verify the webview actually produced day-header elements with the
+    // dates that the extractor returned. assertNoError() (above) catches
+    // host-side throws but does NOT catch ReferenceError inside the webview
+    // iframe -- those errors surface only as a missing DOM. These tests
+    // close the gap by querying the rendered DOM via getRenderedInfo.
+    test('Day mode renders a single day-header with the requested anchor date', async function () {
+        this.timeout(10000);
+        await vscode.commands.executeCommand('markdown-org.showAgendaDay', '2025-12-09');
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        const info = await AgendaPanel.queryRenderedInfoForTesting();
+        assert.ok(info, 'expected AgendaPanel to be open after showAgendaDay');
+        assert.strictEqual(info.mode, 'day');
+        assert.deepStrictEqual(info.dayHeaders, ['2025-12-09']);
+    });
+
+    test('Week mode renders day-headers for every date in the payload, even sparse entries', async function () {
+        this.timeout(10000);
+        await vscode.commands.executeCommand('markdown-org.showAgendaWeek', '2025-12-09');
+        await new Promise((resolve) => setTimeout(resolve, 300));
+        const info = await AgendaPanel.queryRenderedInfoForTesting();
+        assert.ok(info, 'expected AgendaPanel to be open after showAgendaWeek');
+        assert.strictEqual(info.mode, 'week');
+        // sparseWeek above contains '2025-12-08' (with one task) and
+        // '2025-12-09' (with all four buckets empty). Both dates still need
+        // their own .day-header rendered in the DOM.
+        assert.deepStrictEqual(info.dayHeaders, ['2025-12-08', '2025-12-09']);
+    });
 });
 
 // The agenda lists every task that `markdown-org-extract` returns, regardless

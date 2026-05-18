@@ -231,6 +231,38 @@ export class AgendaPanel {
     }
 
     /**
+     * Test-only helper: ask the webview for a snapshot of the day-header
+     * `data-date` attributes currently in the rendered DOM. Used by the
+     * agenda integration suite to verify that renderAgenda produced the
+     * expected dates for a given anchor; production code never queries
+     * this. Returns null when no panel is open.
+     */
+    public static queryRenderedInfoForTesting(
+        timeoutMs: number = 2000
+    ): Promise<{ dayHeaders: string[]; mode: string } | null> {
+        const panel = AgendaPanel.currentPanel;
+        if (!panel) {
+            return Promise.resolve(null);
+        }
+        return new Promise((resolve, reject) => {
+            const sub = panel.webview.onDidReceiveMessage(
+                (m: { command: string; dayHeaders?: string[]; mode?: string }) => {
+                    if (m.command === 'renderedInfo') {
+                        clearTimeout(timer);
+                        sub.dispose();
+                        resolve({ dayHeaders: m.dayHeaders ?? [], mode: m.mode ?? '' });
+                    }
+                }
+            );
+            const timer = setTimeout(() => {
+                sub.dispose();
+                reject(new Error(`webview did not respond to getRenderedInfo within ${timeoutMs}ms`));
+            }, timeoutMs);
+            panel.webview.postMessage({ command: 'getRenderedInfo' });
+        });
+    }
+
+    /**
      * Open a file at the given 1-based line in an editor. The path is expected
      * to be absolute (the agenda passes `--absolute-paths` to
      * `markdown-org-extract`). Failures from `openTextDocument` are surfaced
@@ -550,6 +582,15 @@ export class AgendaPanel {
                 } else {
                     scrollToWeekFocus();
                 }
+            } else if (message.command === 'getRenderedInfo') {
+                // Integration-test query: snapshot the rendered DOM so the
+                // host can verify that renderAgenda produced the expected
+                // day-headers for the given anchor date. Production code
+                // never sends this query, so it has no effect on normal use.
+                const headers = Array.from(document.querySelectorAll('.day-header'))
+                    .map(el => el.getAttribute('data-date'))
+                    .filter(d => d !== null);
+                vscode.postMessage({ command: 'renderedInfo', dayHeaders: headers, mode: initialMode });
             }
         });
         
@@ -590,7 +631,7 @@ export class AgendaPanel {
         }
         
         function renderAgenda(days) {
-            const today = todayLocalStr();
+            const today = toIsoDate(new Date());
             let html = '';
             days.forEach(day => {
                 const isToday = day.date === today;
