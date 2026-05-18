@@ -2,6 +2,8 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { runTests } from '@vscode/test-electron';
 
+const INTEGRATION_HOST_TIMEOUT_MS = 5 * 60 * 1000;
+
 async function main() {
     try {
         const extensionDevelopmentPath = path.resolve(__dirname, '../../');
@@ -16,11 +18,26 @@ async function main() {
         // there before we hand it to test-electron.
         fs.mkdirSync(testWorkspace, { recursive: true });
 
-        await runTests({
-            extensionDevelopmentPath,
-            extensionTestsPath,
-            launchArgs: [testWorkspace]
+        let timer: NodeJS.Timeout | undefined;
+        const timeout = new Promise<never>((_, reject) => {
+            timer = setTimeout(() => {
+                reject(new Error(`Integration host exceeded global timeout of ${INTEGRATION_HOST_TIMEOUT_MS}ms`));
+            }, INTEGRATION_HOST_TIMEOUT_MS);
+            timer.unref?.();
         });
+
+        try {
+            await Promise.race([
+                runTests({
+                    extensionDevelopmentPath,
+                    extensionTestsPath,
+                    launchArgs: [testWorkspace]
+                }),
+                timeout
+            ]);
+        } finally {
+            if (timer) clearTimeout(timer);
+        }
     } catch (err) {
         console.error('Failed to run tests:', err);
         process.exit(1);
