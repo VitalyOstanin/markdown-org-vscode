@@ -6,7 +6,7 @@ suite('Timestamp Tests', () => {
     // not exported from orgPatterns. It captures date parts as separate groups
     // so the unit tests below can pin down parsing semantics directly.
     const TIMESTAMP_REGEX =
-        /<(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})(?: (?<weekday>[А-Яа-яA-Za-z]{2,3}))?(?: (?<hour>\d{2}):(?<minute>\d{2}))?(?: (?<repeater>\+\d+[dwmy]{1,2}))?>/;
+        /<(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})(?: (?<weekday>[А-Яа-яA-Za-z]+))?(?: (?<hour>\d{2}):(?<minute>\d{2}))?(?: (?<repeater>\+\d+[dwmy]{1,2}))?>/;
 
     test('Parse timestamp with date only', () => {
         const timestamp = '<2025-12-06 Fri>';
@@ -48,6 +48,25 @@ suite('Timestamp Tests', () => {
 
         assert.ok(match);
         assert.strictEqual(match.groups?.repeater, '+2wd');
+    });
+
+    test('Parse timestamp with full English weekday name (long form)', () => {
+        // Aligns TIMESTAMP_REGEX with CLOCK_REGEX which already accepts
+        // [А-Яа-яA-Za-z]+. This also unblocks the isFull branch in
+        // getWeekdayName for <>-timestamps -- it was previously unreachable.
+        const timestamp = '<2025-12-06 Friday 14:30>';
+        const match = timestamp.match(TIMESTAMP_REGEX);
+
+        assert.ok(match);
+        assert.strictEqual(match.groups?.weekday, 'Friday');
+    });
+
+    test('Parse timestamp with full Russian weekday name (long form)', () => {
+        const timestamp = '<2025-12-06 Пятница 14:30>';
+        const match = timestamp.match(TIMESTAMP_REGEX);
+
+        assert.ok(match);
+        assert.strictEqual(match.groups?.weekday, 'Пятница');
     });
 
     test('Parse SCHEDULED timestamp line', () => {

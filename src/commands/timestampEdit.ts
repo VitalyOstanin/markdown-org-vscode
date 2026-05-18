@@ -2,8 +2,13 @@ import * as vscode from 'vscode';
 import { HEADING_REGEX, TIMESTAMP_LINE_REGEX } from '../orgPatterns';
 import { formatDurationHM } from '../utils';
 
+// Weekday is `[А-Яа-яA-Za-z]+` (one or more letters) rather than `{2,3}` to
+// stay symmetric with CLOCK_REGEX below and to unblock the `isFull` branch in
+// getWeekdayName: short ("Fri", "Пн") and full ("Friday", "Пятница") forms
+// are both accepted, and adjustTimestamp preserves whichever form the user
+// already wrote.
 const TIMESTAMP_REGEX =
-    /<(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})(?: (?<weekday>[А-Яа-яA-Za-z]{2,3}))?(?: (?<hour>\d{2}):(?<minute>\d{2}))?(?: (?<repeater>\+\d+[dwmy]{1,2}))?>/;
+    /<(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})(?: (?<weekday>[А-Яа-яA-Za-z]+))?(?: (?<hour>\d{2}):(?<minute>\d{2}))?(?: (?<repeater>\+\d+[dwmy]{1,2}))?>/;
 // Local variant of the CLOCK regex with weekday and time as separate groups
 // so cursor offsets can target individual parts; orgPatterns.CLOCK_REGEX uses
 // a broader `[^\]>]+` form for general matching.
