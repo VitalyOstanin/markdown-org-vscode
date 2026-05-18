@@ -123,6 +123,60 @@ jobs:
       - name: Package VSIX
         run: npm run package
 
+      - name: Smoke-test VSIX
+        run: |
+          set -euo pipefail
+          VSIX_FILE="$(ls -1 *.vsix 2>/dev/null | head -n1)"
+          if [ -z "$VSIX_FILE" ]; then
+            echo "::error::npm run package did not produce a .vsix file"
+            exit 1
+          fi
+          if [ ! -s "$VSIX_FILE" ]; then
+            echo "::error::VSIX file '$VSIX_FILE' is empty"
+            exit 1
+          fi
+          if ! unzip -tq "$VSIX_FILE"; then
+            echo "::error::VSIX file '$VSIX_FILE' is not a valid zip archive"
+            exit 1
+          fi
+          SMOKE_DIR="$(mktemp -d)"
+          unzip -q "$VSIX_FILE" -d "$SMOKE_DIR"
+          for required in \
+              extension.vsixmanifest \
+              "[Content_Types].xml" \
+              extension/package.json \
+              extension/out/extension.js \
+              extension/LICENSE.txt \
+              extension/readme.md \
+              extension/changelog.md; do
+            if [ ! -f "$SMOKE_DIR/$required" ]; then
+              echo "::error::Required file '$required' missing from VSIX"
+              exit 1
+            fi
+          done
+          # Catch regressions where dev/test artifacts leak into the package
+          # (coverage/ and .husky/ both slipped into 0.4.0 before this check).
+          for forbidden in \
+              extension/coverage \
+              extension/.husky \
+              extension/.c8rc.json \
+              extension/src \
+              extension/node_modules \
+              extension/out/test; do
+            if [ -e "$SMOKE_DIR/$forbidden" ]; then
+              echo "::error::Forbidden path '$forbidden' present in VSIX"
+              exit 1
+            fi
+          done
+          VSIX_VERSION="$(node -p "require('$SMOKE_DIR/extension/package.json').version")"
+          PKG_VERSION="$(node -p 'require("./package.json").version')"
+          if [ "$VSIX_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::VSIX package.json version ($VSIX_VERSION) does not match repository version ($PKG_VERSION)"
+            exit 1
+          fi
+          VSIX_BYTES="$(stat -c %s "$VSIX_FILE")"
+          echo "VSIX smoke-test passed: $VSIX_FILE ($VSIX_VERSION, $VSIX_BYTES bytes)"
+
       - name: Extract release notes from CHANGELOG.md
         id: changelog
         run: |
