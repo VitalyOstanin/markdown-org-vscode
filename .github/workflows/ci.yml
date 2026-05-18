@@ -8,6 +8,10 @@ on:
 
 permissions:
   contents: read
+  # Codecov OIDC: required so the codecov-action can exchange a short-lived
+  # GitHub-issued JWT for an upload credential -- no long-lived
+  # CODECOV_TOKEN secret needed.
+  id-token: write
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -72,6 +76,43 @@ jobs:
       - name: Run integration tests (macOS / Windows)
         if: runner.os != 'Linux'
         run: npm run test:integration
+
+  coverage:
+    name: Coverage (non-blocking)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    # Coverage thresholds are floors set just below current values -- regressions
+    # should be visible, not block merges. Codecov outages are also expected
+    # not to fail the build.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Run unit tests with coverage
+        run: npm run test:coverage
+
+      - name: Upload coverage to Codecov
+        # codecov/codecov-action pinned to v6.0.0
+        uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2
+        with:
+          # OIDC removes the need for a long-lived CODECOV_TOKEN secret --
+          # the action exchanges a short-lived GitHub-issued JWT for an
+          # upload credential, which Codecov verifies by repository claim.
+          use_oidc: true
+          files: ./coverage/lcov.info
+          flags: unit
+          # Don't fail the build on Codecov outages -- coverage drift is
+          # signal, not a release blocker.
+          fail_ci_if_error: false
 
   audit:
     name: npm audit (non-blocking)
