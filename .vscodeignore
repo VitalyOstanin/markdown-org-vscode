@@ -14,6 +14,11 @@ out/test/**
 **/*.map
 node_modules/**
 
+# Test runtime artifacts -- coverage reports, husky hooks, c8 config.
+coverage/**
+.husky/**
+.c8rc.json
+
 # Linter / formatter / language config
 .editorconfig
 .eslintignore
