@@ -458,3 +458,14 @@ markdown files used by manual testing live in `examples/`:
 - [`TAG_FILTERING.md`](TAG_FILTERING.md) -- user-facing tag filter reference (linked from the main flow above)
 - [`TODO.md`](TODO.md) -- internal backlog
 - [`examples/`](examples/) -- demo markdown files for manual smoke-testing
+
+## Release notes
+
+Per-version changes are tracked in [`CHANGELOG.md`](CHANGELOG.md) using the
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
+
+## License
+
+Released under the [MIT License](LICENSE) -- see the LICENSE file for the
+full text. The `license` field in `package.json` carries the SPDX
+identifier `MIT`.
