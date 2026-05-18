@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import { HEADING_REGEX } from '../orgPatterns';
+import { HEADING_REGEX } from '../../orgPatterns';
 
 suite('Heading Utils Tests', () => {
     test('Detect heading level 1', () => {

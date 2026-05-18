@@ -4,8 +4,8 @@ import * as path from 'path';
 import * as fs from 'fs';
 import * as sinon from 'sinon';
 import type * as cp from 'child_process';
-import { exec } from '../utils/exec';
-import { extractor } from '../utils/extractor';
+import { exec } from '../../utils/exec';
+import { extractor } from '../../utils/extractor';
 
 suite('CLOCK Table Integration Tests', () => {
     let testFilePath: string;

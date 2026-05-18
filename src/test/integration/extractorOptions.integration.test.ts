@@ -5,9 +5,9 @@ import * as fs from 'fs';
 import * as sinon from 'sinon';
 import type * as cp from 'child_process';
 import { suite, before, beforeEach, after, afterEach, test } from 'mocha';
-import { exec } from '../utils/exec';
-import { EXTRACTOR_MAX_BUFFER_BYTES } from '../utils/extractor';
-import { extractor } from '../utils/extractor';
+import { exec } from '../../utils/exec';
+import { EXTRACTOR_MAX_BUFFER_BYTES } from '../../utils/extractor';
+import { extractor } from '../../utils/extractor';
 
 type ExecFileCallback = (error: Error | null, stdout: string, stderr: string) => void;
 

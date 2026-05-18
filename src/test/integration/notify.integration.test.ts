@@ -1,7 +1,7 @@
 import * as assert from 'assert';
 import * as vscode from 'vscode';
 import * as sinon from 'sinon';
-import { notifyError, notifyInfo, notifyWarn } from '../utils/notify';
+import { notifyError, notifyInfo, notifyWarn } from '../../utils/notify';
 
 const ORG_PREFIX = 'Markdown Org: ';
 

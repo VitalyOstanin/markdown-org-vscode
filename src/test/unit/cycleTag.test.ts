@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import { TAG_ALL, computeNextTag } from '../utils/cycleTag';
+import { TAG_ALL, computeNextTag } from '../../utils/cycleTag';
 
 suite('computeNextTag', () => {
     test('ALL advances to the first configured tag', () => {

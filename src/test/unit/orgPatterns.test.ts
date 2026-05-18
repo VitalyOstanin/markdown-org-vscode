@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import { CLOCK_REGEX, HEADING_REGEX, TIMESTAMP_LINE_REGEX } from '../orgPatterns';
+import { CLOCK_REGEX, HEADING_REGEX, TIMESTAMP_LINE_REGEX } from '../../orgPatterns';
 
 suite('orgPatterns named groups', () => {
     suite('HEADING_REGEX', () => {

@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import { TIMESTAMP_LINE_REGEX } from '../orgPatterns';
+import { TIMESTAMP_LINE_REGEX } from '../../orgPatterns';
 
 suite('Timestamp Tests', () => {
     // Local copy: this is the cursor-aware variant from timestampEdit.ts,

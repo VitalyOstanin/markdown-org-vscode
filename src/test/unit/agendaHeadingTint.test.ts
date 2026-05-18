@@ -1,6 +1,6 @@
 import * as assert from 'assert';
 import { suite, test } from 'mocha';
-import { resolveHeadingClass } from '../utils/agendaHeadingTint';
+import { resolveHeadingClass } from '../../utils/agendaHeadingTint';
 
 // `resolveHeadingClass` is inlined into the agenda webview via
 // `.toString()`, so these unit tests transitively cover the runtime

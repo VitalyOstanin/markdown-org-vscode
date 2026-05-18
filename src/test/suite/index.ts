@@ -10,10 +10,10 @@ export function run(): Promise<void> {
         slow: 2000
     });
 
-    const testsRoot = path.resolve(__dirname, '..');
+    const testsRoot = path.resolve(__dirname, '..', 'unit');
 
     return new Promise((resolve, reject) => {
-        glob('**/*.test.js', { cwd: testsRoot, ignore: '**/*.integration.test.js' })
+        glob('**/*.test.js', { cwd: testsRoot })
             .then((files) => {
                 files.forEach((f) => mocha.addFile(path.resolve(testsRoot, f)));
 

@@ -6,9 +6,9 @@ import * as os from 'os';
 import * as sinon from 'sinon';
 import type * as cp from 'child_process';
 import { suite, before, beforeEach, after, afterEach, test } from 'mocha';
-import { exec } from '../utils/exec';
-import { extractor } from '../utils/extractor';
-import { AgendaPanel } from '../views/agendaPanel';
+import { exec } from '../../utils/exec';
+import { extractor } from '../../utils/extractor';
+import { AgendaPanel } from '../../views/agendaPanel';
 
 type ExecFileCallback = (error: Error | null, stdout: string, stderr: string) => void;
 

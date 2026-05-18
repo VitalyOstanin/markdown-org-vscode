@@ -19,5 +19,22 @@ export default tseslint.config(
             '@typescript-eslint/no-require-imports': 'error',
             radix: ['error', 'always']
         }
+    },
+    {
+        files: ['src/test/unit/**/*.ts'],
+        rules: {
+            'no-restricted-imports': [
+                'error',
+                {
+                    paths: [
+                        {
+                            name: 'vscode',
+                            message:
+                                'Unit tests must not import the vscode API. Put VS Code-dependent assertions in src/test/integration/*.integration.test.ts.'
+                        }
+                    ]
+                }
+            ]
+        }
     }
 );
