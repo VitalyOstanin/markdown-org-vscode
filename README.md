@@ -418,7 +418,17 @@ src/
 ├── extension.ts              # Entry point, command registration
 ├── orgPatterns.ts            # Shared regex patterns (CLOCK, HEADING, TIMESTAMP)
 ├── types.ts                  # Shared types (Task, DayAgenda, FileTag, ...)
-├── utils.ts                  # Shared helpers (findNearestHeading, toIsoDate, ...)
+├── utils.ts                  # Top-level helpers (findNearestHeading, toIsoDate, ...)
+├── utils/
+│   ├── extractor.ts          # markdown-org-extract resolution + timeouts/maxBuffer
+│   ├── exec.ts               # execFile wrapper (centralized for test stubbing)
+│   ├── notify.ts             # Unified "Markdown Org: ..." user-facing messages
+│   ├── tagFilter.ts          # File tag filter matching
+│   ├── cycleTag.ts           # ALL <-> tag rotation
+│   ├── blockDeletion.ts      # EOF-safe block deletion range math
+│   ├── agendaClick.ts        # Click intent resolution in the agenda webview
+│   ├── agendaScroll.ts       # Per-anchor scroll memory for the agenda
+│   └── agendaHeadingTint.ts  # Heading class resolution (priority / DEADLINE)
 ├── commands/
 │   ├── taskStatus.ts         # TODO/DONE + priority + SCHEDULED/DEADLINE/CREATED
 │   ├── agenda.ts             # showAgenda(...), cycleTag, extractor invocation
