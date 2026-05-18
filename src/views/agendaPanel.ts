@@ -4,6 +4,7 @@ import { AgendaData } from '../types';
 import { isMeaningfulSelection, resolveTaskClickIntent } from '../utils/agendaClick';
 import { rememberScroll, recallScroll } from '../utils/agendaScroll';
 import { resolveHeadingClass } from '../utils/agendaHeadingTint';
+import { resolveAgendaWatchBase } from '../utils/agendaWatchPattern';
 import { toIsoDate } from '../utils/isoDate';
 import { formatError, notifyError } from '../utils/notify';
 
@@ -178,7 +179,21 @@ export class AgendaPanel {
         }
 
         if (!AgendaPanel.watcher && refreshCallback) {
-            AgendaPanel.watcher = vscode.workspace.createFileSystemWatcher('**/*.md');
+            // Scope the watcher to the directory that the extractor actually
+            // sweeps. With a bare `**/*.md` pattern, the underlying OS
+            // primitive (inotify/FSEvents/etc.) registers watches for every
+            // `.md` under the workspace, including node_modules / .git /
+            // .vscode-test, even though triggerRefresh ignores those events.
+            // A RelativePattern with the workspace dir as the base avoids
+            // setting up those watches in the first place.
+            const watchBase = resolveAgendaWatchBase(
+                config.get<string>('workspaceDir'),
+                vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
+            );
+            const pattern: vscode.GlobPattern = watchBase
+                ? new vscode.RelativePattern(watchBase, '**/*.md')
+                : '**/*.md';
+            AgendaPanel.watcher = vscode.workspace.createFileSystemWatcher(pattern);
 
             const ignored = (uri: vscode.Uri) => {
                 // Normalize backslashes to forward slashes so the same checks
