@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import { formatError } from './formatError';
 
 const ORG_PREFIX = 'Markdown Org: ';
 
@@ -13,3 +14,5 @@ export function notifyWarn(message: string): Thenable<string | undefined> {
 export function notifyInfo(message: string): Thenable<string | undefined> {
     return vscode.window.showInformationMessage(ORG_PREFIX + message);
 }
+
+export { formatError };

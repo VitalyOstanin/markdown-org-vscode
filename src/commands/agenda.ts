@@ -5,7 +5,7 @@ import { toIsoDate } from '../utils';
 import { exec } from '../utils/exec';
 import { filterTasksByTag } from '../utils/tagFilter';
 import { EXTRACTOR_MAX_BUFFER_BYTES, EXTRACTOR_TIMEOUT_MS, extractor } from '../utils/extractor';
-import { notifyError, notifyInfo, notifyWarn } from '../utils/notify';
+import { formatError, notifyError, notifyInfo, notifyWarn } from '../utils/notify';
 import { computeNextTag } from '../utils/cycleTag';
 
 /**
@@ -103,8 +103,7 @@ export async function showAgenda(
                 navigation
             );
         } catch (error) {
-            const errorMsg = error instanceof Error ? error.message : String(error);
-            notifyError(`Failed to load agenda: ${errorMsg}`);
+            notifyError(`Failed to load agenda: ${formatError(error)}`);
         }
     };
 

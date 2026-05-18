@@ -3,7 +3,7 @@ import * as path from 'path';
 import { formatDurationHM, requireActiveEditor } from '../utils';
 import { exec } from '../utils/exec';
 import { EXTRACTOR_MAX_BUFFER_BYTES, EXTRACTOR_TIMEOUT_MS, extractor } from '../utils/extractor';
-import { notifyError, notifyWarn } from '../utils/notify';
+import { formatError, notifyError, notifyWarn } from '../utils/notify';
 import { parseClockDuration } from '../utils/clockDuration';
 
 interface Task {
@@ -103,7 +103,6 @@ export async function insertClockTable() {
             editBuilder.insert(editor.selection.active, table + '\n');
         });
     } catch (error) {
-        const errorMsg = error instanceof Error ? error.message : String(error);
-        notifyError(`Failed to generate clock table: ${errorMsg}`);
+        notifyError(`Failed to generate clock table: ${formatError(error)}`);
     }
 }

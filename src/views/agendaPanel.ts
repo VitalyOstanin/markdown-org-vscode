@@ -4,7 +4,7 @@ import { AgendaData } from '../types';
 import { isMeaningfulSelection, resolveTaskClickIntent } from '../utils/agendaClick';
 import { rememberScroll, recallScroll } from '../utils/agendaScroll';
 import { resolveHeadingClass } from '../utils/agendaHeadingTint';
-import { notifyError } from '../utils/notify';
+import { formatError, notifyError } from '../utils/notify';
 
 const REFRESH_DEBOUNCE_MS = 500;
 const CALENDAR_COLS = 7;
@@ -233,8 +233,7 @@ export class AgendaPanel {
                 selection: new vscode.Range(pos, pos)
             });
         } catch (err) {
-            const detail = err instanceof Error ? err.message : String(err);
-            notifyError(`failed to open ${file}: ${detail}`);
+            notifyError(`failed to open ${file}: ${formatError(err)}`);
         }
     }
 
