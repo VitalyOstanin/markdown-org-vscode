@@ -3,7 +3,9 @@ import * as path from 'path';
 import * as fs from 'fs';
 import { exec } from './exec';
 
-const WHICH_TIMEOUT_MS = 5_000;
+export const EXTRACTOR_TIMEOUT_MS = 30_000;
+export const EXTRACTOR_MAX_BUFFER_BYTES = 10 * 1024 * 1024;
+export const WHICH_TIMEOUT_MS = 5_000;
 const EXTRACTOR_DEFAULT = 'markdown-org-extract';
 
 async function doResolveExtractorPath(): Promise<string | undefined> {

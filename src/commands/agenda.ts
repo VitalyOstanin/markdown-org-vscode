@@ -4,9 +4,7 @@ import { FileTag } from '../types';
 import { toIsoDate } from '../utils';
 import { exec } from '../utils/exec';
 import { filterTasksByTag } from '../utils/tagFilter';
-import { extractor } from '../utils/extractor';
-
-const EXTRACTOR_TIMEOUT_MS = 30_000;
+import { EXTRACTOR_MAX_BUFFER_BYTES, EXTRACTOR_TIMEOUT_MS, extractor } from '../utils/extractor';
 
 /**
  * Open the agenda webview for the given mode (day/week/month/tasks).
@@ -140,13 +138,18 @@ function execCommand(command: string, args: string[]): Promise<string> {
             reject(new Error(`Command timeout after ${EXTRACTOR_TIMEOUT_MS / 1000} seconds`));
         }, EXTRACTOR_TIMEOUT_MS);
 
-        exec.execFile(command, args, (error, stdout, stderr) => {
-            clearTimeout(timeout);
-            if (error) {
-                reject(new Error(stderr || error.message || 'Unknown error'));
-            } else {
-                resolve(stdout);
+        exec.execFile(
+            command,
+            args,
+            { encoding: 'utf-8', maxBuffer: EXTRACTOR_MAX_BUFFER_BYTES },
+            (error, stdout, stderr) => {
+                clearTimeout(timeout);
+                if (error) {
+                    reject(new Error(stderr || error.message || 'Unknown error'));
+                } else {
+                    resolve(stdout);
+                }
             }
-        });
+        );
     });
 }
