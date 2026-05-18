@@ -5,10 +5,6 @@ function isPositivePattern(pattern: string): boolean {
     return pattern.length > 0 && !pattern.startsWith('!');
 }
 
-function matchesAnyPositive(basename: string, fileTags: FileTag[]): boolean {
-    return fileTags.some((t) => isPositivePattern(t.pattern) && basename.includes(t.pattern));
-}
-
 function isDayAgendaArray(value: AgendaData): value is DayAgenda[] {
     return value.length > 0 && 'date' in value[0];
 }
@@ -32,14 +28,21 @@ export function filterTasksByTag(data: AgendaData, tag: string, fileTags: FileTa
     }
 
     const pattern = tagConfig.pattern;
+    const isNegation = pattern.startsWith('!');
+    // Collect positives once instead of re-scanning fileTags inside the hot
+    // loop. With N tasks and M tags the negation branch used to be O(N*M);
+    // it is now O(M + N*P) where P is the number of *positive* patterns
+    // (typically much smaller than M because '!' negations are also entries
+    // in fileTags).
+    const positives = isNegation ? fileTags.filter((t) => isPositivePattern(t.pattern)).map((t) => t.pattern) : [];
 
     const filterFn = (task: Task) => {
         if (pattern === '') {
             return true;
         }
         const basename = path.basename(task.file);
-        if (pattern.startsWith('!')) {
-            return !matchesAnyPositive(basename, fileTags);
+        if (isNegation) {
+            return !positives.some((p) => basename.includes(p));
         }
         return basename.includes(pattern);
     };
