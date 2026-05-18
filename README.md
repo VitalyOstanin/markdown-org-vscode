@@ -17,6 +17,8 @@ Brings [Org mode](https://orgmode.org/) task management workflow to Markdown fil
 
 ## Quick Start
 
+**macOS / Linux (bash / zsh):**
+
 ```bash
 git clone https://github.com/VitalyOstanin/markdown-org-vscode.git
 cd markdown-org-vscode
@@ -25,6 +27,25 @@ npm run compile
 ln -s "$(pwd)" "$HOME/.vscode/extensions/markdown-org-vscode"
 # Reload VS Code: Ctrl+Shift+P -> "Developer: Reload Window"
 ```
+
+**Windows (PowerShell):**
+
+```powershell
+git clone https://github.com/VitalyOstanin/markdown-org-vscode.git
+cd markdown-org-vscode
+npm install
+npm run compile
+# Creating symlinks on Windows requires either Developer Mode
+# (Settings > Privacy & security > For developers) or an elevated
+# PowerShell session.
+New-Item -ItemType SymbolicLink `
+    -Path "$env:USERPROFILE\.vscode\extensions\markdown-org-vscode" `
+    -Target $PWD.Path
+# Reload VS Code: Ctrl+Shift+P -> "Developer: Reload Window"
+```
+
+If creating a symlink on Windows is inconvenient, build a VSIX and install it
+instead -- see [Installation > From VSIX](#from-vsix).
 
 **Prerequisites:**
 
@@ -318,13 +339,28 @@ code --install-extension markdown-org-vscode-<version>.vsix
 
 ### From Source (development symlink)
 
+**macOS / Linux:**
+
 ```bash
 npm install
 npm run compile
 ln -s "$(pwd)" "$HOME/.vscode/extensions/markdown-org-vscode"
 ```
 
-Then reload the VS Code window.
+**Windows (PowerShell):**
+
+```powershell
+npm install
+npm run compile
+# Requires Developer Mode (Settings > Privacy & security > For developers)
+# or an elevated PowerShell session.
+New-Item -ItemType SymbolicLink `
+    -Path "$env:USERPROFILE\.vscode\extensions\markdown-org-vscode" `
+    -Target $PWD.Path
+```
+
+Then reload the VS Code window. On Windows, installing the
+[VSIX](#from-vsix) instead avoids the symlink requirement.
 
 ## Development
 
