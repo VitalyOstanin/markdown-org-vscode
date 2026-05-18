@@ -4,6 +4,7 @@ import * as path from 'path';
 import { findNearestHeading, isPathInsideWorkspace, requireActiveEditor, resolveWorkspacePath } from '../utils';
 import { notifyError, notifyInfo, notifyWarn } from '../utils/notify';
 import { computeBlockDeletionCoords } from '../utils/blockDeletion';
+import { extractHeadingBlockLines } from '../utils/extractHeading';
 
 async function readIfExists(filePath: string): Promise<string | null> {
     try {
@@ -66,17 +67,12 @@ async function findHeadingAtCursor(editor: vscode.TextEditor): Promise<HeadingIn
 }
 
 function extractHeadingContent(document: vscode.TextDocument, startLine: number, level: number): string[] {
-    const lines: string[] = [document.lineAt(startLine).text];
-
-    for (let i = startLine + 1; i < document.lineCount; i++) {
-        const line = document.lineAt(i).text;
-        const match = line.match(/^(#+)\s+/);
-        if (match && match[1].length <= level) {
-            break;
-        }
-        lines.push(line);
-    }
-    return lines;
+    // One getText() + split is cheaper than N independent `lineAt(i).text`
+    // calls on large markdown files. Splitting on /\r?\n/ matches the
+    // per-line strings VS Code's TextLine.text would have surfaced (the API
+    // strips the EOL itself; we strip it explicitly here).
+    const allLines = document.getText().split(/\r?\n/);
+    return extractHeadingBlockLines(allLines, startLine, level);
 }
 
 function getAncestorChain(document: vscode.TextDocument, startLine: number, targetLevel: number): HeadingInfo[] {
