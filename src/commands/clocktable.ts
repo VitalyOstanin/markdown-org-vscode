@@ -4,6 +4,7 @@ import { formatDurationHM, requireActiveEditor } from '../utils';
 import { exec } from '../utils/exec';
 import { EXTRACTOR_MAX_BUFFER_BYTES, EXTRACTOR_TIMEOUT_MS, extractor } from '../utils/extractor';
 import { notifyError, notifyWarn } from '../utils/notify';
+import { parseClockDuration } from '../utils/clockDuration';
 
 interface Task {
     heading: string;
@@ -40,11 +41,6 @@ function formatDuration(minutes: number): string {
     return formatDurationHM(minutes * 60_000);
 }
 
-function parseDuration(duration: string): number {
-    const [hours, mins] = duration.split(':').map((s) => parseInt(s, 10));
-    return hours * 60 + mins;
-}
-
 function buildClockTable(tasks: Task[]): string {
     const tasksWithTime = tasks.filter((t) => t.total_clock_time);
 
@@ -57,7 +53,7 @@ function buildClockTable(tasks: Task[]): string {
         time: t.total_clock_time!
     }));
 
-    const totalMinutes = tasksWithTime.reduce((sum, t) => sum + parseDuration(t.total_clock_time!), 0);
+    const totalMinutes = tasksWithTime.reduce((sum, t) => sum + parseClockDuration(t.total_clock_time!), 0);
 
     const maxHeadingLen = Math.max(7, ...rows.map((r) => r.heading.length));
     const maxTimeLen = Math.max(4, ...rows.map((r) => r.time.length), formatDuration(totalMinutes).length);
