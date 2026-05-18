@@ -22,11 +22,11 @@ export async function setTaskStatus(status: 'TODO' | 'DONE') {
     const text = line.text;
     const match = text.match(HEADING_REGEX);
 
-    if (!match) {
+    if (!match?.groups) {
         return;
     }
 
-    const [, hashes, currentStatus, priority, title] = match;
+    const { hashes, status: currentStatus, priority, title } = match.groups;
 
     let newText = `${hashes} `;
     if (currentStatus !== status) {
@@ -58,11 +58,11 @@ export async function togglePriority() {
     const text = line.text;
     const match = text.match(HEADING_REGEX);
 
-    if (!match) {
+    if (!match?.groups) {
         return;
     }
 
-    const [, hashes, status, currentPriority, title] = match;
+    const { hashes, status, priority: currentPriority, title } = match.groups;
 
     let newText = `${hashes} `;
     if (status) {
@@ -93,10 +93,10 @@ export async function insertCreatedTimestamp() {
     for (let i = headingLine + 1; i < editor.document.lineCount; i++) {
         const lineText = editor.document.lineAt(i).text;
         const tsMatch = lineText.match(TIMESTAMP_LINE_REGEX);
-        if (!tsMatch) {
+        if (!tsMatch?.groups) {
             break;
         }
-        if (tsMatch[2] === 'CREATED') {
+        if (tsMatch.groups.type === 'CREATED') {
             return;
         }
     }
@@ -140,10 +140,10 @@ async function insertOrReplaceTimestamp(type: 'SCHEDULED' | 'DEADLINE') {
     for (let i = headingLine + 1; i < editor.document.lineCount; i++) {
         const line = editor.document.lineAt(i);
         const match = line.text.match(TIMESTAMP_LINE_REGEX);
-        if (!match) {
+        if (!match?.groups) {
             break;
         }
-        if (match[2] === type) {
+        if (match.groups.type === type) {
             existingLines.push(i);
         }
         blockEnd = i + 1;

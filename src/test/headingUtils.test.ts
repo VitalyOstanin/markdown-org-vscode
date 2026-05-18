@@ -1,14 +1,13 @@
 import * as assert from 'assert';
+import { HEADING_REGEX } from '../orgPatterns';
 
 suite('Heading Utils Tests', () => {
-    const HEADING_REGEX = /^(#+)\s+(?:(TODO|DONE)\s+)?(?:\[#([A-Z])\]\s+)?(.+)$/;
-
     test('Detect heading level 1', () => {
         const heading = '# Title';
         const match = heading.match(HEADING_REGEX);
 
         assert.ok(match);
-        assert.strictEqual(match[1].length, 1);
+        assert.strictEqual(match.groups?.hashes.length, 1);
     });
 
     test('Detect heading level 2', () => {
@@ -16,7 +15,7 @@ suite('Heading Utils Tests', () => {
         const match = heading.match(HEADING_REGEX);
 
         assert.ok(match);
-        assert.strictEqual(match[1].length, 2);
+        assert.strictEqual(match.groups?.hashes.length, 2);
     });
 
     test('Detect heading level 3', () => {
@@ -24,7 +23,7 @@ suite('Heading Utils Tests', () => {
         const match = heading.match(HEADING_REGEX);
 
         assert.ok(match);
-        assert.strictEqual(match[1].length, 3);
+        assert.strictEqual(match.groups?.hashes.length, 3);
     });
 
     test('Extract title from heading', () => {
@@ -32,7 +31,7 @@ suite('Heading Utils Tests', () => {
         const match = heading.match(HEADING_REGEX);
 
         assert.ok(match);
-        assert.strictEqual(match[4], 'Task title');
+        assert.strictEqual(match.groups?.title, 'Task title');
     });
 
     test('Extract title from simple heading', () => {
@@ -40,7 +39,7 @@ suite('Heading Utils Tests', () => {
         const match = heading.match(HEADING_REGEX);
 
         assert.ok(match);
-        assert.strictEqual(match[4], 'Simple title');
+        assert.strictEqual(match.groups?.title, 'Simple title');
     });
 
     test('Heading with special characters in title', () => {
@@ -48,7 +47,7 @@ suite('Heading Utils Tests', () => {
         const match = heading.match(HEADING_REGEX);
 
         assert.ok(match);
-        assert.strictEqual(match[4], 'Task with: special, characters!');
+        assert.strictEqual(match.groups?.title, 'Task with: special, characters!');
     });
 
     test('Not a heading - missing hash', () => {

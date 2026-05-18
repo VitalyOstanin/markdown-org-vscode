@@ -78,11 +78,11 @@ function findClockLines(editor: vscode.TextEditor, headingLine: number): number[
 }
 
 function findOpenClock(editor: vscode.TextEditor, clockLines: number[]): number | null {
-    // match[8] is the optional end-bracket group; if absent, the CLOCK entry is open
+    // endCloseBracket is the optional end-bracket group; if absent, the CLOCK entry is open
     for (const lineNum of clockLines) {
         const line = editor.document.lineAt(lineNum);
         const match = line.text.match(CLOCK_REGEX);
-        if (match && !match[8]) {
+        if (match?.groups && !match.groups.endCloseBracket) {
             return lineNum;
         }
     }
@@ -164,16 +164,16 @@ export async function insertClockFinish() {
 
     const line = editor.document.lineAt(openClockLine);
     const match = line.text.match(CLOCK_REGEX);
-    if (!match) {
+    if (!match?.groups) {
         return;
     }
 
-    const indent = match[1];
-    const startYear = parseInt(match[3], 10);
-    const startMonth = parseInt(match[4], 10);
-    const startDay = parseInt(match[5], 10);
+    const { indent, startYear: y, startMonth: m, startDay: d, startBody } = match.groups;
+    const startYear = parseInt(y, 10);
+    const startMonth = parseInt(m, 10);
+    const startDay = parseInt(d, 10);
 
-    const timeMatch = match[6].match(/(\d{2}):(\d{2})$/);
+    const timeMatch = startBody.match(/(\d{2}):(\d{2})$/);
     if (!timeMatch) {
         return;
     }

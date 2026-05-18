@@ -1,21 +1,24 @@
 import * as assert from 'assert';
+import { TIMESTAMP_LINE_REGEX } from '../orgPatterns';
 
 suite('Timestamp Tests', () => {
+    // Local copy: this is the cursor-aware variant from timestampEdit.ts,
+    // not exported from orgPatterns. It captures date parts as separate groups
+    // so the unit tests below can pin down parsing semantics directly.
     const TIMESTAMP_REGEX =
-        /<(\d{4})-(\d{2})-(\d{2})(?: ([А-Яа-яA-Za-z]{2,3}))?(?: (\d{2}):(\d{2}))?(?: (\+\d+[dwmy]{1,2}))?>/;
-    const TIMESTAMP_LINE_REGEX = /^(\s*)`(CREATED|SCHEDULED|DEADLINE|CLOSED): (<[^>]+>)`$/;
+        /<(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})(?: (?<weekday>[А-Яа-яA-Za-z]{2,3}))?(?: (?<hour>\d{2}):(?<minute>\d{2}))?(?: (?<repeater>\+\d+[dwmy]{1,2}))?>/;
 
     test('Parse timestamp with date only', () => {
         const timestamp = '<2025-12-06 Fri>';
         const match = timestamp.match(TIMESTAMP_REGEX);
 
         assert.ok(match);
-        assert.strictEqual(match[1], '2025');
-        assert.strictEqual(match[2], '12');
-        assert.strictEqual(match[3], '06');
-        assert.strictEqual(match[4], 'Fri');
-        assert.strictEqual(match[5], undefined);
-        assert.strictEqual(match[6], undefined);
+        assert.strictEqual(match.groups?.year, '2025');
+        assert.strictEqual(match.groups?.month, '12');
+        assert.strictEqual(match.groups?.day, '06');
+        assert.strictEqual(match.groups?.weekday, 'Fri');
+        assert.strictEqual(match.groups?.hour, undefined);
+        assert.strictEqual(match.groups?.minute, undefined);
     });
 
     test('Parse timestamp with date and time', () => {
@@ -23,12 +26,12 @@ suite('Timestamp Tests', () => {
         const match = timestamp.match(TIMESTAMP_REGEX);
 
         assert.ok(match);
-        assert.strictEqual(match[1], '2025');
-        assert.strictEqual(match[2], '12');
-        assert.strictEqual(match[3], '06');
-        assert.strictEqual(match[4], 'Fri');
-        assert.strictEqual(match[5], '14');
-        assert.strictEqual(match[6], '30');
+        assert.strictEqual(match.groups?.year, '2025');
+        assert.strictEqual(match.groups?.month, '12');
+        assert.strictEqual(match.groups?.day, '06');
+        assert.strictEqual(match.groups?.weekday, 'Fri');
+        assert.strictEqual(match.groups?.hour, '14');
+        assert.strictEqual(match.groups?.minute, '30');
     });
 
     test('Parse timestamp with repeater', () => {
@@ -36,7 +39,7 @@ suite('Timestamp Tests', () => {
         const match = timestamp.match(TIMESTAMP_REGEX);
 
         assert.ok(match);
-        assert.strictEqual(match[7], '+1d');
+        assert.strictEqual(match.groups?.repeater, '+1d');
     });
 
     test('Parse timestamp with workday repeater', () => {
@@ -44,7 +47,7 @@ suite('Timestamp Tests', () => {
         const match = timestamp.match(TIMESTAMP_REGEX);
 
         assert.ok(match);
-        assert.strictEqual(match[7], '+2wd');
+        assert.strictEqual(match.groups?.repeater, '+2wd');
     });
 
     test('Parse SCHEDULED timestamp line', () => {
@@ -52,9 +55,9 @@ suite('Timestamp Tests', () => {
         const match = line.match(TIMESTAMP_LINE_REGEX);
 
         assert.ok(match);
-        assert.strictEqual(match[1], '');
-        assert.strictEqual(match[2], 'SCHEDULED');
-        assert.strictEqual(match[3], '<2025-12-06 Fri 10:00>');
+        assert.strictEqual(match.groups?.indent, '');
+        assert.strictEqual(match.groups?.type, 'SCHEDULED');
+        assert.strictEqual(match.groups?.timestamp, '<2025-12-06 Fri 10:00>');
     });
 
     test('Parse DEADLINE timestamp line', () => {
@@ -62,7 +65,7 @@ suite('Timestamp Tests', () => {
         const match = line.match(TIMESTAMP_LINE_REGEX);
 
         assert.ok(match);
-        assert.strictEqual(match[2], 'DEADLINE');
+        assert.strictEqual(match.groups?.type, 'DEADLINE');
     });
 
     test('Parse CREATED timestamp line', () => {
@@ -70,7 +73,7 @@ suite('Timestamp Tests', () => {
         const match = line.match(TIMESTAMP_LINE_REGEX);
 
         assert.ok(match);
-        assert.strictEqual(match[2], 'CREATED');
+        assert.strictEqual(match.groups?.type, 'CREATED');
     });
 
     test('Parse CLOSED timestamp line', () => {
@@ -78,7 +81,7 @@ suite('Timestamp Tests', () => {
         const match = line.match(TIMESTAMP_LINE_REGEX);
 
         assert.ok(match);
-        assert.strictEqual(match[2], 'CLOSED');
+        assert.strictEqual(match.groups?.type, 'CLOSED');
     });
 
     test('Parse timestamp line with indent', () => {
@@ -86,8 +89,8 @@ suite('Timestamp Tests', () => {
         const match = line.match(TIMESTAMP_LINE_REGEX);
 
         assert.ok(match);
-        assert.strictEqual(match[1], '  ');
-        assert.strictEqual(match[2], 'SCHEDULED');
+        assert.strictEqual(match.groups?.indent, '  ');
+        assert.strictEqual(match.groups?.type, 'SCHEDULED');
     });
 
     test('Toggle timestamp type SCHEDULED to DEADLINE', () => {

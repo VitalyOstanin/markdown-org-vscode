@@ -40,8 +40,8 @@ export function getTimestampIndent(editor: vscode.TextEditor, headingLine: numbe
     if (headingLine + 1 < editor.document.lineCount) {
         const line = editor.document.lineAt(headingLine + 1);
         const match = line.text.match(TIMESTAMP_LINE_REGEX);
-        if (match) {
-            return match[1];
+        if (match?.groups) {
+            return match.groups.indent;
         }
     }
     return '';

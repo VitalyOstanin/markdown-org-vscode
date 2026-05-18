@@ -3,12 +3,12 @@ import { HEADING_REGEX, TIMESTAMP_LINE_REGEX } from '../orgPatterns';
 import { formatDurationHM } from '../utils';
 
 const TIMESTAMP_REGEX =
-    /<(\d{4})-(\d{2})-(\d{2})(?: ([А-Яа-яA-Za-z]{2,3}))?(?: (\d{2}):(\d{2}))?(?: (\+\d+[dwmy]{1,2}))?>/;
+    /<(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})(?: (?<weekday>[А-Яа-яA-Za-z]{2,3}))?(?: (?<hour>\d{2}):(?<minute>\d{2}))?(?: (?<repeater>\+\d+[dwmy]{1,2}))?>/;
 // Local variant of the CLOCK regex with weekday and time as separate groups
 // so cursor offsets can target individual parts; orgPatterns.CLOCK_REGEX uses
 // a broader `[^\]>]+` form for general matching.
 const CLOCK_REGEX =
-    /^(\s*)`CLOCK: ([[<])(\d{4})-(\d{2})-(\d{2}) ([А-Яа-яA-Za-z]+) (\d{2}):(\d{2})([\]>])(?:--([[<])(\d{4})-(\d{2})-(\d{2}) ([А-Яа-яA-Za-z]+) (\d{2}):(\d{2})([\]>]) => +(-?\d+):(-?\d+))?`$/;
+    /^(?<indent>\s*)`CLOCK: (?<startOpenBracket>[[<])(?<startYear>\d{4})-(?<startMonth>\d{2})-(?<startDay>\d{2}) (?<startWeekday>[А-Яа-яA-Za-z]+) (?<startHour>\d{2}):(?<startMinute>\d{2})(?<startCloseBracket>[\]>])(?:--(?<endOpenBracket>[[<])(?<endYear>\d{4})-(?<endMonth>\d{2})-(?<endDay>\d{2}) (?<endWeekday>[А-Яа-яA-Za-z]+) (?<endHour>\d{2}):(?<endMinute>\d{2})(?<endCloseBracket>[\]>]) => +(?<durationHours>-?\d+):(?<durationMinutes>-?\d+))?`$/;
 const PRIORITY_A_CODE = 'A'.charCodeAt(0);
 const PRIORITY_Z_CODE = 'Z'.charCodeAt(0);
 
@@ -36,7 +36,7 @@ function getClockTimestampAtCursor(
     const lineText = line.text;
 
     const match = lineText.match(CLOCK_REGEX);
-    if (!match || match.index === undefined) return null;
+    if (!match || match.index === undefined || !match.groups) return null;
 
     const fullMatch = match[0];
     const cur = position.character;
@@ -64,7 +64,7 @@ function getClockTimestampAtCursor(
     if (cur >= startTimePos + 3 && cur <= startTimePos + 5) return { match, part: 'start-minute' };
 
     // Check end timestamp if exists
-    if (match[10] && timestamps.length > 1) {
+    if (match.groups.endOpenBracket && timestamps.length > 1) {
         const endTs = timestamps[1];
         const endBase = match.index + endTs.index!;
 
@@ -90,10 +90,11 @@ function getTimestampTypeAtCursor(editor: vscode.TextEditor): { match: RegExpMat
     const lineText = line.text;
 
     const match = lineText.match(TIMESTAMP_LINE_REGEX);
-    if (!match) return null;
+    if (!match?.groups) return null;
 
-    const typeStart = lineText.indexOf(match[2]);
-    const typeEnd = typeStart + match[2].length;
+    const type = match.groups.type;
+    const typeStart = lineText.indexOf(type);
+    const typeEnd = typeStart + type.length;
 
     if (position.character >= typeStart && position.character <= typeEnd) {
         const range = new vscode.Range(position.line, typeStart, position.line, typeEnd);
@@ -104,9 +105,7 @@ function getTimestampTypeAtCursor(editor: vscode.TextEditor): { match: RegExpMat
 }
 
 function toggleTimestampType(match: RegExpMatchArray): string {
-    const indent = match[1];
-    const currentType = match[2];
-    const timestamp = match[3];
+    const { indent, type: currentType, timestamp } = match.groups!;
 
     if (currentType === 'CREATED') {
         return `${indent}\`${currentType}: ${timestamp}\``;
@@ -127,13 +126,14 @@ function getHeadingPartAtCursor(
     const lineText = line.text;
 
     const match = lineText.match(HEADING_REGEX);
-    if (!match) return null;
+    if (!match?.groups) return null;
 
-    const hashesEnd = match[1].length + 1;
+    const { hashes, status, priority } = match.groups;
+    const hashesEnd = hashes.length + 1;
 
-    if (match[2]) {
-        const statusStart = lineText.indexOf(match[2], hashesEnd);
-        const statusEnd = statusStart + match[2].length;
+    if (status) {
+        const statusStart = lineText.indexOf(status, hashesEnd);
+        const statusEnd = statusStart + status.length;
 
         if (position.character >= statusStart && position.character <= statusEnd) {
             const range = new vscode.Range(position.line, statusStart, position.line, statusEnd);
@@ -141,8 +141,8 @@ function getHeadingPartAtCursor(
         }
     }
 
-    if (match[3]) {
-        const priorityPattern = `[#${match[3]}]`;
+    if (priority) {
+        const priorityPattern = `[#${priority}]`;
         const priorityStart = lineText.indexOf(priorityPattern);
         const priorityEnd = priorityStart + priorityPattern.length;
 
@@ -156,10 +156,9 @@ function getHeadingPartAtCursor(
 }
 
 function adjustHeadingPart(match: RegExpMatchArray, part: HeadingPart, delta: number): string {
-    const hashes = match[1];
-    const status = match[2] || '';
-    const priority = match[3] || '';
-    const title = match[4];
+    const { hashes, status: rawStatus, priority: rawPriority, title } = match.groups!;
+    const status = rawStatus || '';
+    const priority = rawPriority || '';
 
     let newStatus = status;
     let newPriority = priority;
@@ -202,6 +201,8 @@ function getTimestampAtCursor(
     const regex = new RegExp(TIMESTAMP_REGEX, 'g');
 
     while ((match = regex.exec(lineText)) !== null) {
+        if (!match.groups) continue;
+        const { weekday, hour, minute } = match.groups;
         const start = match.index!;
         const end = start + match[0].length;
 
@@ -220,14 +221,14 @@ function getTimestampAtCursor(
                 part = 'month';
             } else if (position.character >= dayStart && position.character <= dayEnd) {
                 part = 'day';
-            } else if (match[4]) {
-                const weekdayStart = lineText.indexOf(match[4], dayEnd);
-                const weekdayEnd = weekdayStart + match[4].length;
+            } else if (weekday) {
+                const weekdayStart = lineText.indexOf(weekday, dayEnd);
+                const weekdayEnd = weekdayStart + weekday.length;
 
                 if (position.character >= weekdayStart && position.character <= weekdayEnd) {
                     part = 'weekday';
-                } else if (match[5] && match[6]) {
-                    const hourStart = lineText.indexOf(match[5], weekdayEnd);
+                } else if (hour && minute) {
+                    const hourStart = lineText.indexOf(hour, weekdayEnd);
                     const hourEnd = hourStart + 2;
                     const minuteStart = hourEnd + 1;
                     const minuteEnd = minuteStart + 2;
@@ -242,8 +243,8 @@ function getTimestampAtCursor(
                 } else {
                     continue;
                 }
-            } else if (match[5] && match[6]) {
-                const hourStart = lineText.indexOf(match[5], dayEnd);
+            } else if (hour && minute) {
+                const hourStart = lineText.indexOf(hour, dayEnd);
                 const hourEnd = hourStart + 2;
                 const minuteStart = hourEnd + 1;
                 const minuteEnd = minuteStart + 2;
@@ -269,13 +270,14 @@ function getTimestampAtCursor(
 }
 
 function incrementTimestamp(match: RegExpMatchArray, part: TimestampPart, delta: number): string {
-    let year = parseInt(match[1], 10);
-    let month = parseInt(match[2], 10);
-    let day = parseInt(match[3], 10);
-    const weekday = match[4] || '';
-    const hour = match[5] ? parseInt(match[5], 10) : undefined;
-    const minute = match[6] ? parseInt(match[6], 10) : undefined;
-    const repeater = match[7] || '';
+    const g = match.groups!;
+    let year = parseInt(g.year, 10);
+    let month = parseInt(g.month, 10);
+    let day = parseInt(g.day, 10);
+    const weekday = g.weekday || '';
+    const hour = g.hour ? parseInt(g.hour, 10) : undefined;
+    const minute = g.minute ? parseInt(g.minute, 10) : undefined;
+    const repeater = g.repeater || '';
 
     const date = new Date(year, month - 1, day, hour ?? 0, minute ?? 0);
 
@@ -340,18 +342,19 @@ function getWeekdayName(date: Date, originalFormat: string): string {
 }
 
 function adjustClockTimestamp(match: RegExpMatchArray, part: ClockTimestampPart, delta: number): string {
-    const indent = match[1];
-    const startBracket = match[2];
-    const endBracket = match[9];
+    const g = match.groups!;
+    const indent = g.indent;
+    const startBracket = g.startOpenBracket;
+    const endBracket = g.startCloseBracket;
 
     const startDate = new Date(
-        parseInt(match[3], 10),
-        parseInt(match[4], 10) - 1,
-        parseInt(match[5], 10),
-        parseInt(match[7], 10),
-        parseInt(match[8], 10)
+        parseInt(g.startYear, 10),
+        parseInt(g.startMonth, 10) - 1,
+        parseInt(g.startDay, 10),
+        parseInt(g.startHour, 10),
+        parseInt(g.startMinute, 10)
     );
-    const startWeekday = match[6];
+    const startWeekday = g.startWeekday;
 
     // Adjust start date based on part
     if (part === 'start-year') startDate.setFullYear(startDate.getFullYear() + delta);
@@ -363,21 +366,21 @@ function adjustClockTimestamp(match: RegExpMatchArray, part: ClockTimestampPart,
     const newStartWeekday = getWeekdayName(startDate, startWeekday);
     const startTimestamp = `${startBracket}${startDate.getFullYear()}-${(startDate.getMonth() + 1).toString().padStart(2, '0')}-${startDate.getDate().toString().padStart(2, '0')} ${newStartWeekday} ${startDate.getHours().toString().padStart(2, '0')}:${startDate.getMinutes().toString().padStart(2, '0')}${endBracket}`;
 
-    if (!match[10]) {
+    if (!g.endOpenBracket) {
         return `${indent}\`CLOCK: ${startTimestamp}\``;
     }
 
-    const endStartBracket = match[10];
-    const endEndBracket = match[17];
+    const endStartBracket = g.endOpenBracket;
+    const endEndBracket = g.endCloseBracket;
 
     const endDate = new Date(
-        parseInt(match[11], 10),
-        parseInt(match[12], 10) - 1,
-        parseInt(match[13], 10),
-        parseInt(match[15], 10),
-        parseInt(match[16], 10)
+        parseInt(g.endYear, 10),
+        parseInt(g.endMonth, 10) - 1,
+        parseInt(g.endDay, 10),
+        parseInt(g.endHour, 10),
+        parseInt(g.endMinute, 10)
     );
-    const endWeekday = match[14];
+    const endWeekday = g.endWeekday;
 
     // Adjust end date based on part
     if (part === 'end-year') endDate.setFullYear(endDate.getFullYear() + delta);
