@@ -7,6 +7,7 @@ import { filterTasksByTag } from '../utils/tagFilter';
 import { EXTRACTOR_MAX_BUFFER_BYTES, EXTRACTOR_TIMEOUT_MS, extractor } from '../utils/extractor';
 import { formatError, notifyError, notifyInfo, notifyWarn } from '../utils/notify';
 import { computeNextTag } from '../utils/cycleTag';
+import { buildExecError } from '../utils/execError';
 
 /**
  * Open the agenda webview for the given mode (day/week/month/tasks).
@@ -149,7 +150,7 @@ function execCommand(command: string, args: string[]): Promise<string> {
             (error, stdout, stderr) => {
                 clearTimeout(timeout);
                 if (error) {
-                    reject(new Error(stderr || error.message || 'Unknown error'));
+                    reject(buildExecError(error, stderr, 'Unknown error'));
                 } else {
                     resolve(stdout);
                 }

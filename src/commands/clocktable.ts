@@ -5,6 +5,7 @@ import { exec } from '../utils/exec';
 import { EXTRACTOR_MAX_BUFFER_BYTES, EXTRACTOR_TIMEOUT_MS, extractor } from '../utils/extractor';
 import { formatError, notifyError, notifyWarn } from '../utils/notify';
 import { parseClockDuration } from '../utils/clockDuration';
+import { buildExecError } from '../utils/execError';
 
 interface Task {
     heading: string;
@@ -24,7 +25,7 @@ function parseClockData(extractorPath: string, filePath: string): Promise<Task[]
             },
             (error, stdout, stderr) => {
                 if (error) {
-                    reject(new Error(stderr || error.message || `markdown-org-extract failed`));
+                    reject(buildExecError(error, stderr, 'markdown-org-extract failed'));
                     return;
                 }
                 try {
