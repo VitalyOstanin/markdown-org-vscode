@@ -69,6 +69,51 @@ suite('Timestamp Integration Tests', () => {
         assert.strictEqual(document.lineAt(0).text, '## TODO Task title');
     });
 
+    test('Toggle SCHEDULED removes all duplicate SCHEDULED lines, not just the last', async () => {
+        // Regression: insertOrReplaceTimestamp used to track only the most
+        // recently seen line for the type, so a file that accidentally ended
+        // up with two SCHEDULED entries kept the older one after a toggle.
+        document = await vscode.workspace.openTextDocument({
+            content: '## TODO Task title\n' + '`SCHEDULED: <2025-12-06 Fri>`\n' + '`SCHEDULED: <2025-12-07 Sat>`\n',
+            language: 'markdown'
+        });
+        editor = await vscode.window.showTextDocument(document);
+        editor.selection = new vscode.Selection(0, 0, 0, 0);
+
+        await vscode.commands.executeCommand('markdown-org.insertScheduled');
+
+        const remaining = document
+            .getText()
+            .split('\n')
+            .filter((l) => l.includes('SCHEDULED:'));
+        assert.deepStrictEqual(remaining, [], 'all SCHEDULED lines must be removed by the toggle');
+        assert.strictEqual(document.lineAt(0).text, '## TODO Task title');
+    });
+
+    test('Toggle SCHEDULED with duplicates preserves CREATED and DEADLINE', async () => {
+        document = await vscode.workspace.openTextDocument({
+            content:
+                '## TODO Task title\n' +
+                '`CREATED: <2025-12-01 Mon>`\n' +
+                '`DEADLINE: <2025-12-31 Wed>`\n' +
+                '`SCHEDULED: <2025-12-06 Fri>`\n' +
+                '`SCHEDULED: <2025-12-07 Sat>`\n',
+            language: 'markdown'
+        });
+        editor = await vscode.window.showTextDocument(document);
+        editor.selection = new vscode.Selection(0, 0, 0, 0);
+
+        await vscode.commands.executeCommand('markdown-org.insertScheduled');
+
+        const lines = document.getText().split('\n');
+        assert.ok(lines.some((l) => l.startsWith('`CREATED:')));
+        assert.ok(lines.some((l) => l.startsWith('`DEADLINE:')));
+        assert.ok(
+            !lines.some((l) => l.startsWith('`SCHEDULED:')),
+            'no SCHEDULED line should survive a toggle on a duplicated entry'
+        );
+    });
+
     test('SCHEDULED preserves existing DEADLINE', async () => {
         document = await vscode.workspace.openTextDocument({
             content: '## TODO Task title\n`DEADLINE: <2025-12-06 Fri>`\n',

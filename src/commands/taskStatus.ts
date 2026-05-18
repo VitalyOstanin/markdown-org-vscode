@@ -131,10 +131,10 @@ async function insertOrReplaceTimestamp(type: 'SCHEDULED' | 'DEADLINE') {
         return;
     }
 
-    // Walk the consecutive timestamp block after the heading and find the
-    // existing line for `type` (if any). Other timestamps (CREATED, otherType)
-    // are independent and must be preserved.
-    let existingLine: number | null = null;
+    // Walk the consecutive timestamp block after the heading and collect every
+    // existing line for `type` (a file may have duplicates after a manual edit).
+    // Other timestamps (CREATED, otherType) are independent and must be preserved.
+    const existingLines: number[] = [];
     let blockEnd = headingLine + 1;
 
     for (let i = headingLine + 1; i < editor.document.lineCount; i++) {
@@ -144,15 +144,19 @@ async function insertOrReplaceTimestamp(type: 'SCHEDULED' | 'DEADLINE') {
             break;
         }
         if (match[2] === type) {
-            existingLine = i;
+            existingLines.push(i);
         }
         blockEnd = i + 1;
     }
 
-    if (existingLine !== null) {
-        const deleteRange = new vscode.Range(existingLine, 0, existingLine + 1, 0);
+    if (existingLines.length > 0) {
+        // editor.edit applies the supplied deletes atomically against the
+        // original document positions, so the indices don't need to be
+        // compensated as previous lines disappear.
         return editor.edit((editBuilder) => {
-            editBuilder.delete(deleteRange);
+            for (const lineNum of existingLines) {
+                editBuilder.delete(new vscode.Range(lineNum, 0, lineNum + 1, 0));
+            }
         });
     }
 
