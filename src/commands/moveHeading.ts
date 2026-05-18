@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { findNearestHeading, isPathInsideWorkspace, requireActiveEditor, resolveWorkspacePath } from '../utils';
 import { notifyError, notifyInfo, notifyWarn } from '../utils/notify';
+import { computeBlockDeletionCoords } from '../utils/blockDeletion';
 
 async function readIfExists(filePath: string): Promise<string | null> {
     try {
@@ -97,24 +98,20 @@ function getAncestorChain(document: vscode.TextDocument, startLine: number, targ
     return ancestors;
 }
 
-/**
- * Build a Range that deletes `contentLength` lines starting at `startLine`,
- * correctly handling the case when the block ends at EOF on a file without
- * a trailing newline. In that case `new Range(start, 0, lastLine+1, 0)` would
- * point past the last character of the document and leave the trailing line
- * behind, so we close the range on the actual end of the last content line.
- */
 function computeBlockDeletionRange(
     document: vscode.TextDocument,
     startLine: number,
     contentLength: number
 ): vscode.Range {
-    const lastIdx = startLine + contentLength - 1;
-    if (lastIdx >= document.lineCount - 1) {
-        const lastLine = document.lineAt(document.lineCount - 1);
-        return new vscode.Range(startLine, 0, lastLine.range.end.line, lastLine.range.end.character);
-    }
-    return new vscode.Range(startLine, 0, lastIdx + 1, 0);
+    const c = computeBlockDeletionCoords(
+        {
+            lineCount: document.lineCount,
+            getLineLength: (lineIndex) => document.lineAt(lineIndex).text.length
+        },
+        startLine,
+        contentLength
+    );
+    return new vscode.Range(c.startLine, c.startCharacter, c.endLine, c.endCharacter);
 }
 
 function buildArchiveContent(ancestors: HeadingInfo[], heading: HeadingInfo): string {

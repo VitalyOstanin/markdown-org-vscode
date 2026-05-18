@@ -6,6 +6,7 @@ import { exec } from '../utils/exec';
 import { filterTasksByTag } from '../utils/tagFilter';
 import { EXTRACTOR_MAX_BUFFER_BYTES, EXTRACTOR_TIMEOUT_MS, extractor } from '../utils/extractor';
 import { notifyError, notifyInfo, notifyWarn } from '../utils/notify';
+import { computeNextTag } from '../utils/cycleTag';
 
 /**
  * Open the agenda webview for the given mode (day/week/month/tasks).
@@ -117,13 +118,10 @@ export async function cycleTag(_context: vscode.ExtensionContext) {
         return;
     }
 
-    // Treat "ALL" as a virtual entry at index 0 so the cycle can return to it,
-    // and unknown currentTag values fall back to "ALL" rather than silently
-    // jumping to the first configured tag.
-    const cycle = ['ALL', ...fileTags.map((t) => t.name)];
-    const currentIndex = cycle.indexOf(currentTag);
-    const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % cycle.length;
-    const nextTag = cycle[nextIndex];
+    const nextTag = computeNextTag(
+        currentTag,
+        fileTags.map((t) => t.name)
+    );
 
     const target =
         (vscode.workspace.workspaceFolders?.length ?? 0) > 0
