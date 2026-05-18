@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { findNearestHeading, formatDurationHM, formatOrgTimestamp, getTimestampIndent } from '../utils';
 import { CLOCK_REGEX, TIMESTAMP_LINE_REGEX } from '../orgPatterns';
+import { notifyWarn } from '../utils/notify';
 
 function formatTimestamp(date: Date): string {
     return formatOrgTimestamp(date, 'square');
@@ -98,7 +99,7 @@ export async function insertClockStart() {
     const openClockLine = findOpenClock(editor, clockLines);
 
     if (openClockLine !== null) {
-        vscode.window.showWarningMessage('There is already an open CLOCK entry');
+        notifyWarn('There is already an open CLOCK entry');
         return;
     }
 
@@ -151,7 +152,7 @@ export async function insertClockFinish() {
     const openClockLine = findOpenClock(editor, clockLines);
 
     if (openClockLine === null) {
-        vscode.window.showWarningMessage('No open CLOCK entry found');
+        notifyWarn('No open CLOCK entry found');
         return;
     }
 
@@ -162,16 +163,16 @@ export async function insertClockFinish() {
     }
 
     const indent = match[1];
-    const startYear = parseInt(match[3]);
-    const startMonth = parseInt(match[4]);
-    const startDay = parseInt(match[5]);
+    const startYear = parseInt(match[3], 10);
+    const startMonth = parseInt(match[4], 10);
+    const startDay = parseInt(match[5], 10);
 
     const timeMatch = match[6].match(/(\d{2}):(\d{2})$/);
     if (!timeMatch) {
         return;
     }
-    const startHour = parseInt(timeMatch[1]);
-    const startMinute = parseInt(timeMatch[2]);
+    const startHour = parseInt(timeMatch[1], 10);
+    const startMinute = parseInt(timeMatch[2], 10);
     const startDate = new Date(startYear, startMonth - 1, startDay, startHour, startMinute);
 
     const config = vscode.workspace.getConfiguration('markdown-org');
@@ -179,7 +180,7 @@ export async function insertClockFinish() {
 
     const now = new Date();
     if (now < startDate) {
-        vscode.window.showWarningMessage('Markdown Org: open CLOCK starts in the future; finishing anyway');
+        notifyWarn('open CLOCK starts in the future; finishing anyway');
     }
     const endDate = roundEndTime(startDate, now, roundMinutes);
     const endTimestamp = formatTimestamp(endDate);

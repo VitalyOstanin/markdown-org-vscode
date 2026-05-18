@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { exec } from './exec';
+import { notifyError } from './notify';
 
 export const EXTRACTOR_TIMEOUT_MS = 30_000;
 export const EXTRACTOR_MAX_BUFFER_BYTES = 10 * 1024 * 1024;
@@ -16,8 +17,8 @@ async function doResolveExtractorPath(): Promise<string | undefined> {
         try {
             await fs.promises.access(extractorPath, fs.constants.X_OK);
         } catch {
-            vscode.window.showErrorMessage(
-                `Markdown Org: Extractor not found or not executable at '${extractorPath}'. ` +
+            notifyError(
+                `Extractor not found or not executable at '${extractorPath}'. ` +
                     'Please check markdown-org.extractorPath setting or install: cargo install markdown-org-extract'
             );
             return undefined;
@@ -41,8 +42,8 @@ async function doResolveExtractorPath(): Promise<string | undefined> {
             });
         });
     } catch {
-        vscode.window.showErrorMessage(
-            `Markdown Org: Extractor '${extractorPath}' not found in PATH. ` +
+        notifyError(
+            `Extractor '${extractorPath}' not found in PATH. ` +
                 'Please install markdown-org-extract: cargo install markdown-org-extract'
         );
         return undefined;

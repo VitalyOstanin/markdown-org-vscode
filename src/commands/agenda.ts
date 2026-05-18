@@ -5,6 +5,7 @@ import { toIsoDate } from '../utils';
 import { exec } from '../utils/exec';
 import { filterTasksByTag } from '../utils/tagFilter';
 import { EXTRACTOR_MAX_BUFFER_BYTES, EXTRACTOR_TIMEOUT_MS, extractor } from '../utils/extractor';
+import { notifyError, notifyInfo, notifyWarn } from '../utils/notify';
 
 /**
  * Open the agenda webview for the given mode (day/week/month/tasks).
@@ -17,7 +18,7 @@ export async function showAgenda(
     initialDate?: string
 ) {
     if (!vscode.workspace.isTrusted) {
-        vscode.window.showWarningMessage('Markdown Org: agenda is disabled in untrusted workspaces');
+        notifyWarn('agenda is disabled in untrusted workspaces');
         return;
     }
 
@@ -31,9 +32,7 @@ export async function showAgenda(
         startupConfig.get<string>('workspaceDir') || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 
     if (!workspaceDir) {
-        vscode.window.showErrorMessage(
-            'Markdown Org: Please open a workspace folder or configure markdown-org.workspaceDir'
-        );
+        notifyError('Please open a workspace folder or configure markdown-org.workspaceDir');
         return;
     }
 
@@ -84,7 +83,7 @@ export async function showAgenda(
             const fileTags = config.get<FileTag[]>('fileTags', []);
             const data = filterTasksByTag(rawData, currentTag, fileTags);
 
-            const year = shiftedToday ? parseInt(shiftedToday.split('-')[0]) : new Date().getFullYear();
+            const year = shiftedToday ? parseInt(shiftedToday.split('-')[0], 10) : new Date().getFullYear();
             const holidays = await getHolidays(year);
 
             AgendaPanel.render(
@@ -100,7 +99,7 @@ export async function showAgenda(
             );
         } catch (error) {
             const errorMsg = error instanceof Error ? error.message : String(error);
-            vscode.window.showErrorMessage(`Failed to load agenda: ${errorMsg}`);
+            notifyError(`Failed to load agenda: ${errorMsg}`);
         }
     };
 
@@ -114,7 +113,7 @@ export async function cycleTag(_context: vscode.ExtensionContext) {
     const currentTag = config.get<string>('currentTag', 'ALL');
 
     if (fileTags.length === 0) {
-        vscode.window.showWarningMessage('Markdown Org: No file tags configured (markdown-org.fileTags)');
+        notifyWarn('No file tags configured (markdown-org.fileTags)');
         return;
     }
 
@@ -127,7 +126,7 @@ export async function cycleTag(_context: vscode.ExtensionContext) {
             ? vscode.ConfigurationTarget.Workspace
             : vscode.ConfigurationTarget.Global;
     await config.update('currentTag', nextTag, target);
-    vscode.window.showInformationMessage(`Tag filter: ${nextTag}`);
+    notifyInfo(`Tag filter: ${nextTag}`);
 
     AgendaPanel.refresh();
 }

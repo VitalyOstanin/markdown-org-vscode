@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { TIMESTAMP_LINE_REGEX } from './orgPatterns';
+import { notifyError } from './utils/notify';
 
 export const DAY_NAMES_SHORT = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
 
@@ -79,7 +80,7 @@ export function resolveWorkspacePath(p: string): string {
 export function requireActiveEditor(opts?: { markdownOnly?: boolean }): vscode.TextEditor | null {
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
-        vscode.window.showErrorMessage('No active editor');
+        notifyError('No active editor');
         return null;
     }
     if (opts?.markdownOnly && editor.document.languageId !== 'markdown') {
@@ -92,7 +93,7 @@ export function requireActiveEditor(opts?: { markdownOnly?: boolean }): vscode.T
 export async function requireHeadingAtCursor(editor: vscode.TextEditor): Promise<number | null> {
     const headingLine = await findNearestHeading(editor);
     if (headingLine === null) {
-        vscode.window.showErrorMessage('No heading found');
+        notifyError('No heading found');
         return null;
     }
     return headingLine;

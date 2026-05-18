@@ -70,7 +70,7 @@ suite('CLOCK Integration Tests', () => {
         const match = clockLine.match(/`CLOCK: \[\d{4}-\d{2}-\d{2} [^\s]+ (\d{2}):(\d{2})\]`$/);
         assert.ok(match, 'CLOCK line should match expected format');
 
-        const minutes = parseInt(match![2]);
+        const minutes = parseInt(match![2], 10);
         assert.ok(minutes === 0 || minutes === 30, `Minutes should be 0 or 30, got ${minutes}`);
     });
 
@@ -121,8 +121,8 @@ suite('CLOCK Integration Tests', () => {
         const match = clockLine.match(/=> +(\d+):(\d{2})`$/);
         assert.ok(match, 'Should have duration');
 
-        const hours = parseInt(match![1]);
-        const minutes = parseInt(match![2]);
+        const hours = parseInt(match![1], 10);
+        const minutes = parseInt(match![2], 10);
         const totalMinutes = hours * 60 + minutes;
 
         assert.ok(totalMinutes > 0, 'Duration should be greater than zero');

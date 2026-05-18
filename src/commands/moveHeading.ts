@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import { findNearestHeading, isPathInsideWorkspace, requireActiveEditor, resolveWorkspacePath } from '../utils';
+import { notifyError, notifyInfo, notifyWarn } from '../utils/notify';
 
 async function readIfExists(filePath: string): Promise<string | null> {
     try {
@@ -18,7 +19,7 @@ async function refuseIfSymlink(filePath: string): Promise<boolean> {
     try {
         const stat = await fs.promises.lstat(filePath);
         if (stat.isSymbolicLink()) {
-            vscode.window.showErrorMessage(`Markdown Org: refused to follow symlink at ${filePath}`);
+            notifyError(`refused to follow symlink at ${filePath}`);
             return true;
         }
     } catch (err) {
@@ -117,7 +118,7 @@ function buildArchiveContent(ancestors: HeadingInfo[], heading: HeadingInfo): st
  */
 export async function moveToArchive() {
     if (!vscode.workspace.isTrusted) {
-        vscode.window.showWarningMessage('Markdown Org: archive is disabled in untrusted workspaces');
+        notifyWarn('archive is disabled in untrusted workspaces');
         return;
     }
     const editor = requireActiveEditor();
@@ -128,7 +129,7 @@ export async function moveToArchive() {
     const document = editor.document;
     const heading = await findHeadingAtCursor(editor);
     if (!heading) {
-        vscode.window.showErrorMessage('No heading found');
+        notifyError('No heading found');
         return;
     }
 
@@ -152,7 +153,7 @@ export async function moveToArchive() {
     edit.delete(document.uri, new vscode.Range(startLine, 0, endLine, 0));
     await vscode.workspace.applyEdit(edit);
 
-    vscode.window.showInformationMessage(`Moved to ${path.basename(archivePath)}`);
+    notifyInfo(`Moved to ${path.basename(archivePath)}`);
 }
 
 /**
@@ -162,7 +163,7 @@ export async function moveToArchive() {
  */
 export async function promoteToMaintain() {
     if (!vscode.workspace.isTrusted) {
-        vscode.window.showWarningMessage('Markdown Org: maintain promotion is disabled in untrusted workspaces');
+        notifyWarn('maintain promotion is disabled in untrusted workspaces');
         return;
     }
     const editor = requireActiveEditor();
@@ -174,15 +175,13 @@ export async function promoteToMaintain() {
     const rawMaintainPath = config.get<string>('maintainFilePath', '');
 
     if (!rawMaintainPath) {
-        vscode.window.showErrorMessage('Markdown Org: Please configure markdown-org.maintainFilePath in settings');
+        notifyError('Please configure markdown-org.maintainFilePath in settings');
         return;
     }
 
     const maintainPath = resolveWorkspacePath(rawMaintainPath);
     if (!isPathInsideWorkspace(maintainPath)) {
-        vscode.window.showErrorMessage(
-            `Markdown Org: maintainFilePath '${rawMaintainPath}' must be inside the workspace`
-        );
+        notifyError(`maintainFilePath '${rawMaintainPath}' must be inside the workspace`);
         return;
     }
     if (await refuseIfSymlink(maintainPath)) {
@@ -192,7 +191,7 @@ export async function promoteToMaintain() {
     const document = editor.document;
     const heading = await findHeadingAtCursor(editor);
     if (!heading) {
-        vscode.window.showErrorMessage('No heading found');
+        notifyError('No heading found');
         return;
     }
 
@@ -235,5 +234,5 @@ export async function promoteToMaintain() {
     edit.delete(document.uri, new vscode.Range(startLine, 0, endLine, 0));
     await vscode.workspace.applyEdit(edit);
 
-    vscode.window.showInformationMessage(`Promoted to ${path.basename(maintainPath)}`);
+    notifyInfo(`Promoted to ${path.basename(maintainPath)}`);
 }

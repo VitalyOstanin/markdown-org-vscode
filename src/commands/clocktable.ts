@@ -3,6 +3,7 @@ import * as path from 'path';
 import { formatDurationHM, requireActiveEditor } from '../utils';
 import { exec } from '../utils/exec';
 import { EXTRACTOR_MAX_BUFFER_BYTES, EXTRACTOR_TIMEOUT_MS, extractor } from '../utils/extractor';
+import { notifyError, notifyWarn } from '../utils/notify';
 
 interface Task {
     heading: string;
@@ -83,7 +84,7 @@ function buildClockTable(tasks: Task[]): string {
  */
 export async function insertClockTable() {
     if (!vscode.workspace.isTrusted) {
-        vscode.window.showWarningMessage('Markdown Org: clock table is disabled in untrusted workspaces');
+        notifyWarn('clock table is disabled in untrusted workspaces');
         return;
     }
     const editor = requireActiveEditor();
@@ -106,6 +107,7 @@ export async function insertClockTable() {
             editBuilder.insert(editor.selection.active, table + '\n');
         });
     } catch (error) {
-        vscode.window.showErrorMessage(`Failed to generate clock table: ${error}`);
+        const errorMsg = error instanceof Error ? error.message : String(error);
+        notifyError(`Failed to generate clock table: ${errorMsg}`);
     }
 }

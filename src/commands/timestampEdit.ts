@@ -269,12 +269,12 @@ function getTimestampAtCursor(
 }
 
 function incrementTimestamp(match: RegExpMatchArray, part: TimestampPart, delta: number): string {
-    let year = parseInt(match[1]);
-    let month = parseInt(match[2]);
-    let day = parseInt(match[3]);
+    let year = parseInt(match[1], 10);
+    let month = parseInt(match[2], 10);
+    let day = parseInt(match[3], 10);
     const weekday = match[4] || '';
-    const hour = match[5] ? parseInt(match[5]) : undefined;
-    const minute = match[6] ? parseInt(match[6]) : undefined;
+    const hour = match[5] ? parseInt(match[5], 10) : undefined;
+    const minute = match[6] ? parseInt(match[6], 10) : undefined;
     const repeater = match[7] || '';
 
     const date = new Date(year, month - 1, day, hour ?? 0, minute ?? 0);
@@ -345,11 +345,11 @@ function adjustClockTimestamp(match: RegExpMatchArray, part: ClockTimestampPart,
     const endBracket = match[9];
 
     const startDate = new Date(
-        parseInt(match[3]),
-        parseInt(match[4]) - 1,
-        parseInt(match[5]),
-        parseInt(match[7]),
-        parseInt(match[8])
+        parseInt(match[3], 10),
+        parseInt(match[4], 10) - 1,
+        parseInt(match[5], 10),
+        parseInt(match[7], 10),
+        parseInt(match[8], 10)
     );
     const startWeekday = match[6];
 
@@ -371,11 +371,11 @@ function adjustClockTimestamp(match: RegExpMatchArray, part: ClockTimestampPart,
     const endEndBracket = match[17];
 
     const endDate = new Date(
-        parseInt(match[11]),
-        parseInt(match[12]) - 1,
-        parseInt(match[13]),
-        parseInt(match[15]),
-        parseInt(match[16])
+        parseInt(match[11], 10),
+        parseInt(match[12], 10) - 1,
+        parseInt(match[13], 10),
+        parseInt(match[15], 10),
+        parseInt(match[16], 10)
     );
     const endWeekday = match[14];
 
