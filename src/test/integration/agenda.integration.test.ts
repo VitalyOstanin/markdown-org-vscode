@@ -263,19 +263,14 @@ suite('AgendaPanel.openTaskInEditor', () => {
 
     test('opens a file referenced via a symlink to a real file', async function () {
         this.timeout(10000);
-        if (process.platform === 'win32') {
-            // Creating file symlinks on Windows requires admin / developer mode;
-            // skip rather than fail on stock CI runners.
-            //
-            // REVIEW BY 2027-05-19: re-check whether the GitHub-hosted
-            // windows-latest runner ships with Developer Mode enabled (or
-            // whether `actions/checkout` can configure it). If yes, drop
-            // this skip and exercise symlink resolution on Windows too.
-            this.skip();
-        }
         const realFile = path.join(sandboxDir, 'real.md');
         const symlinkFile = path.join(sandboxDir, 'symlink.md');
         fs.writeFileSync(realFile, '## TODO Symlinked file\n');
+        // GitHub-hosted windows-latest runners execute jobs under an
+        // administrator account, so `symlinkSync` works without enabling
+        // Developer Mode. If a future runner image drops admin privileges,
+        // this call will throw EPERM and the test will fail loudly --
+        // which is the right signal to re-introduce a platform skip.
         fs.symlinkSync(realFile, symlinkFile);
         try {
             await AgendaPanel.openTaskInEditor(symlinkFile, 1);
