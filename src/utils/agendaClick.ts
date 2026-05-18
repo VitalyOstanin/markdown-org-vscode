@@ -8,6 +8,28 @@ export interface SelectionLike {
 }
 
 /**
+ * Defense-in-depth sanitizer for `task.line` before it is interpolated into
+ * the `data-line` HTML attribute in the agenda webview.
+ *
+ * The extractor contract has `Task.line: number`, but the webview must never
+ * trust that: a payload string like `1" onmouseover="x` would break out of
+ * the attribute. The result here is always a finite non-negative integer,
+ * safe to interpolate without HTML-escaping. `resolveTaskClickIntent`
+ * additionally re-parses the attribute with parseInt, so this is layered
+ * with the existing parse-time guard.
+ *
+ * Embedded into the webview via `.toString()` (same approach used for
+ * `resolveTaskClickIntent`), and unit-tested in agendaClick.test.ts.
+ */
+export function sanitizeTaskLine(value: unknown): number {
+    const n = Number(value);
+    if (!Number.isFinite(n) || n < 0) {
+        return 0;
+    }
+    return Math.trunc(n);
+}
+
+/**
  * Returns true when there is a meaningful (non-collapsed, non-empty) text
  * selection.
  *

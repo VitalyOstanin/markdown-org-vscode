@@ -1,7 +1,7 @@
 import * as assert from 'assert';
 import { suite, test } from 'mocha';
 import { JSDOM } from 'jsdom';
-import { resolveTaskClickIntent, ClickTargetLike } from '../../utils/agendaClick';
+import { resolveTaskClickIntent, sanitizeTaskLine, ClickTargetLike } from '../../utils/agendaClick';
 
 // jsdom is the only practical way to exercise the agenda webview's
 // click-vs-selection behaviour without spinning up a full VS Code instance
@@ -67,5 +67,56 @@ suite('resolveTaskClickIntent (jsdom)', () => {
     test('returns null when target is null (e.g. detached event)', () => {
         const intent = resolveTaskClickIntent({ target: null }, null);
         assert.strictEqual(intent, null);
+    });
+});
+
+suite('sanitizeTaskLine', () => {
+    // Defense in depth: even though `markdown-org-extract` contracts task.line
+    // as number, the webview must never interpolate an unsanitized value into
+    // the data-line attribute -- a string like `1" onmouseover="x` would break
+    // out of the attribute and inject HTML. sanitizeTaskLine guarantees that
+    // the value built into the attribute is always a finite non-negative
+    // integer that needs no HTML escaping.
+
+    test('passes through a positive integer unchanged', () => {
+        assert.strictEqual(sanitizeTaskLine(42), 42);
+    });
+
+    test('passes through zero unchanged', () => {
+        assert.strictEqual(sanitizeTaskLine(0), 0);
+    });
+
+    test('coerces a numeric string to its integer value', () => {
+        // Extractor contract is number, but be lenient for forward-compat.
+        assert.strictEqual(sanitizeTaskLine('17'), 17);
+    });
+
+    test('truncates a float toward zero (line numbers are integer)', () => {
+        assert.strictEqual(sanitizeTaskLine(12.9), 12);
+        assert.strictEqual(sanitizeTaskLine(-3.2), 0);
+    });
+
+    test('returns 0 for negative integers (no negative line indices)', () => {
+        assert.strictEqual(sanitizeTaskLine(-1), 0);
+    });
+
+    test('returns 0 for NaN / Infinity', () => {
+        assert.strictEqual(sanitizeTaskLine(NaN), 0);
+        assert.strictEqual(sanitizeTaskLine(Infinity), 0);
+        assert.strictEqual(sanitizeTaskLine(-Infinity), 0);
+    });
+
+    test('returns 0 for an HTML-injection attempt that breaks Number coercion', () => {
+        // Worst case the regression targets: a string crafted to escape the
+        // data-line attribute. Number('1" onmouseover="x') is NaN; result is 0.
+        assert.strictEqual(sanitizeTaskLine('1" onmouseover="x'), 0);
+        assert.strictEqual(sanitizeTaskLine('"></div><script>alert(1)</script>'), 0);
+    });
+
+    test('returns 0 for non-numeric inputs (null, undefined, object, array)', () => {
+        assert.strictEqual(sanitizeTaskLine(null), 0);
+        assert.strictEqual(sanitizeTaskLine(undefined), 0);
+        assert.strictEqual(sanitizeTaskLine({}), 0);
+        assert.strictEqual(sanitizeTaskLine([1, 2]), 0);
     });
 });

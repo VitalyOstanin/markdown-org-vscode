@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import { randomBytes } from 'crypto';
 import { AgendaData } from '../types';
-import { isMeaningfulSelection, resolveTaskClickIntent } from '../utils/agendaClick';
+import { isMeaningfulSelection, resolveTaskClickIntent, sanitizeTaskLine } from '../utils/agendaClick';
 import { rememberScroll, recallScroll } from '../utils/agendaScroll';
 import { resolveHeadingClass } from '../utils/agendaHeadingTint';
 import { resolveAgendaWatchBase } from '../utils/agendaWatchPattern';
@@ -304,6 +304,9 @@ export class AgendaPanel {
         // so those tests transitively cover the webview behaviour.
         const selectionGuardSource = isMeaningfulSelection.toString();
         const clickIntentSource = resolveTaskClickIntent.toString();
+        // Defense-in-depth: sanitize task.line before interpolating it into
+        // the data-line HTML attribute. Unit-tested in agendaClick.test.ts.
+        const sanitizeTaskLineSource = sanitizeTaskLine.toString();
         // Same approach for the scroll-memory helpers used by the
         // navigation round-trip fix; unit-tested in agendaScroll.test.ts.
         const rememberScrollSource = rememberScroll.toString();
@@ -485,6 +488,7 @@ export class AgendaPanel {
     <script nonce="${nonce}">
         ${selectionGuardSource}
         ${clickIntentSource}
+        ${sanitizeTaskLineSource}
         ${rememberScrollSource}
         ${recallScrollSource}
         ${resolveHeadingClassSource}
@@ -708,7 +712,7 @@ export class AgendaPanel {
             // Source of truth: src/utils/agendaHeadingTint.ts -- unit tested.
             const headingClass = resolveHeadingClass(task);
 
-            return '<div class="task-line" data-file="' + escapeHtml(task.file) + '" data-line="' + task.line + '">' +
+            return '<div class="task-line" data-file="' + escapeHtml(task.file) + '" data-line="' + sanitizeTaskLine(task.line) + '">' +
                 '<span class="todo-label">todo:</span>' +
                 '<span>' + timeInfo + '</span>' +
                 '<span class="' + statusClass + '">' + escapeHtml(status) + '</span>' +
