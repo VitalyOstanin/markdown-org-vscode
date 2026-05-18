@@ -238,7 +238,10 @@
         },
         "markdown-org.clockRoundMinutes": {
           "type": "number",
-          "description": "Round CLOCK timestamps to specified minutes (e.g., 15, 30). Leave empty to disable rounding."
+          "default": 0,
+          "minimum": 0,
+          "maximum": 60,
+          "description": "Round CLOCK timestamps to N minutes (e.g., 15, 30). 0 disables rounding. Negative and out-of-range values are also treated as 'no rounding'."
         }
       }
     }

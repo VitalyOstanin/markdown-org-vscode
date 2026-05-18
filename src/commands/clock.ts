@@ -8,43 +8,10 @@ import {
 } from '../utils';
 import { CLOCK_REGEX, TIMESTAMP_LINE_REGEX } from '../orgPatterns';
 import { notifyWarn } from '../utils/notify';
+import { roundTime, roundEndTime } from '../utils/clockRounding';
 
 function formatTimestamp(date: Date): string {
     return formatOrgTimestamp(date, 'square');
-}
-
-function roundTime(date: Date, roundMinutes: number | undefined): Date {
-    if (!roundMinutes) {
-        return date;
-    }
-
-    const result = new Date(date);
-    const minutes = result.getMinutes();
-    const rounded = Math.floor(minutes / roundMinutes) * roundMinutes;
-    result.setMinutes(rounded);
-    result.setSeconds(0);
-    result.setMilliseconds(0);
-
-    return result;
-}
-
-function roundEndTime(startDate: Date, endDate: Date, roundMinutes: number | undefined): Date {
-    if (!roundMinutes) {
-        return endDate;
-    }
-
-    const result = new Date(endDate);
-    const minutes = result.getMinutes();
-    const rounded = Math.ceil(minutes / roundMinutes) * roundMinutes;
-    result.setMinutes(rounded);
-    result.setSeconds(0);
-    result.setMilliseconds(0);
-
-    if (result <= startDate) {
-        result.setMinutes(result.getMinutes() + roundMinutes);
-    }
-
-    return result;
 }
 
 function calculateDuration(start: Date, end: Date): string {
