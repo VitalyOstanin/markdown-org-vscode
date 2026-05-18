@@ -40,6 +40,12 @@ jobs:
       - name: Format check
         run: npm run format:check
 
+      - name: Type check
+        # tsc --noEmit gives an explicit, distinct signal when types break.
+        # Compile below still runs to verify the build itself succeeds, but
+        # typecheck failures surface earlier with a clearer step name.
+        run: npm run typecheck
+
       - name: Compile
         run: npm run compile
 
