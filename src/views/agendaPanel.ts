@@ -632,17 +632,20 @@ export class AgendaPanel {
         
         function renderAgenda(days) {
             const today = toIsoDate(new Date());
-            let html = '';
+            // Array-of-fragments + join instead of string += because V8 keeps
+            // re-allocating on each concat for long agendas (a full Month view
+            // can emit ~30 days * 4 buckets * N tasks). Output is identical.
+            const parts = [];
             days.forEach(day => {
                 const isToday = day.date === today;
                 const headerCls = 'day-header' + (isToday ? ' day-header-today' : '');
-                html += '<div class="' + headerCls + '" data-date="' + escapeHtml(day.date) + '">' + formatDayHeader(day.date, isToday) + '</div>';
-                (day.overdue || []).forEach(task => html += renderTask(task, task.days_offset, 'overdue'));
-                (day.scheduled_timed || []).forEach(task => html += renderTask(task, task.days_offset));
-                (day.scheduled_no_time || []).forEach(task => html += renderTask(task, task.days_offset));
-                (day.upcoming || []).forEach(task => html += renderTask(task, task.days_offset, 'upcoming'));
+                parts.push('<div class="' + headerCls + '" data-date="' + escapeHtml(day.date) + '">' + formatDayHeader(day.date, isToday) + '</div>');
+                (day.overdue || []).forEach(task => parts.push(renderTask(task, task.days_offset, 'overdue')));
+                (day.scheduled_timed || []).forEach(task => parts.push(renderTask(task, task.days_offset)));
+                (day.scheduled_no_time || []).forEach(task => parts.push(renderTask(task, task.days_offset)));
+                (day.upcoming || []).forEach(task => parts.push(renderTask(task, task.days_offset, 'upcoming')));
             });
-            return html;
+            return parts.join('');
         }
 
         // The week view scrolls to today's header when today is in the
@@ -667,15 +670,15 @@ export class AgendaPanel {
         
         function renderTasks(tasks) {
             const priorities = ['A', 'B', 'C', ''];
-            let html = '';
+            const parts = [];
             priorities.forEach(priority => {
                 const filtered = tasks.filter(t => (t.priority || '') === priority);
                 if (filtered.length === 0) return;
                 const header = priority ? 'Priority [#' + priority + ']' : 'No priority';
-                html += '<div class="day-header"><span>' + escapeHtml(header) + '</span></div>';
-                filtered.forEach(task => html += renderTask(task));
+                parts.push('<div class="day-header"><span>' + escapeHtml(header) + '</span></div>');
+                filtered.forEach(task => parts.push(renderTask(task)));
             });
-            return html;
+            return parts.join('');
         }
         
         function formatDayHeader(date, isToday) {
