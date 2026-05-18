@@ -72,12 +72,33 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+          # Need the full tag object (not just the commit it points at) to
+          # verify that the tag is annotated rather than lightweight.
+          fetch-tags: true
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
         with:
           node-version-file: '.nvmrc'
           cache: 'npm'
+
+      - name: Verify tag is annotated
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG_NAME="${{ inputs.tag }}"
+          else
+            TAG_NAME="${GITHUB_REF_NAME}"
+          fi
+          TAG_TYPE="$(git cat-file -t "$TAG_NAME")"
+          if [ "$TAG_TYPE" != "tag" ]; then
+            echo "::error::Tag '$TAG_NAME' is lightweight (object type: $TAG_TYPE)."
+            echo "::error::Release tags must be annotated. Recreate locally:"
+            echo "::error::  git tag -d $TAG_NAME"
+            echo "::error::  git tag -a $TAG_NAME -m 'Release $TAG_NAME'"
+            echo "::error::  git push --force origin $TAG_NAME"
+            exit 1
+          fi
 
       - name: Verify tag matches package.json version
         run: |
