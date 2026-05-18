@@ -123,11 +123,36 @@ jobs:
       - name: Package VSIX
         run: npm run package
 
+      - name: Extract release notes from CHANGELOG.md
+        id: changelog
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG_NAME="${{ inputs.tag }}"
+          else
+            TAG_NAME="${GITHUB_REF_NAME}"
+          fi
+          VERSION="${TAG_NAME#v}"
+          # Pull the section between `## [VERSION]` and the next `## [` heading.
+          # If no matching section exists, fall back to a one-liner -- the
+          # workflow should still publish, just without expanded notes.
+          awk -v ver="$VERSION" '
+            /^## \[/ { if (printing) { exit }; if ($0 ~ "^## \\[" ver "\\]") { printing=1; next } }
+            printing { print }
+          ' CHANGELOG.md > release-notes.md
+          if [ ! -s release-notes.md ]; then
+            echo "::warning::No CHANGELOG section for $TAG_NAME ('## [$VERSION]') found"
+            printf 'Release %s\n\nSee CHANGELOG.md for details.\n' "$TAG_NAME" > release-notes.md
+          fi
+          echo "--- release-notes.md ---"
+          cat release-notes.md
+          echo "--- end ---"
+
       - name: Attach VSIX to GitHub Release
         if: ${{ github.event_name != 'workflow_dispatch' || inputs.dry_run == false }}
         uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
         with:
           files: '*.vsix'
           tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          body_path: release-notes.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
