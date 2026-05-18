@@ -1,5 +1,17 @@
 # Tag Filtering
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Configuration](#configuration)
+    - [Settings](#settings)
+- [Usage](#usage)
+    - [Cycle Tag Filter](#cycle-tag-filter)
+- [Examples](#examples)
+    - [Default configuration](#default-configuration)
+    - [Multi-positive configuration](#multi-positive-configuration)
+- [Pattern matching rules — summary](#pattern-matching-rules--summary)
+
 ## Overview
 
 Tag filtering organizes and filters tasks in agenda views by matching the

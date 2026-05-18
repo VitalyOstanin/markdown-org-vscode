@@ -1,5 +1,24 @@
 # CLOCK Implementation Summary
 
+## Table of Contents
+
+- [Overview](#overview)
+- [Features Implemented](#features-implemented)
+    - [1. CLOCK Commands](#1-clock-commands)
+    - [2. Time Rounding Configuration](#2-time-rounding-configuration)
+    - [3. CLOCK Entry Format](#3-clock-entry-format)
+    - [4. Placement Rules](#4-placement-rules)
+- [Files Modified](#files-modified)
+    - [New Files](#new-files)
+    - [Modified Files](#modified-files)
+- [Implementation Details](#implementation-details)
+    - [Core Functions](#core-functions)
+- [Test Coverage](#test-coverage)
+- [Compatibility](#compatibility)
+- [Configuration Example](#configuration-example)
+- [Usage Example](#usage-example)
+- [Future Enhancements](#future-enhancements)
+
 ## Overview
 
 Implemented CLOCK time tracking functionality for the Markdown Org VS Code extension, compatible with Emacs Org-mode format.

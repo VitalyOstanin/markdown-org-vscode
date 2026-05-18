@@ -1,5 +1,22 @@
 # CLOCK Usage Examples
 
+## Table of Contents
+
+- [Basic Usage](#basic-usage)
+    - [Starting a CLOCK Entry](#starting-a-clock-entry)
+    - [Finishing a CLOCK Entry](#finishing-a-clock-entry)
+- [Time Rounding](#time-rounding)
+    - [Without Rounding (Default)](#without-rounding-default)
+    - [With 15-Minute Rounding](#with-15-minute-rounding)
+    - [With 30-Minute Rounding](#with-30-minute-rounding)
+- [Multiple CLOCK Entries](#multiple-clock-entries)
+- [Placement Rules](#placement-rules)
+- [Error Handling](#error-handling)
+    - [Cannot Start When Open CLOCK Exists](#cannot-start-when-open-clock-exists)
+    - [Cannot Finish Without Open CLOCK](#cannot-finish-without-open-clock)
+- [Duration Calculation](#duration-calculation)
+- [Integration with Org-Mode](#integration-with-org-mode)
+
 ## Basic Usage
 
 ### Starting a CLOCK Entry

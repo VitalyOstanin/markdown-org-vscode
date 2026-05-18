@@ -2,6 +2,47 @@
 
 VS Code extension for org-style task management in Markdown files.
 
+## Table of Contents
+
+- [Features](#features)
+- [Quick Start](#quick-start)
+- [Syntax Examples](#syntax-examples)
+    - [Task Statuses](#task-statuses)
+    - [Timestamps](#timestamps)
+    - [CLOCK Entries](#clock-entries)
+    - [Priority Levels](#priority-levels)
+    - [Repeating Tasks](#repeating-tasks)
+- [Commands](#commands)
+    - [Task Status Commands](#task-status-commands)
+    - [Timestamp Commands](#timestamp-commands)
+    - [CLOCK Commands](#clock-commands)
+    - [Agenda Commands](#agenda-commands)
+    - [Heading Management Commands](#heading-management-commands)
+- [Settings](#settings)
+    - [`markdown-org.extractorPath`](#markdown-orgextractorpath)
+    - [`markdown-org.workspaceDir`](#markdown-orgworkspacedir)
+    - [`markdown-org.maintainFilePath`](#markdown-orgmaintainfilepath)
+    - [`markdown-org.dateLocale`](#markdown-orgdatelocale)
+    - [`markdown-org.firstDayOfWeek`](#markdown-orgfirstdayofweek)
+    - [`markdown-org.fileTags`](#markdown-orgfiletags)
+    - [`markdown-org.currentTag`](#markdown-orgcurrenttag)
+    - [`markdown-org.clockRoundMinutes`](#markdown-orgclockroundminutes)
+- [Workspace Trust](#workspace-trust)
+- [Dependencies](#dependencies)
+- [Installation](#installation)
+    - [From VSIX](#from-vsix)
+    - [From Source (development symlink)](#from-source-development-symlink)
+- [Development](#development)
+    - [Requirements](#requirements)
+    - [Build](#build)
+    - [Tests](#tests)
+    - [Lint and format](#lint-and-format)
+    - [Debug](#debug)
+    - [Project Structure](#project-structure)
+    - [Additional documentation](#additional-documentation)
+- [Release notes](#release-notes)
+- [License](#license)
+
 ## Features
 
 Brings [Org mode](https://orgmode.org/) task management workflow to Markdown files in VS Code:

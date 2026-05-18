@@ -1,5 +1,22 @@
 # CLOCK Testing Guide
 
+## Table of Contents
+
+- [Manual Testing Steps](#manual-testing-steps)
+    - [1. Basic CLOCK Start/Finish](#1-basic-clock-startfinish)
+    - [2. Test Time Rounding](#2-test-time-rounding)
+    - [3. Test Multiple CLOCK Entries](#3-test-multiple-clock-entries)
+    - [4. Test Error Handling](#4-test-error-handling)
+    - [5. Test CLOCK Placement](#5-test-clock-placement)
+- [Automated Testing](#automated-testing)
+- [Test Scenarios](#test-scenarios)
+    - [Scenario 1: Daily Time Tracking](#scenario-1-daily-time-tracking)
+    - [Scenario 2: With Time Rounding (30 min)](#scenario-2-with-time-rounding-30-min)
+    - [Scenario 3: Open CLOCK (Work in Progress)](#scenario-3-open-clock-work-in-progress)
+- [Verification Checklist](#verification-checklist)
+- [Performance Testing](#performance-testing)
+- [Compatibility Testing](#compatibility-testing)
+
 ## Manual Testing Steps
 
 ### 1. Basic CLOCK Start/Finish
