@@ -266,6 +266,11 @@ suite('AgendaPanel.openTaskInEditor', () => {
         if (process.platform === 'win32') {
             // Creating file symlinks on Windows requires admin / developer mode;
             // skip rather than fail on stock CI runners.
+            //
+            // REVIEW BY 2027-05-19: re-check whether the GitHub-hosted
+            // windows-latest runner ships with Developer Mode enabled (or
+            // whether `actions/checkout` can configure it). If yes, drop
+            // this skip and exercise symlink resolution on Windows too.
             this.skip();
         }
         const realFile = path.join(sandboxDir, 'real.md');
