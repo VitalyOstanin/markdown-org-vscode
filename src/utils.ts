@@ -27,13 +27,7 @@ export function formatDurationHM(durationMs: number, opts?: { padHoursWithSpace?
     return `${hoursStr}:${minutes.toString().padStart(2, '0')}`;
 }
 
-/** Format a Date as a local `YYYY-MM-DD` string (no timezone conversion). */
-export function toIsoDate(date: Date): string {
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-}
+export { toIsoDate } from './utils/isoDate';
 
 /** Detect the indent (leading whitespace) of an existing timestamp line below the heading, or empty. */
 export function getTimestampIndent(editor: vscode.TextEditor, headingLine: number): string {

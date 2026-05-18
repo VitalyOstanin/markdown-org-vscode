@@ -4,6 +4,7 @@ import { AgendaData } from '../types';
 import { isMeaningfulSelection, resolveTaskClickIntent } from '../utils/agendaClick';
 import { rememberScroll, recallScroll } from '../utils/agendaScroll';
 import { resolveHeadingClass } from '../utils/agendaHeadingTint';
+import { toIsoDate } from '../utils/isoDate';
 import { formatError, notifyError } from '../utils/notify';
 
 const REFRESH_DEBOUNCE_MS = 500;
@@ -62,9 +63,7 @@ export class AgendaPanel {
         if (refreshCallback) {
             AgendaPanel.refreshCallback = refreshCallback;
         }
-        const today = new Date();
-        const localDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-        AgendaPanel.shiftedToday = shiftedToday || localDate;
+        AgendaPanel.shiftedToday = shiftedToday || toIsoDate(new Date());
         const config = vscode.workspace.getConfiguration('markdown-org');
         const locale = config.get<string>('dateLocale', 'en-US');
         const firstDayOfWeek = config.get<FirstDayOfWeek>('firstDayOfWeek', 'monday');
@@ -265,6 +264,9 @@ export class AgendaPanel {
         // Heading tint resolver (DEADLINE > priority > default);
         // unit-tested in agendaHeadingTint.test.ts.
         const resolveHeadingClassSource = resolveHeadingClass.toString();
+        // Local-date formatter shared with host code; unit-tested in
+        // isoDate.test.ts.
+        const toIsoDateSource = toIsoDate.toString();
         return `<!DOCTYPE html>
 <html>
 <head>
@@ -435,6 +437,7 @@ export class AgendaPanel {
         ${rememberScrollSource}
         ${recallScrollSource}
         ${resolveHeadingClassSource}
+        ${toIsoDateSource}
         const vscode = acquireVsCodeApi();
         let initialData = [];
         let initialMode = '';
@@ -587,17 +590,13 @@ export class AgendaPanel {
         // moved them off the current week), it starts at the top instead of
         // landing them mid-week on the day-of-week that happens to share
         // shiftedToday. Day/month/tasks have no equivalent per-day anchor.
-        function todayLocalStr() {
-            const t = new Date();
-            return t.getFullYear() + '-' + String(t.getMonth() + 1).padStart(2, '0') + '-' + String(t.getDate()).padStart(2, '0');
-        }
         function currentWeekIsVisible() {
-            return !!document.querySelector('.day-header[data-date="' + todayLocalStr() + '"]');
+            return !!document.querySelector('.day-header[data-date="' + toIsoDate(new Date()) + '"]');
         }
         function scrollToWeekFocus() {
             if (initialMode !== 'week') return;
             requestAnimationFrame(() => {
-                const target = document.querySelector('.day-header[data-date="' + todayLocalStr() + '"]');
+                const target = document.querySelector('.day-header[data-date="' + toIsoDate(new Date()) + '"]');
                 if (target) {
                     target.scrollIntoView({ block: 'start', behavior: 'auto' });
                 } else {
@@ -693,10 +692,6 @@ export class AgendaPanel {
             return '';
         }
         
-        function formatLocalDate(d) {
-            return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
-        }
-
         function resolveFirstDayOffset() {
             // 0 = Sunday-first, 1 = Monday-first (only these two supported in UI).
             if (firstDayOfWeek === 'sunday') return 0;
@@ -740,7 +735,7 @@ export class AgendaPanel {
             const startDay = (firstDayOfMonth.getDay() - firstOffset + 7) % 7;
 
             const today = new Date();
-            const todayStr = formatLocalDate(today);
+            const todayStr = toIsoDate(today);
 
             let html = '<div class="calendar">';
             buildWeekdayLabels(firstOffset).forEach(label => {
@@ -752,14 +747,14 @@ export class AgendaPanel {
             for (let i = startDay - 1; i >= 0; i--) {
                 const day = prevMonthDays - i;
                 const d = new Date(year, month - 1, day);
-                const dateStr = formatLocalDate(d);
+                const dateStr = toIsoDate(d);
                 html += '<div class="calendar-day other-month" data-date="' + dateStr + '">' +
                        '<div class="day-number">' + day + '</div></div>';
             }
 
             for (let day = 1; day <= lastDayOfMonth.getDate(); day++) {
                 const d = new Date(year, month, day);
-                const dateStr = formatLocalDate(d);
+                const dateStr = toIsoDate(d);
                 const dayOfWeek = d.getDay();
                 const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
                 const isHol = isHoliday(dateStr);
@@ -783,7 +778,7 @@ export class AgendaPanel {
             const trailingCells = (${CALENDAR_COLS} - (used % ${CALENDAR_COLS})) % ${CALENDAR_COLS};
             for (let i = 1; i <= trailingCells; i++) {
                 const d = new Date(year, month + 1, i);
-                const dateStr = formatLocalDate(d);
+                const dateStr = toIsoDate(d);
                 html += '<div class="calendar-day other-month" data-date="' + dateStr + '">' +
                        '<div class="day-number">' + i + '</div></div>';
             }
@@ -812,7 +807,7 @@ export class AgendaPanel {
             } else if (initialMode === 'month') {
                 d.setMonth(d.getMonth() + offset);
             }
-            const newDate = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+            const newDate = toIsoDate(d);
             // Today is an explicit "snap to today" -- drop any remembered
             // scroll for that anchor so the update handler falls back to
             // scrollToWeekFocus() instead of restoring an old position.
