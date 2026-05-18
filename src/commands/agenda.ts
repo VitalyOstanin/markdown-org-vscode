@@ -117,9 +117,13 @@ export async function cycleTag(_context: vscode.ExtensionContext) {
         return;
     }
 
-    const currentIndex = fileTags.findIndex((t) => t.name === currentTag);
-    const nextIndex = (currentIndex + 1) % fileTags.length;
-    const nextTag = fileTags[nextIndex].name;
+    // Treat "ALL" as a virtual entry at index 0 so the cycle can return to it,
+    // and unknown currentTag values fall back to "ALL" rather than silently
+    // jumping to the first configured tag.
+    const cycle = ['ALL', ...fileTags.map((t) => t.name)];
+    const currentIndex = cycle.indexOf(currentTag);
+    const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % cycle.length;
+    const nextTag = cycle[nextIndex];
 
     const target =
         (vscode.workspace.workspaceFolders?.length ?? 0) > 0

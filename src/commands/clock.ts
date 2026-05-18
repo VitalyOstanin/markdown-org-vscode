@@ -1,5 +1,11 @@
 import * as vscode from 'vscode';
-import { findNearestHeading, formatDurationHM, formatOrgTimestamp, getTimestampIndent } from '../utils';
+import {
+    findNearestHeading,
+    formatDurationHM,
+    formatOrgTimestamp,
+    getTimestampIndent,
+    requireActiveEditor
+} from '../utils';
 import { CLOCK_REGEX, TIMESTAMP_LINE_REGEX } from '../orgPatterns';
 import { notifyWarn } from '../utils/notify';
 
@@ -85,8 +91,8 @@ function findOpenClock(editor: vscode.TextEditor, clockLines: number[]): number 
 
 /** Open a new CLOCK entry under the nearest heading. Refuses if an open CLOCK already exists for that heading. */
 export async function insertClockStart() {
-    const editor = vscode.window.activeTextEditor;
-    if (!editor || editor.document.languageId !== 'markdown') {
+    const editor = requireActiveEditor({ markdownOnly: true });
+    if (!editor) {
         return;
     }
 
@@ -138,8 +144,8 @@ export async function insertClockStart() {
 
 /** Close the open CLOCK entry under the nearest heading and append the elapsed duration. */
 export async function insertClockFinish() {
-    const editor = vscode.window.activeTextEditor;
-    if (!editor || editor.document.languageId !== 'markdown') {
+    const editor = requireActiveEditor({ markdownOnly: true });
+    if (!editor) {
         return;
     }
 

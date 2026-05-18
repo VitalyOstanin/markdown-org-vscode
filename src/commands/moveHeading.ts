@@ -97,6 +97,26 @@ function getAncestorChain(document: vscode.TextDocument, startLine: number, targ
     return ancestors;
 }
 
+/**
+ * Build a Range that deletes `contentLength` lines starting at `startLine`,
+ * correctly handling the case when the block ends at EOF on a file without
+ * a trailing newline. In that case `new Range(start, 0, lastLine+1, 0)` would
+ * point past the last character of the document and leave the trailing line
+ * behind, so we close the range on the actual end of the last content line.
+ */
+function computeBlockDeletionRange(
+    document: vscode.TextDocument,
+    startLine: number,
+    contentLength: number
+): vscode.Range {
+    const lastIdx = startLine + contentLength - 1;
+    if (lastIdx >= document.lineCount - 1) {
+        const lastLine = document.lineAt(document.lineCount - 1);
+        return new vscode.Range(startLine, 0, lastLine.range.end.line, lastLine.range.end.character);
+    }
+    return new vscode.Range(startLine, 0, lastIdx + 1, 0);
+}
+
 function buildArchiveContent(ancestors: HeadingInfo[], heading: HeadingInfo): string {
     let content = '';
 
@@ -148,9 +168,7 @@ export async function moveToArchive() {
     await atomicWrite(archivePath, existingContent + archiveContent);
 
     const edit = new vscode.WorkspaceEdit();
-    const startLine = heading.line;
-    const endLine = heading.line + heading.content.length;
-    edit.delete(document.uri, new vscode.Range(startLine, 0, endLine, 0));
+    edit.delete(document.uri, computeBlockDeletionRange(document, heading.line, heading.content.length));
     await vscode.workspace.applyEdit(edit);
 
     notifyInfo(`Moved to ${path.basename(archivePath)}`);
@@ -229,9 +247,7 @@ export async function promoteToMaintain() {
     await atomicWrite(maintainPath, maintainContent);
 
     const edit = new vscode.WorkspaceEdit();
-    const startLine = heading.line;
-    const endLine = heading.line + heading.content.length;
-    edit.delete(document.uri, new vscode.Range(startLine, 0, endLine, 0));
+    edit.delete(document.uri, computeBlockDeletionRange(document, heading.line, heading.content.length));
     await vscode.workspace.applyEdit(edit);
 
     notifyInfo(`Promoted to ${path.basename(maintainPath)}`);

@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { findNearestHeading, formatOrgTimestamp, getTimestampIndent } from '../utils';
+import { findNearestHeading, formatOrgTimestamp, getTimestampIndent, requireActiveEditor } from '../utils';
 import { HEADING_REGEX, TIMESTAMP_LINE_REGEX } from '../orgPatterns';
 
 function formatTimestamp(date: Date): string {
@@ -8,8 +8,8 @@ function formatTimestamp(date: Date): string {
 
 /** Toggle the TODO/DONE keyword on the nearest heading; preserves priority. Silent if no active markdown editor. */
 export async function setTaskStatus(status: 'TODO' | 'DONE') {
-    const editor = vscode.window.activeTextEditor;
-    if (!editor || editor.document.languageId !== 'markdown') {
+    const editor = requireActiveEditor({ markdownOnly: true });
+    if (!editor) {
         return;
     }
 
@@ -44,8 +44,8 @@ export async function setTaskStatus(status: 'TODO' | 'DONE') {
 
 /** Toggle priority `[#A]` on the nearest heading; preserves TODO/DONE keyword. */
 export async function togglePriority() {
-    const editor = vscode.window.activeTextEditor;
-    if (!editor || editor.document.languageId !== 'markdown') {
+    const editor = requireActiveEditor({ markdownOnly: true });
+    if (!editor) {
         return;
     }
 
@@ -80,8 +80,8 @@ export async function togglePriority() {
 
 /** Insert a `CREATED:` timestamp under the heading. No-op if any CREATED line already exists in the timestamp block. */
 export async function insertCreatedTimestamp() {
-    const editor = vscode.window.activeTextEditor;
-    if (!editor || editor.document.languageId !== 'markdown') {
+    const editor = requireActiveEditor({ markdownOnly: true });
+    if (!editor) {
         return;
     }
 
@@ -121,8 +121,8 @@ export async function insertDeadlineTimestamp() {
 }
 
 async function insertOrReplaceTimestamp(type: 'SCHEDULED' | 'DEADLINE') {
-    const editor = vscode.window.activeTextEditor;
-    if (!editor || editor.document.languageId !== 'markdown') {
+    const editor = requireActiveEditor({ markdownOnly: true });
+    if (!editor) {
         return;
     }
 
