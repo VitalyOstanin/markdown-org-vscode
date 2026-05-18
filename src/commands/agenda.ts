@@ -51,6 +51,10 @@ export async function showAgenda(
             holidaysCache.set(year, parsed);
             return parsed;
         } catch {
+            // Graceful degradation: missing/older extractor binaries do not
+            // expose --holidays. The agenda must still render, so we silently
+            // fall back to "no holidays" rather than surfacing an error every
+            // time the panel refreshes.
             return [];
         }
     };
