@@ -438,5 +438,23 @@ src/
 │   └── moveHeading.ts        # Move to Archive, Promote to Maintain
 ├── views/
 │   └── agendaPanel.ts        # Webview for agenda/tasks display
-└── test/                     # Unit (*.test.ts) and integration (*.integration.test.ts)
+└── test/
+    ├── unit/                 # Mocha unit tests (*.test.ts, no VS Code host)
+    ├── integration/          # @vscode/test-electron tests (*.integration.test.ts)
+    └── suite/                # Mocha runners (index.ts, integration.ts)
 ```
+
+### Additional documentation
+
+Internal design notes and testing playbooks live in `docs/`; example
+markdown files used by manual testing live in `examples/`:
+
+- [`docs/clock-implementation.md`](docs/clock-implementation.md) -- CLOCK feature design notes
+- [`docs/clock-testing.md`](docs/clock-testing.md) -- manual CLOCK test plan
+- [`CLOCK_USAGE.md`](CLOCK_USAGE.md) -- CLOCK end-user reference (kept in repo root for visibility)
+- [`docs/holidays-integration.md`](docs/holidays-integration.md) -- how the extractor supplies holiday dates
+- [`docs/month-view-changes.md`](docs/month-view-changes.md) -- month-calendar implementation notes
+- [`docs/month-view-tests.md`](docs/month-view-tests.md) -- month-view test scenarios
+- [`TAG_FILTERING.md`](TAG_FILTERING.md) -- user-facing tag filter reference (linked from the main flow above)
+- [`TODO.md`](TODO.md) -- internal backlog
+- [`examples/`](examples/) -- demo markdown files for manual smoke-testing
