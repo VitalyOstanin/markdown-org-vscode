@@ -84,7 +84,7 @@ CLOCK entries are:
 
 - `src/commands/clock.ts` -- CLOCK command implementation
 - `src/test/integration/clock.integration.test.ts` -- integration tests (8 tests)
-- `CLOCK_USAGE.md` (repo root) -- user documentation
+- `docs/clock-usage.md` -- user documentation
 - `docs/clock-implementation.md` -- this file
 
 ### Modified Files

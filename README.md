@@ -492,7 +492,7 @@ markdown files used by manual testing live in `examples/`:
 
 - [`docs/clock-implementation.md`](docs/clock-implementation.md) -- CLOCK feature design notes
 - [`docs/clock-testing.md`](docs/clock-testing.md) -- manual CLOCK test plan
-- [`CLOCK_USAGE.md`](CLOCK_USAGE.md) -- CLOCK end-user reference (kept in repo root for visibility)
+- [`docs/clock-usage.md`](docs/clock-usage.md) -- CLOCK end-user reference
 - [`docs/holidays-integration.md`](docs/holidays-integration.md) -- how the extractor supplies holiday dates
 - [`docs/month-view-changes.md`](docs/month-view-changes.md) -- month-calendar implementation notes
 - [`docs/month-view-tests.md`](docs/month-view-tests.md) -- month-view test scenarios

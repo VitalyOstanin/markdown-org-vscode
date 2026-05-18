@@ -36,7 +36,6 @@ test-workspace/**
 
 # Internal design / process notes that aren't user docs
 # (most design docs live in docs/ now -- already excluded by docs/** above)
-CLOCK_USAGE.md
 TODO.md
 
 # Build outputs
