@@ -342,11 +342,15 @@ export class AgendaPanel {
             font-weight: bold;
             margin: 20px 0 5px 0;
             display: grid;
+            /* 3-column day header (see formatDayHeader): weekday | day | month+year. */
             grid-template-columns: 120px 30px 1fr;
             column-gap: 1ch;
         }
         .task-line {
             display: grid;
+            /* 6-column task line (see renderTask): todo: | time | status | priority | heading | date.
+               When adding/removing a column, update renderTask in lockstep — the grid does not
+               span-collapse, so a missing span shifts every column right of it. */
             grid-template-columns: auto 140px 60px 60px 1fr 90px;
             gap: 8px;
             margin: 2px 0;
