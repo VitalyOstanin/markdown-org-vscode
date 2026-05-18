@@ -3,3 +3,4 @@ out
 *.vsix
 .vscode-test
 test-workspace/
+docs/reviews/
