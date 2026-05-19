@@ -517,6 +517,14 @@ markdown files used by manual testing live in `examples/`:
 Per-version changes are tracked in [`CHANGELOG.md`](CHANGELOG.md) using the
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
+The version bump itself ships as a single commit whose subject follows
+the form `chore(release): vX.Y.Z`. That commit updates `package.json`
+(and any other version-pinning file) and adds the matching CHANGELOG
+section; the annotated tag `vX.Y.Z` is then created on the same commit
+to trigger the publish workflow. The Conventional Commits scope keeps
+release commits easy to filter (`git log --grep '^chore(release)'`)
+without claiming a behaviour change those commits never carry.
+
 ## License
 
 Released under the [MIT License](LICENSE) -- see the LICENSE file for the
