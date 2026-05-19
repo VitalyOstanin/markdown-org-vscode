@@ -5,6 +5,12 @@ function isPositivePattern(pattern: string): boolean {
     return pattern.length > 0 && !pattern.startsWith('!');
 }
 
+// Empty arrays return `false` here even though `DayAgenda[]` and `Task[]` are
+// both valid empty shapes. That is deliberate: the caller's two branches both
+// reduce to "no tasks" on an empty input (`Task[].filter` and `DayAgenda[].map`
+// over zero elements alike yield `[]`), so falling through to the simpler
+// `Task[]` branch is harmless and avoids guessing at a shape with no
+// discriminating element to inspect.
 function isDayAgendaArray(value: AgendaData): value is DayAgenda[] {
     return value.length > 0 && 'date' in value[0];
 }

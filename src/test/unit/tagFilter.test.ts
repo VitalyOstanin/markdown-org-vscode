@@ -157,6 +157,15 @@ suite('Tag Filter Unit Tests', () => {
             assert.strictEqual(result[0].date, '2025-12-09');
         });
 
+        test('an empty input returns an empty array (Task[] branch is taken without crashing)', () => {
+            // Documents the isDayAgendaArray edge case: with zero elements
+            // there is no discriminator object, so the function falls through
+            // to the Task[] branch. Both branches reduce to [] on empty input,
+            // so the caller observes the same shape it passed in (empty).
+            const result = filterTasksByTag([], 'WORK', TAGS) as Task[];
+            assert.deepStrictEqual(result, []);
+        });
+
         test('handles DayAgenda with missing buckets (week/month payloads)', () => {
             // markdown-org-extract sometimes omits empty buckets in week/month
             // agenda output. Cast away the missing fields to mirror what the
