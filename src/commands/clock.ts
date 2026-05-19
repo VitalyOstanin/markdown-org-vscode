@@ -9,6 +9,7 @@ import {
 import { CLOCK_REGEX, TIMESTAMP_LINE_REGEX } from '../orgPatterns';
 import { notifyWarn } from '../utils/notify';
 import { roundTime, roundEndTime } from '../utils/clockRounding';
+import { findClockLinesInLines } from '../utils/findClockLines';
 
 function formatTimestamp(date: Date): string {
     return formatOrgTimestamp(date, 'square');
@@ -19,29 +20,7 @@ function calculateDuration(start: Date, end: Date): string {
 }
 
 function findClockLines(editor: vscode.TextEditor, headingLine: number): number[] {
-    const clockLines: number[] = [];
-
-    for (let i = headingLine + 1; i < editor.document.lineCount; i++) {
-        const line = editor.document.lineAt(i);
-        const text = line.text;
-
-        if (text.match(TIMESTAMP_LINE_REGEX)) {
-            continue;
-        }
-
-        if (text.match(CLOCK_REGEX)) {
-            clockLines.push(i);
-            continue;
-        }
-
-        if (text.trim() === '' && clockLines.length > 0) {
-            continue;
-        }
-
-        break;
-    }
-
-    return clockLines;
+    return findClockLinesInLines(editor.document.getText().split(/\r?\n/), headingLine);
 }
 
 function findOpenClock(editor: vscode.TextEditor, clockLines: number[]): number | null {
