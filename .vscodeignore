@@ -14,10 +14,14 @@ out/test/**
 **/*.map
 node_modules/**
 
-# Test runtime artifacts -- coverage reports, husky hooks, c8 config.
+# Test runtime artifacts -- coverage reports, husky hooks, c8 config,
+# Mocha unit-test config, vscode-test CLI config, custom test runners.
 coverage/**
 .husky/**
 .c8rc.json
+.mocharc.unit.json
+.vscode-test.mjs
+scripts/**
 
 # Linter / formatter / language config
 .editorconfig

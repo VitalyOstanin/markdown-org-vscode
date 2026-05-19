@@ -101,7 +101,7 @@ jobs:
       - name: Run unit tests with coverage
         run: npm run test:coverage
 
-      - name: Upload coverage to Codecov
+      - name: Upload unit coverage to Codecov
         # codecov/codecov-action pinned to v6.0.0
         uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2
         with:
@@ -113,6 +113,22 @@ jobs:
           flags: unit
           # Don't fail the build on Codecov outages -- coverage drift is
           # signal, not a release blocker.
+          fail_ci_if_error: false
+
+      - name: Run integration tests with coverage
+        # The wrapper auto-wraps the VS Code Extension Host with xvfb-run
+        # when it's available (Ubuntu runners ship it preinstalled); on
+        # other platforms it falls through to the real display. Coverage
+        # data is gathered via V8 natively, remapped through source maps
+        # to TypeScript sources by @vscode/test-cli before lcov is emitted.
+        run: npm run test:integration:coverage
+
+      - name: Upload integration coverage to Codecov
+        uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2
+        with:
+          use_oidc: true
+          files: ./coverage/integration/lcov.info
+          flags: integration
           fail_ci_if_error: false
 
   audit:

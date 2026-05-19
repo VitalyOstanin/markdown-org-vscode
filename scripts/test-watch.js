@@ -51,14 +51,7 @@ process.on('SIGTERM', () => {
 });
 
 tsc = spawnChild('tsc', 'npx', ['tsc', '-w', '-p', './']);
-mocha = spawnChild('mocha', 'npx', [
-    'mocha',
-    '--watch',
-    '--watch-files',
-    'out',
-    '--recursive',
-    'out/test/unit/**/*.test.js'
-]);
+mocha = spawnChild('mocha', 'npx', ['mocha', '--config', '.mocharc.unit.json', '--watch', '--watch-files', 'out']);
 
 tsc.on('exit', (code, signal) => {
     if (!shuttingDown) {

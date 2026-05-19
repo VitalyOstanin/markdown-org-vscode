@@ -1,16 +1,34 @@
 #!/usr/bin/env node
 'use strict';
 
-// Wrap @vscode/test-electron with xvfb-run when it's available, so that
-// running `npm run test:integration` locally never pops the test VS Code
-// instance on the developer's real X display. When xvfb-run is missing
-// (macOS, Windows, headless containers that don't ship it), fall back to
-// running the test host directly.
+// Wrap `vscode-test` (from @vscode/test-cli) with xvfb-run when it's
+// available, so running `npm run test:integration` locally never pops the
+// test VS Code instance on the developer's real X display. When xvfb-run
+// is missing (macOS, Windows, headless containers that don't ship it),
+// fall back to running the test host directly.
+//
+// All command-line arguments passed to this script are forwarded to
+// `vscode-test`. The wrapper itself takes no flags.
 
 const { spawn, spawnSync } = require('node:child_process');
 const path = require('node:path');
 
-const RUN_TEST_ENTRY = path.join(__dirname, '..', 'out', 'test', 'runTest.js');
+// Resolve the `vscode-test` binary from node_modules without going through
+// require.resolve / `exports`: `@vscode/test-cli` does not list
+// `out/bin.mjs` or `package.json` in its exports map, so the standard
+// resolver refuses both. The path is stable enough to hardcode against
+// the local installation tree.
+function resolveVscodeTestBin() {
+    const fs = require('node:fs');
+    const repoRoot = path.join(__dirname, '..');
+    const candidate = path.join(repoRoot, 'node_modules', '@vscode', 'test-cli', 'out', 'bin.mjs');
+    if (!fs.existsSync(candidate)) {
+        throw new Error(`@vscode/test-cli binary not found at ${candidate}; run \`npm install\` first`);
+    }
+    return candidate;
+}
+
+const VSCODE_TEST_BIN = resolveVscodeTestBin();
 
 function findXvfbRun() {
     if (process.platform !== 'linux') {
@@ -32,12 +50,13 @@ function findXvfbRun() {
 function main() {
     const xvfbRun = findXvfbRun();
     const nodeBin = process.execPath;
+    const forwarded = process.argv.slice(2);
     let command;
     let args;
 
     if (xvfbRun) {
         command = xvfbRun;
-        args = ['-a', '--server-args=-screen 0 1280x720x24', nodeBin, RUN_TEST_ENTRY];
+        args = ['-a', '--server-args=-screen 0 1280x720x24', nodeBin, VSCODE_TEST_BIN, ...forwarded];
     } else {
         if (process.platform === 'linux') {
             console.warn(
@@ -47,7 +66,7 @@ function main() {
             );
         }
         command = nodeBin;
-        args = [RUN_TEST_ENTRY];
+        args = [VSCODE_TEST_BIN, ...forwarded];
     }
 
     const child = spawn(command, args, { stdio: 'inherit' });

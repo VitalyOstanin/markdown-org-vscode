@@ -1,0 +1,8 @@
+{
+  "ui": "tdd",
+  "color": true,
+  "timeout": 5000,
+  "slow": 2000,
+  "recursive": true,
+  "spec": ["out/test/unit/**/*.test.js"]
+}
