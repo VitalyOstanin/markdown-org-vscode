@@ -1,92 +1,24 @@
 import * as vscode from 'vscode';
 import { HEADING_REGEX, TIMESTAMP_LINE_REGEX } from '../orgPatterns';
 import { formatDurationHM } from '../utils';
+import {
+    getTimestampPartAt,
+    getClockTimestampPartAt,
+    TimestampPart,
+    ClockTimestampPart
+} from '../utils/timestampParts';
 
-// Weekday is `[А-Яа-яA-Za-z]+` (one or more letters) rather than `{2,3}` to
-// stay symmetric with CLOCK_REGEX below and to unblock the `isFull` branch in
-// getWeekdayName: short ("Fri", "Пн") and full ("Friday", "Пятница") forms
-// are both accepted, and adjustTimestamp preserves whichever form the user
-// already wrote.
-const TIMESTAMP_REGEX =
-    /<(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})(?: (?<weekday>[А-Яа-яA-Za-z]+))?(?: (?<hour>\d{2}):(?<minute>\d{2}))?(?: (?<repeater>\+\d+[dwmy]{1,2}))?>/;
-// Local variant of the CLOCK regex with weekday and time as separate groups
-// so cursor offsets can target individual parts; orgPatterns.CLOCK_REGEX uses
-// a broader `[^\]>]+` form for general matching.
-const CLOCK_REGEX =
-    /^(?<indent>\s*)`CLOCK: (?<startOpenBracket>[[<])(?<startYear>\d{4})-(?<startMonth>\d{2})-(?<startDay>\d{2}) (?<startWeekday>[А-Яа-яA-Za-z]+) (?<startHour>\d{2}):(?<startMinute>\d{2})(?<startCloseBracket>[\]>])(?:--(?<endOpenBracket>[[<])(?<endYear>\d{4})-(?<endMonth>\d{2})-(?<endDay>\d{2}) (?<endWeekday>[А-Яа-яA-Za-z]+) (?<endHour>\d{2}):(?<endMinute>\d{2})(?<endCloseBracket>[\]>]) => +(?<durationHours>-?\d+):(?<durationMinutes>-?\d+))?`$/;
 const PRIORITY_A_CODE = 'A'.charCodeAt(0);
 const PRIORITY_Z_CODE = 'Z'.charCodeAt(0);
 
-type TimestampPart = 'year' | 'month' | 'day' | 'weekday' | 'hour' | 'minute';
 type HeadingPart = 'status' | 'priority';
-type ClockTimestampPart =
-    | 'start-year'
-    | 'start-month'
-    | 'start-day'
-    | 'start-weekday'
-    | 'start-hour'
-    | 'start-minute'
-    | 'end-year'
-    | 'end-month'
-    | 'end-day'
-    | 'end-weekday'
-    | 'end-hour'
-    | 'end-minute';
 
 function getClockTimestampAtCursor(
     editor: vscode.TextEditor
 ): { match: RegExpMatchArray; part: ClockTimestampPart } | null {
     const position = editor.selection.active;
-    const line = editor.document.lineAt(position.line);
-    const lineText = line.text;
-
-    const match = lineText.match(CLOCK_REGEX);
-    if (!match || match.index === undefined || !match.groups) return null;
-
-    const fullMatch = match[0];
-    const cur = position.character;
-
-    // Find all timestamps in the CLOCK line
-    const timestampRegex = /(\d{4})-(\d{2})-(\d{2}) ([А-Яа-яA-Za-z]+) (\d{2}):(\d{2})/g;
-    const timestamps = [...fullMatch.matchAll(timestampRegex)];
-
-    if (timestamps.length === 0) return null;
-
-    // Check start timestamp
-    const startTs = timestamps[0];
-    const startBase = match.index + startTs.index!;
-
-    if (cur >= startBase && cur < startBase + 4) return { match, part: 'start-year' };
-    if (cur >= startBase + 5 && cur < startBase + 7) return { match, part: 'start-month' };
-    if (cur >= startBase + 8 && cur < startBase + 10) return { match, part: 'start-day' };
-
-    const startWeekdayPos = startBase + 11;
-    const startWeekdayLen = startTs[4].length;
-    if (cur >= startWeekdayPos && cur < startWeekdayPos + startWeekdayLen) return { match, part: 'start-weekday' };
-
-    const startTimePos = startWeekdayPos + startWeekdayLen + 1;
-    if (cur >= startTimePos && cur <= startTimePos + 2) return { match, part: 'start-hour' };
-    if (cur >= startTimePos + 3 && cur <= startTimePos + 5) return { match, part: 'start-minute' };
-
-    // Check end timestamp if exists
-    if (match.groups.endOpenBracket && timestamps.length > 1) {
-        const endTs = timestamps[1];
-        const endBase = match.index + endTs.index!;
-
-        if (cur >= endBase && cur < endBase + 4) return { match, part: 'end-year' };
-        if (cur >= endBase + 5 && cur < endBase + 7) return { match, part: 'end-month' };
-        if (cur >= endBase + 8 && cur < endBase + 10) return { match, part: 'end-day' };
-
-        const endWeekdayPos = endBase + 11;
-        const endWeekdayLen = endTs[4].length;
-        if (cur >= endWeekdayPos && cur < endWeekdayPos + endWeekdayLen) return { match, part: 'end-weekday' };
-
-        const endTimePos = endWeekdayPos + endWeekdayLen + 1;
-        if (cur >= endTimePos && cur <= endTimePos + 2) return { match, part: 'end-hour' };
-        if (cur >= endTimePos + 3 && cur <= endTimePos + 5) return { match, part: 'end-minute' };
-    }
-
-    return null;
+    const lineText = editor.document.lineAt(position.line).text;
+    return getClockTimestampPartAt(lineText, position.character);
 }
 
 function getTimestampTypeAtCursor(editor: vscode.TextEditor): { match: RegExpMatchArray; range: vscode.Range } | null {
@@ -199,79 +131,11 @@ function getTimestampAtCursor(
     editor: vscode.TextEditor
 ): { match: RegExpMatchArray; range: vscode.Range; part: TimestampPart } | null {
     const position = editor.selection.active;
-    const line = editor.document.lineAt(position.line);
-    const lineText = line.text;
-
-    let match: RegExpMatchArray | null;
-    const regex = new RegExp(TIMESTAMP_REGEX, 'g');
-
-    while ((match = regex.exec(lineText)) !== null) {
-        if (!match.groups) continue;
-        const { weekday, hour, minute } = match.groups;
-        const start = match.index!;
-        const end = start + match[0].length;
-
-        if (position.character >= start && position.character < end) {
-            const yearStart = start + 1;
-            const yearEnd = yearStart + 4;
-            const monthStart = yearEnd + 1;
-            const monthEnd = monthStart + 2;
-            const dayStart = monthEnd + 1;
-            const dayEnd = dayStart + 2;
-
-            let part: TimestampPart;
-            if (position.character >= yearStart && position.character <= yearEnd) {
-                part = 'year';
-            } else if (position.character >= monthStart && position.character <= monthEnd) {
-                part = 'month';
-            } else if (position.character >= dayStart && position.character <= dayEnd) {
-                part = 'day';
-            } else if (weekday) {
-                const weekdayStart = lineText.indexOf(weekday, dayEnd);
-                const weekdayEnd = weekdayStart + weekday.length;
-
-                if (position.character >= weekdayStart && position.character <= weekdayEnd) {
-                    part = 'weekday';
-                } else if (hour && minute) {
-                    const hourStart = lineText.indexOf(hour, weekdayEnd);
-                    const hourEnd = hourStart + 2;
-                    const minuteStart = hourEnd + 1;
-                    const minuteEnd = minuteStart + 2;
-
-                    if (position.character >= hourStart && position.character <= hourEnd) {
-                        part = 'hour';
-                    } else if (position.character >= minuteStart && position.character <= minuteEnd) {
-                        part = 'minute';
-                    } else {
-                        continue;
-                    }
-                } else {
-                    continue;
-                }
-            } else if (hour && minute) {
-                const hourStart = lineText.indexOf(hour, dayEnd);
-                const hourEnd = hourStart + 2;
-                const minuteStart = hourEnd + 1;
-                const minuteEnd = minuteStart + 2;
-
-                if (position.character >= hourStart && position.character <= hourEnd) {
-                    part = 'hour';
-                } else if (position.character >= minuteStart && position.character <= minuteEnd) {
-                    part = 'minute';
-                } else {
-                    continue;
-                }
-            } else {
-                continue;
-            }
-
-            const range = new vscode.Range(position.line, start, position.line, end);
-
-            return { match, range, part };
-        }
-    }
-
-    return null;
+    const lineText = editor.document.lineAt(position.line).text;
+    const hit = getTimestampPartAt(lineText, position.character);
+    if (!hit) return null;
+    const range = new vscode.Range(position.line, hit.start, position.line, hit.end);
+    return { match: hit.match, range, part: hit.part };
 }
 
 function incrementTimestamp(match: RegExpMatchArray, part: TimestampPart, delta: number): string {

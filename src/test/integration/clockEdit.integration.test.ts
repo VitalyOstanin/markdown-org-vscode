@@ -443,26 +443,56 @@ suite('CLOCK Timestamp Editing Integration Tests', () => {
         });
     });
 
-    suite('Cursor on Colon Position', () => {
-        test('[] - Cursor before colon in end hour', async () => {
+    suite('Cursor boundary positions (half-open intervals)', () => {
+        // Each timestamp part is matched by a half-open interval [start, end);
+        // separators (hyphens, spaces, colons, brackets) are no man's land.
+        // The cursor must sit on an actual digit/letter to trigger an edit.
+
+        test('[] - cursor on last hour digit -> hour increments', async () => {
             await setupTest(`# Test\n\`CLOCK: [2025-12-09 Вт 21:00]--[2025-12-09 Вт 22:34] =>  1:34\`\n`);
-            editor.selection = new vscode.Selection(1, 48, 1, 48); // On colon
+            editor.selection = new vscode.Selection(1, 47, 1, 47); // last hour digit '2' in '22'
             await vscode.commands.executeCommand('markdown-org.timestampUp');
             assert.ok(editor.document.lineAt(1).text.includes('--[2025-12-09 Вт 23:34]'));
         });
 
-        test('[] - Cursor before colon in end minute', async () => {
+        test('[] - cursor on last minute digit -> minute increments', async () => {
             await setupTest(`# Test\n\`CLOCK: [2025-12-09 Вт 21:00]--[2025-12-09 Вт 22:34] =>  1:34\`\n`);
-            editor.selection = new vscode.Selection(1, 51, 1, 51); // After last minute digit
+            editor.selection = new vscode.Selection(1, 50, 1, 50); // last minute digit '4' in '34'
             await vscode.commands.executeCommand('markdown-org.timestampUp');
             assert.ok(editor.document.lineAt(1).text.includes('--[2025-12-09 Вт 22:35]'));
         });
 
-        test('<> - Cursor before colon in end hour', async () => {
+        test('<> - cursor on last hour digit -> hour increments', async () => {
             await setupTest(`# Test\n\`CLOCK: <2025-12-10 Ср 22:00>--<2025-12-11 Чт 20:30> => 22:30\`\n`);
-            editor.selection = new vscode.Selection(1, 48, 1, 48);
+            editor.selection = new vscode.Selection(1, 47, 1, 47);
             await vscode.commands.executeCommand('markdown-org.timestampUp');
             assert.ok(editor.document.lineAt(1).text.includes('--<2025-12-11 Чт 21:30>'));
+        });
+
+        test('cursor on the colon between end hour and end minute -> no edit', async () => {
+            // Position 48 is `:` -- under the new half-open semantics, this is
+            // a separator and not part of any timestamp segment. timestampUp
+            // falls back to cursorUpSelect, which doesn't touch the line text.
+            const initial = `# Test\n\`CLOCK: [2025-12-09 Вт 21:00]--[2025-12-09 Вт 22:34] =>  1:34\`\n`;
+            await setupTest(initial);
+            editor.selection = new vscode.Selection(1, 48, 1, 48);
+            await vscode.commands.executeCommand('markdown-org.timestampUp');
+            assert.strictEqual(
+                editor.document.lineAt(1).text,
+                '`CLOCK: [2025-12-09 Вт 21:00]--[2025-12-09 Вт 22:34] =>  1:34`'
+            );
+        });
+
+        test('cursor on the closing bracket after end minute -> no edit', async () => {
+            // Position 51 is `]` -- separator, not part of any segment.
+            const initial = `# Test\n\`CLOCK: [2025-12-09 Вт 21:00]--[2025-12-09 Вт 22:34] =>  1:34\`\n`;
+            await setupTest(initial);
+            editor.selection = new vscode.Selection(1, 51, 1, 51);
+            await vscode.commands.executeCommand('markdown-org.timestampUp');
+            assert.strictEqual(
+                editor.document.lineAt(1).text,
+                '`CLOCK: [2025-12-09 Вт 21:00]--[2025-12-09 Вт 22:34] =>  1:34`'
+            );
         });
     });
 });
