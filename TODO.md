@@ -19,6 +19,11 @@
 - [x] Add publisher field to package.json
     - Added `"publisher": "vitalyostanin"`
     - Note: Publisher must be registered at https://marketplace.visualstudio.com/manage before publishing
+- [ ] Decide on automated VS Code Marketplace publishing
+    - Current: release workflow only creates a GitHub Release with the VSIX; Marketplace publish is manual.
+    - Option A: add a `vsce publish` step to `.github/workflows/release.yml` so each annotated tag goes live on Marketplace. Requires `secrets.VSCE_PAT` (Azure DevOps PAT with Marketplace rights) and acceptance that every published tag is irrevocable.
+    - Option B: keep Marketplace publish manual and document the local recipe (`npx vsce publish` with the same PAT) in README.
+    - Option C: open-vsx publish (separate registry used by VSCodium and others) -- consider alongside whichever choice above is taken.
 
 ## Documentation
 
