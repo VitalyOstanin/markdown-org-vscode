@@ -8,6 +8,7 @@ import { EXTRACTOR_MAX_BUFFER_BYTES, EXTRACTOR_TIMEOUT_MS, extractor } from '../
 import { formatError, notifyError, notifyInfo, notifyWarn } from '../utils/notify';
 import { computeNextTag } from '../utils/cycleTag';
 import { buildExecError } from '../utils/execError';
+import { getCachedHolidays } from '../utils/holidaysCache';
 
 /**
  * Open the agenda webview for the given mode (day/week/month/tasks).
@@ -39,23 +40,19 @@ export async function showAgenda(
     }
 
     let shiftedToday = initialDate;
-    const holidaysCache = new Map<number, string[]>();
 
     const getHolidays = async (year: number): Promise<string[]> => {
-        const cached = holidaysCache.get(year);
-        if (cached) {
-            return cached;
-        }
         try {
-            const result = await execCommand(extractorPath, ['--holidays', year.toString()]);
-            const parsed: string[] = JSON.parse(result);
-            holidaysCache.set(year, parsed);
-            return parsed;
+            return await getCachedHolidays(year, async (y) => {
+                const result = await execCommand(extractorPath, ['--holidays', y.toString()]);
+                return JSON.parse(result) as string[];
+            });
         } catch {
             // Graceful degradation: missing/older extractor binaries do not
             // expose --holidays. The agenda must still render, so we silently
             // fall back to "no holidays" rather than surfacing an error every
-            // time the panel refreshes.
+            // time the panel refreshes. The cache itself does not memoise
+            // failures, so the next agenda open will retry the extractor.
             return [];
         }
     };
