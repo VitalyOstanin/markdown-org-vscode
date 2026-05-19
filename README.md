@@ -282,6 +282,18 @@ For a custom installation location:
 }
 ```
 
+> **Security:** the configured path is executed by the extension every
+> time agenda or related commands run. Always point this setting at a
+> binary you trust -- ideally one installed via
+> `cargo install markdown-org-extract` from
+> [crates.io](https://crates.io/crates/markdown-org-extract), or built
+> from a source tree you control. Do not point it at downloaded
+> executables of unknown origin, files in world-writable locations
+> (`/tmp`, shared caches), or scripts that wrap the extractor with
+> extra side effects. In untrusted workspaces VS Code automatically
+> refuses to honour this setting (see `capabilities.untrustedWorkspaces`
+> in `package.json`).
+
 ### `markdown-org.workspaceDir`
 
 **Type:** `string`
