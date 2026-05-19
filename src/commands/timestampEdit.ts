@@ -7,6 +7,7 @@ import {
     TimestampPart,
     ClockTimestampPart
 } from '../utils/timestampParts';
+import { toggleTimestampType } from '../utils/toggleTimestampType';
 
 const PRIORITY_A_CODE = 'A'.charCodeAt(0);
 const PRIORITY_Z_CODE = 'Z'.charCodeAt(0);
@@ -41,19 +42,8 @@ function getTimestampTypeAtCursor(editor: vscode.TextEditor): { match: RegExpMat
     return null;
 }
 
-function toggleTimestampType(match: RegExpMatchArray): string {
-    const { indent, type: currentType, timestamp } = match.groups!;
-
-    if (currentType === 'CREATED') {
-        return `${indent}\`${currentType}: ${timestamp}\``;
-    }
-
-    const types = ['SCHEDULED', 'DEADLINE', 'CLOSED'];
-    const currentIndex = types.indexOf(currentType);
-    const newIndex = (currentIndex + 1) % types.length;
-    const newType = types[newIndex];
-    return `${indent}\`${newType}: ${timestamp}\``;
-}
+// toggleTimestampType lives in utils/toggleTimestampType.ts so that unit tests
+// can exercise it without pulling the whole vscode module graph in.
 
 function getHeadingPartAtCursor(
     editor: vscode.TextEditor
