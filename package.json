@@ -253,7 +253,7 @@
     "watch": "tsc -watch -p ./",
     "test": "npm run compile && node ./out/test/suite/index.js",
     "test:coverage": "npm run compile && c8 node ./out/test/suite/index.js",
-    "test:integration": "npm run compile && node ./out/test/runTest.js",
+    "test:integration": "npm run compile && node ./scripts/run-integration-tests.js",
     "lint": "eslint src",
     "lint:fix": "eslint src --fix",
     "format": "prettier --write .",

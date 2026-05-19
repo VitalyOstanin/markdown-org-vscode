@@ -75,12 +75,7 @@ jobs:
       - name: Run unit tests
         run: npm test
 
-      - name: Run integration tests (Linux)
-        if: runner.os == 'Linux'
-        run: xvfb-run -a npm run test:integration
-
-      - name: Run integration tests (macOS / Windows)
-        if: runner.os != 'Linux'
+      - name: Run integration tests
         run: npm run test:integration
 
   coverage:
