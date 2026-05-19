@@ -502,6 +502,7 @@ src/
 Internal design notes and testing playbooks live in `docs/`; example
 markdown files used by manual testing live in `examples/`:
 
+- [`docs/adr/`](docs/adr/) -- Architecture Decision Records (why the project looks the way it does)
 - [`docs/clock-implementation.md`](docs/clock-implementation.md) -- CLOCK feature design notes
 - [`docs/clock-testing.md`](docs/clock-testing.md) -- manual CLOCK test plan
 - [`docs/clock-usage.md`](docs/clock-usage.md) -- CLOCK end-user reference
