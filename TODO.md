@@ -39,6 +39,12 @@
     - Added detailed Settings section with examples
     - Documented markdown-org-extract dependency and installation
 - [ ] Add screenshots/GIF demonstrations
+- [ ] Add Marketplace version badge to README after publishing
+    - Once the extension goes live on the VS Code Marketplace, append
+      `[![Marketplace](https://img.shields.io/visual-studio-marketplace/v/vitalyostanin.markdown-org-vscode)](https://marketplace.visualstudio.com/items?itemName=vitalyostanin.markdown-org-vscode)`
+      to the badge block at the top of README.md.
+    - Optional companion: installs badge `visual-studio-marketplace/i/...` and rating badge `visual-studio-marketplace/r/...`.
+    - Blocked until the first successful Marketplace publish (see "Decide on automated VS Code Marketplace publishing" above).
 - [x] Create CHANGELOG.md
     - Documented version 0.1.0 features
     - Set up format for future releases
