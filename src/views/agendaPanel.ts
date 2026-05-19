@@ -70,12 +70,7 @@ export class AgendaPanel {
         const firstDayOfWeek = config.get<FirstDayOfWeek>('firstDayOfWeek', 'monday');
 
         if (AgendaPanel.currentPanel) {
-            if (userInitiated) {
-                AgendaPanel.currentPanel.reveal(vscode.ViewColumn.One);
-            }
-            AgendaPanel.currentPanel.title = `Agenda: ${mode}`;
-            AgendaPanel.currentPanel.webview.postMessage({
-                type: 'update',
+            AgendaPanel.updateExistingPanel(
                 data,
                 mode,
                 shiftedToday,
@@ -83,151 +78,200 @@ export class AgendaPanel {
                 firstDayOfWeek,
                 userInitiated,
                 navigation
-            });
+            );
         } else {
-            AgendaPanel.currentPanel = vscode.window.createWebviewPanel(
-                'markdownOrgAgenda',
-                `Agenda: ${mode}`,
-                vscode.ViewColumn.One,
-                {
-                    enableScripts: true,
-                    retainContextWhenHidden: true,
-                    localResourceRoots: []
-                }
-            );
-
-            // Drives the `markdown-org.agendaFocused` when-clause so show/cycle
-            // keybindings (Ctrl+K Ctrl+W, Ctrl+K Ctrl+M, cycleTag) keep working
-            // when the user is inside the agenda webview and no markdown editor
-            // is focused.
-            AgendaPanel.setAgendaFocusedContext(true);
-
-            AgendaPanel.currentPanel.onDidChangeViewState((e) => {
-                AgendaPanel.setAgendaFocusedContext(e.webviewPanel.active);
-            });
-
-            AgendaPanel.currentPanel.onDidDispose(() => {
-                AgendaPanel.setAgendaFocusedContext(false);
-                AgendaPanel.currentPanel = undefined;
-                AgendaPanel.watcher?.dispose();
-                AgendaPanel.watcher = undefined;
-                AgendaPanel.refreshCallback = undefined;
-                if (AgendaPanel.debounceTimer) {
-                    clearTimeout(AgendaPanel.debounceTimer);
-                    AgendaPanel.debounceTimer = undefined;
-                }
-                if (AgendaPanel.dayCheckTimer) {
-                    clearTimeout(AgendaPanel.dayCheckTimer);
-                    AgendaPanel.dayCheckTimer = undefined;
-                }
-            });
-
-            AgendaPanel.currentPanel.webview.onDidReceiveMessage(async (message) => {
-                if (message.command === 'openTask') {
-                    if (typeof message.file !== 'string' || typeof message.line !== 'number') {
-                        return;
-                    }
-                    await AgendaPanel.openTaskInEditor(message.file, message.line);
-                } else if (message.command === 'navigate') {
-                    if (message.switchToDay) {
-                        AgendaPanel.currentPanel?.dispose();
-                        await vscode.commands.executeCommand('markdown-org.showAgendaDay', message.date);
-                    } else {
-                        AgendaPanel.refreshCallback?.(message.date, true);
-                    }
-                } else if (message.command === 'cycleTag') {
-                    await vscode.commands.executeCommand('markdown-org.cycleTag');
-                } else if (message.command === 'switchMode') {
-                    const targetCommand =
-                        message.mode === 'day'
-                            ? 'markdown-org.showAgendaDay'
-                            : message.mode === 'week'
-                              ? 'markdown-org.showAgendaWeek'
-                              : message.mode === 'month'
-                                ? 'markdown-org.showAgendaMonth'
-                                : message.mode === 'tasks'
-                                  ? 'markdown-org.showTasks'
-                                  : null;
-                    if (targetCommand) {
-                        await vscode.commands.executeCommand(targetCommand, AgendaPanel.shiftedToday);
-                    }
-                }
-            });
-
-            const nonce = generateNonce();
-            const cspSource = AgendaPanel.currentPanel.webview.cspSource;
-            AgendaPanel.currentPanel.webview.html = this.getHtmlContent(
-                data,
-                mode,
-                locale,
-                currentTag || 'ALL',
-                holidays || [],
-                nonce,
-                cspSource
-            );
-
-            AgendaPanel.currentPanel.webview.postMessage({
-                command: 'init',
-                data: data,
-                mode: mode,
-                locale: locale,
-                shiftedToday: AgendaPanel.shiftedToday,
-                currentTag: currentTag || 'ALL',
-                holidays: holidays || [],
-                firstDayOfWeek: firstDayOfWeek
-            });
+            AgendaPanel.createNewPanel(data, mode, locale, currentTag, holidays, firstDayOfWeek);
         }
 
         if (!AgendaPanel.watcher && refreshCallback) {
-            // Scope the watcher to the directory that the extractor actually
-            // sweeps. With a bare `**/*.md` pattern, the underlying OS
-            // primitive (inotify/FSEvents/etc.) registers watches for every
-            // `.md` under the workspace, including node_modules / .git /
-            // .vscode-test, even though triggerRefresh ignores those events.
-            // A RelativePattern with the workspace dir as the base avoids
-            // setting up those watches in the first place.
-            const watchBase = resolveAgendaWatchBase(
-                config.get<string>('workspaceDir'),
-                vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
-            );
-            const pattern: vscode.GlobPattern = watchBase
-                ? new vscode.RelativePattern(watchBase, '**/*.md')
-                : '**/*.md';
-            AgendaPanel.watcher = vscode.workspace.createFileSystemWatcher(pattern);
-
-            const ignored = (uri: vscode.Uri) => {
-                // Normalize backslashes to forward slashes so the same checks
-                // work regardless of how `fsPath` is rendered on the current
-                // platform (Windows can produce either style depending on the
-                // URI source).
-                const normalized = uri.fsPath.replace(/\\/g, '/');
-                return (
-                    normalized.endsWith('.archive.md') ||
-                    normalized.includes('/.git/') ||
-                    normalized.includes('/node_modules/')
-                );
-            };
-
-            const triggerRefresh = (uri: vscode.Uri) => {
-                if (ignored(uri)) {
-                    return;
-                }
-                if (AgendaPanel.debounceTimer) {
-                    clearTimeout(AgendaPanel.debounceTimer);
-                }
-                AgendaPanel.debounceTimer = setTimeout(() => {
-                    AgendaPanel.refreshCallback?.();
-                }, REFRESH_DEBOUNCE_MS);
-            };
-
-            AgendaPanel.watcher.onDidChange(triggerRefresh);
-            AgendaPanel.watcher.onDidCreate(triggerRefresh);
-            AgendaPanel.watcher.onDidDelete(triggerRefresh);
+            AgendaPanel.ensureWatcher(config);
         }
 
         if (!AgendaPanel.dayCheckTimer && refreshCallback) {
             AgendaPanel.scheduleNextDayCheck();
         }
+    }
+
+    private static updateExistingPanel(
+        data: AgendaData,
+        mode: string,
+        shiftedToday: string | undefined,
+        currentTag: string | undefined,
+        firstDayOfWeek: FirstDayOfWeek,
+        userInitiated: boolean,
+        navigation: boolean
+    ) {
+        const panel = AgendaPanel.currentPanel!;
+        if (userInitiated) {
+            panel.reveal(vscode.ViewColumn.One);
+        }
+        panel.title = `Agenda: ${mode}`;
+        panel.webview.postMessage({
+            type: 'update',
+            data,
+            mode,
+            shiftedToday,
+            currentTag,
+            firstDayOfWeek,
+            userInitiated,
+            navigation
+        });
+    }
+
+    private static createNewPanel(
+        data: AgendaData,
+        mode: string,
+        locale: string,
+        currentTag: string | undefined,
+        holidays: string[] | undefined,
+        firstDayOfWeek: FirstDayOfWeek
+    ) {
+        AgendaPanel.currentPanel = vscode.window.createWebviewPanel(
+            'markdownOrgAgenda',
+            `Agenda: ${mode}`,
+            vscode.ViewColumn.One,
+            {
+                enableScripts: true,
+                retainContextWhenHidden: true,
+                localResourceRoots: []
+            }
+        );
+
+        // Drives the `markdown-org.agendaFocused` when-clause so show/cycle
+        // keybindings (Ctrl+K Ctrl+W, Ctrl+K Ctrl+M, cycleTag) keep working
+        // when the user is inside the agenda webview and no markdown editor
+        // is focused.
+        AgendaPanel.setAgendaFocusedContext(true);
+
+        AgendaPanel.currentPanel.onDidChangeViewState((e) => {
+            AgendaPanel.setAgendaFocusedContext(e.webviewPanel.active);
+        });
+
+        AgendaPanel.currentPanel.onDidDispose(() => AgendaPanel.handleDispose());
+        AgendaPanel.currentPanel.webview.onDidReceiveMessage((message) => AgendaPanel.handleWebviewMessage(message));
+
+        const nonce = generateNonce();
+        const cspSource = AgendaPanel.currentPanel.webview.cspSource;
+        AgendaPanel.currentPanel.webview.html = AgendaPanel.getHtmlContent(
+            data,
+            mode,
+            locale,
+            currentTag || 'ALL',
+            holidays || [],
+            nonce,
+            cspSource
+        );
+
+        AgendaPanel.currentPanel.webview.postMessage({
+            command: 'init',
+            data,
+            mode,
+            locale,
+            shiftedToday: AgendaPanel.shiftedToday,
+            currentTag: currentTag || 'ALL',
+            holidays: holidays || [],
+            firstDayOfWeek
+        });
+    }
+
+    private static handleDispose() {
+        AgendaPanel.setAgendaFocusedContext(false);
+        AgendaPanel.currentPanel = undefined;
+        AgendaPanel.watcher?.dispose();
+        AgendaPanel.watcher = undefined;
+        AgendaPanel.refreshCallback = undefined;
+        if (AgendaPanel.debounceTimer) {
+            clearTimeout(AgendaPanel.debounceTimer);
+            AgendaPanel.debounceTimer = undefined;
+        }
+        if (AgendaPanel.dayCheckTimer) {
+            clearTimeout(AgendaPanel.dayCheckTimer);
+            AgendaPanel.dayCheckTimer = undefined;
+        }
+    }
+
+    private static async handleWebviewMessage(message: {
+        command: string;
+        file?: string;
+        line?: number;
+        switchToDay?: boolean;
+        date?: string;
+        mode?: string;
+    }) {
+        if (message.command === 'openTask') {
+            if (typeof message.file !== 'string' || typeof message.line !== 'number') {
+                return;
+            }
+            await AgendaPanel.openTaskInEditor(message.file, message.line);
+        } else if (message.command === 'navigate') {
+            if (message.switchToDay) {
+                AgendaPanel.currentPanel?.dispose();
+                await vscode.commands.executeCommand('markdown-org.showAgendaDay', message.date);
+            } else {
+                AgendaPanel.refreshCallback?.(message.date, true);
+            }
+        } else if (message.command === 'cycleTag') {
+            await vscode.commands.executeCommand('markdown-org.cycleTag');
+        } else if (message.command === 'switchMode') {
+            const targetCommand =
+                message.mode === 'day'
+                    ? 'markdown-org.showAgendaDay'
+                    : message.mode === 'week'
+                      ? 'markdown-org.showAgendaWeek'
+                      : message.mode === 'month'
+                        ? 'markdown-org.showAgendaMonth'
+                        : message.mode === 'tasks'
+                          ? 'markdown-org.showTasks'
+                          : null;
+            if (targetCommand) {
+                await vscode.commands.executeCommand(targetCommand, AgendaPanel.shiftedToday);
+            }
+        }
+    }
+
+    private static ensureWatcher(config: vscode.WorkspaceConfiguration) {
+        // Scope the watcher to the directory that the extractor actually
+        // sweeps. With a bare `**/*.md` pattern, the underlying OS primitive
+        // (inotify/FSEvents/etc.) registers watches for every `.md` under
+        // the workspace, including node_modules / .git / .vscode-test, even
+        // though triggerRefresh ignores those events. A RelativePattern with
+        // the workspace dir as the base avoids setting up those watches in
+        // the first place.
+        const watchBase = resolveAgendaWatchBase(
+            config.get<string>('workspaceDir'),
+            vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
+        );
+        const pattern: vscode.GlobPattern = watchBase ? new vscode.RelativePattern(watchBase, '**/*.md') : '**/*.md';
+        AgendaPanel.watcher = vscode.workspace.createFileSystemWatcher(pattern);
+
+        const ignored = (uri: vscode.Uri) => {
+            // Normalize backslashes to forward slashes so the same checks
+            // work regardless of how `fsPath` is rendered on the current
+            // platform (Windows can produce either style depending on the
+            // URI source).
+            const normalized = uri.fsPath.replace(/\\/g, '/');
+            return (
+                normalized.endsWith('.archive.md') ||
+                normalized.includes('/.git/') ||
+                normalized.includes('/node_modules/')
+            );
+        };
+
+        const triggerRefresh = (uri: vscode.Uri) => {
+            if (ignored(uri)) {
+                return;
+            }
+            if (AgendaPanel.debounceTimer) {
+                clearTimeout(AgendaPanel.debounceTimer);
+            }
+            AgendaPanel.debounceTimer = setTimeout(() => {
+                AgendaPanel.refreshCallback?.();
+            }, REFRESH_DEBOUNCE_MS);
+        };
+
+        AgendaPanel.watcher.onDidChange(triggerRefresh);
+        AgendaPanel.watcher.onDidCreate(triggerRefresh);
+        AgendaPanel.watcher.onDidDelete(triggerRefresh);
     }
 
     /**
