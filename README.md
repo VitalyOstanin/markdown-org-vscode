@@ -419,7 +419,7 @@ Then reload the VS Code window. On Windows, installing the
 
 ### Requirements
 
-- Node.js 20+ required (`engines.node` in `package.json`); CI and `.nvmrc` use **Node 22** -- run `nvm use` to match.
+- Node.js 22+ required (`engines.node` in `package.json`); CI and `.nvmrc` also use **Node 22** -- run `nvm use` to match.
 - npm
 - VS Code 1.85+
 - For running integration tests on **headless Linux** (CI, remote machines without an X server): `xvfb-run` (e.g. `apt install xvfb`). Not required on macOS, Windows, or Linux with a graphical session.
