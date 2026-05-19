@@ -41,6 +41,7 @@ VS Code extension for org-style task management in Markdown files.
     - [Project Structure](#project-structure)
     - [Additional documentation](#additional-documentation)
 - [Release notes](#release-notes)
+    - [Rolling back to a previous version](#rolling-back-to-a-previous-version)
 - [License](#license)
 
 ## Features
@@ -525,6 +526,28 @@ section; the annotated tag `vX.Y.Z` is then created on the same commit
 to trigger the publish workflow. The Conventional Commits scope keeps
 release commits easy to filter (`git log --grep '^chore(release)'`)
 without claiming a behaviour change those commits never carry.
+
+### Rolling back to a previous version
+
+If a release introduces a regression, you can pin the extension to the
+previous good build without waiting for a forward fix:
+
+1. Open the **GitHub Releases** page and download the `.vsix` for the
+   last known good version.
+2. In VS Code, open the **Extensions** view, click the `...` menu next
+   to the search box, choose **Install from VSIX...**, and select the
+   downloaded file. VS Code will replace the current install with that
+   version.
+3. To stop auto-updates from pulling the broken version back in, right-
+   click the extension entry and choose **Pin Version**.
+
+After the regression is fixed in a later release, unpin the version
+and let VS Code resume normal updates.
+
+If the issue is severe enough that the broken release should not be
+installed by anyone, also unpublish or yank the offending tag from the
+distribution channel (GitHub Release / Marketplace) so new users don't
+land on it; existing installs are still protected by the steps above.
 
 ## License
 
