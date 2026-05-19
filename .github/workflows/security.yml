@@ -1,0 +1,48 @@
+name: Security
+
+on:
+  schedule:
+    # Weekly, Monday 06:30 UTC. Catches CVEs published against pinned
+    # transitive dependencies that wouldn't surface in the per-PR audit
+    # because nothing in the repo had changed.
+    - cron: '30 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    name: npm audit (scheduled)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    # Informational. New advisories should be triaged manually rather
+    # than auto-failing the workflow.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
+      - name: Install dependencies (lockfile only)
+        # Skip lifecycle scripts to avoid running anything before audit.
+        run: npm ci --ignore-scripts
+
+      - name: npm audit (production deps)
+        # Production deps are what ship inside the VSIX, so a moderate
+        # finding here is the more pressing signal.
+        run: npm audit --omit=dev --audit-level=moderate
+
+      - name: npm audit (all deps)
+        # Full report including devDependencies. Kept as a separate
+        # step so a moderate dev-only advisory does not mask the
+        # production scan above.
+        run: npm audit || true
