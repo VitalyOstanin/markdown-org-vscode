@@ -180,6 +180,12 @@ export class AgendaPanel {
         AgendaPanel.watcher?.dispose();
         AgendaPanel.watcher = undefined;
         AgendaPanel.refreshCallback = undefined;
+        // The next agenda open must rebuild its anchor date from
+        // initialDate/toIsoDate(today). Keeping a stale shiftedToday from a
+        // previous session around would leak into AgendaPanel.refresh()
+        // (which reads it directly) the moment a fresh refreshCallback is
+        // wired up.
+        AgendaPanel.shiftedToday = undefined;
         if (AgendaPanel.debounceTimer) {
             clearTimeout(AgendaPanel.debounceTimer);
             AgendaPanel.debounceTimer = undefined;

@@ -389,6 +389,25 @@ suite('Agenda webview keybindings scope', () => {
         }
     });
 
+    test('shiftedToday is reset when the agenda panel is disposed', async function () {
+        this.timeout(10000);
+        await vscode.commands.executeCommand('markdown-org.showAgendaWeek');
+        await new Promise((resolve) => setTimeout(resolve, 300));
+
+        const beforeClose = (AgendaPanel as unknown as { shiftedToday?: string }).shiftedToday;
+        assert.ok(beforeClose, 'expected AgendaPanel.shiftedToday to be populated while the panel is open');
+
+        await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+        await new Promise((resolve) => setTimeout(resolve, 300));
+
+        const afterClose = (AgendaPanel as unknown as { shiftedToday?: string }).shiftedToday;
+        assert.strictEqual(
+            afterClose,
+            undefined,
+            'AgendaPanel.shiftedToday must clear on dispose so AgendaPanel.refresh() cannot reuse a stale anchor when the panel reopens'
+        );
+    });
+
     test('agendaFocused context is set true on open and false on dispose', async function () {
         this.timeout(10000);
         const spy = sinon.spy(vscode.commands, 'executeCommand');
