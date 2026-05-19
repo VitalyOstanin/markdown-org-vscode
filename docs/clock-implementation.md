@@ -66,7 +66,7 @@ Implemented CLOCK time tracking functionality for the Markdown Org VS Code exten
 **Closed CLOCK:**
 
 ```
-`CLOCK: [2025-12-09 Tue 14:30]--[2025-12-09 Tue 16:45] =>  2:15
+`CLOCK: [2025-12-09 Tue 14:30]--[2025-12-09 Tue 16:45] =>  2:15`
 ```
 
 ### 4. Placement Rules
@@ -158,8 +158,8 @@ All tests pass successfully.
 ## TODO Code review
 
 `CREATED: <2025-12-09 Tue 09:00>`
-`CLOCK: [2025-12-09 Tue 10:00]--[2025-12-09 Tue 11:30] =>  1:30
-`CLOCK: [2025-12-09 Tue 14:00]--[2025-12-09 Tue 16:00] => 2:00
+`CLOCK: [2025-12-09 Tue 10:00]--[2025-12-09 Tue 11:30] =>  1:30`
+`CLOCK: [2025-12-09 Tue 14:00]--[2025-12-09 Tue 16:00] => 2:00`
 `CLOCK: [2025-12-09 Tue 16:30]`
 
 Review notes here.
