@@ -92,5 +92,5 @@ Harder:
 - Timestamp manipulation: `src/commands/timestampEdit.ts`,
   `src/utils/timestampParts.ts`, `src/utils/toggleTimestampType.ts`
 - CLOCK manipulation: `src/commands/clock.ts`, `src/utils/findClockLines.ts`
-- Extractor end of the contract: [crates.io/crates/markdown-org-extract](https://crates.io/crates/markdown-org-extract)
+- Extractor end of the contract: [github.com/VitalyOstanin/markdown-org-extract](https://github.com/VitalyOstanin/markdown-org-extract) (published to [crates.io](https://crates.io/crates/markdown-org-extract))
 - Upstream reference for Org-mode timestamps: [orgmode.org](https://orgmode.org/)

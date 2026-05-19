@@ -80,4 +80,4 @@ Harder:
 - Agenda invocation: `src/commands/agenda.ts`
 - User-facing setting: `markdown-org.extractorPath` in `package.json`
 - Trust gate: `capabilities.untrustedWorkspaces` in `package.json`
-- Binary source: [crates.io/crates/markdown-org-extract](https://crates.io/crates/markdown-org-extract)
+- Binary source: [github.com/VitalyOstanin/markdown-org-extract](https://github.com/VitalyOstanin/markdown-org-extract) (published to [crates.io](https://crates.io/crates/markdown-org-extract))
