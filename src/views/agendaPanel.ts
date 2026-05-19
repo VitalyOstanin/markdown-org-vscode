@@ -357,8 +357,10 @@ export class AgendaPanel {
         // Defense-in-depth: sanitize task.line before interpolating it into
         // the data-line HTML attribute. Unit-tested in agendaClick.test.ts.
         const sanitizeTaskLineSource = sanitizeTaskLine.toString();
-        // Same approach for the scroll-memory helpers used by the
-        // navigation round-trip fix; unit-tested in agendaScroll.test.ts.
+        // Same approach for the scroll-memory helpers that restore the
+        // user's last scroll on Prev/Next round-trips (e.g. Next Week then
+        // Prev Week back to the same week); unit-tested in
+        // agendaScroll.test.ts.
         const rememberScrollSource = rememberScroll.toString();
         const recallScrollSource = recallScroll.toString();
         // Heading tint resolver (DEADLINE > priority > default);
