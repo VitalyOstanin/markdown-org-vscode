@@ -45,18 +45,25 @@ suite('Demo: Task Status', () => {
         const document = await vscode.workspace.openTextDocument(demoFile);
         const editor = await vscode.window.showTextDocument(document);
 
+        // Order matters: apply the theme first (awaits the active-theme
+        // event), then collapse side panels and adjust workspace settings.
+        // maximizeVscodeWindow comes last so neither the theme repaint nor
+        // closing a sidebar can reset the X11 window size mid-setup.
+        await applyMonokaiTheme();
         await hideSidePanels();
         await forceEnglishWeekdays();
-        await applyMonokaiTheme();
+        await sleep(800);
         await maximizeVscodeWindow();
-        // Theme repaint + window resize need a generous window under Xvfb;
-        // happens BEFORE markDemoStart so the transition is trimmed out of
-        // the final recording.
-        await sleep(4000);
+        await sleep(1500);
         await vscode.commands.executeCommand('notifications.clearAll');
         await vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup');
         await enableScreencast();
-        await sleep(1500);
+        await sleep(1000);
+        // Final defensive resize -- screencast overlay activation can shift
+        // the layout. This happens BEFORE markDemoStart so the transition is
+        // trimmed out of the recording.
+        await maximizeVscodeWindow();
+        await sleep(500);
         await markDemoStart();
         await sleep(500);
 

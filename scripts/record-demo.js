@@ -10,7 +10,7 @@
 // scenario ∈ { task-status, timestamps, clock, agenda }.
 //
 // Логика одного прогона:
-//   1. Запустить Xvfb на DISPLAY :99 (1920x1080x24).
+//   1. Запустить Xvfb на DISPLAY :99 в разрешении RECORD_GEOMETRY (см. ниже).
 //   2. Запустить ffmpeg -f x11grab для записи DISPLAY в mp4.
 //   3. Передать тесту MARKDOWN_ORG_DEMO_MARKER=<tmp path>; в начале действий
 //      тест пишет туда {startedAt: Date.now()}.
@@ -29,6 +29,45 @@ const mediaDir = path.join(repoRoot, 'media');
 fs.mkdirSync(mediaDir, { recursive: true });
 
 const SCENARIOS = ['task-status', 'timestamps', 'clock', 'agenda'];
+
+// Resolution of the Xvfb screen the recording runs on. Kept in one place so
+// that the value flows into ffmpeg's video_size, the env that
+// `maximizeVscodeWindow` / `captureScreenshot` read for their geometry, and
+// the comment block at the top of this file.
+const RECORD_GEOMETRY = '1280x720';
+
+// Map a scenario name to the demo workspace folder that .vscode-test.demo.mjs
+// runs the test under. Each scenario gets its own folder so the settings.json
+// seeded below cannot bleed between scenarios.
+const SCENARIO_WORKSPACES = {
+    'task-status': 'test-workspace-demo-task-status',
+    timestamps: 'test-workspace-demo-timestamps',
+    clock: 'test-workspace-demo-clock',
+    agenda: 'test-workspace-demo-agenda'
+};
+
+// Seed the demo workspace's settings.json before VS Code starts. The demo
+// workspaces are listed in .gitignore, so each run regenerates the file --
+// without seeding it here, a fresh clone would record demos without the
+// zoom level / hidden activity bar / English weekdays the GIFs are tuned for.
+// The colour theme is intentionally not seeded; see the note in
+// scripts/screenshot-demo.js for the cold-start reason.
+function seedWorkspaceSettings(workspaceDir, scenario) {
+    const settings = {
+        'markdown-org.weekdayLocale': 'en',
+        'workbench.activityBar.location': 'hidden',
+        'window.zoomLevel': 1
+    };
+    if (scenario === 'clock') {
+        settings['markdown-org.clockRoundMinutes'] = 60;
+    }
+    if (scenario === 'agenda') {
+        settings['markdown-org.workspaceDir'] = workspaceDir;
+    }
+    const vscodeDir = path.join(workspaceDir, '.vscode');
+    fs.mkdirSync(vscodeDir, { recursive: true });
+    fs.writeFileSync(path.join(vscodeDir, 'settings.json'), JSON.stringify(settings, null, 4) + '\n', 'utf-8');
+}
 
 function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
@@ -110,8 +149,16 @@ async function recordOne(scenario, display) {
         fs.rmSync(stale, { force: true });
     }
 
-    console.log(`[record-demo] starting Xvfb ${display} (1920x1080x24)`);
-    const xvfb = spawn('Xvfb', [display, '-screen', '0', '1920x1080x24', '-nolisten', 'tcp', '-noreset'], {
+    const workspaceFolder = SCENARIO_WORKSPACES[scenario];
+    if (!workspaceFolder) {
+        throw new Error(`no workspace mapping for scenario '${scenario}'`);
+    }
+    const workspaceDir = path.join(repoRoot, workspaceFolder);
+    fs.mkdirSync(workspaceDir, { recursive: true });
+    seedWorkspaceSettings(workspaceDir, scenario);
+
+    console.log(`[record-demo] starting Xvfb ${display} (${RECORD_GEOMETRY}x24)`);
+    const xvfb = spawn('Xvfb', [display, '-screen', '0', `${RECORD_GEOMETRY}x24`, '-nolisten', 'tcp', '-noreset'], {
         stdio: ['ignore', 'inherit', 'inherit']
     });
 
@@ -133,7 +180,7 @@ async function recordOne(scenario, display) {
             '-framerate',
             '30',
             '-video_size',
-            '1920x1080',
+            RECORD_GEOMETRY,
             '-i',
             display,
             '-y',
@@ -156,7 +203,12 @@ async function recordOne(scenario, display) {
         [vscodeTestBin, '--config', path.join(repoRoot, '.vscode-test.demo.mjs'), '--label', `demo-${scenario}`],
         {
             stdio: 'inherit',
-            env: { ...process.env, DISPLAY: display, MARKDOWN_ORG_DEMO_MARKER: markerPath }
+            env: {
+                ...process.env,
+                DISPLAY: display,
+                MARKDOWN_ORG_DEMO_MARKER: markerPath,
+                MARKDOWN_ORG_SCREENSHOT_GEOMETRY: RECORD_GEOMETRY
+            }
         }
     );
 

@@ -74,15 +74,18 @@ suite('Demo: Timestamps', () => {
         const document = await vscode.workspace.openTextDocument(demoFile);
         const editor = await vscode.window.showTextDocument(document);
 
+        await applyMonokaiTheme();
         await hideSidePanels();
         await forceEnglishWeekdays();
-        await applyMonokaiTheme();
+        await sleep(800);
         await maximizeVscodeWindow();
-        await sleep(4000);
+        await sleep(1500);
         await vscode.commands.executeCommand('notifications.clearAll');
         await vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup');
         await enableScreencast();
-        await sleep(1500);
+        await sleep(1000);
+        await maximizeVscodeWindow();
+        await sleep(500);
         await markDemoStart();
         await sleep(500);
 

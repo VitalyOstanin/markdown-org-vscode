@@ -8,7 +8,7 @@
 //
 // Логика:
 //   1. Скомпилировать TS (тот же шаг, что в record-demo.js).
-//   2. Запустить Xvfb на DISPLAY :99 (1920x1080x24).
+//   2. Запустить Xvfb на DISPLAY :99 (1280x720x24).
 //   3. Запустить vscode-test с label demo-screenshots; передать тесту
 //      env MARKDOWN_ORG_SCREENSHOT_DIR=<media> и геометрию.
 //   4. Тест внутри сценария вызывает captureScreenshot(name), которая
@@ -124,7 +124,7 @@ async function main() {
     }
 
     const display = process.env.SCREENSHOT_DEMO_DISPLAY || ':99';
-    const geometry = '1920x1080';
+    const geometry = '1280x720';
 
     console.log(`[screenshot-demo] starting Xvfb ${display} (${geometry}x24)`);
     const xvfb = spawn('Xvfb', [display, '-screen', '0', `${geometry}x24`, '-nolisten', 'tcp', '-noreset'], {

@@ -143,23 +143,20 @@ suite('Demo: Screenshots', () => {
         await config.update('workspaceDir', wsDir, vscode.ConfigurationTarget.Workspace);
 
         await forceEnglishWeekdays();
+        // applyMonokaiTheme now waits for VS Code's active-theme event, so
+        // by the time control returns the editor has already recoloured.
         await applyMonokaiTheme();
-        // Stretch the window to the full Xvfb resolution before the first
-        // snap -- without this, the screenshot has a wide black border
-        // because the X server has no window manager to maximise on open.
-        await maximizeVscodeWindow();
-        // Generous repaint window: Monokai recomputes editor decorations,
-        // tokenisation colours and the minimap palette in response to
-        // config.update, and Xvfb-backed sessions take noticeably longer
-        // than a real GPU. 4 s is comfortable in practice.
-        await sleep(4000);
 
         // 1. Editor view: planning.md is the most representative source file.
         const planningDoc = await vscode.workspace.openTextDocument(planningFile);
         await vscode.window.showTextDocument(planningDoc);
         await hideSidePanels();
         await vscode.commands.executeCommand('notifications.clearAll');
-        await sleep(900);
+        // Stretch the window to the full Xvfb resolution AFTER side panels
+        // are collapsed -- without `--sync`, closing the sidebar could race
+        // the resize and leave a wide black border around the chrome.
+        await maximizeVscodeWindow();
+        await sleep(1500);
         await captureScreenshot('editor-markdown');
 
         // 2. Agenda Day.

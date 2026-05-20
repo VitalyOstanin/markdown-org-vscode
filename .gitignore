@@ -7,3 +7,4 @@ test-workspace-demo*/
 docs/reviews/
 coverage/
 .nyc_output/
+temp/

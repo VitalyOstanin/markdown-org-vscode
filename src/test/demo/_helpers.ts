@@ -34,7 +34,7 @@ export async function hideSidePanels(): Promise<void> {
  *
  * Settings tweaks:
  *   - `screencastMode.fontSize`: bumped above the default 56px equivalent so
- *     the overlay survives the 1280:-1 gif rescale without becoming a smear.
+ *     the overlay stays legible at the 1280x720 Xvfb the recorder uses.
  *   - `screencastMode.keyboardOptions.showSingleEditorCursorMoves`: off, so
  *     plain arrow-key cursor moves do not flood the overlay during
  *     navigation-heavy scenarios.
@@ -111,7 +111,7 @@ export async function markDemoStart(): Promise<void> {
  * helper resizes to whatever resolution the recording driver uses.
  */
 export async function maximizeVscodeWindow(): Promise<void> {
-    const geometry = process.env.MARKDOWN_ORG_SCREENSHOT_GEOMETRY ?? '1920x1080';
+    const geometry = process.env.MARKDOWN_ORG_SCREENSHOT_GEOMETRY ?? '1280x720';
     const [w, h] = geometry.split('x').map((n) => parseInt(n, 10));
     const display = process.env.DISPLAY ?? ':99';
     const search = await new Promise<{ status: number; stdout: string }>((resolve, reject) => {
@@ -140,10 +140,14 @@ export async function maximizeVscodeWindow(): Promise<void> {
             proc.on('exit', (code) => resolve(code ?? 1));
             proc.on('error', reject);
         });
-    if ((await runSync(['windowsize', wid, String(w), String(h)])) !== 0) {
+    // `--sync` makes xdotool block until the X server reports the operation
+    // applied. Without it the next demo step can race the resize -- the
+    // recording then captures VS Code in its default Xvfb size with a wide
+    // black border around the chrome.
+    if ((await runSync(['windowsize', '--sync', wid, String(w), String(h)])) !== 0) {
         throw new Error('xdotool windowsize failed');
     }
-    if ((await runSync(['windowmove', wid, '0', '0'])) !== 0) {
+    if ((await runSync(['windowmove', '--sync', wid, '0', '0'])) !== 0) {
         throw new Error('xdotool windowmove failed');
     }
 }
@@ -158,10 +162,37 @@ export async function maximizeVscodeWindow(): Promise<void> {
  */
 export async function applyMonokaiTheme(): Promise<void> {
     const workbench = vscode.workspace.getConfiguration('workbench');
+    // If the previous run already wrote Monokai to settings, `update` is a
+    // no-op and onDidChangeActiveColorTheme would never fire. Detect that
+    // case up front so the caller is not blocked on a timeout.
+    if (workbench.get<string>('colorTheme') === 'Monokai') {
+        await sleep(500);
+        return;
+    }
+    // Wait for VS Code to acknowledge the swap, otherwise the recording can
+    // start before the editor finishes recolouring -- the first few GIF
+    // frames then show the default dark theme bleeding through.
+    const themeApplied = new Promise<void>((resolve) => {
+        const subscription = vscode.window.onDidChangeActiveColorTheme(() => {
+            subscription.dispose();
+            resolve();
+        });
+        // Safety net: if the event for some reason does not fire (the theme
+        // was already active but the workspace config did not reflect it),
+        // resolve after 5 s so the demo does not stall indefinitely.
+        setTimeout(() => {
+            subscription.dispose();
+            resolve();
+        }, 5000);
+    });
     // Workspace target applies immediately without a window reload; Global
     // also works but is only picked up after VS Code re-reads the settings
     // file, which is unreliable under the test runner.
     await workbench.update('colorTheme', 'Monokai', vscode.ConfigurationTarget.Workspace);
+    await themeApplied;
+    // Even after the active-theme event, the editor needs a moment to
+    // recompute tokenisation colours and the minimap palette.
+    await sleep(800);
 }
 
 /**
@@ -171,16 +202,16 @@ export async function applyMonokaiTheme(): Promise<void> {
  * `npm run test:integration` without a screen capture stack attached.
  *
  * The frame is saved as `${MARKDOWN_ORG_SCREENSHOT_DIR}/${name}.png`. Display
- * geometry (1920x1080) matches the Xvfb the recording driver starts; it is
- * read from MARKDOWN_ORG_SCREENSHOT_GEOMETRY when present so the test stays
- * portable if the driver ever changes resolution.
+ * geometry defaults to 1280x720 to match the Xvfb the recording driver starts;
+ * it is read from MARKDOWN_ORG_SCREENSHOT_GEOMETRY when present so the test
+ * stays portable if the driver ever changes resolution.
  */
 export async function captureScreenshot(name: string): Promise<void> {
     const dir = process.env.MARKDOWN_ORG_SCREENSHOT_DIR;
     if (!dir) return;
     await fs.mkdir(dir, { recursive: true });
     const display = process.env.DISPLAY ?? ':99';
-    const geometry = process.env.MARKDOWN_ORG_SCREENSHOT_GEOMETRY ?? '1920x1080';
+    const geometry = process.env.MARKDOWN_ORG_SCREENSHOT_GEOMETRY ?? '1280x720';
     const target = path.join(dir, `${name}.png`);
     await new Promise<void>((resolve, reject) => {
         const proc = spawn(
