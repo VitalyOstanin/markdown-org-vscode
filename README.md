@@ -108,7 +108,6 @@ become tasks, inline code spans hold timestamps:
 
 ```markdown
 ## TODO [#A] Important meeting
-
 `CREATED: <2025-12-01 Sun 09:15>`
 `DEADLINE: <2025-12-06 Fri 15:00>`
 ```
@@ -117,7 +116,6 @@ become tasks, inline code spans hold timestamps:
 
 ```markdown
 ## DONE Fix bug in parser
-
 `CREATED: <2025-12-01 Sun 10:00>`
 `CLOSED: <2025-12-03 Tue 14:30>`
 ```
@@ -126,11 +124,9 @@ become tasks, inline code spans hold timestamps:
 
 ```markdown
 ## Project planning session
-
 `SCHEDULED: <2025-12-10 Tue 10:00>`
 
 ## Report submission
-
 `DEADLINE: <2025-12-15 Sun>`
 ```
 
@@ -145,7 +141,6 @@ or closed (with duration).
 
 ```markdown
 ## TODO Working on feature
-
 `CREATED: <2025-12-09 Tue 10:00>`
 `CLOCK: [2025-12-09 Tue 14:30]`
 ```
@@ -154,7 +149,6 @@ or closed (with duration).
 
 ```markdown
 ## TODO Code review
-
 `CREATED: <2025-12-09 Tue 09:00>`
 `CLOCK: [2025-12-09 Tue 10:00]--[2025-12-09 Tue 11:30] =>  1:30`
 `CLOCK: [2025-12-09 Tue 14:00]--[2025-12-09 Tue 16:00] =>  2:00`
@@ -213,15 +207,12 @@ weekday and repeater always live **inside** the angle brackets.
 
 ```markdown
 ## TODO Daily standup
-
 `SCHEDULED: <2026-12-06 Sun 10:00 +1d>`
 
 ## TODO Weekly review
-
 `SCHEDULED: <2026-12-06 Sun ++1w>`
 
 ## TODO Every 2 workdays
-
 `SCHEDULED: <2026-12-06 Sun +2wd>`
 ```
 
