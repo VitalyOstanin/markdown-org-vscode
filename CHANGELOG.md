@@ -2,6 +2,18 @@
 
 All notable changes to the "Markdown Org" extension will be documented in this file.
 
+## [0.5.1] - 2026-05-21
+
+### Documentation
+
+- Re-recorded all demo GIFs and screenshots at 1280×720 with `window.zoomLevel: 1`, so the editor, agenda and clocktable read clearly in a typical GitHub viewport instead of the previous 1920×1080 capture downscaled through lanczos. The first frames now already show Monokai colours instead of the transient default-dark palette that bled through on slower runs.
+- Dropped blank lines between `## Heading` and the inline-code timestamps in the README's syntax examples; they were inserted automatically by Prettier's embedded-language formatting and did not match the wire format the extension actually consumes.
+
+### Internal
+
+- The recording pipeline (`scripts/record-demo.js`, `scripts/screenshot-demo.js`, `src/test/demo/_helpers.ts`) now seeds every demo workspace's `settings.json` (English weekdays, hidden activity bar, `window.zoomLevel: 1` for the GIF scenarios), awaits `vscode.window.onDidChangeActiveColorTheme` before recording starts, and uses `xdotool --sync` so the X11 window resize cannot race subsequent demo steps. A clone or CI checkout reproduces identical assets.
+- Prettier now runs with `embeddedLanguageFormatting: "off"` so fenced ` ```markdown ` blocks inside the README are not silently rewritten on each `npm run format`.
+
 ## [0.5.0] - 2026-05-20
 
 ### Added
