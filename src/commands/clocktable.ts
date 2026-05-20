@@ -1,74 +1,34 @@
 import * as vscode from 'vscode';
-import * as path from 'path';
 import { formatDurationHM, requireActiveEditor } from '../utils';
-import { exec } from '../utils/exec';
-import { EXTRACTOR_MAX_BUFFER_BYTES, EXTRACTOR_TIMEOUT_MS, extractor } from '../utils/extractor';
 import { formatError, notifyError, notifyWarn } from '../utils/notify';
-import { parseClockDuration } from '../utils/clockDuration';
-import { buildExecError } from '../utils/execError';
-
-interface Task {
-    heading: string;
-    clocks?: Array<{ duration?: string }>;
-    total_clock_time?: string;
-}
-
-function parseClockData(extractorPath: string, filePath: string): Promise<Task[]> {
-    return new Promise((resolve, reject) => {
-        exec.execFile(
-            extractorPath,
-            ['--dir', path.dirname(filePath), '--glob', path.basename(filePath), '--format', 'json', '--tasks'],
-            {
-                encoding: 'utf-8',
-                maxBuffer: EXTRACTOR_MAX_BUFFER_BYTES,
-                timeout: EXTRACTOR_TIMEOUT_MS
-            },
-            (error, stdout, stderr) => {
-                if (error) {
-                    reject(buildExecError(error, stderr, 'markdown-org-extract failed'));
-                    return;
-                }
-                try {
-                    resolve(JSON.parse(stdout));
-                } catch (parseError) {
-                    reject(parseError);
-                }
-            }
-        );
-    });
-}
+import { parseClockEntries, type ClockTableRow } from '../utils/parseClockEntries';
 
 function formatDuration(minutes: number): string {
     return formatDurationHM(minutes * 60_000);
 }
 
-function buildClockTable(tasks: Task[]): string {
-    const tasksWithTime = tasks.filter((t) => t.total_clock_time);
-
-    if (tasksWithTime.length === 0) {
+export function buildClockTable(rows: ClockTableRow[]): string {
+    if (rows.length === 0) {
         return '| Heading | Time |\n|---------|------|\n| No CLOCK entries found | 0:00 |';
     }
 
-    const rows = tasksWithTime.map((t) => ({
-        heading: t.heading.replace(/^(TODO|DONE)\s+(\[#[A-Z]\]\s+)?/, ''),
-        time: t.total_clock_time!
-    }));
+    const headingStrs = rows.map((r) => r.title);
+    const timeStrs = rows.map((r) => formatDuration(r.totalMinutes));
+    const totalMinutes = rows.reduce((sum, r) => sum + r.totalMinutes, 0);
+    const totalStr = formatDuration(totalMinutes);
 
-    const totalMinutes = tasksWithTime.reduce((sum, t) => sum + parseClockDuration(t.total_clock_time!), 0);
-
-    const maxHeadingLen = Math.max(7, ...rows.map((r) => r.heading.length));
-    const maxTimeLen = Math.max(4, ...rows.map((r) => r.time.length), formatDuration(totalMinutes).length);
+    const maxHeadingLen = Math.max('Heading'.length, '**Total**'.length, ...headingStrs.map((s) => s.length));
+    const maxTimeLen = Math.max('Time'.length, ...timeStrs.map((s) => s.length), totalStr.length);
 
     const lines: string[] = [];
     lines.push(`| ${'Heading'.padEnd(maxHeadingLen)} | ${'Time'.padEnd(maxTimeLen)} |`);
     lines.push(`|${'-'.repeat(maxHeadingLen + 2)}|${'-'.repeat(maxTimeLen + 2)}|`);
 
-    for (const row of rows) {
-        lines.push(`| ${row.heading.padEnd(maxHeadingLen)} | ${row.time.padEnd(maxTimeLen)} |`);
+    for (let i = 0; i < headingStrs.length; i++) {
+        lines.push(`| ${headingStrs[i].padEnd(maxHeadingLen)} | ${timeStrs[i].padEnd(maxTimeLen)} |`);
     }
 
     lines.push(`|${'-'.repeat(maxHeadingLen + 2)}|${'-'.repeat(maxTimeLen + 2)}|`);
-    const totalStr = formatDuration(totalMinutes);
     lines.push(`| ${'**Total**'.padEnd(maxHeadingLen)} | **${totalStr}**${' '.repeat(maxTimeLen - totalStr.length)} |`);
 
     return lines.join('\n');
@@ -76,8 +36,12 @@ function buildClockTable(tasks: Task[]): string {
 
 /**
  * Insert a CLOCK summary table for the current file at the cursor position.
- * Runs markdown-org-extract over the file to aggregate clocks per heading.
- * Disabled in untrusted workspaces.
+ * Parses the document directly (no extractor dependency) so DONE and plain
+ * headings with CLOCK history are included alongside TODO ones, matching
+ * Org-mode clocktable semantics for `:scope file`.
+ *
+ * Disabled in untrusted workspaces because the command modifies file
+ * contents.
  */
 export async function insertClockTable() {
     if (!vscode.workspace.isTrusted) {
@@ -89,16 +53,9 @@ export async function insertClockTable() {
         return;
     }
 
-    const extractorPath = await extractor.resolveExtractorPath();
-    if (!extractorPath) {
-        return;
-    }
-
-    const filePath = editor.document.uri.fsPath;
-
     try {
-        const tasks = await parseClockData(extractorPath, filePath);
-        const table = buildClockTable(tasks);
+        const rows = parseClockEntries(editor.document.getText());
+        const table = buildClockTable(rows);
 
         await editor.edit((editBuilder) => {
             editBuilder.insert(editor.selection.active, table + '\n');
