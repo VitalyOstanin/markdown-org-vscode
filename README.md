@@ -3,7 +3,12 @@
 [![CI](https://github.com/VitalyOstanin/markdown-org-vscode/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/VitalyOstanin/markdown-org-vscode/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/VitalyOstanin/markdown-org-vscode/branch/master/graph/badge.svg)](https://codecov.io/gh/VitalyOstanin/markdown-org-vscode)
 
-VS Code extension for org-style task management in Markdown files.
+Org-mode style task management in Markdown -- TODO/DONE workflow,
+priorities, SCHEDULED/DEADLINE timestamps, day/week/month agenda views,
+and CLOCK time tracking. Everything lives in plain `.md` files, so your
+tasks travel with the repository.
+
+![Day / Week / Month agenda demo](media/demo-agenda.gif)
 
 ## Table of Contents
 
@@ -32,42 +37,58 @@ VS Code extension for org-style task management in Markdown files.
     - [`markdown-org.clockRoundMinutes`](#markdown-orgclockroundminutes)
 - [Workspace Trust](#workspace-trust)
 - [Dependencies](#dependencies)
-- [Installation](#installation)
-    - [From VSIX](#from-vsix)
 - [Development](#development)
 - [Release notes](#release-notes)
 - [License](#license)
 
 ## Features
 
-Brings [Org mode](https://orgmode.org/) task management workflow to Markdown files in VS Code:
+Brings the [Org mode](https://orgmode.org/) task management workflow
+to Markdown files in VS Code:
 
-- **Task Management** - TODO/DONE statuses with priority levels ([#A])
-- **Timestamps** - SCHEDULED, DEADLINE, and CREATED timestamps with date/time
-- **Repeating Tasks** - Org-mode repeater syntax (+1d, +1w, +1wd for workdays)
-- **CLOCK Entries** - Time tracking with start/finish entries and clock tables
-- **Agenda Views** - Day, week, and month views with automatic task grouping
-- **Tag Filtering** - File tag filters (e.g. WORK/PRIVATE) toggled from the agenda view
-- **Live Updates** - Agenda automatically refreshes when markdown files change
-- **Heading Management** - Archive completed tasks or promote to a maintain file
+- **Task management** -- TODO / DONE statuses with priorities (`[#A]` -- `[#Z]` or numeric `[#0]` -- `[#64]`).
+- **Timestamps** -- `CREATED`, `SCHEDULED`, `DEADLINE`, `CLOSED` with full date / time.
+- **Repeating tasks** -- Org-mode repeaters `+1d`, `+1w`, `+1m`, `.+1m`, `++1w`, and `+1wd` for workdays (skips weekends and Russian holidays).
+- **CLOCK entries** -- Time tracking with start / finish events and an aggregated CLOCK table per file.
+- **Agenda views** -- Day, Week, and Month, with automatic grouping of overdue, scheduled, and upcoming tasks.
+- **Tag filtering** -- Filter agenda by file-name patterns (e.g. `WORK` / `PRIVATE`), toggled from the agenda or by hotkey.
+- **Live updates** -- Agenda refreshes automatically when underlying markdown files change.
+- **Heading management** -- Archive completed tasks to `*.archive.md` or promote them to a maintenance file.
 
 ## Quick Start
 
-1. Install the [`markdown-org-extract`](https://crates.io/crates/markdown-org-extract) binary:
+1. Install the [`markdown-org-extract`](https://crates.io/crates/markdown-org-extract) binary -- the extension relies on it to parse markdown files:
 
     ```bash
     cargo install markdown-org-extract
     ```
 
-2. Install the extension itself: see [Installation > From VSIX](#from-vsix).
-3. Open any `.md` file in your workspace and start using the [commands](#commands).
+2. Download the latest `markdown-org-vscode-X.Y.Z.vsix` from
+   [GitHub Releases](https://github.com/VitalyOstanin/markdown-org-vscode/releases).
+
+3. Install the extension in VS Code:
+    - **GUI:** open the **Extensions** view (`Ctrl+Shift+X`), click the `...` menu next to the search box, choose **Install from VSIX...**, and select the downloaded file.
+    - **CLI:**
+
+        ```bash
+        code --install-extension markdown-org-vscode-X.Y.Z.vsix
+        ```
+
+4. Open any `.md` file in your workspace and start using the [commands](#commands).
 
 For building the extension from source, see
 [DEVELOPMENT.md](DEVELOPMENT.md).
 
 ## Syntax Examples
 
+The extension reads tasks directly from your Markdown -- headings
+become tasks, inline code spans hold timestamps:
+
+![Editor view of a planning file](media/editor-markdown.png)
+
 ### Task Statuses
+
+![TODO / priority / DONE workflow](media/demo-task-status.gif)
 
 ```markdown
 ## TODO Task without priority
@@ -80,6 +101,8 @@ For building the extension from source, see
 ```
 
 ### Timestamps
+
+![All four timestamp types and three repeater flavours](media/demo-timestamps.gif)
 
 **With tasks:**
 
@@ -113,7 +136,10 @@ For building the extension from source, see
 
 ### CLOCK Entries
 
-CLOCK entries track time spent on tasks. They can be open (running) or closed (with duration).
+CLOCK entries track time spent on tasks. They can be open (running)
+or closed (with duration).
+
+![CLOCK history, new entry, and clocktable](media/demo-clock.gif)
 
 **Open CLOCK (running):**
 
@@ -134,11 +160,15 @@ CLOCK entries track time spent on tasks. They can be open (running) or closed (w
 `CLOCK: [2025-12-09 Tue 14:00]--[2025-12-09 Tue 16:00] =>  2:00`
 ```
 
-Use **Insert CLOCK Table** to produce an aggregated table of CLOCK durations for the current file.
+Use **Insert CLOCK Table** to produce an aggregated table of CLOCK
+durations for the current file:
+
+![Aggregated CLOCK table](media/clocktable.png)
 
 ### Priority Levels
 
-Priority markers can use any letter A-Z:
+Priority markers can be either a letter `A` -- `Z` or a number
+`0` -- `64`:
 
 ```markdown
 ## TODO [#A] High priority task
@@ -146,48 +176,60 @@ Priority markers can use any letter A-Z:
 ## TODO [#B] Medium priority task
 
 ## TODO [#C] Low priority task
+
+## TODO [#0] Highest numeric priority
+
+## TODO [#64] Lowest numeric priority
 ```
 
-Tasks with priority are shown first in agenda, sorted alphabetically (A before B before C).
+Tasks with priority are shown first in the agenda, sorted ascending
+(A before B before C; 0 before 1 before 2).
 
 ### Repeating Tasks
 
-Timestamps support org-mode repeater syntax for recurring tasks:
+Timestamps support Org-mode repeater syntax for recurring tasks. The
+weekday and repeater always live **inside** the angle brackets.
 
 **Standard units:**
 
-- `+Nh` - repeat every N hours
-- `+Nd` - repeat every N days
-- `+Nw` - repeat every N weeks
-- `+Nm` - repeat every N months
-- `+Ny` - repeat every N years
-- `+Nwd` - **repeat every N workdays** (skips weekends and Russian holidays)
+| Repeater | Meaning                                             |
+| -------- | --------------------------------------------------- |
+| `+Nh`    | Every N hours                                       |
+| `+Nd`    | Every N days                                        |
+| `+Nw`    | Every N weeks                                       |
+| `+Nm`    | Every N months                                      |
+| `+Ny`    | Every N years                                       |
+| `+Nwd`   | Every N **workdays** (skips weekends + RU holidays) |
 
 **Repeater modifiers:**
 
-- `+` - cumulative (strict, preserves overdue)
-- `++` - catch-up (preserves day of week)
-- `.+` - restart (from completion date)
+| Prefix | Behaviour                                |
+| ------ | ---------------------------------------- |
+| `+`    | Cumulative (strict) -- preserves overdue |
+| `++`   | Catch-up -- preserves day of week        |
+| `.+`   | Restart -- counts from completion date   |
 
 **Examples:**
 
 ```markdown
 ## TODO Daily standup
 
-`SCHEDULED: <2025-12-06 Fri 10:00 +1d>`
+`SCHEDULED: <2026-12-06 Sun 10:00 +1d>`
 
 ## TODO Weekly review
 
-`SCHEDULED: <2025-12-06 Fri ++1w>`
+`SCHEDULED: <2026-12-06 Sun ++1w>`
 
 ## TODO Every 2 workdays
 
-`SCHEDULED: <2025-12-06 Fri +2wd>`
+`SCHEDULED: <2026-12-06 Sun +2wd>`
 ```
 
 ## Commands
 
-Hotkeys below match the bindings declared in `package.json`. All keybindings except `Cycle Tag Filter` are only active when an active Markdown editor has focus.
+Hotkeys below match the bindings declared in `package.json`. All
+keybindings except `Cycle Tag Filter` are only active when an active
+Markdown editor has focus.
 
 ### Task Status Commands
 
@@ -204,8 +246,8 @@ Hotkeys below match the bindings declared in `package.json`. All keybindings exc
 | `Markdown Org: Insert CREATED Timestamp`   | `Ctrl+K Ctrl+K Ctrl+C` | Insert CREATED timestamp under the heading                                |
 | `Markdown Org: Insert SCHEDULED Timestamp` | `Ctrl+K Ctrl+K Ctrl+S` | Insert SCHEDULED timestamp; repeating the command removes it (toggle off) |
 | `Markdown Org: Insert DEADLINE Timestamp`  | `Ctrl+K Ctrl+K D`      | Insert DEADLINE timestamp; repeating the command removes it (toggle off)  |
-| `Markdown Org: Timestamp Up`               | `Shift+Up`             | Increment date/time/task status/timestamp type under cursor               |
-| `Markdown Org: Timestamp Down`             | `Shift+Down`           | Decrement date/time/task status/timestamp type under cursor               |
+| `Markdown Org: Timestamp Up`               | `Shift+Up`             | Increment date / time / task status / timestamp type under cursor         |
+| `Markdown Org: Timestamp Down`             | `Shift+Down`           | Decrement date / time / task status / timestamp type under cursor         |
 
 ### CLOCK Commands
 
@@ -220,10 +262,22 @@ Hotkeys below match the bindings declared in `package.json`. All keybindings exc
 | Command                             | Hotkey                 | Description                                              |
 | ----------------------------------- | ---------------------- | -------------------------------------------------------- |
 | `Markdown Org: Show Agenda (Day)`   | -                      | Show today's tasks                                       |
-| `Markdown Org: Show Agenda (Week)`  | `Ctrl+K Ctrl+W`        | Show week's tasks                                        |
-| `Markdown Org: Show Agenda (Month)` | `Ctrl+K Ctrl+M`        | Show month's tasks                                       |
+| `Markdown Org: Show Agenda (Week)`  | `Ctrl+K Ctrl+W`        | Show this week's tasks                                   |
+| `Markdown Org: Show Agenda (Month)` | `Ctrl+K Ctrl+M`        | Show this month's tasks                                  |
 | `Markdown Org: Show Tasks`          | -                      | Show all TODO tasks grouped by priority                  |
 | `Markdown Org: Cycle Tag Filter`    | `Ctrl+K Ctrl+K Ctrl+T` | Cycle the active file tag filter (e.g. ALL/WORK/PRIVATE) |
+
+**Day view:**
+
+![Agenda day view](media/agenda-day.png)
+
+**Week view:**
+
+![Agenda week view](media/agenda-week.png)
+
+**Month view:**
+
+![Agenda month view](media/agenda-month.png)
 
 ### Heading Management Commands
 
@@ -320,9 +374,9 @@ First day of week in the month calendar. `"auto"` resolves the first day from th
 
 File tag filters applied in agenda. `pattern` is a case-sensitive substring matched against the file's **basename** (not the full path), so a pattern like `"work"` does not accidentally match files inside a `networking/` directory.
 
-- `""` (empty) — filter disabled; all tasks are shown. The tag's name has no special meaning.
-- `"text"` — basename contains `"text"`.
-- `"!..."` — basename matches **none** of the positive patterns in `fileTags`. The text after `!` is only a marker and is ignored, so `"!"`, `"!work"`, and `"!xyz"` all behave the same way.
+- `""` (empty) -- filter disabled; all tasks are shown. The tag's name has no special meaning.
+- `"text"` -- basename contains `"text"`.
+- `"!..."` -- basename matches **none** of the positive patterns in `fileTags`. The text after `!` is only a marker and is ignored, so `"!"`, `"!work"`, and `"!xyz"` all behave the same way.
 
 See [TAG_FILTERING.md](TAG_FILTERING.md) for examples. Cycle the active tag with `Cycle Tag Filter`.
 
@@ -346,26 +400,16 @@ The extension is **limited in untrusted workspaces**. The following commands are
 
 ## Dependencies
 
-This extension requires [markdown-org-extract](https://crates.io/crates/markdown-org-extract) - a Rust utility for extracting tasks from markdown files.
+This extension delegates markdown parsing to
+[`markdown-org-extract`](https://crates.io/crates/markdown-org-extract) --
+a Rust utility that scans `.md` files for headings, timestamps, and
+CLOCK entries. Install it once with:
 
 ```bash
 cargo install markdown-org-extract
 ```
 
-After installation, the utility will be available at `~/.cargo/bin/markdown-org-extract`. Make sure `~/.cargo/bin` is in your PATH, or configure the full path in the `markdown-org.extractorPath` setting.
-
-## Installation
-
-### From VSIX
-
-```bash
-npm run package    # produces markdown-org-vscode-<version>.vsix
-code --install-extension markdown-org-vscode-<version>.vsix
-```
-
-Building the extension from source (symlink install for development)
-is described in [DEVELOPMENT.md > Install from
-source](DEVELOPMENT.md#install-from-source).
+After installation the binary lives at `~/.cargo/bin/markdown-org-extract`. Make sure `~/.cargo/bin` is in your `PATH`, or set the full path in the [`markdown-org.extractorPath`](#markdown-orgextractorpath) setting.
 
 ## Development
 
