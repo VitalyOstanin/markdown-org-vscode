@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+    <!-- Monokai background -->
+    <rect width="128" height="128" fill="#272822"/>
+    <!-- M letter, left side -->
+    <text x="42" y="84" text-anchor="middle"
+          font-family="Inter, 'DejaVu Sans', sans-serif"
+          font-size="62" font-weight="900"
+          fill="#f92672">M</text>
+    <!-- O letter, slightly right and lower, overlaps M's right stem -->
+    <text x="80" y="92" text-anchor="middle"
+          font-family="Inter, 'DejaVu Sans', sans-serif"
+          font-size="62" font-weight="900"
+          fill="#66d9ef" fill-opacity="0.78">O</text>
+</svg>

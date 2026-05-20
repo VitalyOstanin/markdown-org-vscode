@@ -52,7 +52,10 @@ TODO.md
 # Media: only the GIFs and PNGs referenced from README.md ship in
 # the VSIX. The MP4 source files that the demo recording produces
 # alongside each GIF aren't linked from anywhere user-visible.
+# The SVG source of the icon is kept in-tree for future re-renders
+# but only the resulting PNG is shipped.
 media/*.mp4
+media/*.svg
 
 # Build outputs
 *.vsix
