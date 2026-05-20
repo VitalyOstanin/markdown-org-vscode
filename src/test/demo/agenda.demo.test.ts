@@ -8,6 +8,8 @@ import {
     hideSidePanels,
     enableScreencast,
     forceEnglishWeekdays,
+    applyMonokaiTheme,
+    maximizeVscodeWindow,
     pressKey,
     runCommandViaPalette
 } from './_helpers';
@@ -76,6 +78,9 @@ suite('Demo: Agenda', () => {
 
         await hideSidePanels();
         await forceEnglishWeekdays();
+        await applyMonokaiTheme();
+        await maximizeVscodeWindow();
+        await sleep(4000);
         await vscode.commands.executeCommand('notifications.clearAll');
         await vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup');
         await enableScreencast();

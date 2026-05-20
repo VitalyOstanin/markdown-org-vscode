@@ -9,6 +9,8 @@ import {
     hideSidePanels,
     enableScreencast,
     forceEnglishWeekdays,
+    applyMonokaiTheme,
+    maximizeVscodeWindow,
     pressKey
 } from './_helpers';
 
@@ -45,6 +47,12 @@ suite('Demo: Task Status', () => {
 
         await hideSidePanels();
         await forceEnglishWeekdays();
+        await applyMonokaiTheme();
+        await maximizeVscodeWindow();
+        // Theme repaint + window resize need a generous window under Xvfb;
+        // happens BEFORE markDemoStart so the transition is trimmed out of
+        // the final recording.
+        await sleep(4000);
         await vscode.commands.executeCommand('notifications.clearAll');
         await vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup');
         await enableScreencast();
