@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 import { spawn } from 'node:child_process';
 
 export const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
@@ -98,6 +99,114 @@ export async function markDemoStart(): Promise<void> {
     const target = process.env.MARKDOWN_ORG_DEMO_MARKER;
     if (!target) return;
     await fs.writeFile(target, JSON.stringify({ startedAt: Date.now() }), 'utf-8');
+}
+
+/**
+ * Stretch the Extension Development Host window to fill the X server's
+ * screen. Useful before `captureScreenshot()`: without a window manager,
+ * Xvfb opens VS Code in a much smaller default size, so screenshots come
+ * out with a wide black border around the actual application chrome.
+ *
+ * `width`/`height` default to MARKDOWN_ORG_SCREENSHOT_GEOMETRY so the
+ * helper resizes to whatever resolution the recording driver uses.
+ */
+export async function maximizeVscodeWindow(): Promise<void> {
+    const geometry = process.env.MARKDOWN_ORG_SCREENSHOT_GEOMETRY ?? '1920x1080';
+    const [w, h] = geometry.split('x').map((n) => parseInt(n, 10));
+    const display = process.env.DISPLAY ?? ':99';
+    const search = await new Promise<{ status: number; stdout: string }>((resolve, reject) => {
+        const chunks: Buffer[] = [];
+        const proc = spawn('xdotool', ['search', '--name', 'Extension Development Host'], {
+            env: { ...process.env, DISPLAY: display },
+            stdio: ['ignore', 'pipe', 'ignore']
+        });
+        proc.stdout.on('data', (b) => chunks.push(b));
+        proc.on('exit', (code) =>
+            resolve({ status: code ?? 1, stdout: Buffer.concat(chunks).toString('utf-8').trim() })
+        );
+        proc.on('error', reject);
+    });
+    if (search.status !== 0 || !search.stdout) {
+        throw new Error('xdotool: could not find a VS Code Extension Development Host window');
+    }
+    const ids = search.stdout.split('\n').filter(Boolean);
+    const wid = ids[ids.length - 1];
+    const runSync = (args: string[]): Promise<number> =>
+        new Promise((resolve, reject) => {
+            const proc = spawn('xdotool', args, {
+                env: { ...process.env, DISPLAY: display },
+                stdio: ['ignore', 'inherit', 'inherit']
+            });
+            proc.on('exit', (code) => resolve(code ?? 1));
+            proc.on('error', reject);
+        });
+    if ((await runSync(['windowsize', wid, String(w), String(h)])) !== 0) {
+        throw new Error('xdotool windowsize failed');
+    }
+    if ((await runSync(['windowmove', wid, '0', '0'])) !== 0) {
+        throw new Error('xdotool windowmove failed');
+    }
+}
+
+/**
+ * Switch the running VS Code window to the built-in Monokai theme. Used by
+ * the screenshots scenario so the PNGs that land on the marketplace listing
+ * have a recognisable, high-contrast colour palette that does not look like
+ * a stock VS Code screenshot. Written at Global scope; the demo runner gets
+ * its own disposable user-data-dir, so the developer's own theme choice is
+ * not touched.
+ */
+export async function applyMonokaiTheme(): Promise<void> {
+    const workbench = vscode.workspace.getConfiguration('workbench');
+    // Workspace target applies immediately without a window reload; Global
+    // also works but is only picked up after VS Code re-reads the settings
+    // file, which is unreliable under the test runner.
+    await workbench.update('colorTheme', 'Monokai', vscode.ConfigurationTarget.Workspace);
+}
+
+/**
+ * Capture a single PNG of the current X11 display via `ffmpeg -frames:v 1`.
+ * Active only when the recording driver sets MARKDOWN_ORG_SCREENSHOT_DIR;
+ * a no-op outside the pipeline so the same test suite can be debugged via
+ * `npm run test:integration` without a screen capture stack attached.
+ *
+ * The frame is saved as `${MARKDOWN_ORG_SCREENSHOT_DIR}/${name}.png`. Display
+ * geometry (1920x1080) matches the Xvfb the recording driver starts; it is
+ * read from MARKDOWN_ORG_SCREENSHOT_GEOMETRY when present so the test stays
+ * portable if the driver ever changes resolution.
+ */
+export async function captureScreenshot(name: string): Promise<void> {
+    const dir = process.env.MARKDOWN_ORG_SCREENSHOT_DIR;
+    if (!dir) return;
+    await fs.mkdir(dir, { recursive: true });
+    const display = process.env.DISPLAY ?? ':99';
+    const geometry = process.env.MARKDOWN_ORG_SCREENSHOT_GEOMETRY ?? '1920x1080';
+    const target = path.join(dir, `${name}.png`);
+    await new Promise<void>((resolve, reject) => {
+        const proc = spawn(
+            'ffmpeg',
+            [
+                '-loglevel',
+                'error',
+                '-y',
+                '-f',
+                'x11grab',
+                '-video_size',
+                geometry,
+                '-i',
+                display,
+                '-frames:v',
+                '1',
+                target
+            ],
+            { stdio: ['ignore', 'inherit', 'inherit'] }
+        );
+        proc.on('exit', (code) => {
+            if (code === 0) resolve();
+            else reject(new Error(`ffmpeg screenshot ${name} exited with code ${code}`));
+        });
+        proc.on('error', reject);
+    });
 }
 
 export async function moveCursorTo(editor: vscode.TextEditor, line: number, column = 0): Promise<void> {

@@ -27,6 +27,7 @@ export default defineConfig({
         demoEntry('demo-task-status', 'taskStatus.demo.test.js', 'test-workspace-demo-task-status'),
         demoEntry('demo-timestamps', 'timestamps.demo.test.js', 'test-workspace-demo-timestamps'),
         demoEntry('demo-clock', 'clock.demo.test.js', 'test-workspace-demo-clock'),
-        demoEntry('demo-agenda', 'agenda.demo.test.js', 'test-workspace-demo-agenda')
+        demoEntry('demo-agenda', 'agenda.demo.test.js', 'test-workspace-demo-agenda'),
+        demoEntry('demo-screenshots', 'screenshots.demo.test.js', 'test-workspace-demo-screenshots')
     ]
 });
