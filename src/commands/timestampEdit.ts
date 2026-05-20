@@ -11,6 +11,10 @@ import { toggleTimestampType } from '../utils/toggleTimestampType';
 
 const PRIORITY_A_CODE = 'A'.charCodeAt(0);
 const PRIORITY_Z_CODE = 'Z'.charCodeAt(0);
+// Numeric priorities mirror org-mode's `[#0]..[#64]` range -- same bounds
+// markdown-org-extract enforces in `Priority::parse`.
+const PRIORITY_NUMERIC_MIN = 0;
+const PRIORITY_NUMERIC_MAX = 64;
 
 type HeadingPart = 'status' | 'priority';
 
@@ -98,10 +102,17 @@ function adjustHeadingPart(match: RegExpMatchArray, part: HeadingPart, delta: nu
             newStatus = statuses[newIndex];
         }
     } else if (part === 'priority') {
-        const currentCode = priority.charCodeAt(0);
-        const newCode = currentCode + delta;
-        if (newCode >= PRIORITY_A_CODE && newCode <= PRIORITY_Z_CODE) {
-            newPriority = String.fromCharCode(newCode);
+        if (/^\d+$/.test(priority)) {
+            const newValue = parseInt(priority, 10) + delta;
+            if (newValue >= PRIORITY_NUMERIC_MIN && newValue <= PRIORITY_NUMERIC_MAX) {
+                newPriority = String(newValue);
+            }
+        } else {
+            const currentCode = priority.charCodeAt(0);
+            const newCode = currentCode + delta;
+            if (newCode >= PRIORITY_A_CODE && newCode <= PRIORITY_Z_CODE) {
+                newPriority = String.fromCharCode(newCode);
+            }
         }
     }
 

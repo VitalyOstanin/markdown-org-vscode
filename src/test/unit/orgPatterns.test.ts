@@ -31,6 +31,48 @@ suite('orgPatterns named groups', () => {
             assert.strictEqual(match.groups.priority, undefined);
             assert.strictEqual(match.groups.title, 'Wrap-up');
         });
+
+        test('numeric priority [#0] is captured', () => {
+            const match = '## TODO [#0] Hottest item'.match(HEADING_REGEX);
+            assert.ok(match);
+            assert.strictEqual(match.groups?.priority, '0');
+            assert.strictEqual(match.groups?.title, 'Hottest item');
+        });
+
+        test('numeric priority [#5] is captured', () => {
+            const match = '## TODO [#5] Mid item'.match(HEADING_REGEX);
+            assert.ok(match);
+            assert.strictEqual(match.groups?.priority, '5');
+        });
+
+        test('numeric priority [#42] is captured (two-digit value)', () => {
+            const match = '## TODO [#42] Forty-two'.match(HEADING_REGEX);
+            assert.ok(match);
+            assert.strictEqual(match.groups?.priority, '42');
+            assert.strictEqual(match.groups?.title, 'Forty-two');
+        });
+
+        test('numeric priority [#64] is captured (upper bound)', () => {
+            const match = '## TODO [#64] Lowest numeric'.match(HEADING_REGEX);
+            assert.ok(match);
+            assert.strictEqual(match.groups?.priority, '64');
+        });
+
+        test('numeric priority [#65] is rejected (out of range -- consumed as part of title)', () => {
+            // The regex falls through: priority group does not match, the
+            // bracket cookie remains in the title.
+            const match = '## TODO [#65] Out of range'.match(HEADING_REGEX);
+            assert.ok(match);
+            assert.strictEqual(match.groups?.priority, undefined);
+            assert.strictEqual(match.groups?.title, '[#65] Out of range');
+        });
+
+        test('numeric priority [#01] is rejected (leading zero)', () => {
+            const match = '## TODO [#01] Leading zero'.match(HEADING_REGEX);
+            assert.ok(match);
+            assert.strictEqual(match.groups?.priority, undefined);
+            assert.strictEqual(match.groups?.title, '[#01] Leading zero');
+        });
     });
 
     suite('TIMESTAMP_LINE_REGEX', () => {

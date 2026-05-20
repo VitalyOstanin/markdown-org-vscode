@@ -131,4 +131,65 @@ suite('Task Status Integration Tests', () => {
 
         assert.strictEqual(document.lineAt(0).text, '## [#A] Task title');
     });
+
+    async function openAtPriorityCookie(content: string): Promise<void> {
+        document = await vscode.workspace.openTextDocument({ content, language: 'markdown' });
+        editor = await vscode.window.showTextDocument(document);
+        const cookieStart = content.indexOf('[#');
+        // Cursor inside the cookie character (between `[#` and `]`).
+        const inside = cookieStart + 2;
+        editor.selection = new vscode.Selection(0, inside, 0, inside);
+    }
+
+    test('timestampUp on [#A] cycles to [#B]', async () => {
+        await openAtPriorityCookie('## TODO [#A] Task title');
+        await vscode.commands.executeCommand('markdown-org.timestampUp');
+        assert.strictEqual(document.lineAt(0).text, '## TODO [#B] Task title');
+    });
+
+    test('timestampDown on [#A] stays at [#A] (lower bound)', async () => {
+        await openAtPriorityCookie('## TODO [#A] Task title');
+        await vscode.commands.executeCommand('markdown-org.timestampDown');
+        assert.strictEqual(document.lineAt(0).text, '## TODO [#A] Task title');
+    });
+
+    test('Set TODO preserves numeric priority [#3]', async () => {
+        document = await vscode.workspace.openTextDocument({
+            content: '## [#3] Numeric task',
+            language: 'markdown'
+        });
+        editor = await vscode.window.showTextDocument(document);
+        await vscode.commands.executeCommand('markdown-org.setTodo');
+        assert.strictEqual(document.lineAt(0).text, '## TODO [#3] Numeric task');
+    });
+
+    test('timestampUp on [#3] cycles to [#4]', async () => {
+        await openAtPriorityCookie('## TODO [#3] Numeric task');
+        await vscode.commands.executeCommand('markdown-org.timestampUp');
+        assert.strictEqual(document.lineAt(0).text, '## TODO [#4] Numeric task');
+    });
+
+    test('timestampDown on [#3] cycles to [#2]', async () => {
+        await openAtPriorityCookie('## TODO [#3] Numeric task');
+        await vscode.commands.executeCommand('markdown-org.timestampDown');
+        assert.strictEqual(document.lineAt(0).text, '## TODO [#2] Numeric task');
+    });
+
+    test('timestampUp on [#9] cycles to [#10] (two-digit transition)', async () => {
+        await openAtPriorityCookie('## TODO [#9] Numeric task');
+        await vscode.commands.executeCommand('markdown-org.timestampUp');
+        assert.strictEqual(document.lineAt(0).text, '## TODO [#10] Numeric task');
+    });
+
+    test('timestampDown on [#0] stays at [#0] (lower bound)', async () => {
+        await openAtPriorityCookie('## TODO [#0] Numeric task');
+        await vscode.commands.executeCommand('markdown-org.timestampDown');
+        assert.strictEqual(document.lineAt(0).text, '## TODO [#0] Numeric task');
+    });
+
+    test('timestampUp on [#64] stays at [#64] (upper bound)', async () => {
+        await openAtPriorityCookie('## TODO [#64] Numeric task');
+        await vscode.commands.executeCommand('markdown-org.timestampUp');
+        assert.strictEqual(document.lineAt(0).text, '## TODO [#64] Numeric task');
+    });
 });
