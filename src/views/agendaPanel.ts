@@ -4,6 +4,7 @@ import { AgendaData } from '../types';
 import { isMeaningfulSelection, resolveTaskClickIntent, sanitizeTaskLine } from '../utils/agendaClick';
 import { rememberScroll, recallScroll } from '../utils/agendaScroll';
 import { resolveHeadingClass } from '../utils/agendaHeadingTint';
+import { buildTimeInfo } from '../utils/agendaTimeInfo';
 import { resolveAgendaWatchBase } from '../utils/agendaWatchPattern';
 import { toIsoDate } from '../utils/isoDate';
 import { formatError, notifyError } from '../utils/notify';
@@ -366,6 +367,11 @@ export class AgendaPanel {
         // Heading tint resolver (DEADLINE > priority > default);
         // unit-tested in agendaHeadingTint.test.ts.
         const resolveHeadingClassSource = resolveHeadingClass.toString();
+        // timeInfo cell builder (time / DEADLINE / relative day labels);
+        // unit-tested in agendaTimeInfo.test.ts. The two-line layout of
+        // time over DEADLINE is forced by the flex-column .time-info-cell
+        // class below, so the rendering is stable across fonts and sizes.
+        const buildTimeInfoSource = buildTimeInfo.toString();
         // Local-date formatter shared with host code; unit-tested in
         // isoDate.test.ts.
         const toIsoDateSource = toIsoDate.toString();
@@ -462,6 +468,16 @@ export class AgendaPanel {
         .task-line:hover {
             background: #2d2d30;
         }
+        /* timeInfo cell -- forced vertical stack so a SCHEDULED time and
+           a DEADLINE marker always render as two stacked lines, regardless
+           of font width. This replaced an older "DEADLINE ⌃" caret that
+           relied on CSS wrap inside a fixed-width cell and broke on narrow
+           monospace fonts (caret pointed at unrelated content above). */
+        .time-info-cell {
+            display: flex;
+            flex-direction: column;
+            line-height: 1.2;
+        }
         .todo-label { color: #f48771; }
         .todo-keyword { color: #f48771; font-weight: bold; }
         .done-keyword { color: #73c991; font-weight: bold; }
@@ -544,6 +560,7 @@ export class AgendaPanel {
         ${rememberScrollSource}
         ${recallScrollSource}
         ${resolveHeadingClassSource}
+        ${buildTimeInfoSource}
         ${toIsoDateSource}
         const vscode = acquireVsCodeApi();
         let initialData = [];
@@ -766,7 +783,7 @@ export class AgendaPanel {
 
             return '<div class="task-line" data-file="' + escapeHtml(task.file) + '" data-line="' + sanitizeTaskLine(task.line) + '">' +
                 '<span class="todo-label">todo:</span>' +
-                '<span>' + timeInfo + '</span>' +
+                '<span class="time-info-cell">' + timeInfo + '</span>' +
                 '<span class="' + statusClass + '">' + escapeHtml(status) + '</span>' +
                 '<span class="' + priorityClass + '">' + escapeHtml(priority) + '</span>' +
                 '<span class="' + headingClass + '">' + escapeHtml(task.heading) + '</span>' +
@@ -783,34 +800,13 @@ export class AgendaPanel {
         }
         
         function getTimeInfo(task, daysOffset) {
-            if (task.timestamp_time) {
-                const type = task.timestamp_type;
-                if (type && type !== 'PLAIN' && type !== 'SCHEDULED') {
-                    const typeClass = type === 'DEADLINE' ? 'timestamp-deadline' : 'timestamp-type';
-                    return '<span class="time-display">' + escapeHtml(task.timestamp_time) + '</span>...... <span class="' + typeClass + '">' + escapeHtml(type) + ' ⌃</span>';
-                }
-                return '<span class="time-display">' + escapeHtml(task.timestamp_time) + '</span>......';
-            }
-            if (daysOffset !== undefined) {
-                if (daysOffset < 0) {
-                    const daysAgo = Math.abs(daysOffset);
-                    if (task.timestamp_type === 'SCHEDULED') {
-                        return 'Sched.' + daysAgo + 'x:';
-                    }
-                    return daysAgo + ' d. ago:';
-                }
-                if (daysOffset > 0) {
-                    return 'In ' + daysOffset + ' d.:';
-                }
-            }
-            const type = task.timestamp_type;
-            if (type && type !== 'PLAIN' && type !== 'SCHEDULED') {
-                const typeClass = type === 'DEADLINE' ? 'timestamp-deadline' : 'timestamp-type';
-                return '<span class="' + typeClass + '">' + escapeHtml(type) + ' ⌃</span>';
-            }
-            return '';
+            // Body is inlined from src/utils/agendaTimeInfo.ts via .toString();
+            // see buildTimeInfoSource in getHtmlContent. The wrapper exists
+            // to bind the in-webview escapeHtml closure to the shared
+            // implementation.
+            return buildTimeInfo(task, daysOffset, escapeHtml);
         }
-        
+
         function resolveFirstDayOffset() {
             // 0 = Sunday-first, 1 = Monday-first (only these two supported in UI).
             if (firstDayOfWeek === 'sunday') return 0;
