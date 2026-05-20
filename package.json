@@ -1,20 +1,43 @@
 {
   "name": "markdown-org-vscode",
   "displayName": "Markdown Org",
-  "description": "Org-style task management for Markdown files",
+  "description": "Org-mode style task management in Markdown: TODO/DONE workflow, priorities, SCHEDULED/DEADLINE timestamps, agenda views, and CLOCK time tracking.",
   "version": "0.4.2",
   "publisher": "vitalyostanin",
   "repository": {
     "type": "git",
     "url": "https://github.com/VitalyOstanin/markdown-org-vscode"
   },
+  "homepage": "https://github.com/VitalyOstanin/markdown-org-vscode#readme",
+  "bugs": {
+    "url": "https://github.com/VitalyOstanin/markdown-org-vscode/issues"
+  },
+  "qna": "marketplace",
   "license": "MIT",
   "engines": {
     "vscode": "^1.85.0",
     "node": ">=22"
   },
   "categories": [
+    "Visualization",
     "Other"
+  ],
+  "keywords": [
+    "agenda",
+    "clock",
+    "clocktable",
+    "deadline",
+    "gtd",
+    "markdown",
+    "org",
+    "org-mode",
+    "planning",
+    "productivity",
+    "scheduled",
+    "task management",
+    "tasks",
+    "time tracking",
+    "todo"
   ],
   "activationEvents": [],
   "main": "./out/extension.js",
