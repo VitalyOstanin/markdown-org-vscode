@@ -2,6 +2,36 @@
 
 All notable changes to the "Markdown Org" extension will be documented in this file.
 
+## [0.5.0] - 2026-05-20
+
+### Added
+
+- Numeric priorities `[#0]`..`[#64]` are now supported on TODO/DONE headings, matching the `markdown-org-extract` wire contract. The agenda sorts them numerically and groups them under a single `(Priority)` heading.
+- All Org-mode timestamp repeaters (`+`, `++`, `.+`, `--`) are recognised in SCHEDULED/DEADLINE/CREATED/CLOCK lines. Previously only `+1d`-style repeaters were parsed.
+- New configuration `markdown-org.weekdayLocale` (`ru` / `en`, default `ru`) controls the language of weekday short names inserted into timestamps.
+- Extension icon (128×128 Monokai M+O monogram) and a `galleryBanner` are now part of `package.json`, so the Extensions view renders a recognisable tile.
+- Filled the marketplace metadata in `package.json` (`displayName`, `description`, `categories`, `keywords`, `repository`, `homepage`, `bugs`, `license`, `qna`).
+
+### Fixed
+
+- `clocktable` no longer drops DONE tasks and plain headings that have CLOCK entries. Previously only TODO tasks contributed to the table, hiding completed work from time-tracking reports.
+
+### Changed
+
+- Agenda time-info cell is now two lines (timestamp type on its own line, time on the next), and the dedicated caret marker `⌃` was removed -- it was redundant with the existing highlight.
+
+### Documentation
+
+- Rewrote README for end users: hero GIF, four demo animations and five screenshots inline, install path via GitHub Releases .vsix.
+- Moved developer-facing material (build, tests, install from source, release process) into `DEVELOPMENT.md`; README links to it from a single line.
+- Recorded the project's serialization rule: production code uses `safe-stable-stringify` instead of `JSON.stringify` (preventive -- no production call sites yet).
+
+### Internal
+
+- New demo-recording pipeline: an integration test exercises the extension while `xvfb-run` + `ffmpeg` capture the X server, producing the GIFs shipped in README. Re-recorded all demos against Monokai theme on a full-screen window for consistency.
+- `.vscodeignore` now drops demo test workspaces (`test-workspace-demo*/`), the demo vscode-test config, and `media/*.mp4` source files. The final VSIX is 4.26 MB / 52 files.
+- VS Code's built-in screencast mode is enabled inside demo scenarios so key chords are visible in the recordings.
+
 ## [0.4.2] - 2026-05-19
 
 ### Internal
