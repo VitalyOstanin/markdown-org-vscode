@@ -3,6 +3,7 @@ out
 *.vsix
 .vscode-test
 test-workspace/
+test-workspace-demo*/
 docs/reviews/
 coverage/
 .nyc_output/
