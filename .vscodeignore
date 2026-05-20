@@ -21,6 +21,7 @@ coverage/**
 .c8rc.json
 .mocharc.unit.json
 .vscode-test.mjs
+.vscode-test.demo.mjs
 scripts/**
 
 # Linter / formatter / language config
@@ -42,10 +43,16 @@ package-lock.json
 docs/**
 examples/**
 test-workspace/**
+test-workspace-demo*/**
 
 # Internal design / process notes that aren't user docs
 # (most design docs live in docs/ now -- already excluded by docs/** above)
 TODO.md
+
+# Media: only the GIFs and PNGs referenced from README.md ship in
+# the VSIX. The MP4 source files that the demo recording produces
+# alongside each GIF aren't linked from anywhere user-visible.
+media/*.mp4
 
 # Build outputs
 *.vsix
