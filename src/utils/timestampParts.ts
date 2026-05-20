@@ -28,8 +28,15 @@ export interface ClockTimestampPartHit {
 
 // Cursor-aware variant of TIMESTAMP_REGEX from orgPatterns: captures date parts
 // as named groups so the position-to-part mapping below stays self-describing.
+//
+// Repeater syntax mirrors markdown-org-extract (src/timestamp/repeater.rs):
+//   * prefix: `.+` (Restart) | `++` (CatchUp) | `+` (Cumulative)
+//   * unit:   `wd` (Workday) | `d` | `w` | `m` | `y` | `h`
+// Order inside the alternations matters: `.+` and `++` must come before `+`,
+// `wd` must come before `d`, otherwise the engine commits to the shorter
+// option and consumes a partial match.
 const TIMESTAMP_REGEX =
-    /<(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})(?: (?<weekday>[А-Яа-яA-Za-z]+))?(?: (?<hour>\d{2}):(?<minute>\d{2}))?(?: (?<repeater>\+\d+[dwmy]{1,2}))?>/;
+    /<(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})(?: (?<weekday>[А-Яа-яA-Za-z]+))?(?: (?<hour>\d{2}):(?<minute>\d{2}))?(?: (?<repeater>(?:\.\+|\+\+|\+)\d+(?:wd|[dwmyh])))?>/;
 
 const CLOCK_REGEX =
     /^(?<indent>\s*)`CLOCK: (?<startOpenBracket>[[<])(?<startYear>\d{4})-(?<startMonth>\d{2})-(?<startDay>\d{2}) (?<startWeekday>[А-Яа-яA-Za-z]+) (?<startHour>\d{2}):(?<startMinute>\d{2})(?<startCloseBracket>[\]>])(?:--(?<endOpenBracket>[[<])(?<endYear>\d{4})-(?<endMonth>\d{2})-(?<endDay>\d{2}) (?<endWeekday>[А-Яа-яA-Za-z]+) (?<endHour>\d{2}):(?<endMinute>\d{2})(?<endCloseBracket>[\]>]) => +(?<durationHours>-?\d+):(?<durationMinutes>-?\d+))?`$/;

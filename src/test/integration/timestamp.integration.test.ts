@@ -184,6 +184,81 @@ suite('Timestamp Integration Tests', () => {
         assert.ok(line.startsWith('`DEADLINE:'));
     });
 
+    test('weekdayLocale=en makes insertScheduled emit Mon/Tue/... names', async () => {
+        const cfg = vscode.workspace.getConfiguration('markdown-org');
+        await cfg.update('weekdayLocale', 'en', vscode.ConfigurationTarget.Workspace);
+        try {
+            document = await vscode.workspace.openTextDocument({
+                content: '## TODO English-locale task\n',
+                language: 'markdown'
+            });
+            editor = await vscode.window.showTextDocument(document);
+            editor.selection = new vscode.Selection(0, 0, 0, 0);
+
+            await vscode.commands.executeCommand('markdown-org.insertScheduled');
+
+            const inserted = document.lineAt(1).text;
+            assert.ok(inserted.startsWith('`SCHEDULED:'), `expected SCHEDULED line, got: ${inserted}`);
+            const englishDays = new Set(['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']);
+            const match = inserted.match(/<\d{4}-\d{2}-\d{2}\s+(\S+)\s/);
+            assert.ok(match, `cannot extract weekday from: ${inserted}`);
+            assert.ok(englishDays.has(match![1]), `weekday "${match![1]}" is not an English short name`);
+        } finally {
+            await cfg.update('weekdayLocale', undefined, vscode.ConfigurationTarget.Workspace);
+        }
+    });
+
+    test('weekdayLocale default keeps Russian names (back-compat)', async () => {
+        document = await vscode.workspace.openTextDocument({
+            content: '## TODO Default-locale task\n',
+            language: 'markdown'
+        });
+        editor = await vscode.window.showTextDocument(document);
+        editor.selection = new vscode.Selection(0, 0, 0, 0);
+
+        await vscode.commands.executeCommand('markdown-org.insertScheduled');
+
+        const inserted = document.lineAt(1).text;
+        const russianDays = new Set(['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб']);
+        const match = inserted.match(/<\d{4}-\d{2}-\d{2}\s+(\S+)\s/);
+        assert.ok(match, `cannot extract weekday from: ${inserted}`);
+        assert.ok(russianDays.has(match![1]), `weekday "${match![1]}" should default to Russian`);
+    });
+
+    // Repeater preservation across day-shift commands: all three prefixes
+    // (`+`, `++`, `.+`) and the workday `wd` / hour `h` units that
+    // markdown-org-extract recognizes must survive a timestampUp/Down on the
+    // date. Before the regex extension only `+\d+[dwmy]{1,2}` matched, so
+    // shifting a `++1w` date silently dropped the repeater on reconstruction.
+    const repeaterCases: { repeater: string; label: string }[] = [
+        { repeater: '+1d', label: 'cumulative day' },
+        { repeater: '+2w', label: 'cumulative week' },
+        { repeater: '+3m', label: 'cumulative month' },
+        { repeater: '+1y', label: 'cumulative year' },
+        { repeater: '+4h', label: 'hour repeater' },
+        { repeater: '+1wd', label: 'workday repeater' },
+        { repeater: '++1w', label: 'catch-up week' },
+        { repeater: '.+1m', label: 'restart month' }
+    ];
+
+    for (const { repeater, label } of repeaterCases) {
+        test(`Timestamp Up on day preserves ${label} (${repeater})`, async () => {
+            document = await vscode.workspace.openTextDocument({
+                content: `\`SCHEDULED: <2025-12-06 Fri ${repeater}>\``,
+                language: 'markdown'
+            });
+            editor = await vscode.window.showTextDocument(document);
+            // Cursor on the day "06".
+            editor.selection = new vscode.Selection(0, 21, 0, 21);
+
+            await vscode.commands.executeCommand('markdown-org.timestampUp');
+
+            const line = document.lineAt(0).text;
+            assert.ok(line.includes('2025-12-07'), `expected day to increment, got: ${line}`);
+            assert.ok(line.includes(repeater), `expected ${repeater} to survive, got: ${line}`);
+        });
+    }
+
     test('CLOCK start hour increment', async () => {
         document = await vscode.workspace.openTextDocument({
             content: '`CLOCK: [2025-12-09 Mon 14:30]--[2025-12-09 Mon 16:00] =>  1:30`',

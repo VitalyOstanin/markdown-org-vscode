@@ -3,16 +3,40 @@ import * as path from 'path';
 import { TIMESTAMP_LINE_REGEX } from './orgPatterns';
 import { notifyError } from './utils/notify';
 
-export const DAY_NAMES_SHORT = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+export const DAY_NAMES_SHORT_RU = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+export const DAY_NAMES_SHORT_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-/** Format a Date as `<YYYY-MM-DD Ru HH:MM>` (angle) or `[...]` (square) in org-mode style. */
-export function formatOrgTimestamp(date: Date, bracket: 'angle' | 'square'): string {
+/**
+ * Legacy export: kept as-is (Russian short names) so any downstream caller
+ * that imports it gets the historical behaviour. New code should go through
+ * `formatOrgTimestamp`, which respects `markdown-org.weekdayLocale`.
+ */
+export const DAY_NAMES_SHORT = DAY_NAMES_SHORT_RU;
+
+export type WeekdayLocale = 'ru' | 'en';
+
+/** Read the configured weekday locale (`markdown-org.weekdayLocale`). */
+export function getWeekdayLocale(): WeekdayLocale {
+    const cfg = vscode.workspace.getConfiguration('markdown-org');
+    const value = cfg.get<string>('weekdayLocale', 'ru');
+    return value === 'en' ? 'en' : 'ru';
+}
+
+/**
+ * Format a Date as `<YYYY-MM-DD Day HH:MM>` (angle) or `[...]` (square) in
+ * org-mode style. The weekday short name comes from the configured locale --
+ * Russian by default, English when `markdown-org.weekdayLocale === 'en'`.
+ * Locale can also be forced via the `locale` argument, which is what demo
+ * fixtures and unit tests do to stay independent of workspace config.
+ */
+export function formatOrgTimestamp(date: Date, bracket: 'angle' | 'square', locale?: WeekdayLocale): string {
     const year = date.getFullYear();
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
     const day = date.getDate().toString().padStart(2, '0');
     const hour = date.getHours().toString().padStart(2, '0');
     const minute = date.getMinutes().toString().padStart(2, '0');
-    const weekday = DAY_NAMES_SHORT[date.getDay()];
+    const days = (locale ?? getWeekdayLocale()) === 'en' ? DAY_NAMES_SHORT_EN : DAY_NAMES_SHORT_RU;
+    const weekday = days[date.getDay()];
     const open = bracket === 'angle' ? '<' : '[';
     const close = bracket === 'angle' ? '>' : ']';
     return `${open}${year}-${month}-${day} ${weekday} ${hour}:${minute}${close}`;

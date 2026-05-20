@@ -242,6 +242,15 @@
           "minimum": 0,
           "maximum": 60,
           "description": "Round CLOCK timestamps to N minutes (e.g., 15, 30). 0 disables rounding. Negative and out-of-range values are also treated as 'no rounding'."
+        },
+        "markdown-org.weekdayLocale": {
+          "type": "string",
+          "enum": [
+            "ru",
+            "en"
+          ],
+          "default": "ru",
+          "description": "Language for the weekday short name inserted into timestamps (CREATED/SCHEDULED/DEADLINE/CLOCK). 'ru' produces Пн/Вт/..., 'en' produces Mon/Tue/...."
         }
       }
     }
