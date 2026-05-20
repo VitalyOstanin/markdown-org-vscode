@@ -1,0 +1,254 @@
+import * as vscode from 'vscode';
+import * as fs from 'node:fs/promises';
+import { spawn } from 'node:child_process';
+
+export const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Hide everything in the VS Code chrome that is irrelevant to the recorded
+ * action: primary side bar (Explorer), secondary side bar, bottom panel
+ * (Terminal/Problems/Output), and activity bar. The status bar at the bottom
+ * is kept -- it carries the agenda's tag-filter indicator and reads as
+ * "this is VS Code", not as clutter.
+ *
+ * Side-bar visibility is toggled via commands (workbench provides explicit
+ * close-* commands for both bars). The activity bar has no close command,
+ * so it is hidden via a workspace-scoped settings update; the demo workspaces
+ * are ephemeral, so the settings.json that VS Code writes there does not
+ * leak into the repository.
+ */
+export async function hideSidePanels(): Promise<void> {
+    await vscode.commands.executeCommand('workbench.action.closeSidebar');
+    await vscode.commands.executeCommand('workbench.action.closeAuxiliaryBar');
+    await vscode.commands.executeCommand('workbench.action.closePanel');
+    const workbench = vscode.workspace.getConfiguration('workbench');
+    await workbench.update('activityBar.location', 'hidden', vscode.ConfigurationTarget.Workspace);
+}
+
+/**
+ * Turn on VS Code's built-in screencast overlay -- the one that surfaces
+ * pressed keys at the bottom of the editor and draws a click ring on the
+ * pointer. With it on, a recorded GIF reads as "what command was invoked",
+ * not just "the cursor moved".
+ *
+ * Settings tweaks:
+ *   - `screencastMode.fontSize`: bumped above the default 56px equivalent so
+ *     the overlay survives the 1280:-1 gif rescale without becoming a smear.
+ *   - `screencastMode.keyboardOptions.showSingleEditorCursorMoves`: off, so
+ *     plain arrow-key cursor moves do not flood the overlay during
+ *     navigation-heavy scenarios.
+ *   - `screencastMode.verticalOffset`: pushed up so the overlay sits inside
+ *     the editor viewport regardless of the bottom-panel state.
+ *
+ * Settings are written at Global scope; the test instance runs against a
+ * disposable `--user-data-dir` (see `.vscode-test.demo.mjs`), so this does
+ * not leak into the developer's real VS Code profile.
+ */
+/**
+ * Force the extension to emit English weekday short names (Mon/Tue/...) for
+ * every CREATED/SCHEDULED/DEADLINE/CLOCK timestamp the demo plants. Demo
+ * footage is shared with a global audience -- the GIFs are easier to read
+ * when the dates do not switch language mid-shot.
+ *
+ * Workspace-scoped so the demo workspaces (which are disposable) carry the
+ * setting; the developer's main VS Code profile is unaffected.
+ */
+export async function forceEnglishWeekdays(): Promise<void> {
+    const cfg = vscode.workspace.getConfiguration('markdown-org');
+    await cfg.update('weekdayLocale', 'en', vscode.ConfigurationTarget.Workspace);
+}
+
+export async function enableScreencast(): Promise<void> {
+    const cfg = vscode.workspace.getConfiguration('screencastMode');
+    await cfg.update('fontSize', 28, vscode.ConfigurationTarget.Global);
+    await cfg.update('verticalOffset', 30, vscode.ConfigurationTarget.Global);
+    await cfg.update(
+        'keyboardOptions',
+        {
+            showKeys: true,
+            showKeybindings: true,
+            showCommands: true,
+            showCommandGroups: false,
+            showSingleEditorCursorMoves: false
+        },
+        vscode.ConfigurationTarget.Global
+    );
+    await cfg.update('keyboardOverlayTimeout', 2500, vscode.ConfigurationTarget.Global);
+    // Mute the "A git repository was found in the parent folders..." notification
+    // toast that otherwise grabs keyboard focus and swallows the first chord
+    // xdotool sends. The demo workspaces all sit inside a checkout, so the
+    // toast triggers every time without this knob.
+    const git = vscode.workspace.getConfiguration('git');
+    await git.update('openRepositoryInParentFolders', 'never', vscode.ConfigurationTarget.Global);
+    await vscode.commands.executeCommand('workbench.action.toggleScreencastMode');
+}
+
+/**
+ * Write a JSON marker file with the wall-clock time at which the demo's
+ * recordable action sequence begins. The recording script (`scripts/record-demo.js`)
+ * reads this marker after the test exits and trims the leading portion of the
+ * MP4 that captured Xvfb + VS Code startup.
+ *
+ * The marker path is passed via the MARKDOWN_ORG_DEMO_MARKER environment
+ * variable. If unset (e.g. when the test is run outside the recording
+ * pipeline), the call is a no-op so the same suite can be executed for
+ * debugging without crashing.
+ */
+export async function markDemoStart(): Promise<void> {
+    const target = process.env.MARKDOWN_ORG_DEMO_MARKER;
+    if (!target) return;
+    await fs.writeFile(target, JSON.stringify({ startedAt: Date.now() }), 'utf-8');
+}
+
+export async function moveCursorTo(editor: vscode.TextEditor, line: number, column = 0): Promise<void> {
+    const position = new vscode.Position(line, column);
+    editor.selection = new vscode.Selection(position, position);
+    editor.revealRange(new vscode.Range(position, position));
+}
+
+/**
+ * Dispatch a keystroke (or a chord, i.e. space-separated sequence of
+ * keystrokes) to the X server backing the demo recording. Goes through
+ * `xdotool key` so VS Code's keyboard pipeline -- and therefore the
+ * screencast overlay -- sees the input, which it does not when commands are
+ * invoked through `vscode.commands.executeCommand` directly.
+ *
+ * Format follows xdotool's grammar: modifiers joined with `+` (`ctrl+k`,
+ * `shift+Up`), multiple keystrokes separated by spaces (`ctrl+k ctrl+t`).
+ * DISPLAY is read from the env so the call lands on the Xvfb that
+ * record-demo.js started, not on the developer's main session.
+ *
+ * The first call also locates and activates the VS Code window. Without
+ * that step xdotool would dispatch the keystroke into whichever window is
+ * "active" on the empty Xvfb (usually nothing), and VS Code would never see
+ * the chord that the demo just pressed.
+ */
+let vscodeWindowId: string | null = null;
+
+async function runXdotool(args: string[]): Promise<{ status: number; stdout: string }> {
+    const display = process.env.DISPLAY ?? ':99';
+    return new Promise((resolve, reject) => {
+        const chunks: Buffer[] = [];
+        const proc = spawn('xdotool', args, {
+            env: { ...process.env, DISPLAY: display },
+            stdio: ['ignore', 'pipe', 'ignore']
+        });
+        proc.stdout.on('data', (b) => chunks.push(b));
+        proc.on('exit', (code) =>
+            resolve({ status: code ?? 1, stdout: Buffer.concat(chunks).toString('utf-8').trim() })
+        );
+        proc.on('error', reject);
+    });
+}
+
+async function ensureVscodeWindowFocused(): Promise<void> {
+    // Resolve the VS Code window on every call. Caching the id is fragile:
+    // VS Code can spawn helper windows (notification overlays, command
+    // palette dropdowns) that steal focus and outlive the cached id.
+    const { status, stdout } = await runXdotool(['search', '--name', 'Extension Development Host']);
+    if (status !== 0 || !stdout) {
+        throw new Error('xdotool: could not find a VS Code Extension Development Host window');
+    }
+    const ids = stdout.split('\n').filter(Boolean);
+    vscodeWindowId = ids[ids.length - 1];
+    await runXdotool(['windowactivate', '--sync', vscodeWindowId]);
+    // Force pointer-follows-keyboard semantics by raising the window too.
+    await runXdotool(['windowraise', vscodeWindowId]);
+}
+
+function pause(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Decompose a `modifier+modifier+key` token into its modifier keysyms and the
+ * final key. Recognizes `ctrl`, `shift`, `alt`, `meta` (case-insensitive).
+ */
+function splitToken(token: string): { modifiers: string[]; key: string } {
+    const parts = token.split('+');
+    const key = parts.pop()!;
+    const modifierMap: Record<string, string> = {
+        ctrl: 'ctrl',
+        control: 'ctrl',
+        shift: 'shift',
+        alt: 'alt',
+        meta: 'super'
+    };
+    const modifiers = parts.map((p) => modifierMap[p.toLowerCase()] ?? p);
+    return { modifiers, key };
+}
+
+/**
+ * Invoke a command that has no dedicated keybinding by running it through
+ * the Command Palette. The whole flow -- palette opening shortcut, typed
+ * command name, and the final Enter -- is dispatched at the X-server level,
+ * so the screencast overlay shows the keystrokes the same way a user would
+ * see them when reproducing the demo by hand.
+ *
+ * `name` should match the palette query a user would type, e.g.
+ * "Markdown Org Show Agenda Day".
+ */
+export async function runCommandViaPalette(name: string): Promise<void> {
+    await ensureVscodeWindowFocused();
+    // Clear any stale chord/modifier state from a previous pressKey.
+    for (const mod of ['ctrl', 'shift', 'alt', 'super']) {
+        await runXdotool(['keyup', mod]);
+    }
+    await runXdotool(['key', 'Escape']);
+    await pause(120);
+    // Open palette: ctrl+shift+p (single modifier-combined key, no chord).
+    await runXdotool(['keydown', 'ctrl']);
+    await runXdotool(['keydown', 'shift']);
+    await runXdotool(['key', 'p']);
+    await runXdotool(['keyup', 'shift']);
+    await runXdotool(['keyup', 'ctrl']);
+    await pause(350);
+    await runXdotool(['type', '--delay', '25', name]);
+    await pause(450);
+    await runXdotool(['key', 'Return']);
+}
+
+export async function pressKey(sequence: string): Promise<void> {
+    await ensureVscodeWindowFocused();
+    // Defensively clear any modifiers that an earlier xdotool call might have
+    // left stuck (an interrupted run, a race on `keyup`, or a chord that
+    // returned before its keyup finished propagating). Without this guard,
+    // VS Code's chord recognizer sees stale `ctrl-down` on the next chord
+    // step and either ignores it or routes it as a continuation of a stale
+    // multi-chord state.
+    for (const mod of ['ctrl', 'shift', 'alt', 'super']) {
+        await runXdotool(['keyup', mod]);
+    }
+    // Drop any pending chord state in VS Code. The chord recognizer
+    // remembers the partial chord prefix across the chord timeout, and
+    // Escape is the documented "abort chord" key on every VS Code edition.
+    // Skip the reset when the caller is itself sending Escape, to avoid an
+    // infinite loop.
+    if (sequence.trim() !== 'Escape') {
+        await runXdotool(['key', 'Escape']);
+        await pause(60);
+    }
+    const tokens = sequence.split(/\s+/).filter(Boolean);
+    // Send each chord step with explicit keydown/keyup on modifiers and a
+    // real JS pause between steps. VS Code's chord recognizer needs to see
+    // each step as a distinct top-level keyboard event; sending them as a
+    // single `xdotool key A B C` call or even back-to-back `xdotool key`
+    // invocations causes the second prefix to fail randomly on Xvfb after
+    // the first chord has already entered multi-chord mode.
+    for (let i = 0; i < tokens.length; i++) {
+        const { modifiers, key } = splitToken(tokens[i]);
+        for (const mod of modifiers) {
+            const r = await runXdotool(['keydown', mod]);
+            if (r.status !== 0) throw new Error(`xdotool keydown ${mod} failed`);
+        }
+        const tap = await runXdotool(['key', key]);
+        if (tap.status !== 0) throw new Error(`xdotool key ${key} failed`);
+        for (const mod of [...modifiers].reverse()) {
+            const r = await runXdotool(['keyup', mod]);
+            if (r.status !== 0) throw new Error(`xdotool keyup ${mod} failed`);
+        }
+        if (i < tokens.length - 1) {
+            await pause(200);
+        }
+    }
+}
