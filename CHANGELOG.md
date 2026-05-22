@@ -20,7 +20,8 @@ All notable changes to the "Markdown Org" extension will be documented in this f
 - `src/utils/bundledBinary.ts` extracts the platform-mapped path lookup as a pure function so unit tests can exercise the layout without spinning up a VS Code extension host.
 - `src/utils/extractor.ts` now resolves the extractor in this order: explicit `markdown-org.extractorPath` setting → bundled binary at `<extensionPath>/bin/markdown-org-extract[.exe]` → `markdown-org-extract` in `PATH`.
 - `.github/workflows/release.yml` split into `test` → `validate-tag` → `package` (matrix across the four VS Code targets) → `publish` (downloads the per-target artifacts and attaches all of them to the GitHub Release in one step). Smoke-test now also asserts the bundled binary's presence inside the VSIX.
-- `.vscodeignore` extended to drop `temp/**`, `DEVELOPMENT.md`, `TAG_FILTERING.md`, and `.claude-dir-settings.yaml` from the VSIX. Marketplace / Open VSX rewrite relative links in README to GitHub URLs, so the in-VSIX copies of `DEVELOPMENT.md` and `TAG_FILTERING.md` were dead weight.
+- `.vscodeignore` extended to drop `temp/**`, `DEVELOPMENT.md`, `TAG_FILTERING.md`, and `.claude-dir-settings.yaml` from the VSIX. Open VSX rewrites relative links in README to GitHub URLs, so the in-VSIX copies of `DEVELOPMENT.md` and `TAG_FILTERING.md` were dead weight.
+- ADR-0004 (`docs/adr/0004-open-vsx-distribution.md`) records the decision to distribute via Open VSX + GitHub Releases only and the consequences of opting out of the Microsoft Marketplace. References to Marketplace publishing were removed from `TODO.md`, `DEVELOPMENT.md`, `README.md`, and demo test comments; `package.json` `qna` flipped from `"marketplace"` to `false`.
 
 ## [0.5.1] - 2026-05-21
 
