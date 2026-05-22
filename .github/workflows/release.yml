@@ -263,3 +263,28 @@ jobs:
           body_path: release-notes.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Publish VSIX files to Open VSX
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.dry_run == false }}
+        env:
+          # The Personal Access Token from https://open-vsx.org/user-settings/tokens
+          # was stored in the repo's Actions secrets via `gh secret set`.
+          # ovsx CLI reads it from `-p`; without a value the publish step
+          # fails fast instead of attempting an unauthenticated upload.
+          OVSX_PAT: ${{ secrets.OVSX_PAT }}
+        run: |
+          set -euo pipefail
+          if [ -z "${OVSX_PAT:-}" ]; then
+            echo "::error::OVSX_PAT secret is missing; cannot publish to Open VSX"
+            exit 1
+          fi
+          # Loop one VSIX per `ovsx publish` invocation. `--skip-duplicate`
+          # turns "already exists" into a no-op success, so a re-run of
+          # this job after a partial failure on a later target does not
+          # blow up on the earlier targets that succeeded the first time.
+          # Target platform is read from each VSIX's manifest; no -t flag
+          # needed.
+          for vsix in markdown-org-vscode-*.vsix; do
+            echo "Publishing $vsix to Open VSX..."
+            npx -y ovsx@0.10.12 publish "$vsix" --skip-duplicate -p "$OVSX_PAT"
+          done
