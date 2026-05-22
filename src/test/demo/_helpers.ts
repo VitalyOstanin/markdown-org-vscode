@@ -154,7 +154,7 @@ export async function maximizeVscodeWindow(): Promise<void> {
 
 /**
  * Switch the running VS Code window to the built-in Monokai theme. Used by
- * the screenshots scenario so the PNGs that land on the marketplace listing
+ * the screenshots scenario so the PNGs that land on the Open VSX listing
  * have a recognisable, high-contrast colour palette that does not look like
  * a stock VS Code screenshot. Written at Global scope; the demo runner gets
  * its own disposable user-data-dir, so the developer's own theme choice is

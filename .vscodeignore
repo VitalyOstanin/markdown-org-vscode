@@ -48,9 +48,9 @@ temp/**
 
 # Internal design / process notes that aren't user docs
 # (most design docs live in docs/ now -- already excluded by docs/** above).
-# DEVELOPMENT.md and TAG_FILTERING.md are referenced from README but the
-# Marketplace / Open VSX rewrite relative links to GitHub URLs, so
-# shipping these files in the VSIX is dead weight.
+# DEVELOPMENT.md and TAG_FILTERING.md are referenced from README but
+# Open VSX rewrites relative links to GitHub URLs, so shipping these
+# files in the VSIX is dead weight.
 TODO.md
 DEVELOPMENT.md
 TAG_FILTERING.md

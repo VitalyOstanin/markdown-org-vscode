@@ -71,8 +71,9 @@ channel that matches your editor:
     Or browse the extension page on
     [Open VSX](https://open-vsx.org/extension/vitalyostanin/markdown-org-vscode).
 
-- **VS Code (Marketplace not yet available):** download the platform-specific
-  `markdown-org-vscode-X.Y.Z-<platform>.vsix` from
+- **VS Code (Microsoft Marketplace is intentionally not used -- see
+  [ADR-0004](docs/adr/0004-open-vsx-distribution.md)):** download the
+  platform-specific `markdown-org-vscode-X.Y.Z-<platform>.vsix` from
   [GitHub Releases](https://github.com/VitalyOstanin/markdown-org-vscode/releases)
   (e.g. `linux-x64`, `darwin-arm64`, `win32-x64`) and install it:
     - **GUI:** open the **Extensions** view (`Ctrl+Shift+X`), click the

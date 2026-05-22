@@ -17,17 +17,13 @@
 ## Publishing
 
 - [x] Add publisher field to package.json
-    - Added `"publisher": "vitalyostanin"`
-    - Note: Publisher must be registered at https://marketplace.visualstudio.com/manage before publishing
+    - Added `"publisher": "vitalyostanin"` (reused as the Open VSX namespace).
+- [x] Pick a distribution channel
+    - Open VSX (`vitalyostanin.markdown-org-vscode`) + GitHub Releases (per-target VSIX). Microsoft Marketplace is out of scope -- see [ADR-0004](docs/adr/0004-open-vsx-distribution.md).
 - [ ] Generate an SBOM (CycloneDX or SPDX) and attach it to GitHub Releases
     - Currently low-value: the VSIX bundles minimal production deps and the user base is individual.
     - Becomes worth doing once production-deps surface grows or corporate adoption picks up (CRA/EO 14028 readiness, Dependency-Track / Trivy ingestion).
     - Implementation sketch: add a step to `.github/workflows/release.yml` that runs `npx @cyclonedx/cyclonedx-npm --output-file sbom.cdx.json` after the VSIX is built and attaches `sbom.cdx.json` to the GitHub Release alongside the `.vsix`.
-- [ ] Decide on automated VS Code Marketplace publishing
-    - Current: release workflow only creates a GitHub Release with the VSIX; Marketplace publish is manual.
-    - Option A: add a `vsce publish` step to `.github/workflows/release.yml` so each annotated tag goes live on Marketplace. Requires `secrets.VSCE_PAT` (Azure DevOps PAT with Marketplace rights) and acceptance that every published tag is irrevocable.
-    - Option B: keep Marketplace publish manual and document the local recipe (`npx vsce publish` with the same PAT) in README.
-    - Option C: open-vsx publish (separate registry used by VSCodium and others) -- consider alongside whichever choice above is taken.
 
 ## Documentation
 
@@ -39,12 +35,8 @@
     - Added detailed Settings section with examples
     - Documented markdown-org-extract dependency and installation
 - [ ] Add screenshots/GIF demonstrations
-- [ ] Add Marketplace version badge to README after publishing
-    - Once the extension goes live on the VS Code Marketplace, append
-      `[![Marketplace](https://img.shields.io/visual-studio-marketplace/v/vitalyostanin.markdown-org-vscode)](https://marketplace.visualstudio.com/items?itemName=vitalyostanin.markdown-org-vscode)`
-      to the badge block at the top of README.md.
-    - Optional companion: installs badge `visual-studio-marketplace/i/...` and rating badge `visual-studio-marketplace/r/...`.
-    - Blocked until the first successful Marketplace publish (see "Decide on automated VS Code Marketplace publishing" above).
+- [x] Add Open VSX version badge to README
+    - Shipped in 0.6.0 alongside the auto-publish workflow ([ADR-0004](docs/adr/0004-open-vsx-distribution.md)).
 - [x] Create CHANGELOG.md
     - Documented version 0.1.0 features
     - Set up format for future releases

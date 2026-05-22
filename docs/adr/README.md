@@ -26,11 +26,12 @@ was decided, and the trade-offs that came with it.
 
 ## Index
 
-| #    | Title                                                                            | Status   |
-| ---- | -------------------------------------------------------------------------------- | -------- |
-| 0001 | [External Rust extractor for markdown scanning](0001-external-rust-extractor.md) | Accepted |
-| 0002 | [Webview-based agenda UI](0002-webview-agenda.md)                                | Accepted |
-| 0003 | [Org-mode wire format for timestamps and CLOCK](0003-org-mode-wire-format.md)    | Accepted |
+| #    | Title                                                                                                   | Status   |
+| ---- | ------------------------------------------------------------------------------------------------------- | -------- |
+| 0001 | [External Rust extractor for markdown scanning](0001-external-rust-extractor.md)                        | Accepted |
+| 0002 | [Webview-based agenda UI](0002-webview-agenda.md)                                                       | Accepted |
+| 0003 | [Org-mode wire format for timestamps and CLOCK](0003-org-mode-wire-format.md)                           | Accepted |
+| 0004 | [Distribute via Open VSX and GitHub Releases, not Microsoft Marketplace](0004-open-vsx-distribution.md) | Accepted |
 
 ## Adding a new ADR
 

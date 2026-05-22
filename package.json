@@ -12,7 +12,7 @@
   "bugs": {
     "url": "https://github.com/VitalyOstanin/markdown-org-vscode/issues"
   },
-  "qna": "marketplace",
+  "qna": false,
   "license": "MIT",
   "icon": "media/icon.png",
   "galleryBanner": {

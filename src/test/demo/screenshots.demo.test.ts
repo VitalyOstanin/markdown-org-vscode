@@ -14,9 +14,9 @@ import {
 } from './_helpers';
 
 /**
- * Marketplace / README screenshots. Unlike the four scenario demos, this
+ * Open VSX / README screenshots. Unlike the four scenario demos, this
  * suite does not record a video -- it just stages each view that the
- * marketplace listing should advertise and snaps a single PNG of the
+ * Open VSX listing should advertise and snaps a single PNG of the
  * current X11 display.
  *
  * The screenshots scenario uses the Monokai theme so the PNGs read as

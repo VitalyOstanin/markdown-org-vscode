@@ -178,5 +178,5 @@ and let VS Code resume normal updates.
 
 If the issue is severe enough that the broken release should not be
 installed by anyone, also unpublish or yank the offending tag from the
-distribution channel (GitHub Release / Marketplace) so new users don't
+distribution channel (GitHub Release / Open VSX) so new users don't
 land on it; existing installs are still protected by the steps above.
