@@ -8,3 +8,5 @@ docs/reviews/
 coverage/
 .nyc_output/
 temp/
+bin/
+.claude-dir-settings.yaml

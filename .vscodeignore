@@ -44,10 +44,20 @@ docs/**
 examples/**
 test-workspace/**
 test-workspace-demo*/**
+temp/**
 
 # Internal design / process notes that aren't user docs
-# (most design docs live in docs/ now -- already excluded by docs/** above)
+# (most design docs live in docs/ now -- already excluded by docs/** above).
+# DEVELOPMENT.md and TAG_FILTERING.md are referenced from README but the
+# Marketplace / Open VSX rewrite relative links to GitHub URLs, so
+# shipping these files in the VSIX is dead weight.
 TODO.md
+DEVELOPMENT.md
+TAG_FILTERING.md
+
+# Claude Code repo-specific configuration (the .claude/** line above only
+# catches the directory; this file lives at the repo root).
+.claude-dir-settings.yaml
 
 # Media: only the GIFs and PNGs referenced from README.md ship in
 # the VSIX. The MP4 source files that the demo recording produces

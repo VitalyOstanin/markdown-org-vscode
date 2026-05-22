@@ -213,8 +213,8 @@
       "properties": {
         "markdown-org.extractorPath": {
           "type": "string",
-          "default": "markdown-org-extract",
-          "description": "Path to markdown-org-extract executable (default: searches in PATH)"
+          "default": "",
+          "description": "Path to markdown-org-extract executable. Empty (default) uses the bundled binary, falling back to PATH. Set to override (e.g. an absolute path for local builds)."
         },
         "markdown-org.workspaceDir": {
           "type": "string",
@@ -303,6 +303,9 @@
   "overrides": {
     "diff": "^9.0.0",
     "serialize-javascript": "^7.0.5"
+  },
+  "x-markdown-org": {
+    "extractorVersion": "0.4.2"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

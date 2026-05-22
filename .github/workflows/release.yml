@@ -58,11 +58,11 @@ jobs:
       - name: Run integration tests
         run: npm run test:integration
 
-  publish:
-    name: Publish VSIX
+  validate-tag:
+    name: Validate release tag
     needs: test
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
@@ -71,12 +71,6 @@ jobs:
           # verify that the tag is annotated rather than lightweight.
           fetch-tags: true
           fetch-depth: 0
-
-      - name: Setup Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
-        with:
-          node-version-file: '.nvmrc'
-          cache: 'npm'
 
       - name: Verify tag is annotated
         run: |
@@ -109,21 +103,54 @@ jobs:
             exit 1
           fi
 
+  package:
+    name: Package VSIX (${{ matrix.target }})
+    needs: [test, validate-tag]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # One VSIX per VS Code platform. vsce supports per-target packaging
+        # on a single host -- the bundled binary inside is opaque to vsce,
+        # we only need to drop the right file into bin/ before packaging.
+        target: [linux-x64, darwin-x64, darwin-arm64, win32-x64]
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6
+        with:
+          node-version-file: '.nvmrc'
+          cache: 'npm'
+
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
       - name: Compile
         run: npm run compile
 
-      - name: Package VSIX
-        run: npm run package
+      - name: Download bundled extractor binary
+        run: bash scripts/download-extractor.sh "${{ matrix.target }}"
 
-      - name: Smoke-test VSIX
+      - name: Package VSIX
         run: |
           set -euo pipefail
-          VSIX_FILE="$(ls -1 *.vsix 2>/dev/null | head -n1)"
+          VERSION="$(node -p 'require("./package.json").version')"
+          npx --no-install @vscode/vsce package \
+            --target "${{ matrix.target }}" \
+            -o "markdown-org-vscode-${VERSION}-${{ matrix.target }}.vsix"
+
+      - name: Smoke-test VSIX
+        env:
+          TARGET: ${{ matrix.target }}
+        run: |
+          set -euo pipefail
+          VSIX_FILE="$(ls -1 markdown-org-vscode-*-${TARGET}.vsix 2>/dev/null | head -n1)"
           if [ -z "$VSIX_FILE" ]; then
-            echo "::error::npm run package did not produce a .vsix file"
+            echo "::error::vsce package did not produce a .vsix for target $TARGET"
             exit 1
           fi
           if [ ! -s "$VSIX_FILE" ]; then
@@ -136,6 +163,12 @@ jobs:
           fi
           SMOKE_DIR="$(mktemp -d)"
           unzip -q "$VSIX_FILE" -d "$SMOKE_DIR"
+          # Bundled binary name depends on target -- only win32-x64 ships
+          # the .exe; the other three ship the bare name with +x mode.
+          case "$TARGET" in
+            win32-*) BUNDLED_BIN="extension/bin/markdown-org-extract.exe" ;;
+            *)       BUNDLED_BIN="extension/bin/markdown-org-extract"     ;;
+          esac
           for required in \
               extension.vsixmanifest \
               "[Content_Types].xml" \
@@ -143,7 +176,8 @@ jobs:
               extension/out/extension.js \
               extension/LICENSE.txt \
               extension/readme.md \
-              extension/changelog.md; do
+              extension/changelog.md \
+              "$BUNDLED_BIN"; do
             if [ ! -f "$SMOKE_DIR/$required" ]; then
               echo "::error::Required file '$required' missing from VSIX"
               exit 1
@@ -172,6 +206,30 @@ jobs:
           VSIX_BYTES="$(stat -c %s "$VSIX_FILE")"
           echo "VSIX smoke-test passed: $VSIX_FILE ($VSIX_VERSION, $VSIX_BYTES bytes)"
 
+      - name: Upload VSIX artifact
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: vsix-${{ matrix.target }}
+          path: 'markdown-org-vscode-*-${{ matrix.target }}.vsix'
+          if-no-files-found: error
+          retention-days: 7
+
+  publish:
+    name: Publish to GitHub Release
+    needs: package
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
+
+      - name: Download VSIX artifacts
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+        with:
+          pattern: vsix-*
+          merge-multiple: true
+
       - name: Extract release notes from CHANGELOG.md
         id: changelog
         run: |
@@ -196,11 +254,11 @@ jobs:
           cat release-notes.md
           echo "--- end ---"
 
-      - name: Attach VSIX to GitHub Release
+      - name: Attach VSIX files to GitHub Release
         if: ${{ github.event_name != 'workflow_dispatch' || inputs.dry_run == false }}
         uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
         with:
-          files: '*.vsix'
+          files: 'markdown-org-vscode-*.vsix'
           tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
           body_path: release-notes.md
         env:
