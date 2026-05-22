@@ -2,6 +2,26 @@
 
 All notable changes to the "Markdown Org" extension will be documented in this file.
 
+## [0.6.0] - 2026-05-22
+
+### Added
+
+- The `markdown-org-extract` binary is now bundled inside the VSIX (one per VS Code platform: `linux-x64`, `darwin-x64`, `darwin-arm64`, `win32-x64`). Users no longer need to `cargo install markdown-org-extract` before installing the extension. The pinned extractor version is declared once in `package.json` (`x-markdown-org.extractorVersion`) and consumed by both the CI download step and the runtime locator.
+- Extension is now published to the [Open VSX registry](https://open-vsx.org/extension/vitalyostanin/markdown-org-vscode) so VSCodium / Cursor / Gitpod / code-server users can install it with `code --install-extension vitalyostanin.markdown-org-vscode`. A version badge linking to the Open VSX page has been added to README.
+
+### Changed
+
+- `markdown-org.extractorPath` default changed from `"markdown-org-extract"` to `""` (empty). An empty value now means "use the bundled binary, fall back to PATH"; existing absolute or custom-name overrides keep their previous behaviour. The Settings page description has been rewritten to match.
+- README's Quick Start no longer requires a separate `cargo install`. The "Dependencies" section now documents the bundled binary and points the override scenarios to [`markdown-org.extractorPath`](#markdown-orgextractorpath).
+
+### Internal
+
+- `scripts/download-extractor.sh` downloads a per-target prebuilt extractor archive from the extractor's GitHub Releases, verifies the upstream `.sha256`, and unpacks the binary into `bin/`. Idempotent: a second run on the same version skips re-download.
+- `src/utils/bundledBinary.ts` extracts the platform-mapped path lookup as a pure function so unit tests can exercise the layout without spinning up a VS Code extension host.
+- `src/utils/extractor.ts` now resolves the extractor in this order: explicit `markdown-org.extractorPath` setting → bundled binary at `<extensionPath>/bin/markdown-org-extract[.exe]` → `markdown-org-extract` in `PATH`.
+- `.github/workflows/release.yml` split into `test` → `validate-tag` → `package` (matrix across the four VS Code targets) → `publish` (downloads the per-target artifacts and attaches all of them to the GitHub Release in one step). Smoke-test now also asserts the bundled binary's presence inside the VSIX.
+- `.vscodeignore` extended to drop `temp/**`, `DEVELOPMENT.md`, `TAG_FILTERING.md`, and `.claude-dir-settings.yaml` from the VSIX. Marketplace / Open VSX rewrite relative links in README to GitHub URLs, so the in-VSIX copies of `DEVELOPMENT.md` and `TAG_FILTERING.md` were dead weight.
+
 ## [0.5.1] - 2026-05-21
 
 ### Documentation

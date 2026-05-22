@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/VitalyOstanin/markdown-org-vscode/actions/workflows/ci.yml/badge.svg?branch=master)](https://github.com/VitalyOstanin/markdown-org-vscode/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/VitalyOstanin/markdown-org-vscode/branch/master/graph/badge.svg)](https://codecov.io/gh/VitalyOstanin/markdown-org-vscode)
+[![Open VSX](https://img.shields.io/open-vsx/v/vitalyostanin/markdown-org-vscode?label=Open%20VSX)](https://open-vsx.org/extension/vitalyostanin/markdown-org-vscode)
 
 Org-mode style task management in Markdown -- TODO/DONE workflow,
 priorities, SCHEDULED/DEADLINE timestamps, day/week/month agenda views,
@@ -57,27 +58,37 @@ to Markdown files in VS Code:
 
 ## Quick Start
 
-1. Install the [`markdown-org-extract`](https://crates.io/crates/markdown-org-extract) binary -- the extension relies on it to parse markdown files:
+The extension bundles a prebuilt `markdown-org-extract` binary inside
+the VSIX, so there is nothing to install separately. Pick the install
+channel that matches your editor:
+
+- **VSCodium / Cursor / Gitpod / code-server (Open VSX registry):**
 
     ```bash
-    cargo install markdown-org-extract
+    code --install-extension vitalyostanin.markdown-org-vscode
     ```
 
-2. Download the latest `markdown-org-vscode-X.Y.Z.vsix` from
-   [GitHub Releases](https://github.com/VitalyOstanin/markdown-org-vscode/releases).
+    Or browse the extension page on
+    [Open VSX](https://open-vsx.org/extension/vitalyostanin/markdown-org-vscode).
 
-3. Install the extension in VS Code:
-    - **GUI:** open the **Extensions** view (`Ctrl+Shift+X`), click the `...` menu next to the search box, choose **Install from VSIX...**, and select the downloaded file.
+- **VS Code (Marketplace not yet available):** download the platform-specific
+  `markdown-org-vscode-X.Y.Z-<platform>.vsix` from
+  [GitHub Releases](https://github.com/VitalyOstanin/markdown-org-vscode/releases)
+  (e.g. `linux-x64`, `darwin-arm64`, `win32-x64`) and install it:
+    - **GUI:** open the **Extensions** view (`Ctrl+Shift+X`), click the
+      `...` menu next to the search box, choose **Install from VSIX...**,
+      and select the downloaded file.
     - **CLI:**
 
         ```bash
-        code --install-extension markdown-org-vscode-X.Y.Z.vsix
+        code --install-extension markdown-org-vscode-X.Y.Z-<platform>.vsix
         ```
 
-4. Open any `.md` file in your workspace and start using the [commands](#commands).
-
-For building the extension from source, see
-[DEVELOPMENT.md](DEVELOPMENT.md).
+Open any `.md` file in your workspace and start using the
+[commands](#commands). For building the extension from source or
+running with a custom `markdown-org-extract` build, see
+[DEVELOPMENT.md](DEVELOPMENT.md) and
+[`markdown-org.extractorPath`](#markdown-orgextractorpath).
 
 ## Syntax Examples
 
@@ -282,27 +293,26 @@ Markdown editor has focus.
 ### `markdown-org.extractorPath`
 
 **Type:** `string`
-**Default:** `"markdown-org-extract"`
+**Default:** `""` (use bundled binary)
 
-Path to the markdown-org-extract executable. By default, searches in system PATH.
+Path to the markdown-org-extract executable.
+
+- **Empty (default):** the extension uses the binary bundled inside the
+  VSIX (`bin/markdown-org-extract[.exe]`). Falls back to looking up
+  `markdown-org-extract` in `PATH` if the bundled file is missing
+  (e.g. during local development without a prepared `bin/`).
+- **Custom value:** overrides the bundled binary. Useful when
+  contributing to markdown-org-extract or running with local patches.
 
 ```json
 {
-    "markdown-org.extractorPath": "markdown-org-extract"
-}
-```
-
-For a custom installation location:
-
-```json
-{
-    "markdown-org.extractorPath": "/custom/path/to/markdown-org-extract"
+    "markdown-org.extractorPath": "/path/to/my/markdown-org-extract"
 }
 ```
 
 > **Security:** the configured path is executed by the extension every
-> time agenda or related commands run. Always point this setting at a
-> binary you trust -- ideally one installed via
+> time agenda or related commands run. Only override the bundled
+> binary with one you trust -- ideally installed via
 > `cargo install markdown-org-extract` from
 > [crates.io](https://crates.io/crates/markdown-org-extract), or built
 > from a source tree you control. Do not point it at downloaded
@@ -391,16 +401,17 @@ The extension is **limited in untrusted workspaces**. The following commands are
 
 ## Dependencies
 
-This extension delegates markdown parsing to
+The extension delegates markdown parsing to
 [`markdown-org-extract`](https://crates.io/crates/markdown-org-extract) --
 a Rust utility that scans `.md` files for headings, timestamps, and
-CLOCK entries. Install it once with:
+CLOCK entries. The compiled binary for your platform is shipped inside
+the VSIX, so there is nothing to install separately.
 
-```bash
-cargo install markdown-org-extract
-```
-
-After installation the binary lives at `~/.cargo/bin/markdown-org-extract`. Make sure `~/.cargo/bin` is in your `PATH`, or set the full path in the [`markdown-org.extractorPath`](#markdown-orgextractorpath) setting.
+If you want to use a custom build (e.g. you are contributing to
+markdown-org-extract or running with local patches), point
+[`markdown-org.extractorPath`](#markdown-orgextractorpath) at your
+binary. The setting is also useful in untrusted workspaces where the
+bundled binary is disabled until you trust the workspace.
 
 ## Development
 
