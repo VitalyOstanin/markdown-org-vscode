@@ -159,7 +159,7 @@
       },
       {
         "command": "markdown-org.insertDeadline",
-        "key": "ctrl+k ctrl+k d",
+        "key": "ctrl+k ctrl+k ctrl+d",
         "when": "editorTextFocus && editorLangId == markdown"
       },
       {
