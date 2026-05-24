@@ -210,11 +210,21 @@ suite('Agenda Show Integration Tests', () => {
 // behaviour described in CLAUDE.md: any path coming through `openTask` must
 // open, even when it points outside `workspaceFolders` or through a symlink.
 suite('AgendaPanel.openTaskInEditor', () => {
-    const sandboxDir = path.join(os.tmpdir(), 'markdown-org-openTask-tests');
+    // Per-suite unique tmpdir via `mkdtemp` instead of a stable path:
+    //   * each run lands in its own directory, so a residual file from a
+    //     previous interrupted run on a dev machine does not affect the next;
+    //   * the suite no longer needs an after-hook to remove the directory.
+    //     On Windows the previous `rmSync` consistently tripped on EBUSY
+    //     because VS Code holds a handle on the sandbox after the last editor
+    //     closes, and bumping `maxRetries`/`retryDelay` only made the failure
+    //     slower. Leaving tmpdir to the OS (CI runners discard the workspace
+    //     after the job; dev tmpdir is reaped by the OS on its own schedule)
+    //     trades a few stale kilobytes for a reliable signal.
+    let sandboxDir: string;
     let showErrorStub: sinon.SinonStub;
 
     before(() => {
-        fs.mkdirSync(sandboxDir, { recursive: true });
+        sandboxDir = fs.mkdtempSync(path.join(os.tmpdir(), 'markdown-org-openTask-tests-'));
     });
 
     beforeEach(() => {
@@ -224,15 +234,6 @@ suite('AgendaPanel.openTaskInEditor', () => {
     afterEach(async () => {
         showErrorStub.restore();
         await vscode.commands.executeCommand('workbench.action.closeAllEditors');
-    });
-
-    after(() => {
-        // Windows: VS Code may still hold a handle to the file that was last
-        // shown in the editor, so rmSync trips on EBUSY. `maxRetries` is the
-        // native node 14.14+ knob for exactly this case -- linear backoff
-        // around the documented set of recoverable errors (EBUSY, EMFILE,
-        // ENFILE, ENOTEMPTY, EPERM).
-        fs.rmSync(sandboxDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
     });
 
     function assertOpened(expectedRealPath: string) {
