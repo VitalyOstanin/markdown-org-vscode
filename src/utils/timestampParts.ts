@@ -53,11 +53,17 @@ function inSpan(character: number, span: Span): boolean {
 
 /**
  * Map a cursor position inside a line to the timestamp part it sits on.
- * All ranges are half-open intervals `[start, end)` -- separators (hyphens,
- * spaces, colons, brackets) are no man's land and return `null`.
  *
- * If a line contains multiple timestamps, the one containing the cursor wins;
- * if none contains it, returns `null`.
+ * Internally each part owns a half-open span `[start, end)` over the
+ * character columns. VS Code positions sit BETWEEN characters, so a cursor
+ * shown "right after" a part visually lands on the separator that follows
+ * it (e.g. column 22 in `<2026-05-25 Пн ...>` is the space immediately past
+ * `25`). To match user intent we first probe `character`, then fall back to
+ * `character - 1` -- staying within the same timestamp so an adjacent one
+ * never picks up the position. Cursor on an opening `<`, or anywhere outside
+ * a timestamp, returns `null`.
+ *
+ * If a line contains multiple timestamps, the one containing the cursor wins.
  */
 export function getTimestampPartAt(lineText: string, character: number): TimestampPartHit | null {
     const regex = new RegExp(TIMESTAMP_REGEX, 'g');
@@ -68,46 +74,63 @@ export function getTimestampPartAt(lineText: string, character: number): Timesta
         const tsEnd = tsStart + match[0].length;
         if (character < tsStart || character >= tsEnd) continue;
 
-        const { weekday, hour, minute } = match.groups;
-        const spans: Span[] = [
-            { part: 'year', start: tsStart + 1, end: tsStart + 5 },
-            { part: 'month', start: tsStart + 6, end: tsStart + 8 },
-            { part: 'day', start: tsStart + 9, end: tsStart + 11 }
-        ];
+        const spans = buildTimestampSpans(lineText, match, tsStart);
 
-        let cursor = tsStart + 11;
-        if (weekday) {
-            const weekdayStart = lineText.indexOf(weekday, cursor);
-            spans.push({ part: 'weekday', start: weekdayStart, end: weekdayStart + weekday.length });
-            cursor = weekdayStart + weekday.length;
+        const direct = findPart(character, spans);
+        if (direct) {
+            return { match, part: direct as TimestampPart, start: tsStart, end: tsEnd };
         }
-        if (hour && minute) {
-            const hourStart = lineText.indexOf(hour, cursor);
-            spans.push({ part: 'hour', start: hourStart, end: hourStart + 2 });
-            const minuteStart = hourStart + 3;
-            spans.push({ part: 'minute', start: minuteStart, end: minuteStart + 2 });
-        }
-
-        for (const span of spans) {
-            if (inSpan(character, span)) {
-                return {
-                    match,
-                    part: span.part as TimestampPart,
-                    start: tsStart,
-                    end: tsEnd
-                };
+        if (character > tsStart) {
+            const leftLeaning = findPart(character - 1, spans);
+            if (leftLeaning) {
+                return { match, part: leftLeaning as TimestampPart, start: tsStart, end: tsEnd };
             }
         }
-        // Cursor is on a separator inside the timestamp -- treat as no part.
         return null;
+    }
+    return null;
+}
+
+function buildTimestampSpans(lineText: string, match: RegExpExecArray, tsStart: number): Span[] {
+    const { weekday, hour, minute } = match.groups!;
+    const spans: Span[] = [
+        { part: 'year', start: tsStart + 1, end: tsStart + 5 },
+        { part: 'month', start: tsStart + 6, end: tsStart + 8 },
+        { part: 'day', start: tsStart + 9, end: tsStart + 11 }
+    ];
+
+    let cursor = tsStart + 11;
+    if (weekday) {
+        const weekdayStart = lineText.indexOf(weekday, cursor);
+        spans.push({ part: 'weekday', start: weekdayStart, end: weekdayStart + weekday.length });
+        cursor = weekdayStart + weekday.length;
+    }
+    if (hour && minute) {
+        const hourStart = lineText.indexOf(hour, cursor);
+        spans.push({ part: 'hour', start: hourStart, end: hourStart + 2 });
+        const minuteStart = hourStart + 3;
+        spans.push({ part: 'minute', start: minuteStart, end: minuteStart + 2 });
+    }
+
+    return spans;
+}
+
+function findPart(character: number, spans: Span[]): Span['part'] | null {
+    for (const span of spans) {
+        if (inSpan(character, span)) return span.part;
     }
     return null;
 }
 
 /**
  * Map a cursor position inside a CLOCK line to the CLOCK timestamp part.
- * Returns `null` if the line is not a CLOCK entry or the cursor is on a
- * separator (hyphen / colon / bracket / space).
+ *
+ * Returns `null` if the line is not a CLOCK entry, or if the cursor sits
+ * outside the start/end timestamps entirely. As with `getTimestampPartAt`,
+ * a left-leaning fallback (`character - 1`) covers the visual "right after a
+ * part" case where the cursor lands on `-`, `:`, ` `, `]`, `>` directly
+ * adjacent to a part. The fallback is bounded to `character > 0` so we never
+ * leak negative offsets into the spans.
  */
 export function getClockTimestampPartAt(lineText: string, character: number): ClockTimestampPartHit | null {
     const match = lineText.match(CLOCK_REGEX);
@@ -122,10 +145,11 @@ export function getClockTimestampPartAt(lineText: string, character: number): Cl
         spans.push(...clockSpans(timestamps[1], match.index, 'end'));
     }
 
-    for (const span of spans) {
-        if (inSpan(character, span)) {
-            return { match, part: span.part as ClockTimestampPart };
-        }
+    const direct = findPart(character, spans);
+    if (direct) return { match, part: direct as ClockTimestampPart };
+    if (character > 0) {
+        const leftLeaning = findPart(character - 1, spans);
+        if (leftLeaning) return { match, part: leftLeaning as ClockTimestampPart };
     }
     return null;
 }

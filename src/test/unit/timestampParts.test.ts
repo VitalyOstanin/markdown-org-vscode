@@ -12,6 +12,13 @@ suite('getTimestampPartAt (plain timestamp)', () => {
     //   weekday: [12, 15)
     //   hour:    [16, 18)
     //   minute:  [19, 21)
+    //
+    // Cursor positions sit BETWEEN characters in VS Code, so the lookup
+    // applies a left-leaning fallback (`character - 1`) whenever the column
+    // does not land directly on a part: a column on a separator (`-`, ` `,
+    // `:`, `>`) resolves to the part immediately to its left. The opening
+    // `<` (column 0) and the trailing column past `>` stay `null` because
+    // there is no left neighbor inside the timestamp to fall back to.
     const LINE = '<2025-12-06 Fri 14:30>';
 
     test('returns null when cursor is outside any timestamp', () => {
@@ -22,8 +29,8 @@ suite('getTimestampPartAt (plain timestamp)', () => {
         assert.strictEqual(getTimestampPartAt(LINE, 0), null);
     });
 
-    test('returns null when cursor is on the closing bracket', () => {
-        assert.strictEqual(getTimestampPartAt(LINE, 21), null);
+    test('cursor on the closing bracket falls back to minute (left-leaning)', () => {
+        assert.strictEqual(getTimestampPartAt(LINE, 21)?.part, 'minute');
     });
 
     test('cursor at the very first year digit -> year', () => {
@@ -34,8 +41,8 @@ suite('getTimestampPartAt (plain timestamp)', () => {
         assert.strictEqual(getTimestampPartAt(LINE, 4)?.part, 'year');
     });
 
-    test('cursor on the year/month separator hyphen -> null', () => {
-        assert.strictEqual(getTimestampPartAt(LINE, 5), null);
+    test('cursor on the year/month separator hyphen falls back to year', () => {
+        assert.strictEqual(getTimestampPartAt(LINE, 5)?.part, 'year');
     });
 
     test('cursor at first month digit -> month', () => {
@@ -46,8 +53,8 @@ suite('getTimestampPartAt (plain timestamp)', () => {
         assert.strictEqual(getTimestampPartAt(LINE, 7)?.part, 'month');
     });
 
-    test('cursor on the month/day separator hyphen -> null', () => {
-        assert.strictEqual(getTimestampPartAt(LINE, 8), null);
+    test('cursor on the month/day separator hyphen falls back to month', () => {
+        assert.strictEqual(getTimestampPartAt(LINE, 8)?.part, 'month');
     });
 
     test('cursor at first day digit -> day', () => {
@@ -58,8 +65,10 @@ suite('getTimestampPartAt (plain timestamp)', () => {
         assert.strictEqual(getTimestampPartAt(LINE, 10)?.part, 'day');
     });
 
-    test('cursor on the day/weekday space -> null', () => {
-        assert.strictEqual(getTimestampPartAt(LINE, 11), null);
+    test('cursor on the day/weekday space falls back to day', () => {
+        // Regression for issue #41: was `null` (visible to the user as a
+        // line selection from `cursorUpSelect`).
+        assert.strictEqual(getTimestampPartAt(LINE, 11)?.part, 'day');
     });
 
     test('cursor at first weekday letter -> weekday', () => {
@@ -70,8 +79,8 @@ suite('getTimestampPartAt (plain timestamp)', () => {
         assert.strictEqual(getTimestampPartAt(LINE, 14)?.part, 'weekday');
     });
 
-    test('cursor on the weekday/time space -> null', () => {
-        assert.strictEqual(getTimestampPartAt(LINE, 15), null);
+    test('cursor on the weekday/time space falls back to weekday', () => {
+        assert.strictEqual(getTimestampPartAt(LINE, 15)?.part, 'weekday');
     });
 
     test('cursor at first hour digit -> hour', () => {
@@ -82,8 +91,8 @@ suite('getTimestampPartAt (plain timestamp)', () => {
         assert.strictEqual(getTimestampPartAt(LINE, 17)?.part, 'hour');
     });
 
-    test('cursor on the hour/minute colon -> null', () => {
-        assert.strictEqual(getTimestampPartAt(LINE, 18), null);
+    test('cursor on the hour/minute colon falls back to hour', () => {
+        assert.strictEqual(getTimestampPartAt(LINE, 18)?.part, 'hour');
     });
 
     test('cursor at first minute digit -> minute', () => {
@@ -108,7 +117,8 @@ suite('getTimestampPartAt (plain timestamp)', () => {
         assert.strictEqual(getTimestampPartAt(dateOnly, 6)?.part, 'month');
         assert.strictEqual(getTimestampPartAt(dateOnly, 9)?.part, 'day');
         assert.strictEqual(getTimestampPartAt(dateOnly, 10)?.part, 'day');
-        assert.strictEqual(getTimestampPartAt(dateOnly, 11), null);
+        // Column 11 sits on the closing `>` and now falls back to day.
+        assert.strictEqual(getTimestampPartAt(dateOnly, 11)?.part, 'day');
     });
 
     test('Russian full-form weekday spans full length', () => {
@@ -118,19 +128,23 @@ suite('getTimestampPartAt (plain timestamp)', () => {
         const wdLast = wdStart + 'Пятница'.length - 1;
         assert.strictEqual(getTimestampPartAt(ru, wdStart)?.part, 'weekday');
         assert.strictEqual(getTimestampPartAt(ru, wdLast)?.part, 'weekday');
-        // Space immediately after weekday is not part of weekday.
-        assert.strictEqual(getTimestampPartAt(ru, wdLast + 1), null);
+        // Space immediately after the weekday is a boundary: left-leaning
+        // resolves it back to weekday.
+        assert.strictEqual(getTimestampPartAt(ru, wdLast + 1)?.part, 'weekday');
     });
 
     test('finds the right timestamp when two appear on one line', () => {
         // `<2025-12-06> <2025-12-07>`
         const two = '<2025-12-06> <2025-12-07>';
         assert.strictEqual(getTimestampPartAt(two, 1)?.part, 'year');
-        // Position 13 is `<` of the second timestamp -> null.
+        // Position 13 is `<` of the second timestamp -> null (opening
+        // bracket has no left-leaning fallback inside its own timestamp).
         assert.strictEqual(getTimestampPartAt(two, 13), null);
         // Position 14 is the first year digit of the second timestamp.
         assert.strictEqual(getTimestampPartAt(two, 14)?.part, 'year');
-        // Position 12 is the space between -> null.
+        // Position 12 is the space between the two timestamps: it sits
+        // OUTSIDE both [tsStart, tsEnd) ranges, so the fallback never
+        // crosses over into either neighbor.
         assert.strictEqual(getTimestampPartAt(two, 12), null);
     });
 });
@@ -158,45 +172,46 @@ suite('getClockTimestampPartAt', () => {
     test('start-year boundaries', () => {
         assert.strictEqual(getClockTimestampPartAt(CLOSED_CLOCK, 9)?.part, 'start-year');
         assert.strictEqual(getClockTimestampPartAt(CLOSED_CLOCK, 12)?.part, 'start-year');
-        // The hyphen between year and month is no man's land.
-        assert.strictEqual(getClockTimestampPartAt(CLOSED_CLOCK, 13), null);
+        // The hyphen between year and month falls back to start-year.
+        assert.strictEqual(getClockTimestampPartAt(CLOSED_CLOCK, 13)?.part, 'start-year');
     });
 
     test('start-month boundaries', () => {
         assert.strictEqual(getClockTimestampPartAt(CLOSED_CLOCK, 14)?.part, 'start-month');
         assert.strictEqual(getClockTimestampPartAt(CLOSED_CLOCK, 15)?.part, 'start-month');
-        assert.strictEqual(getClockTimestampPartAt(CLOSED_CLOCK, 16), null);
+        assert.strictEqual(getClockTimestampPartAt(CLOSED_CLOCK, 16)?.part, 'start-month');
     });
 
-    test('start-hour and start-minute boundaries (half-open)', () => {
+    test('start-hour and start-minute boundaries (left-leaning)', () => {
         assert.strictEqual(getClockTimestampPartAt(CLOSED_CLOCK, 24)?.part, 'start-hour');
         assert.strictEqual(getClockTimestampPartAt(CLOSED_CLOCK, 25)?.part, 'start-hour');
-        // Colon between hour and minute is no man's land.
-        assert.strictEqual(getClockTimestampPartAt(CLOSED_CLOCK, 26), null);
+        // Colon between hour and minute falls back to hour.
+        assert.strictEqual(getClockTimestampPartAt(CLOSED_CLOCK, 26)?.part, 'start-hour');
         assert.strictEqual(getClockTimestampPartAt(CLOSED_CLOCK, 27)?.part, 'start-minute');
         assert.strictEqual(getClockTimestampPartAt(CLOSED_CLOCK, 28)?.part, 'start-minute');
-        assert.strictEqual(getClockTimestampPartAt(CLOSED_CLOCK, 29), null);
+        // Closing `]` falls back to start-minute.
+        assert.strictEqual(getClockTimestampPartAt(CLOSED_CLOCK, 29)?.part, 'start-minute');
     });
 
     test('end-year boundaries', () => {
         assert.strictEqual(getClockTimestampPartAt(CLOSED_CLOCK, 33)?.part, 'end-year');
         assert.strictEqual(getClockTimestampPartAt(CLOSED_CLOCK, 36)?.part, 'end-year');
-        assert.strictEqual(getClockTimestampPartAt(CLOSED_CLOCK, 37), null);
+        assert.strictEqual(getClockTimestampPartAt(CLOSED_CLOCK, 37)?.part, 'end-year');
     });
 
-    test('end-minute boundaries (half-open)', () => {
+    test('end-minute boundaries (left-leaning)', () => {
         assert.strictEqual(getClockTimestampPartAt(CLOSED_CLOCK, 51)?.part, 'end-minute');
         assert.strictEqual(getClockTimestampPartAt(CLOSED_CLOCK, 52)?.part, 'end-minute');
-        // Closing bracket `]` is no man's land.
-        assert.strictEqual(getClockTimestampPartAt(CLOSED_CLOCK, 53), null);
+        // Closing `]` falls back to end-minute.
+        assert.strictEqual(getClockTimestampPartAt(CLOSED_CLOCK, 53)?.part, 'end-minute');
     });
 
     test('open CLOCK (no end timestamp) -- only start parts addressable', () => {
         const open = '`CLOCK: [2025-12-09 Tue 14:30]`';
         assert.strictEqual(getClockTimestampPartAt(open, 9)?.part, 'start-year');
         assert.strictEqual(getClockTimestampPartAt(open, 27)?.part, 'start-minute');
-        // Beyond the start timestamp there is no end timestamp to address.
-        assert.strictEqual(getClockTimestampPartAt(open, 29), null);
+        // Closing `]` falls back to start-minute.
+        assert.strictEqual(getClockTimestampPartAt(open, 29)?.part, 'start-minute');
     });
 
     test('returns null when the line is not a CLOCK entry', () => {

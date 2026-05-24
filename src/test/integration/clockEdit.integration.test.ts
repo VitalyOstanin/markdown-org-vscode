@@ -443,10 +443,11 @@ suite('CLOCK Timestamp Editing Integration Tests', () => {
         });
     });
 
-    suite('Cursor boundary positions (half-open intervals)', () => {
-        // Each timestamp part is matched by a half-open interval [start, end);
-        // separators (hyphens, spaces, colons, brackets) are no man's land.
-        // The cursor must sit on an actual digit/letter to trigger an edit.
+    suite('Cursor boundary positions (left-leaning fallback)', () => {
+        // Each timestamp part owns a half-open interval [start, end); when the
+        // cursor lands on a separator (hyphen, space, colon, closing bracket)
+        // the lookup retries with `character - 1`, resolving the position to
+        // the part immediately to the left. See issue #41.
 
         test('[] - cursor on last hour digit -> hour increments', async () => {
             await setupTest(`# Test\n\`CLOCK: [2025-12-09 Вт 21:00]--[2025-12-09 Вт 22:34] =>  1:34\`\n`);
@@ -469,29 +470,30 @@ suite('CLOCK Timestamp Editing Integration Tests', () => {
             assert.ok(editor.document.lineAt(1).text.includes('--<2025-12-11 Чт 21:30>'));
         });
 
-        test('cursor on the colon between end hour and end minute -> no edit', async () => {
-            // Position 48 is `:` -- under the new half-open semantics, this is
-            // a separator and not part of any timestamp segment. timestampUp
-            // falls back to cursorUpSelect, which doesn't touch the line text.
+        test('cursor on the colon between end hour and end minute -> end hour increments', async () => {
+            // Column 48 is `:` between `22` (end-hour) and `34` (end-minute).
+            // The left-leaning fallback resolves to end-hour, so timestampUp
+            // raises `22` -> `23` and the duration follows.
             const initial = `# Test\n\`CLOCK: [2025-12-09 Вт 21:00]--[2025-12-09 Вт 22:34] =>  1:34\`\n`;
             await setupTest(initial);
             editor.selection = new vscode.Selection(1, 48, 1, 48);
             await vscode.commands.executeCommand('markdown-org.timestampUp');
             assert.strictEqual(
                 editor.document.lineAt(1).text,
-                '`CLOCK: [2025-12-09 Вт 21:00]--[2025-12-09 Вт 22:34] =>  1:34`'
+                '`CLOCK: [2025-12-09 Вт 21:00]--[2025-12-09 Вт 23:34] =>  2:34`'
             );
         });
 
-        test('cursor on the closing bracket after end minute -> no edit', async () => {
-            // Position 51 is `]` -- separator, not part of any segment.
+        test('cursor on the closing bracket after end minute -> end minute increments', async () => {
+            // Column 51 is `]` immediately past `34` (end-minute). Left-leaning
+            // resolves it to end-minute, so timestampUp raises `34` -> `35`.
             const initial = `# Test\n\`CLOCK: [2025-12-09 Вт 21:00]--[2025-12-09 Вт 22:34] =>  1:34\`\n`;
             await setupTest(initial);
             editor.selection = new vscode.Selection(1, 51, 1, 51);
             await vscode.commands.executeCommand('markdown-org.timestampUp');
             assert.strictEqual(
                 editor.document.lineAt(1).text,
-                '`CLOCK: [2025-12-09 Вт 21:00]--[2025-12-09 Вт 22:34] =>  1:34`'
+                '`CLOCK: [2025-12-09 Вт 21:00]--[2025-12-09 Вт 22:35] =>  1:35`'
             );
         });
     });
