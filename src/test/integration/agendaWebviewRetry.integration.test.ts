@@ -49,6 +49,14 @@ suite('Agenda webview ServiceWorker-race retry', () => {
         }
     });
 
+    // Test-only timeout for the webview ready handshake. The shortest the
+    // production code allows is "set anything > 0"; the value here trades
+    // test wall-time against runner-latency tolerance. 500 ms is generous
+    // enough for macos-15 GitHub runners, where the prior 150 ms was
+    // racing the webview iframe startup and producing a false retry on
+    // the happy-path test (observed in CI on v0.6.1).
+    const TEST_READY_TIMEOUT_MS = 500;
+
     beforeEach(async () => {
         const config = vscode.workspace.getConfiguration('markdown-org');
         await config.update('workspaceDir', testWorkspaceDir, vscode.ConfigurationTarget.Workspace);
@@ -63,7 +71,7 @@ suite('Agenda webview ServiceWorker-race retry', () => {
             return {} as unknown as cp.ChildProcess;
         });
 
-        AgendaPanel.__testSetReadyTimeoutMs(150);
+        AgendaPanel.__testSetReadyTimeoutMs(TEST_READY_TIMEOUT_MS);
         AgendaPanel.__testSuppressNextReadies(0);
     });
 
@@ -82,7 +90,7 @@ suite('Agenda webview ServiceWorker-race retry', () => {
         await vscode.commands.executeCommand('markdown-org.showAgendaWeek');
         // Wait noticeably longer than the timeout so a buggy implementation
         // that fails to clear the timer would have retried by now.
-        await new Promise((r) => setTimeout(r, 600));
+        await new Promise((r) => setTimeout(r, TEST_READY_TIMEOUT_MS * 4));
 
         const delta = AgendaPanel.__testGetCreateCount() - before;
         assert.strictEqual(delta, 1, `expected exactly one createWebviewPanel call, got ${delta}`);
@@ -96,19 +104,23 @@ suite('Agenda webview ServiceWorker-race retry', () => {
         AgendaPanel.__testSuppressNextReadies(1);
 
         await vscode.commands.executeCommand('markdown-org.showAgendaWeek');
-        await new Promise((r) => setTimeout(r, 800));
+        // One timeout window for the suppressed first ready, then enough
+        // for the second create's handshake to land.
+        await new Promise((r) => setTimeout(r, TEST_READY_TIMEOUT_MS * 4));
 
         const delta = AgendaPanel.__testGetCreateCount() - before;
         assert.strictEqual(delta, 2, `expected one retry (2 creates total), got ${delta}`);
     });
 
     test('retry path: two suppressed readies still recover within max retries', async function () {
-        this.timeout(10000);
+        this.timeout(15000);
         const before = AgendaPanel.__testGetCreateCount();
         AgendaPanel.__testSuppressNextReadies(2);
 
         await vscode.commands.executeCommand('markdown-org.showAgendaWeek');
-        await new Promise((r) => setTimeout(r, 1200));
+        // Two suppressed handshakes -> two retry windows + slack for the
+        // third create's handshake.
+        await new Promise((r) => setTimeout(r, TEST_READY_TIMEOUT_MS * 6));
 
         const delta = AgendaPanel.__testGetCreateCount() - before;
         assert.strictEqual(delta, 3, `expected two retries (3 creates total), got ${delta}`);
