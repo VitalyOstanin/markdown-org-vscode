@@ -343,17 +343,21 @@ export async function adjustTimestamp(delta: number) {
 }
 
 /**
- * Flip the bracket form of the timestamp under the cursor:
- * active `<...>` <-> inactive `[...]`. Analogue of Emacs
- * `org-toggle-timestamp-type` (`C-c C-x C-,`).
+ * Flip the bracket form of the timestamp under the cursor: active `<...>`
+ * <-> inactive `[...]`. Analogue of Emacs `org-toggle-timestamp-type`.
  *
- * On a SCHEDULED/DEADLINE/CLOSED/CREATED line the bracket is fixed by the
- * keyword (ADR-0014), so the command refuses to flip and shows a hint --
- * the user should cycle the keyword instead (Shift+Up on the keyword word).
+ * Whether a timestamp can switch active form depends on the keyword
+ * (ADR-0014):
+ *   - bare inline (no keyword) and CLOCK         -- both forms allowed
+ *   - SCHEDULED, DEADLINE                        -- active only
+ *   - CLOSED, CREATED                            -- inactive only
  *
- * No-op outside any timestamp.
+ * On a SCHEDULED/DEADLINE/CLOSED/CREATED line the command refuses with a
+ * keyword-specific message naming the only legal form. CLOCK timestamps
+ * are out of scope in this iteration. Outside any timestamp the command
+ * is a no-op with a hint.
  */
-export async function toggleTimestampType() {
+export async function toggleTimestampActive() {
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
         return;
@@ -361,14 +365,20 @@ export async function toggleTimestampType() {
 
     const position = editor.selection.active;
     const lineText = editor.document.lineAt(position.line).text;
-    const hit = getTimestampPartAt(lineText, position.character);
-    if (!hit) {
-        notifyWarn('Cursor is not on a timestamp');
+
+    const keywordLine = matchTimestampLine(lineText);
+    if (keywordLine) {
+        const required = keywordLine.active ? 'active `<...>`' : 'inactive `[...]`';
+        notifyWarn(
+            `${keywordLine.type} allows only ${required} form (ADR-0014); ` +
+                `cycle the keyword via Shift+Up to change it.`
+        );
         return;
     }
 
-    if (matchTimestampLine(lineText)) {
-        notifyWarn('Bracket form is fixed by the keyword (ADR-0014); cycle the keyword via Shift+Up.');
+    const hit = getTimestampPartAt(lineText, position.character);
+    if (!hit) {
+        notifyWarn('Cursor is not on a timestamp');
         return;
     }
 

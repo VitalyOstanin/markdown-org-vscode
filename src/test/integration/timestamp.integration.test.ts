@@ -380,10 +380,10 @@ suite('Timestamp Integration Tests', () => {
         assert.ok(line.includes('=>  1:29'), `Expected duration 1:29, got: ${line}`);
     });
 
-    // ADR-0014: markdown-org.toggleTimestampType flips `<>` <-> `[]` on bare
+    // ADR-0014: markdown-org.toggleTimestampActive flips `<>` <-> `[]` on bare
     // inline timestamps. On a keyword line (SCHEDULED/DEADLINE/CLOSED/CREATED)
     // the bracket form is fixed by the keyword, so the command refuses to flip.
-    test('toggleTimestampType flips bare inline `<...>` to `[...]`', async () => {
+    test('toggleTimestampActive flips bare inline `<...>` to `[...]`', async () => {
         document = await vscode.workspace.openTextDocument({
             content: 'See <2025-12-06 Fri 14:30> in calendar',
             language: 'markdown'
@@ -391,12 +391,12 @@ suite('Timestamp Integration Tests', () => {
         editor = await vscode.window.showTextDocument(document);
         editor.selection = new vscode.Selection(0, 5, 0, 5); // inside the year
 
-        await vscode.commands.executeCommand('markdown-org.toggleTimestampType');
+        await vscode.commands.executeCommand('markdown-org.toggleTimestampActive');
 
         assert.strictEqual(document.lineAt(0).text, 'See [2025-12-06 Fri 14:30] in calendar');
     });
 
-    test('toggleTimestampType flips bare inline `[...]` to `<...>`', async () => {
+    test('toggleTimestampActive flips bare inline `[...]` to `<...>`', async () => {
         document = await vscode.workspace.openTextDocument({
             content: 'Archived [2025-12-06 Fri 14:30]',
             language: 'markdown'
@@ -404,40 +404,40 @@ suite('Timestamp Integration Tests', () => {
         editor = await vscode.window.showTextDocument(document);
         editor.selection = new vscode.Selection(0, 12, 0, 12);
 
-        await vscode.commands.executeCommand('markdown-org.toggleTimestampType');
+        await vscode.commands.executeCommand('markdown-org.toggleTimestampActive');
 
         assert.strictEqual(document.lineAt(0).text, 'Archived <2025-12-06 Fri 14:30>');
     });
 
-    test('toggleTimestampType refuses to flip on a SCHEDULED line (bracket fixed by keyword)', async () => {
+    test('toggleTimestampActive refuses to flip on a SCHEDULED line (bracket fixed by keyword)', async () => {
         const line = '`SCHEDULED: <2025-12-06 Fri>`';
         document = await vscode.workspace.openTextDocument({ content: line, language: 'markdown' });
         editor = await vscode.window.showTextDocument(document);
         editor.selection = new vscode.Selection(0, 15, 0, 15); // inside the year
 
-        await vscode.commands.executeCommand('markdown-org.toggleTimestampType');
+        await vscode.commands.executeCommand('markdown-org.toggleTimestampActive');
 
         assert.strictEqual(document.lineAt(0).text, line, 'keyword-line bracket must stay fixed');
     });
 
-    test('toggleTimestampType refuses to flip on a CREATED line', async () => {
+    test('toggleTimestampActive refuses to flip on a CREATED line', async () => {
         const line = '`CREATED: [2025-12-06 Fri]`';
         document = await vscode.workspace.openTextDocument({ content: line, language: 'markdown' });
         editor = await vscode.window.showTextDocument(document);
         editor.selection = new vscode.Selection(0, 13, 0, 13);
 
-        await vscode.commands.executeCommand('markdown-org.toggleTimestampType');
+        await vscode.commands.executeCommand('markdown-org.toggleTimestampActive');
 
         assert.strictEqual(document.lineAt(0).text, line, 'CREATED bracket form must stay inactive');
     });
 
-    test('toggleTimestampType is a no-op when cursor is not on a timestamp', async () => {
+    test('toggleTimestampActive is a no-op when cursor is not on a timestamp', async () => {
         const line = 'Just narrative prose without timestamps.';
         document = await vscode.workspace.openTextDocument({ content: line, language: 'markdown' });
         editor = await vscode.window.showTextDocument(document);
         editor.selection = new vscode.Selection(0, 10, 0, 10);
 
-        await vscode.commands.executeCommand('markdown-org.toggleTimestampType');
+        await vscode.commands.executeCommand('markdown-org.toggleTimestampActive');
 
         assert.strictEqual(document.lineAt(0).text, line);
     });
