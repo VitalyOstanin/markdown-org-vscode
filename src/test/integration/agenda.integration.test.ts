@@ -1,8 +1,9 @@
 import * as assert from 'assert';
-import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
+import { setTimeout as sleep } from 'node:timers/promises';
+import * as vscode from 'vscode';
 import * as sinon from 'sinon';
 import type * as cp from 'child_process';
 import { suite, before, beforeEach, after, afterEach, test } from 'mocha';
@@ -126,7 +127,7 @@ suite('Agenda Show Integration Tests', () => {
     test('Show Agenda (Day) loads without error', async function () {
         this.timeout(10000);
         await vscode.commands.executeCommand('markdown-org.showAgendaDay');
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        await sleep(300);
         assertNoError();
         // Lock in the contract with markdown-org-extract: paths must come
         // back absolute so the openTask handler can pass them straight to
@@ -142,21 +143,21 @@ suite('Agenda Show Integration Tests', () => {
     test('Show Agenda (Week) loads sparse payload without error', async function () {
         this.timeout(10000);
         await vscode.commands.executeCommand('markdown-org.showAgendaWeek');
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        await sleep(300);
         assertNoError();
     });
 
     test('Show Agenda (Month) loads sparse payload without error', async function () {
         this.timeout(10000);
         await vscode.commands.executeCommand('markdown-org.showAgendaMonth');
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        await sleep(300);
         assertNoError();
     });
 
     test('Show Tasks loads without error', async function () {
         this.timeout(10000);
         await vscode.commands.executeCommand('markdown-org.showTasks');
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        await sleep(300);
         assertNoError();
     });
 
@@ -169,7 +170,7 @@ suite('Agenda Show Integration Tests', () => {
             'markdown-org.showTasks'
         ]) {
             await vscode.commands.executeCommand(cmd);
-            await new Promise((resolve) => setTimeout(resolve, 200));
+            await sleep(200);
         }
         assertNoError();
     });
@@ -182,7 +183,7 @@ suite('Agenda Show Integration Tests', () => {
     test('Day mode renders a single day-header with the requested anchor date', async function () {
         this.timeout(10000);
         await vscode.commands.executeCommand('markdown-org.showAgendaDay', '2025-12-09');
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        await sleep(300);
         const info = await AgendaPanel.queryRenderedInfoForTesting();
         assert.ok(info, 'expected AgendaPanel to be open after showAgendaDay');
         assert.strictEqual(info.mode, 'day');
@@ -192,7 +193,7 @@ suite('Agenda Show Integration Tests', () => {
     test('Week mode renders day-headers for every date in the payload, even sparse entries', async function () {
         this.timeout(10000);
         await vscode.commands.executeCommand('markdown-org.showAgendaWeek', '2025-12-09');
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        await sleep(300);
         const info = await AgendaPanel.queryRenderedInfoForTesting();
         assert.ok(info, 'expected AgendaPanel to be open after showAgendaWeek');
         assert.strictEqual(info.mode, 'week');
@@ -392,13 +393,13 @@ suite('Agenda webview keybindings scope', () => {
     test('shiftedToday is reset when the agenda panel is disposed', async function () {
         this.timeout(10000);
         await vscode.commands.executeCommand('markdown-org.showAgendaWeek');
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        await sleep(300);
 
         const beforeClose = (AgendaPanel as unknown as { shiftedToday?: string }).shiftedToday;
         assert.ok(beforeClose, 'expected AgendaPanel.shiftedToday to be populated while the panel is open');
 
         await vscode.commands.executeCommand('workbench.action.closeAllEditors');
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        await sleep(300);
 
         const afterClose = (AgendaPanel as unknown as { shiftedToday?: string }).shiftedToday;
         assert.strictEqual(
@@ -413,7 +414,7 @@ suite('Agenda webview keybindings scope', () => {
         const spy = sinon.spy(vscode.commands, 'executeCommand');
         try {
             await vscode.commands.executeCommand('markdown-org.showAgendaWeek');
-            await new Promise((resolve) => setTimeout(resolve, 300));
+            await sleep(300);
 
             const focusCalls = spy
                 .getCalls()
@@ -424,7 +425,7 @@ suite('Agenda webview keybindings scope', () => {
             );
 
             await vscode.commands.executeCommand('workbench.action.closeAllEditors');
-            await new Promise((resolve) => setTimeout(resolve, 300));
+            await sleep(300);
 
             const afterClose = spy
                 .getCalls()
@@ -444,7 +445,7 @@ suite('Agenda webview keybindings scope', () => {
         await vscode.commands.executeCommand('workbench.action.closeAllEditors');
 
         await vscode.commands.executeCommand('markdown-org.showAgendaWeek');
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        await sleep(300);
         let tab = vscode.window.tabGroups.activeTabGroup.activeTab;
         assert.ok(
             tab && tab.label.toLowerCase().includes('week'),
@@ -452,7 +453,7 @@ suite('Agenda webview keybindings scope', () => {
         );
 
         await vscode.commands.executeCommand('markdown-org.showAgendaMonth');
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        await sleep(300);
         tab = vscode.window.tabGroups.activeTabGroup.activeTab;
         assert.ok(
             tab && tab.label.toLowerCase().includes('month'),
@@ -460,7 +461,7 @@ suite('Agenda webview keybindings scope', () => {
         );
 
         await vscode.commands.executeCommand('markdown-org.showAgendaDay');
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        await sleep(300);
         tab = vscode.window.tabGroups.activeTabGroup.activeTab;
         assert.ok(
             tab && tab.label.toLowerCase().includes('day'),
@@ -468,7 +469,7 @@ suite('Agenda webview keybindings scope', () => {
         );
 
         await vscode.commands.executeCommand('markdown-org.showTasks');
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        await sleep(300);
         tab = vscode.window.tabGroups.activeTabGroup.activeTab;
         assert.ok(
             tab && tab.label.toLowerCase().includes('tasks'),
@@ -484,7 +485,7 @@ suite('Agenda webview keybindings scope', () => {
 
         // Open the panel on the current week first.
         await vscode.commands.executeCommand('markdown-org.showAgendaWeek');
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        await sleep(300);
 
         const renderSpy = sinon.spy(AgendaPanel, 'render');
         try {
@@ -500,7 +501,7 @@ suite('Agenda webview keybindings scope', () => {
             assert.ok(refreshCb, 'refreshCallback should be set after the panel opens');
 
             await refreshCb('2026-05-24', true);
-            await new Promise((resolve) => setTimeout(resolve, 300));
+            await sleep(300);
 
             assert.ok(renderSpy.callCount >= 1, 'expected AgendaPanel.render to be called from refreshCallback');
             const last = renderSpy.lastCall;
@@ -524,7 +525,7 @@ suite('Agenda webview keybindings scope', () => {
         // Open the panel and then nudge it onto a different anchor so the
         // Today click has somewhere to come back from.
         await vscode.commands.executeCommand('markdown-org.showAgendaWeek');
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        await sleep(300);
 
         const refreshCb = (
             AgendaPanel as unknown as {
@@ -535,7 +536,7 @@ suite('Agenda webview keybindings scope', () => {
 
         // Step away (imitates Next Week).
         await refreshCb('2026-05-24', true);
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        await sleep(300);
 
         const renderSpy = sinon.spy(AgendaPanel, 'render');
         try {
@@ -550,7 +551,7 @@ suite('Agenda webview keybindings scope', () => {
                 String(todayDate.getDate()).padStart(2, '0');
 
             await refreshCb(todayIso, true);
-            await new Promise((resolve) => setTimeout(resolve, 300));
+            await sleep(300);
 
             assert.ok(renderSpy.callCount >= 1, 'expected AgendaPanel.render to be called from Today refresh');
             const last = renderSpy.lastCall;
@@ -574,13 +575,13 @@ suite('Agenda webview keybindings scope', () => {
 
         // First open establishes the panel.
         await vscode.commands.executeCommand('markdown-org.showAgendaWeek');
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        await sleep(300);
 
         const renderSpy = sinon.spy(AgendaPanel, 'render');
         try {
             // Second invocation while the panel is already open.
             await vscode.commands.executeCommand('markdown-org.showAgendaWeek');
-            await new Promise((resolve) => setTimeout(resolve, 300));
+            await sleep(300);
 
             assert.ok(renderSpy.callCount >= 1, 'expected AgendaPanel.render to be called on repeat');
             const navigationArg = renderSpy.lastCall.args[8];
@@ -605,10 +606,10 @@ suite('Agenda webview keybindings scope', () => {
 
         await vscode.commands.executeCommand('workbench.action.closeAllEditors');
         await vscode.commands.executeCommand('markdown-org.showAgendaWeek');
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        await sleep(300);
 
         await vscode.commands.executeCommand('markdown-org.cycleTag');
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        await sleep(300);
 
         const after = vscode.workspace.getConfiguration('markdown-org').get<string>('currentTag');
         assert.strictEqual(after, 'WORK', `expected currentTag to cycle to WORK, got ${after}`);

@@ -1,7 +1,8 @@
 import * as assert from 'assert';
-import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import { setTimeout as sleep } from 'node:timers/promises';
+import * as vscode from 'vscode';
 import * as sinon from 'sinon';
 import type * as cp from 'child_process';
 import { suite, before, beforeEach, after, afterEach, test } from 'mocha';
@@ -77,7 +78,7 @@ suite('Extractor execFile options', () => {
     test('showAgenda passes maxBuffer in execFile options so large workspaces do not overflow stdout', async function () {
         this.timeout(10000);
         await vscode.commands.executeCommand('markdown-org.showAgendaDay');
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        await sleep(300);
 
         const agendaCall = execFileStub.getCalls().find((c) => {
             const args = c.args[1] as string[] | undefined;

@@ -1,7 +1,8 @@
 import * as assert from 'assert';
-import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
+import { setTimeout as sleep } from 'node:timers/promises';
+import * as vscode from 'vscode';
 
 suite('CLOCK Integration Tests', () => {
     let testFilePath: string;
@@ -82,7 +83,7 @@ suite('CLOCK Integration Tests', () => {
 
         await vscode.commands.executeCommand('markdown-org.insertClockStart');
 
-        await new Promise((resolve) => setTimeout(resolve, 100));
+        await sleep(100);
 
         await vscode.commands.executeCommand('markdown-org.insertClockFinish');
 

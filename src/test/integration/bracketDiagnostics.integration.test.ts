@@ -1,4 +1,5 @@
 import * as assert from 'assert';
+import { setTimeout as sleep } from 'node:timers/promises';
 import * as vscode from 'vscode';
 import { suite, test, teardown } from 'mocha';
 import { BRACKET_POLICY_CODE, DIAGNOSTIC_SOURCE } from '../../diagnostics/timestampBrackets';
@@ -21,7 +22,7 @@ async function waitForBracketDiagnostics(
         if (all.length === expected) {
             return all;
         }
-        await new Promise((r) => setTimeout(r, 50));
+        await sleep(50);
     }
     const observed = vscode.languages
         .getDiagnostics(uri)
@@ -96,7 +97,7 @@ suite('Bracket-policy diagnostics + Quick Fix', () => {
         await vscode.window.showTextDocument(doc);
         // Wait a moment so any spurious diagnostics would have a chance
         // to land; the assertion is that none do.
-        await new Promise((r) => setTimeout(r, 200));
+        await sleep(200);
         const ours = vscode.languages
             .getDiagnostics(doc.uri)
             .filter((d) => d.source === DIAGNOSTIC_SOURCE && d.code === BRACKET_POLICY_CODE);

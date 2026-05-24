@@ -1,9 +1,10 @@
-import * as vscode from 'vscode';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { spawn } from 'node:child_process';
+import { setTimeout as sleep } from 'node:timers/promises';
+import * as vscode from 'vscode';
 
-export const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+export { sleep };
 
 /**
  * Hide everything in the VS Code chrome that is irrelevant to the recorded
@@ -296,10 +297,6 @@ async function ensureVscodeWindowFocused(): Promise<void> {
     await runXdotool(['windowraise', vscodeWindowId]);
 }
 
-function pause(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 /**
  * Decompose a `modifier+modifier+key` token into its modifier keysyms and the
  * final key. Recognizes `ctrl`, `shift`, `alt`, `meta` (case-insensitive).
@@ -335,16 +332,16 @@ export async function runCommandViaPalette(name: string): Promise<void> {
         await runXdotool(['keyup', mod]);
     }
     await runXdotool(['key', 'Escape']);
-    await pause(120);
+    await sleep(120);
     // Open palette: ctrl+shift+p (single modifier-combined key, no chord).
     await runXdotool(['keydown', 'ctrl']);
     await runXdotool(['keydown', 'shift']);
     await runXdotool(['key', 'p']);
     await runXdotool(['keyup', 'shift']);
     await runXdotool(['keyup', 'ctrl']);
-    await pause(350);
+    await sleep(350);
     await runXdotool(['type', '--delay', '25', name]);
-    await pause(450);
+    await sleep(450);
     await runXdotool(['key', 'Return']);
 }
 
@@ -366,7 +363,7 @@ export async function pressKey(sequence: string): Promise<void> {
     // infinite loop.
     if (sequence.trim() !== 'Escape') {
         await runXdotool(['key', 'Escape']);
-        await pause(60);
+        await sleep(60);
     }
     const tokens = sequence.split(/\s+/).filter(Boolean);
     // Send each chord step with explicit keydown/keyup on modifiers and a
@@ -388,7 +385,7 @@ export async function pressKey(sequence: string): Promise<void> {
             if (r.status !== 0) throw new Error(`xdotool keyup ${mod} failed`);
         }
         if (i < tokens.length - 1) {
-            await pause(200);
+            await sleep(200);
         }
     }
 }
