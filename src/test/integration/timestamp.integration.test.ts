@@ -21,8 +21,9 @@ suite('Timestamp Integration Tests', () => {
         await vscode.commands.executeCommand('markdown-org.insertCreated');
 
         const line1 = document.lineAt(1).text;
-        assert.ok(line1.startsWith('`CREATED: <'));
-        assert.ok(line1.endsWith('>`'));
+        // ADR-0014: CREATED is inactive `[...]`.
+        assert.ok(line1.startsWith('`CREATED: ['), `expected inactive CREATED, got: ${line1}`);
+        assert.ok(line1.endsWith(']`'), `expected closing ], got: ${line1}`);
     });
 
     test('Insert SCHEDULED timestamp', async () => {

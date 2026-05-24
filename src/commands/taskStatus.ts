@@ -2,8 +2,12 @@ import * as vscode from 'vscode';
 import { findNearestHeading, formatOrgTimestamp, getTimestampIndent, requireActiveEditor } from '../utils';
 import { HEADING_REGEX, matchTimestampLine } from '../orgPatterns';
 
-function formatTimestamp(date: Date): string {
+function formatActiveTimestamp(date: Date): string {
     return formatOrgTimestamp(date, 'angle');
+}
+
+function formatInactiveTimestamp(date: Date): string {
+    return formatOrgTimestamp(date, 'square');
 }
 
 /** Toggle the TODO/DONE keyword on the nearest heading; preserves priority. Silent if no active markdown editor. */
@@ -101,7 +105,8 @@ export async function insertCreatedTimestamp() {
     }
 
     const indent = getTimestampIndent(editor, headingLine);
-    const timestamp = formatTimestamp(new Date());
+    // ADR-0014: CREATED is inactive `[...]` (Emacs `org-expiry` convention).
+    const timestamp = formatInactiveTimestamp(new Date());
     const insertPosition = new vscode.Position(headingLine + 1, 0);
 
     return editor.edit((editBuilder) => {
@@ -159,7 +164,8 @@ async function insertOrReplaceTimestamp(type: 'SCHEDULED' | 'DEADLINE') {
     }
 
     const indent = getTimestampIndent(editor, headingLine);
-    const timestamp = formatTimestamp(new Date());
+    // ADR-0014: SCHEDULED and DEADLINE are active `<...>`.
+    const timestamp = formatActiveTimestamp(new Date());
     const insertPosition = new vscode.Position(blockEnd, 0);
 
     return editor.edit((editBuilder) => {
