@@ -18,6 +18,7 @@ tasks travel with the repository.
 - [Syntax Examples](#syntax-examples)
     - [Task Statuses](#task-statuses)
     - [Timestamps](#timestamps)
+        - [Active and inactive forms](#active-and-inactive-forms)
     - [CLOCK Entries](#clock-entries)
     - [Priority Levels](#priority-levels)
     - [Repeating Tasks](#repeating-tasks)
@@ -48,7 +49,7 @@ Brings the [Org mode](https://orgmode.org/) task management workflow
 to Markdown files in VS Code:
 
 - **Task management** -- TODO / DONE statuses with priorities (`[#A]` -- `[#Z]` or numeric `[#0]` -- `[#64]`).
-- **Timestamps** -- `CREATED`, `SCHEDULED`, `DEADLINE`, `CLOSED` with full date / time.
+- **Timestamps** -- `CREATED`, `SCHEDULED`, `DEADLINE`, `CLOSED` with full date / time, in both active `<...>` and inactive `[...]` forms per [ADR-0005](docs/adr/0005-active-and-inactive-timestamps.md).
 - **Repeating tasks** -- Org-mode repeaters `+1d`, `+1w`, `+1m`, `.+1m`, `++1w`, and `+1wd` for workdays (skips weekends and Russian holidays).
 - **CLOCK entries** -- Time tracking with start / finish events and an aggregated CLOCK table per file.
 - **Agenda views** -- Day, Week, and Month, with automatic grouping of overdue, scheduled, and upcoming tasks.
@@ -120,7 +121,7 @@ become tasks, inline code spans hold timestamps:
 
 ```markdown
 ## TODO [#A] Important meeting
-`CREATED: <2025-12-01 Sun 09:15>`
+`CREATED: [2025-12-01 Sun 09:15]`
 `DEADLINE: <2025-12-06 Fri 15:00>`
 ```
 
@@ -128,8 +129,8 @@ become tasks, inline code spans hold timestamps:
 
 ```markdown
 ## DONE Fix bug in parser
-`CREATED: <2025-12-01 Sun 10:00>`
-`CLOSED: <2025-12-03 Tue 14:30>`
+`CREATED: [2025-12-01 Sun 10:00]`
+`CLOSED: [2025-12-03 Tue 14:30]`
 ```
 
 **Without tasks (standalone timestamps):**
@@ -142,6 +143,35 @@ become tasks, inline code spans hold timestamps:
 `DEADLINE: <2025-12-15 Sun>`
 ```
 
+#### Active and inactive forms
+
+Org-mode distinguishes two bracket forms for timestamps; the editor
+follows the per-keyword policy defined in
+[ADR-0005](docs/adr/0005-active-and-inactive-timestamps.md):
+
+| Keyword      | Bracket form       | Rationale                                                                 |
+| ------------ | ------------------ | ------------------------------------------------------------------------- |
+| `SCHEDULED:` | `<...>`            | Drives agenda windows; must be active.                                    |
+| `DEADLINE:`  | `<...>`            | Drives agenda windows; must be active.                                    |
+| `CLOSED:`    | `[...]`            | Descriptive completion stamp; matches Emacs `org-todo`.                   |
+| `CREATED:`   | `[...]`            | Descriptive metadata; matches Emacs `org-expiry`.                         |
+| Inline plain | `<...>` or `[...]` | Either form; active is agenda-relevant, inactive is descriptive metadata. |
+| `CLOCK:`     | `<...>` or `[...]` | Either form is accepted on read; the editor writes `[...]`.               |
+
+A keyword line whose bracket form does not match the table -- for
+example `CLOSED: <2025-12-03 Tue>` or a mixed pair like
+`<2025-12-03 Tue]` -- is surfaced as a warning under the
+`markdown-org` diagnostic source. Press `Ctrl+.` on the warning to
+apply the **Convert to canonical bracket form** Quick Fix.
+
+To flip a bare inline timestamp between `<...>` and `[...]`, run
+`Markdown Org: Toggle Timestamp Active/Inactive` from the Command
+Palette. The command refuses on keyword lines (the keyword binds the
+bracket form); use `Shift+Up` / `Shift+Down` to cycle the keyword
+instead. See [ADR-0006](docs/adr/0006-bracket-toggle-keybindings.md)
+for the UX rationale and the deliberate asymmetry with Emacs
+`org-toggle-timestamp-type`.
+
 ### CLOCK Entries
 
 CLOCK entries track time spent on tasks. They can be open (running)
@@ -153,7 +183,7 @@ or closed (with duration).
 
 ```markdown
 ## TODO Working on feature
-`CREATED: <2025-12-09 Tue 10:00>`
+`CREATED: [2025-12-09 Tue 10:00]`
 `CLOCK: [2025-12-09 Tue 14:30]`
 ```
 
@@ -161,7 +191,7 @@ or closed (with duration).
 
 ```markdown
 ## TODO Code review
-`CREATED: <2025-12-09 Tue 09:00>`
+`CREATED: [2025-12-09 Tue 09:00]`
 `CLOCK: [2025-12-09 Tue 10:00]--[2025-12-09 Tue 11:30] =>  1:30`
 `CLOCK: [2025-12-09 Tue 14:00]--[2025-12-09 Tue 16:00] =>  2:00`
 ```
@@ -244,13 +274,14 @@ Markdown editor has focus.
 
 ### Timestamp Commands
 
-| Command                                    | Hotkey                 | Description                                                               |
-| ------------------------------------------ | ---------------------- | ------------------------------------------------------------------------- |
-| `Markdown Org: Insert CREATED Timestamp`   | `Ctrl+K Ctrl+K Ctrl+C` | Insert CREATED timestamp under the heading                                |
-| `Markdown Org: Insert SCHEDULED Timestamp` | `Ctrl+K Ctrl+K Ctrl+S` | Insert SCHEDULED timestamp; repeating the command removes it (toggle off) |
-| `Markdown Org: Insert DEADLINE Timestamp`  | `Ctrl+K Ctrl+K D`      | Insert DEADLINE timestamp; repeating the command removes it (toggle off)  |
-| `Markdown Org: Timestamp Up`               | `Shift+Up`             | Increment date / time / task status / timestamp type under cursor         |
-| `Markdown Org: Timestamp Down`             | `Shift+Down`           | Decrement date / time / task status / timestamp type under cursor         |
+| Command                                          | Hotkey                 | Description                                                                                                                                            |
+| ------------------------------------------------ | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `Markdown Org: Insert CREATED Timestamp`         | `Ctrl+K Ctrl+K Ctrl+C` | Insert CREATED timestamp under the heading (inactive `[...]` form)                                                                                     |
+| `Markdown Org: Insert SCHEDULED Timestamp`       | `Ctrl+K Ctrl+K Ctrl+S` | Insert SCHEDULED timestamp; repeating the command removes it (toggle off)                                                                              |
+| `Markdown Org: Insert DEADLINE Timestamp`        | `Ctrl+K Ctrl+K D`      | Insert DEADLINE timestamp; repeating the command removes it (toggle off)                                                                               |
+| `Markdown Org: Timestamp Up`                     | `Shift+Up`             | Increment date / time / task status / timestamp type under cursor                                                                                      |
+| `Markdown Org: Timestamp Down`                   | `Shift+Down`           | Decrement date / time / task status / timestamp type under cursor                                                                                      |
+| `Markdown Org: Toggle Timestamp Active/Inactive` | -                      | Flip `<...>` ↔ `[...]` on a bare inline timestamp under the cursor (Command Palette only; see [ADR-0006](docs/adr/0006-bracket-toggle-keybindings.md)) |
 
 ### CLOCK Commands
 
