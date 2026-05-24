@@ -11,6 +11,14 @@ import { formatError, notifyError } from '../utils/notify';
 
 const REFRESH_DEBOUNCE_MS = 500;
 const CALENDAR_COLS = 7;
+// Window of time after createWebviewPanel within which the webview is expected
+// to send back its `ready` handshake. VS Code's webview host registers a
+// ServiceWorker on first use, and on a freshly opened window that registration
+// occasionally races against the very first Show Agenda command, producing
+// "InvalidStateError: Failed to register a ServiceWorker". After the ServiceWorker
+// is up, recreating the panel succeeds, so we wait, then dispose+recreate.
+const WEBVIEW_READY_TIMEOUT_MS = 2000;
+const WEBVIEW_MAX_RETRIES = 2;
 type FirstDayOfWeek = 'monday' | 'sunday' | 'auto';
 
 function msUntilNextLocalMidnight(now: Date): number {
@@ -33,6 +41,41 @@ export class AgendaPanel {
     // the navbar label, and which date the navigation buttons step from.
     private static shiftedToday?: string;
     private static dayCheckTimer?: NodeJS.Timeout;
+    // Tracks the ServiceWorker readiness handshake from the webview. The
+    // webview sends `{command: 'ready'}` once acquireVsCodeApi() succeeds; if
+    // it never arrives within WEBVIEW_READY_TIMEOUT_MS, we assume the host
+    // failed to register its ServiceWorker and retry by recreating the panel.
+    private static readyTimeout?: NodeJS.Timeout;
+    private static panelReady = false;
+    private static createRetries = 0;
+    private static internalRetryInProgress = false;
+    private static lastCreateArgs?: {
+        data: AgendaData;
+        mode: string;
+        locale: string;
+        currentTag: string | undefined;
+        holidays: string[] | undefined;
+        firstDayOfWeek: FirstDayOfWeek;
+    };
+    // Test-only hooks for exercising the ServiceWorker-race retry path:
+    // `_testReadyTimeoutMs` shortens the wait so a single integration test
+    // runs in milliseconds instead of seconds; `_testSuppressReadies` counts
+    // the next N `ready` messages that handleReady should silently drop, so
+    // the timeout actually fires. Production code keeps the constants intact.
+    private static _testReadyTimeoutMs?: number;
+    private static _testSuppressReadies = 0;
+    // Public read-only counter test code asserts against to verify whether
+    // the retry path fired (each createNewPanel call bumps it by one).
+    private static _createCount = 0;
+    public static __testGetCreateCount(): number {
+        return AgendaPanel._createCount;
+    }
+    public static __testSetReadyTimeoutMs(ms: number | undefined): void {
+        AgendaPanel._testReadyTimeoutMs = ms;
+    }
+    public static __testSuppressNextReadies(n: number): void {
+        AgendaPanel._testSuppressReadies = n;
+    }
 
     private static setAgendaFocusedContext(focused: boolean) {
         vscode.commands.executeCommand('setContext', 'markdown-org.agendaFocused', focused);
@@ -127,6 +170,17 @@ export class AgendaPanel {
         holidays: string[] | undefined,
         firstDayOfWeek: FirstDayOfWeek
     ) {
+        // Captured for the ServiceWorker-race retry path: if the webview never
+        // reaches `ready`, the timeout below disposes the panel and re-enters
+        // createNewPanel with these same arguments.
+        AgendaPanel.lastCreateArgs = { data, mode, locale, currentTag, holidays, firstDayOfWeek };
+        AgendaPanel.panelReady = false;
+        AgendaPanel._createCount += 1;
+        if (AgendaPanel.readyTimeout) {
+            clearTimeout(AgendaPanel.readyTimeout);
+            AgendaPanel.readyTimeout = undefined;
+        }
+
         AgendaPanel.currentPanel = vscode.window.createWebviewPanel(
             'markdownOrgAgenda',
             `Agenda: ${mode}`,
@@ -173,9 +227,68 @@ export class AgendaPanel {
             holidays: holidays || [],
             firstDayOfWeek
         });
+
+        AgendaPanel.armReadyTimeout();
+    }
+
+    private static armReadyTimeout() {
+        const ms = AgendaPanel._testReadyTimeoutMs ?? WEBVIEW_READY_TIMEOUT_MS;
+        AgendaPanel.readyTimeout = setTimeout(() => {
+            AgendaPanel.readyTimeout = undefined;
+            if (AgendaPanel.panelReady) {
+                return;
+            }
+            if (AgendaPanel.createRetries >= WEBVIEW_MAX_RETRIES) {
+                notifyError(
+                    'Agenda webview failed to load (ServiceWorker not registered). Please reload the VS Code window and try again.'
+                );
+                AgendaPanel.createRetries = 0;
+                AgendaPanel.lastCreateArgs = undefined;
+                AgendaPanel.currentPanel?.dispose();
+                return;
+            }
+            const args = AgendaPanel.lastCreateArgs;
+            if (!args) {
+                return;
+            }
+            AgendaPanel.createRetries += 1;
+            AgendaPanel.internalRetryInProgress = true;
+            AgendaPanel.currentPanel?.dispose();
+            AgendaPanel.createNewPanel(
+                args.data,
+                args.mode,
+                args.locale,
+                args.currentTag,
+                args.holidays,
+                args.firstDayOfWeek
+            );
+        }, ms);
+    }
+
+    private static handleReady() {
+        if (AgendaPanel._testSuppressReadies > 0) {
+            AgendaPanel._testSuppressReadies -= 1;
+            return;
+        }
+        AgendaPanel.panelReady = true;
+        AgendaPanel.createRetries = 0;
+        AgendaPanel.lastCreateArgs = undefined;
+        if (AgendaPanel.readyTimeout) {
+            clearTimeout(AgendaPanel.readyTimeout);
+            AgendaPanel.readyTimeout = undefined;
+        }
     }
 
     private static handleDispose() {
+        // armReadyTimeout's retry path disposes the broken panel right before
+        // recreating it. In that case the watcher, scheduled day check, and
+        // shiftedToday belong to the user's session, not to the failed panel,
+        // so we keep them; createNewPanel will reuse them transparently.
+        if (AgendaPanel.internalRetryInProgress) {
+            AgendaPanel.internalRetryInProgress = false;
+            AgendaPanel.currentPanel = undefined;
+            return;
+        }
         AgendaPanel.setAgendaFocusedContext(false);
         AgendaPanel.currentPanel = undefined;
         AgendaPanel.watcher?.dispose();
@@ -195,6 +308,13 @@ export class AgendaPanel {
             clearTimeout(AgendaPanel.dayCheckTimer);
             AgendaPanel.dayCheckTimer = undefined;
         }
+        if (AgendaPanel.readyTimeout) {
+            clearTimeout(AgendaPanel.readyTimeout);
+            AgendaPanel.readyTimeout = undefined;
+        }
+        AgendaPanel.panelReady = false;
+        AgendaPanel.createRetries = 0;
+        AgendaPanel.lastCreateArgs = undefined;
     }
 
     private static async handleWebviewMessage(message: {
@@ -205,6 +325,10 @@ export class AgendaPanel {
         date?: string;
         mode?: string;
     }) {
+        if (message.command === 'ready') {
+            AgendaPanel.handleReady();
+            return;
+        }
         if (message.command === 'openTask') {
             if (typeof message.file !== 'string' || typeof message.line !== 'number') {
                 return;
@@ -563,6 +687,10 @@ export class AgendaPanel {
         ${buildTimeInfoSource}
         ${toIsoDateSource}
         const vscode = acquireVsCodeApi();
+        // Handshake for the ServiceWorker-race retry path on the extension
+        // side: tells AgendaPanel.armReadyTimeout the webview script is alive
+        // so the timeout-triggered dispose+recreate does not fire.
+        vscode.postMessage({ command: 'ready' });
         let initialData = [];
         let initialMode = '';
         let locale = '';
