@@ -225,9 +225,11 @@ suite('Timestamp cursor boundaries (issue #41)', () => {
         });
     }
 
-    // --- CLOSED type cycling: like SCHEDULED -> DEADLINE, the type wheel
-    // must reach CLOSED and wrap around back to SCHEDULED on further presses.
-    test('CLOSED type cycles to SCHEDULED (wrap)', async () => {
+    // --- CLOSED type cycling under the ADR-0005 cycle order
+    // SCHEDULED -> DEADLINE -> CLOSED -> CREATED -> SCHEDULED. CREATED
+    // is the natural step after CLOSED; the bracket form stays `[...]`
+    // because both CLOSED and CREATED are inactive.
+    test('CLOSED type cycles to CREATED (CREATED joins the cycle)', async () => {
         const document = await vscode.workspace.openTextDocument({
             content: CLOSED_LINE,
             language: 'markdown'
@@ -237,8 +239,8 @@ suite('Timestamp cursor boundaries (issue #41)', () => {
         editor.selection = new vscode.Selection(0, 3, 0, 3);
         await vscode.commands.executeCommand('markdown-org.timestampUp');
         assert.ok(
-            document.lineAt(0).text.startsWith('`SCHEDULED:'),
-            `expected wrap to SCHEDULED, got: ${document.lineAt(0).text}`
+            document.lineAt(0).text.startsWith('`CREATED:'),
+            `expected CLOSED -> CREATED, got: ${document.lineAt(0).text}`
         );
     });
 
@@ -405,24 +407,24 @@ suite('Timestamp cursor boundaries (issue #41)', () => {
         await vscode.commands.executeCommand('workbench.action.closeAllEditors');
     });
 
-    // --- Cursor outside the timestamp (e.g. on the leading backtick or
-    // before `<`) is not a part-hit; the command must fall back to
-    // `cursorUpSelect` and leave the line text intact.
-    test('Cursor before `<` leaves the line unchanged (falls back to cursorUpSelect)', async () => {
+    // --- Cursor outside the bracketed body on a keyword line triggers
+    // the keyword cycle (ADR-0005). Specifically, the gap between `:`
+    // and the opening bracket is no longer a no-op -- it counts as
+    // "on the keyword line, not on the timestamp body".
+    test('Cursor on the gap between `:` and `<` cycles the keyword', async () => {
         const document = await vscode.workspace.openTextDocument({
             content: DEADLINE_LINE,
             language: 'markdown'
         });
         const editor = await vscode.window.showTextDocument(document);
-        // Column 10 = the space between `:` and `<`.
+        // Column 10 = the space between `:` and `<` of `DEADLINE: <...>`.
         editor.selection = new vscode.Selection(0, 10, 0, 10);
 
         await vscode.commands.executeCommand('markdown-org.timestampUp');
 
-        assert.strictEqual(
-            document.lineAt(0).text,
-            DEADLINE_LINE,
-            'timestampUp on a non-part column should not mutate the line'
+        assert.ok(
+            document.lineAt(0).text.startsWith('`CLOSED:'),
+            `cursor in the keyword/body gap should cycle, got: ${document.lineAt(0).text}`
         );
     });
 });

@@ -8,6 +8,7 @@ import {
     ClockTimestampPart
 } from '../utils/timestampParts';
 import { cycleTimestampKeyword, normaliseBracket } from '../utils/toggleTimestampType';
+import { collectSiblingKeywords } from '../utils/headingScan';
 import { notifyWarn } from '../utils/notify';
 
 const PRIORITY_A_CODE = 'A'.charCodeAt(0);
@@ -35,15 +36,26 @@ function getTimestampTypeAtCursor(editor: vscode.TextEditor): { hit: TimestampLi
     const hit = matchTimestampLine(lineText);
     if (!hit) return null;
 
-    const typeStart = lineText.indexOf(hit.type);
-    const typeEnd = typeStart + hit.type.length;
-
-    if (position.character >= typeStart && position.character <= typeEnd) {
-        const range = new vscode.Range(position.line, typeStart, position.line, typeEnd);
-        return { hit, range };
+    // Cycle covers every column on the keyword line that is OUTSIDE
+    // the bracketed body: the leading backtick, the keyword token, the
+    // colon, the gap between `:` and the opening bracket, the trailing
+    // backtick. Columns INSIDE `<...>` / `[...]` belong to the
+    // timestamp-part adapter (it may legitimately return null for
+    // non-shiftable tokens like a repeater); in that case we must NOT
+    // fall through to a keyword cycle -- the user is editing the
+    // timestamp interior, not the keyword.
+    const timestampStart = lineText.indexOf(hit.timestamp);
+    if (timestampStart >= 0) {
+        const timestampEnd = timestampStart + hit.timestamp.length;
+        if (position.character >= timestampStart && position.character < timestampEnd) {
+            return null;
+        }
     }
 
-    return null;
+    const typeStart = lineText.indexOf(hit.type);
+    const typeEnd = typeStart + hit.type.length;
+    const range = new vscode.Range(position.line, typeStart, position.line, typeEnd);
+    return { hit, range };
 }
 
 // cycleTimestampKeyword lives in utils/toggleTimestampType.ts so that unit tests
@@ -311,8 +323,10 @@ export async function adjustTimestamp(delta: number) {
 
     const timestampType = getTimestampTypeAtCursor(editor);
     if (timestampType) {
-        const newLine = cycleTimestampKeyword(timestampType.hit);
-        const lineRange = editor.document.lineAt(editor.selection.active.line).range;
+        const cursorLine = editor.selection.active.line;
+        const usedKeywords = collectSiblingKeywords(editor.document, cursorLine);
+        const newLine = cycleTimestampKeyword(timestampType.hit, usedKeywords);
+        const lineRange = editor.document.lineAt(cursorLine).range;
 
         return editor
             .edit((editBuilder) => {

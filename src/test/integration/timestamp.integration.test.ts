@@ -441,4 +441,192 @@ suite('Timestamp Integration Tests', () => {
 
         assert.strictEqual(document.lineAt(0).text, line);
     });
+
+    // Cycle reachability: any column on a keyword line that is NOT inside
+    // the bracketed body must trigger the keyword cycle. The earlier
+    // implementation only fired when the cursor was inside the keyword
+    // token itself, so positions on the colon / on the gap before the
+    // bracket / on the trailing backtick fell into the `cursorUpSelect`
+    // fallback. The four tests below pin down the regression boundary
+    // (indices for `` `CLOSED: [` `` are: 0=`, 1..6=CLOSED, 7=:, 8=space,
+    // 9=`[`).
+    const closedLine = '`CLOSED: [2025-12-31 Wed]`';
+
+    test('Shift+Down on column 7 (the colon) cycles the keyword', async () => {
+        document = await vscode.workspace.openTextDocument({ content: closedLine, language: 'markdown' });
+        editor = await vscode.window.showTextDocument(document);
+        editor.selection = new vscode.Selection(0, 7, 0, 7);
+
+        await vscode.commands.executeCommand('markdown-org.timestampDown');
+
+        assert.ok(
+            document.lineAt(0).text.startsWith('`CREATED:'),
+            `cursor on the colon should cycle, got: ${document.lineAt(0).text}`
+        );
+    });
+
+    test('Shift+Down on column 8 (gap between `:` and `[`) cycles the keyword', async () => {
+        document = await vscode.workspace.openTextDocument({ content: closedLine, language: 'markdown' });
+        editor = await vscode.window.showTextDocument(document);
+        editor.selection = new vscode.Selection(0, 8, 0, 8);
+
+        await vscode.commands.executeCommand('markdown-org.timestampDown');
+
+        assert.ok(
+            document.lineAt(0).text.startsWith('`CREATED:'),
+            `cursor right after the colon should cycle, got: ${document.lineAt(0).text}`
+        );
+    });
+
+    test('Shift+Down on column 0 (before backtick) still cycles the keyword', async () => {
+        document = await vscode.workspace.openTextDocument({ content: closedLine, language: 'markdown' });
+        editor = await vscode.window.showTextDocument(document);
+        editor.selection = new vscode.Selection(0, 0, 0, 0);
+
+        await vscode.commands.executeCommand('markdown-org.timestampDown');
+
+        assert.ok(
+            document.lineAt(0).text.startsWith('`CREATED:'),
+            `cursor at start of line should cycle, got: ${document.lineAt(0).text}`
+        );
+    });
+
+    test('Shift+Down at end of the keyword line cycles the keyword', async () => {
+        document = await vscode.workspace.openTextDocument({ content: closedLine, language: 'markdown' });
+        editor = await vscode.window.showTextDocument(document);
+        editor.selection = new vscode.Selection(0, closedLine.length, 0, closedLine.length);
+
+        await vscode.commands.executeCommand('markdown-org.timestampDown');
+
+        assert.ok(
+            document.lineAt(0).text.startsWith('`CREATED:'),
+            `cursor at end of line should cycle, got: ${document.lineAt(0).text}`
+        );
+    });
+
+    // CREATED joins the cycle (CLOSED -> CREATED -> SCHEDULED).
+    test('Shift+Down on CLOSED cycles to CREATED and preserves `[...]`', async () => {
+        document = await vscode.workspace.openTextDocument({
+            content: '`CLOSED: [2025-12-31 Wed]`',
+            language: 'markdown'
+        });
+        editor = await vscode.window.showTextDocument(document);
+        editor.selection = new vscode.Selection(0, 5, 0, 5); // inside CLOSED
+
+        await vscode.commands.executeCommand('markdown-org.timestampDown');
+
+        assert.strictEqual(document.lineAt(0).text, '`CREATED: [2025-12-31 Wed]`');
+    });
+
+    test('Shift+Down on CREATED cycles to SCHEDULED and flips bracket to `<...>`', async () => {
+        document = await vscode.workspace.openTextDocument({
+            content: '`CREATED: [2025-12-31 Wed]`',
+            language: 'markdown'
+        });
+        editor = await vscode.window.showTextDocument(document);
+        editor.selection = new vscode.Selection(0, 5, 0, 5); // inside CREATED
+
+        await vscode.commands.executeCommand('markdown-org.timestampDown');
+
+        assert.strictEqual(document.lineAt(0).text, '`SCHEDULED: <2025-12-31 Wed>`');
+    });
+
+    // Duplicate-skip: the cycle never produces two lines of the same
+    // keyword under one heading. The cursor line is excluded from the
+    // "occupied" set (its slot frees up as the cycle replaces it), so
+    // only sibling keyword lines count.
+    test('Shift+Down on CLOSED skips DEADLINE when DEADLINE is already present', async () => {
+        document = await vscode.workspace.openTextDocument({
+            content: '## TODO Task\n`CLOSED: [2025-12-31 Wed]`\n`DEADLINE: <2026-01-15 Thu>`',
+            language: 'markdown'
+        });
+        editor = await vscode.window.showTextDocument(document);
+        editor.selection = new vscode.Selection(1, 5, 1, 5); // inside CLOSED
+
+        // Natural step: CLOSED -> CREATED. CREATED is free, so the
+        // cycle should land there. This test fixes the "no duplicate"
+        // contract for a sibling we are NOT skipping; the next test
+        // exercises the actual skip.
+        await vscode.commands.executeCommand('markdown-org.timestampDown');
+        assert.strictEqual(document.lineAt(1).text, '`CREATED: [2025-12-31 Wed]`');
+    });
+
+    test('Shift+Down on SCHEDULED skips occupied DEADLINE and lands on CLOSED', async () => {
+        document = await vscode.workspace.openTextDocument({
+            content: '## TODO Task\n`SCHEDULED: <2025-12-31 Wed>`\n`DEADLINE: <2026-01-15 Thu>`',
+            language: 'markdown'
+        });
+        editor = await vscode.window.showTextDocument(document);
+        editor.selection = new vscode.Selection(1, 5, 1, 5); // inside SCHEDULED
+
+        await vscode.commands.executeCommand('markdown-org.timestampDown');
+
+        // SCHEDULED -> (DEADLINE occupied -> skip) -> CLOSED.
+        assert.strictEqual(document.lineAt(1).text, '`CLOSED: [2025-12-31 Wed]`');
+        // Sibling DEADLINE line stays where it was.
+        assert.strictEqual(document.lineAt(2).text, '`DEADLINE: <2026-01-15 Thu>`');
+    });
+
+    test('Shift+Down on SCHEDULED skips DEADLINE and CLOSED and lands on CREATED', async () => {
+        document = await vscode.workspace.openTextDocument({
+            content:
+                '## TODO Task\n' +
+                '`SCHEDULED: <2025-12-31 Wed>`\n' +
+                '`DEADLINE: <2026-01-15 Thu>`\n' +
+                '`CLOSED: [2026-01-20 Tue]`',
+            language: 'markdown'
+        });
+        editor = await vscode.window.showTextDocument(document);
+        editor.selection = new vscode.Selection(1, 5, 1, 5); // inside SCHEDULED
+
+        await vscode.commands.executeCommand('markdown-org.timestampDown');
+
+        // Two skips in a row: DEADLINE (occupied) and CLOSED (occupied).
+        assert.strictEqual(document.lineAt(1).text, '`CREATED: [2025-12-31 Wed]`');
+    });
+
+    test('Shift+Down is a no-op when every other slot is occupied', async () => {
+        const closed = '`CLOSED: [2025-12-31 Wed]`';
+        document = await vscode.workspace.openTextDocument({
+            content:
+                '## TODO Task\n' +
+                '`SCHEDULED: <2025-12-31 Wed>`\n' +
+                '`DEADLINE: <2026-01-15 Thu>`\n' +
+                closed +
+                '\n' +
+                '`CREATED: [2025-12-01 Mon]`',
+            language: 'markdown'
+        });
+        editor = await vscode.window.showTextDocument(document);
+        editor.selection = new vscode.Selection(3, 5, 3, 5); // inside CLOSED
+
+        await vscode.commands.executeCommand('markdown-org.timestampDown');
+
+        // Every other slot is taken by a sibling, so CLOSED stays.
+        assert.strictEqual(document.lineAt(3).text, closed);
+    });
+
+    test('skip-duplicates respects heading boundaries (next-section keywords do not count)', async () => {
+        document = await vscode.workspace.openTextDocument({
+            content:
+                '## TODO First\n' +
+                '`SCHEDULED: <2025-12-31 Wed>`\n' +
+                '## TODO Second\n' +
+                '`DEADLINE: <2026-02-01 Sun>`\n' +
+                '`CLOSED: [2026-02-02 Mon]`',
+            language: 'markdown'
+        });
+        editor = await vscode.window.showTextDocument(document);
+        editor.selection = new vscode.Selection(1, 5, 1, 5); // SCHEDULED in the FIRST heading
+
+        await vscode.commands.executeCommand('markdown-org.timestampDown');
+
+        // SCHEDULED is in the first section. DEADLINE / CLOSED below
+        // live under a different heading -- they MUST NOT influence
+        // the duplicate-skip, so the natural next step (DEADLINE) wins.
+        assert.strictEqual(document.lineAt(1).text, '`DEADLINE: <2025-12-31 Wed>`');
+        // Sibling section is untouched.
+        assert.strictEqual(document.lineAt(3).text, '`DEADLINE: <2026-02-01 Sun>`');
+        assert.strictEqual(document.lineAt(4).text, '`CLOSED: [2026-02-02 Mon]`');
+    });
 });
