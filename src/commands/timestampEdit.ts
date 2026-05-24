@@ -9,7 +9,7 @@ import {
 } from '../utils/timestampParts';
 import { cycleTimestampKeyword, normaliseBracket } from '../utils/toggleTimestampType';
 import { collectSiblingKeywords } from '../utils/headingScan';
-import { notifyWarn } from '../utils/notify';
+import { notifyWarn, notifyStatus } from '../utils/notify';
 
 const PRIORITY_A_CODE = 'A'.charCodeAt(0);
 const PRIORITY_Z_CODE = 'Z'.charCodeAt(0);
@@ -325,12 +325,29 @@ export async function adjustTimestamp(delta: number) {
     if (timestampType) {
         const cursorLine = editor.selection.active.line;
         const usedKeywords = collectSiblingKeywords(editor.document, cursorLine);
-        const newLine = cycleTimestampKeyword(timestampType.hit, usedKeywords);
-        const lineRange = editor.document.lineAt(cursorLine).range;
+        const cycle = cycleTimestampKeyword(timestampType.hit, usedKeywords);
 
+        if (cycle.from === cycle.to) {
+            // Every other keyword is taken by a sibling line under the
+            // same heading. A silent no-op feels like a broken keystroke,
+            // so escalate to a warning toast that names the occupied
+            // siblings.
+            const occupied = [...usedKeywords].sort().join(', ');
+            notifyWarn(`Cannot cycle ${cycle.from}: ${occupied} are already on this heading.`);
+            return;
+        }
+
+        if (cycle.skipped.length > 0) {
+            // The cycle walked past at least one occupied sibling. Use
+            // the status bar (auto-dismissing) instead of a toast so
+            // repeated cycling does not flood the user with popups.
+            notifyStatus(`Skipped ${cycle.skipped.join(', ')} (already on heading)`);
+        }
+
+        const lineRange = editor.document.lineAt(cursorLine).range;
         return editor
             .edit((editBuilder) => {
-                editBuilder.replace(lineRange, newLine);
+                editBuilder.replace(lineRange, cycle.line);
             })
             .then(() => {
                 const newPosition = editor.selection.active;

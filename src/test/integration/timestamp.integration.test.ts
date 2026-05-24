@@ -1,5 +1,6 @@
 import * as assert from 'assert';
 import * as vscode from 'vscode';
+import * as sinon from 'sinon';
 import { suite, test } from 'mocha';
 
 suite('Timestamp Integration Tests', () => {
@@ -551,59 +552,92 @@ suite('Timestamp Integration Tests', () => {
         assert.strictEqual(document.lineAt(1).text, '`CREATED: [2025-12-31 Wed]`');
     });
 
-    test('Shift+Down on SCHEDULED skips occupied DEADLINE and lands on CLOSED', async () => {
-        document = await vscode.workspace.openTextDocument({
-            content: '## TODO Task\n`SCHEDULED: <2025-12-31 Wed>`\n`DEADLINE: <2026-01-15 Thu>`',
-            language: 'markdown'
-        });
-        editor = await vscode.window.showTextDocument(document);
-        editor.selection = new vscode.Selection(1, 5, 1, 5); // inside SCHEDULED
+    test('Shift+Down on SCHEDULED skips occupied DEADLINE and surfaces a status-bar hint', async () => {
+        const statusStub = sinon.stub(vscode.window, 'setStatusBarMessage');
+        try {
+            document = await vscode.workspace.openTextDocument({
+                content: '## TODO Task\n`SCHEDULED: <2025-12-31 Wed>`\n`DEADLINE: <2026-01-15 Thu>`',
+                language: 'markdown'
+            });
+            editor = await vscode.window.showTextDocument(document);
+            editor.selection = new vscode.Selection(1, 5, 1, 5); // inside SCHEDULED
 
-        await vscode.commands.executeCommand('markdown-org.timestampDown');
+            await vscode.commands.executeCommand('markdown-org.timestampDown');
 
-        // SCHEDULED -> (DEADLINE occupied -> skip) -> CLOSED.
-        assert.strictEqual(document.lineAt(1).text, '`CLOSED: [2025-12-31 Wed]`');
-        // Sibling DEADLINE line stays where it was.
-        assert.strictEqual(document.lineAt(2).text, '`DEADLINE: <2026-01-15 Thu>`');
+            // SCHEDULED -> (DEADLINE occupied -> skip) -> CLOSED.
+            assert.strictEqual(document.lineAt(1).text, '`CLOSED: [2025-12-31 Wed]`');
+            assert.strictEqual(document.lineAt(2).text, '`DEADLINE: <2026-01-15 Thu>`');
+
+            // The skip is communicated through the status bar, not a toast.
+            assert.strictEqual(statusStub.callCount, 1, 'one status-bar message per skip');
+            // setStatusBarMessage has overloads; sinon types the args as a 1-tuple
+            // even when 2 args are passed, so widen for the second-arg check.
+            const args = statusStub.firstCall.args as unknown as [string, number];
+            assert.match(args[0], /Skipped DEADLINE \(already on heading\)/);
+            assert.strictEqual(args[1], 3000, 'status hint auto-dismisses in 3s');
+        } finally {
+            statusStub.restore();
+        }
     });
 
-    test('Shift+Down on SCHEDULED skips DEADLINE and CLOSED and lands on CREATED', async () => {
-        document = await vscode.workspace.openTextDocument({
-            content:
-                '## TODO Task\n' +
-                '`SCHEDULED: <2025-12-31 Wed>`\n' +
-                '`DEADLINE: <2026-01-15 Thu>`\n' +
-                '`CLOSED: [2026-01-20 Tue]`',
-            language: 'markdown'
-        });
-        editor = await vscode.window.showTextDocument(document);
-        editor.selection = new vscode.Selection(1, 5, 1, 5); // inside SCHEDULED
+    test('Shift+Down on SCHEDULED skips DEADLINE and CLOSED, status bar names both', async () => {
+        const statusStub = sinon.stub(vscode.window, 'setStatusBarMessage');
+        try {
+            document = await vscode.workspace.openTextDocument({
+                content:
+                    '## TODO Task\n' +
+                    '`SCHEDULED: <2025-12-31 Wed>`\n' +
+                    '`DEADLINE: <2026-01-15 Thu>`\n' +
+                    '`CLOSED: [2026-01-20 Tue]`',
+                language: 'markdown'
+            });
+            editor = await vscode.window.showTextDocument(document);
+            editor.selection = new vscode.Selection(1, 5, 1, 5); // inside SCHEDULED
 
-        await vscode.commands.executeCommand('markdown-org.timestampDown');
+            await vscode.commands.executeCommand('markdown-org.timestampDown');
 
-        // Two skips in a row: DEADLINE (occupied) and CLOSED (occupied).
-        assert.strictEqual(document.lineAt(1).text, '`CREATED: [2025-12-31 Wed]`');
+            assert.strictEqual(document.lineAt(1).text, '`CREATED: [2025-12-31 Wed]`');
+            assert.strictEqual(statusStub.callCount, 1);
+            assert.match(statusStub.firstCall.args[0] as string, /Skipped DEADLINE, CLOSED \(already on heading\)/);
+        } finally {
+            statusStub.restore();
+        }
     });
 
-    test('Shift+Down is a no-op when every other slot is occupied', async () => {
-        const closed = '`CLOSED: [2025-12-31 Wed]`';
-        document = await vscode.workspace.openTextDocument({
-            content:
-                '## TODO Task\n' +
-                '`SCHEDULED: <2025-12-31 Wed>`\n' +
-                '`DEADLINE: <2026-01-15 Thu>`\n' +
-                closed +
-                '\n' +
-                '`CREATED: [2025-12-01 Mon]`',
-            language: 'markdown'
-        });
-        editor = await vscode.window.showTextDocument(document);
-        editor.selection = new vscode.Selection(3, 5, 3, 5); // inside CLOSED
+    test('Shift+Down is a no-op when every other slot is occupied AND warns via toast', async () => {
+        const warnStub = sinon.stub(vscode.window, 'showWarningMessage');
+        const statusStub = sinon.stub(vscode.window, 'setStatusBarMessage');
+        try {
+            const closed = '`CLOSED: [2025-12-31 Wed]`';
+            document = await vscode.workspace.openTextDocument({
+                content:
+                    '## TODO Task\n' +
+                    '`SCHEDULED: <2025-12-31 Wed>`\n' +
+                    '`DEADLINE: <2026-01-15 Thu>`\n' +
+                    closed +
+                    '\n' +
+                    '`CREATED: [2025-12-01 Mon]`',
+                language: 'markdown'
+            });
+            editor = await vscode.window.showTextDocument(document);
+            editor.selection = new vscode.Selection(3, 5, 3, 5); // inside CLOSED
 
-        await vscode.commands.executeCommand('markdown-org.timestampDown');
+            await vscode.commands.executeCommand('markdown-org.timestampDown');
 
-        // Every other slot is taken by a sibling, so CLOSED stays.
-        assert.strictEqual(document.lineAt(3).text, closed);
+            // Line text is preserved -- there is no free target.
+            assert.strictEqual(document.lineAt(3).text, closed);
+
+            // Escalates to a warning toast (not the quiet status bar).
+            assert.strictEqual(warnStub.callCount, 1, 'no-op must escalate to a warning toast');
+            assert.match(
+                warnStub.firstCall.args[0] as string,
+                /Cannot cycle CLOSED: CREATED, DEADLINE, SCHEDULED are already on this heading\./
+            );
+            assert.strictEqual(statusStub.callCount, 0, 'no status-bar message on a pure no-op');
+        } finally {
+            warnStub.restore();
+            statusStub.restore();
+        }
     });
 
     test('skip-duplicates respects heading boundaries (next-section keywords do not count)', async () => {
