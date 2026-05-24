@@ -309,7 +309,7 @@
     "serialize-javascript": "^7.0.5"
   },
   "x-markdown-org": {
-    "extractorVersion": "0.4.2"
+    "extractorVersion": "0.5.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -2,6 +2,37 @@
 
 All notable changes to the "Markdown Org" extension will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- Per-keyword active / inactive bracket policy for timestamps, mirroring the upstream extractor 0.5.0 contract ([extractor ADR-0014](https://github.com/VitalyOstanin/markdown-org-extract/blob/master/docs/adr/0014-active-and-inactive-timestamps.md), editor side [ADR-0005](docs/adr/0005-active-and-inactive-timestamps.md)): `SCHEDULED:` / `DEADLINE:` stay active `<...>`, `CLOSED:` / `CREATED:` are now inactive `[...]`; CLOCK and bare inline timestamps accept both forms.
+- Diagnostic source `markdown-org` (code `bracket-policy`, severity Warning) surfaces keyword lines whose bracket form violates the policy or whose pair is mixed (`<...]`, `[...>`). A preferred Quick Fix **Convert to canonical bracket form** rewrites the brackets in place (`Ctrl+.` on the warning).
+- New command `Markdown Org: Toggle Timestamp Active/Inactive` (`markdown-org.toggleTimestampActive`) flips `<...>` ↔ `[...]` on a bare inline timestamp under the cursor. On keyword lines the command refuses with a keyword-named message and points at `Shift+Up` for keyword cycling. The command ships without a default keybinding -- it is reachable from the Command Palette only ([ADR-0006](docs/adr/0006-bracket-toggle-keybindings.md)).
+
+### Changed
+
+- **Breaking**: `insertCreated` now writes `CREATED: [YYYY-MM-DD Dayname HH:MM]` (inactive form), and `setTaskStatus('DONE')` writes `CLOSED: [YYYY-MM-DD Dayname HH:MM]`. Pre-existing files with `CREATED: <...>` or `CLOSED: <...>` will raise a warning on open; apply the Quick Fix per line, or run a one-time bulk rewrite:
+
+    ```bash
+    # Migrate stored CLOSED: <YYYY-MM-DD ...> to CLOSED: [YYYY-MM-DD ...]
+    sed -i -E 's/`CLOSED: <([^>]+)>`/`CLOSED: [\1]`/g' $(rg -l '`CLOSED: <' .)
+    # Migrate stored CREATED: <YYYY-MM-DD ...> to CREATED: [YYYY-MM-DD ...]
+    sed -i -E 's/`CREATED: <([^>]+)>`/`CREATED: [\1]`/g' $(rg -l '`CREATED: <' .)
+    ```
+
+    The recipe matches the one shared with extractor 0.5.0.
+
+- `markdown-org.insertDeadline` keybinding changed from `Ctrl+K Ctrl+K D` to `Ctrl+K Ctrl+K Ctrl+D` to match the shape used by `insertCreated` (`Ctrl+K Ctrl+K Ctrl+C`) and `insertScheduled` (`Ctrl+K Ctrl+K Ctrl+S`). The shorter `Ctrl+K Ctrl+D` still belongs to `setDone`; VS Code disambiguates the chord by length after the second `Ctrl+K`.
+- `Shift+Up` / `Shift+Down` (`adjustTimestamp`) now preserves the bracket form when shifting dates / times on inline timestamps -- an inactive `[...]` stays inactive across the edit.
+
+### Internal
+
+- `TIMESTAMP_LINE_REGEX` (`src/orgPatterns.ts`) is now strict per ADR-0005: it matches a keyword line only when the bracket form satisfies the policy table. The helper `matchTimestampLine` replaces ad-hoc consumers of the raw regex.
+- Bracket validation is split across `src/diagnostics/bracketPolicy.ts` (pure validator, fully unit-tested) and `src/diagnostics/timestampBrackets.ts` (vscode adapter wiring the `DiagnosticCollection` and `CodeActionProvider`).
+- Bundled extractor bumped from 0.4.2 to 0.5.0 (`package.json` `x-markdown-org.extractorVersion`); the matching binary now ships in `bin/markdown-org-extract`. The integration smoke test (`src/test/integration/extractorBundled.integration.test.ts`) continues to assert that `<bin>/<binary> --version` matches the manifest field.
+- New integration suite `src/test/integration/keybindings.integration.test.ts` locks the package.json keybinding contract for the three Insert\* commands and asserts that `markdown-org.insertDeadline` is a registered command with an active-`<...>` output.
+
 ## [0.6.0] - 2026-05-22
 
 ### Added
