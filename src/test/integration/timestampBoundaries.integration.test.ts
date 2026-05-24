@@ -353,6 +353,55 @@ suite('Timestamp cursor boundaries (issue #41)', () => {
         });
     }
 
+    // --- Inactive `[...]` timestamps (ADR-0014). Bare inline form is
+    // exercised here; per-keyword line forms are covered separately.
+    test('inline inactive timestamp: Shift+Up increments day and preserves square brackets', async () => {
+        const line = 'Reference [2026-05-25 Пн 19:02] in prose';
+        const document = await vscode.workspace.openTextDocument({
+            content: line,
+            language: 'markdown'
+        });
+        const editor = await vscode.window.showTextDocument(document);
+        // Column 21 is the first day digit `2` of `25`.
+        editor.selection = new vscode.Selection(0, 21, 0, 21);
+        await vscode.commands.executeCommand('markdown-org.timestampUp');
+        const result = document.lineAt(0).text;
+        assert.ok(result.includes('[2026-05-26'), `inactive day must increment, got: ${result}`);
+        assert.ok(result.endsWith('in prose'), `surrounding text preserved, got: ${result}`);
+        assert.ok(!result.includes('<2026-05-26'), `bracket form must stay inactive, got: ${result}`);
+        await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+    });
+
+    test('inline inactive timestamp: cursor on boundary past `26` still increments day', async () => {
+        // 2026-05-26 is Вт (Tuesday); +1 day → 2026-05-27 Ср (Wednesday).
+        const line = '[2026-05-26 Вт 09:00]';
+        const document = await vscode.workspace.openTextDocument({
+            content: line,
+            language: 'markdown'
+        });
+        const editor = await vscode.window.showTextDocument(document);
+        // Column 11 is the space past the day -- left-leaning fallback lands on day.
+        editor.selection = new vscode.Selection(0, 11, 0, 11);
+        await vscode.commands.executeCommand('markdown-org.timestampUp');
+        assert.strictEqual(document.lineAt(0).text, '[2026-05-27 Ср 09:00]');
+        await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+    });
+
+    test('inline mixed pair `<...]` is not editable (cursor falls through to cursorUpSelect)', async () => {
+        // ADR-0014 rejects mixed pairs. `getTimestampPartAt` returns null,
+        // so `timestampUp` falls back to line motion and leaves the text intact.
+        const line = '<2026-05-25 Пн 19:02]';
+        const document = await vscode.workspace.openTextDocument({
+            content: line,
+            language: 'markdown'
+        });
+        const editor = await vscode.window.showTextDocument(document);
+        editor.selection = new vscode.Selection(0, 1, 0, 1);
+        await vscode.commands.executeCommand('markdown-org.timestampUp');
+        assert.strictEqual(document.lineAt(0).text, line, 'mixed pair must not be edited');
+        await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+    });
+
     // --- Cursor outside the timestamp (e.g. on the leading backtick or
     // before `<`) is not a part-hit; the command must fall back to
     // `cursorUpSelect` and leave the line text intact.

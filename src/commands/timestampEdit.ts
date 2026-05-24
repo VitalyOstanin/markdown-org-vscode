@@ -130,16 +130,16 @@ function adjustHeadingPart(match: RegExpMatchArray, part: HeadingPart, delta: nu
 
 function getTimestampAtCursor(
     editor: vscode.TextEditor
-): { match: RegExpMatchArray; range: vscode.Range; part: TimestampPart } | null {
+): { match: RegExpMatchArray; range: vscode.Range; part: TimestampPart; active: boolean } | null {
     const position = editor.selection.active;
     const lineText = editor.document.lineAt(position.line).text;
     const hit = getTimestampPartAt(lineText, position.character);
     if (!hit) return null;
     const range = new vscode.Range(position.line, hit.start, position.line, hit.end);
-    return { match: hit.match, range, part: hit.part };
+    return { match: hit.match, range, part: hit.part, active: hit.active };
 }
 
-function incrementTimestamp(match: RegExpMatchArray, part: TimestampPart, delta: number): string {
+function incrementTimestamp(match: RegExpMatchArray, part: TimestampPart, delta: number, active: boolean): string {
     const g = match.groups!;
     let year = parseInt(g.year, 10);
     let month = parseInt(g.month, 10);
@@ -176,7 +176,9 @@ function incrementTimestamp(match: RegExpMatchArray, part: TimestampPart, delta:
 
     const newWeekday = weekday ? getWeekdayName(date, weekday) : '';
 
-    let result = `<${year.toString().padStart(4, '0')}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
+    const open = active ? '<' : '[';
+    const close = active ? '>' : ']';
+    let result = `${open}${year.toString().padStart(4, '0')}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
     if (newWeekday) {
         result += ` ${newWeekday}`;
     }
@@ -188,7 +190,7 @@ function incrementTimestamp(match: RegExpMatchArray, part: TimestampPart, delta:
     if (repeater) {
         result += ` ${repeater}`;
     }
-    result += '>';
+    result += close;
 
     return result;
 }
@@ -295,7 +297,7 @@ export async function adjustTimestamp(delta: number) {
 
     const timestamp = getTimestampAtCursor(editor);
     if (timestamp) {
-        const newTimestamp = incrementTimestamp(timestamp.match, timestamp.part, delta);
+        const newTimestamp = incrementTimestamp(timestamp.match, timestamp.part, delta, timestamp.active);
 
         return editor
             .edit((editBuilder) => {

@@ -19,6 +19,8 @@ export interface TimestampPartHit {
     part: TimestampPart;
     start: number;
     end: number;
+    /** `true` for active `<...>`, `false` for inactive `[...]`. */
+    active: boolean;
 }
 
 export interface ClockTimestampPartHit {
@@ -28,6 +30,8 @@ export interface ClockTimestampPartHit {
 
 // Cursor-aware variant of TIMESTAMP_REGEX from orgPatterns: captures date parts
 // as named groups so the position-to-part mapping below stays self-describing.
+// Both active `<...>` and inactive `[...]` bracket forms are accepted per
+// ADR-0014. Mixed pairs (`<...]`, `[...>`) are rejected after the match.
 //
 // Repeater syntax mirrors markdown-org-extract (src/timestamp/repeater.rs):
 //   * prefix: `.+` (Restart) | `++` (CatchUp) | `+` (Cumulative)
@@ -36,7 +40,11 @@ export interface ClockTimestampPartHit {
 // `wd` must come before `d`, otherwise the engine commits to the shorter
 // option and consumes a partial match.
 const TIMESTAMP_REGEX =
-    /<(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})(?: (?<weekday>[А-Яа-яA-Za-z]+))?(?: (?<hour>\d{2}):(?<minute>\d{2}))?(?: (?<repeater>(?:\.\+|\+\+|\+)\d+(?:wd|[dwmyh])))?>/;
+    /(?<open>[<[])(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})(?: (?<weekday>[А-Яа-яA-Za-z]+))?(?: (?<hour>\d{2}):(?<minute>\d{2}))?(?: (?<repeater>(?:\.\+|\+\+|\+)\d+(?:wd|[dwmyh])))?(?<close>[>\]])/;
+
+function isPairedBracket(open: string, close: string): boolean {
+    return (open === '<' && close === '>') || (open === '[' && close === ']');
+}
 
 const CLOCK_REGEX =
     /^(?<indent>\s*)`CLOCK: (?<startOpenBracket>[[<])(?<startYear>\d{4})-(?<startMonth>\d{2})-(?<startDay>\d{2}) (?<startWeekday>[А-Яа-яA-Za-z]+) (?<startHour>\d{2}):(?<startMinute>\d{2})(?<startCloseBracket>[\]>])(?:--(?<endOpenBracket>[[<])(?<endYear>\d{4})-(?<endMonth>\d{2})-(?<endDay>\d{2}) (?<endWeekday>[А-Яа-яA-Za-z]+) (?<endHour>\d{2}):(?<endMinute>\d{2})(?<endCloseBracket>[\]>]) => +(?<durationHours>-?\d+):(?<durationMinutes>-?\d+))?`$/;
@@ -70,20 +78,22 @@ export function getTimestampPartAt(lineText: string, character: number): Timesta
     let match: RegExpExecArray | null;
     while ((match = regex.exec(lineText)) !== null) {
         if (!match.groups) continue;
+        if (!isPairedBracket(match.groups.open, match.groups.close)) continue;
         const tsStart = match.index;
         const tsEnd = tsStart + match[0].length;
         if (character < tsStart || character >= tsEnd) continue;
 
         const spans = buildTimestampSpans(lineText, match, tsStart);
+        const active = match.groups.open === '<';
 
         const direct = findPart(character, spans);
         if (direct) {
-            return { match, part: direct as TimestampPart, start: tsStart, end: tsEnd };
+            return { match, part: direct as TimestampPart, start: tsStart, end: tsEnd, active };
         }
         if (character > tsStart) {
             const leftLeaning = findPart(character - 1, spans);
             if (leftLeaning) {
-                return { match, part: leftLeaning as TimestampPart, start: tsStart, end: tsEnd };
+                return { match, part: leftLeaning as TimestampPart, start: tsStart, end: tsEnd, active };
             }
         }
         return null;

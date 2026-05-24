@@ -147,6 +147,68 @@ suite('getTimestampPartAt (plain timestamp)', () => {
         // crosses over into either neighbor.
         assert.strictEqual(getTimestampPartAt(two, 12), null);
     });
+
+    // ADR-0014: inactive `[...]` is parsed identically to active `<...>`;
+    // the only observable difference is the `active` flag on the hit.
+    suite('inactive `[...]` form (ADR-0014)', () => {
+        // Layout for `[2025-12-06 Fri 14:30]` is identical to the active
+        // form because the bracket characters occupy the same positions.
+        const INACTIVE = '[2025-12-06 Fri 14:30]';
+
+        test('flags inactive form via active=false', () => {
+            const hit = getTimestampPartAt(INACTIVE, 1);
+            assert.ok(hit);
+            assert.strictEqual(hit!.active, false);
+        });
+
+        test('flags active form via active=true', () => {
+            const hit = getTimestampPartAt('<2025-12-06 Fri 14:30>', 1);
+            assert.ok(hit);
+            assert.strictEqual(hit!.active, true);
+        });
+
+        test('cursor positions resolve to the same parts as the active form', () => {
+            assert.strictEqual(getTimestampPartAt(INACTIVE, 1)?.part, 'year');
+            assert.strictEqual(getTimestampPartAt(INACTIVE, 5)?.part, 'year');
+            assert.strictEqual(getTimestampPartAt(INACTIVE, 6)?.part, 'month');
+            assert.strictEqual(getTimestampPartAt(INACTIVE, 11)?.part, 'day');
+            assert.strictEqual(getTimestampPartAt(INACTIVE, 12)?.part, 'weekday');
+            assert.strictEqual(getTimestampPartAt(INACTIVE, 16)?.part, 'hour');
+            assert.strictEqual(getTimestampPartAt(INACTIVE, 19)?.part, 'minute');
+            assert.strictEqual(getTimestampPartAt(INACTIVE, 21)?.part, 'minute');
+        });
+
+        test('inactive date-only timestamp', () => {
+            const dateOnly = '[2025-12-06]';
+            assert.strictEqual(getTimestampPartAt(dateOnly, 1)?.part, 'year');
+            assert.strictEqual(getTimestampPartAt(dateOnly, 6)?.part, 'month');
+            assert.strictEqual(getTimestampPartAt(dateOnly, 9)?.part, 'day');
+        });
+
+        test('mixed pair `<...]` is rejected', () => {
+            // ADR-0014 forbids `<...]` and `[...>`. The post-match
+            // bracket-pair check drops these so the cursor lookup never
+            // returns a part hit.
+            assert.strictEqual(getTimestampPartAt('<2025-12-06]', 1), null);
+            assert.strictEqual(getTimestampPartAt('[2025-12-06>', 1), null);
+        });
+
+        test('two inactive timestamps on one line', () => {
+            const two = '[2025-12-06] [2025-12-07]';
+            assert.strictEqual(getTimestampPartAt(two, 1)?.part, 'year');
+            assert.strictEqual(getTimestampPartAt(two, 1)?.active, false);
+            assert.strictEqual(getTimestampPartAt(two, 14)?.part, 'year');
+            assert.strictEqual(getTimestampPartAt(two, 14)?.active, false);
+        });
+
+        test('inactive with repeater preserves the repeater span', () => {
+            const inactiveRepeated = '[2025-12-06 Fri 14:30 +1d]';
+            const hit = getTimestampPartAt(inactiveRepeated, 1);
+            assert.ok(hit);
+            assert.strictEqual(hit!.active, false);
+            assert.strictEqual(hit!.match.groups!.repeater, '+1d');
+        });
+    });
 });
 
 suite('getClockTimestampPartAt', () => {
