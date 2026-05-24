@@ -7,7 +7,7 @@ import {
     insertDeadlineTimestamp
 } from './commands/taskStatus';
 import { showAgenda, cycleTag } from './commands/agenda';
-import { adjustTimestamp } from './commands/timestampEdit';
+import { adjustTimestamp, toggleTimestampType } from './commands/timestampEdit';
 import { moveToArchive, promoteToMaintain } from './commands/moveHeading';
 import { insertClockStart, insertClockFinish } from './commands/clock';
 import { insertClockTable } from './commands/clocktable';
@@ -39,6 +39,7 @@ export function activate(context: vscode.ExtensionContext) {
     registerOrgCommand(context, 'markdown-org.showTasks', (date?: string) => showAgenda(context, 'tasks', date));
     registerOrgCommand(context, 'markdown-org.timestampUp', () => adjustTimestamp(1));
     registerOrgCommand(context, 'markdown-org.timestampDown', () => adjustTimestamp(-1));
+    registerOrgCommand(context, 'markdown-org.toggleTimestampType', () => toggleTimestampType());
     registerOrgCommand(context, 'markdown-org.moveToArchive', () => moveToArchive());
     registerOrgCommand(context, 'markdown-org.promoteToMaintain', () => promoteToMaintain());
     registerOrgCommand(context, 'markdown-org.cycleTag', () => cycleTag(context));

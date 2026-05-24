@@ -7,7 +7,8 @@ import {
     TimestampPart,
     ClockTimestampPart
 } from '../utils/timestampParts';
-import { cycleTimestampKeyword } from '../utils/toggleTimestampType';
+import { cycleTimestampKeyword, normaliseBracket } from '../utils/toggleTimestampType';
+import { notifyWarn } from '../utils/notify';
 
 const PRIORITY_A_CODE = 'A'.charCodeAt(0);
 const PRIORITY_Z_CODE = 'Z'.charCodeAt(0);
@@ -339,4 +340,41 @@ export async function adjustTimestamp(delta: number) {
     }
 
     return vscode.commands.executeCommand(delta > 0 ? 'cursorUpSelect' : 'cursorDownSelect');
+}
+
+/**
+ * Flip the bracket form of the timestamp under the cursor:
+ * active `<...>` <-> inactive `[...]`. Analogue of Emacs
+ * `org-toggle-timestamp-type` (`C-c C-x C-,`).
+ *
+ * On a SCHEDULED/DEADLINE/CLOSED/CREATED line the bracket is fixed by the
+ * keyword (ADR-0014), so the command refuses to flip and shows a hint --
+ * the user should cycle the keyword instead (Shift+Up on the keyword word).
+ *
+ * No-op outside any timestamp.
+ */
+export async function toggleTimestampType() {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor) {
+        return;
+    }
+
+    const position = editor.selection.active;
+    const lineText = editor.document.lineAt(position.line).text;
+    const hit = getTimestampPartAt(lineText, position.character);
+    if (!hit) {
+        notifyWarn('Cursor is not on a timestamp');
+        return;
+    }
+
+    if (matchTimestampLine(lineText)) {
+        notifyWarn('Bracket form is fixed by the keyword (ADR-0014); cycle the keyword via Shift+Up.');
+        return;
+    }
+
+    const newTimestamp = normaliseBracket(hit.match[0], !hit.active);
+    const range = new vscode.Range(position.line, hit.start, position.line, hit.end);
+    return editor.edit((editBuilder) => {
+        editBuilder.replace(range, newTimestamp);
+    });
 }

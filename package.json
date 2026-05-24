@@ -115,6 +115,10 @@
         "title": "Markdown Org: Timestamp Down"
       },
       {
+        "command": "markdown-org.toggleTimestampType",
+        "title": "Markdown Org: Toggle Timestamp Type (active/inactive)"
+      },
+      {
         "command": "markdown-org.moveToArchive",
         "title": "Markdown Org: Move to Archive"
       },
@@ -191,6 +195,11 @@
       {
         "command": "markdown-org.timestampDown",
         "key": "shift+down",
+        "when": "editorTextFocus && editorLangId == markdown"
+      },
+      {
+        "command": "markdown-org.toggleTimestampType",
+        "key": "ctrl+k ctrl+,",
         "when": "editorTextFocus && editorLangId == markdown"
       },
       {
