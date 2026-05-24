@@ -24,8 +24,11 @@ import { suite, test, teardown } from 'mocha';
 
 const DEADLINE_LINE = '`DEADLINE: <2026-05-25 Пн 19:02>`';
 const SCHEDULED_LINE = '`SCHEDULED: <2026-05-25 Пн 19:02 +1d>`';
-const CREATED_DATE_ONLY = '`CREATED: <2026-05-25 Пн>`';
-const CLOSED_LINE = '`CLOSED: <2026-05-25 Пн 19:02>`';
+// ADR-0014: CREATED/CLOSED are emitted in inactive `[...]` form. Bracket
+// characters occupy the same columns as `<`/`>`, so all boundary offsets
+// in the cases below stay valid.
+const CREATED_DATE_ONLY = '`CREATED: [2026-05-25 Пн]`';
+const CLOSED_LINE = '`CLOSED: [2026-05-25 Пн 19:02]`';
 const BARE_TIMESTAMP = '<2026-05-25 Пн 19:02>';
 const DEADLINE_WITH_REPEATER = '`DEADLINE: <2026-05-25 Пн 19:02 ++1w>`';
 
@@ -151,12 +154,12 @@ suite('Timestamp cursor boundaries (issue #41)', () => {
     });
 
     // --- CREATED without weekday/hour: only year/month/day spans. The boundary
-    // just past the day sits ON `>`, which used to drop the request.
+    // just past the day sits ON `]`, which used to drop the request.
     test('CREATED date-only day boundary (just past 25) increments day', async () => {
-        // `CREATED: <2026-05-25 Пн>` -- length 25 incl. backticks.
+        // `CREATED: [2026-05-25 Пн]` -- length 25 incl. backticks.
         //  0         1         2
         //  012345678901234567890123456
-        //  `CREATED: <2026-05-25 Пн>`
+        //  `CREATED: [2026-05-25 Пн]`
         // year [11, 15), month [16, 18), day [19, 21), weekday [22, 24)
         // boundary right after `25` is column 21.
         await runCase({
@@ -197,14 +200,14 @@ suite('Timestamp cursor boundaries (issue #41)', () => {
         });
     });
 
-    // --- CLOSED uses the same TIMESTAMP_LINE_REGEX as DEADLINE/SCHEDULED.
-    // The active <...> form is what TIMESTAMP_REGEX from timestampParts.ts
-    // accepts; verify all six boundary positions resolve the same way.
+    // --- CLOSED uses the inactive `[...]` form per ADR-0014. The bare
+    // TIMESTAMP_REGEX from timestampParts.ts accepts both forms paired, so
+    // all six boundary positions resolve the same way.
     //
-    // Layout for `\`CLOSED: <2026-05-25 Пн 19:02>\``:
+    // Layout for `\`CLOSED: [2026-05-25 Пн 19:02]\``:
     //    0         1         2         3
     //    0123456789012345678901234567890
-    //    `CLOSED: <2026-05-25 Пн 19:02>`
+    //    `CLOSED: [2026-05-25 Пн 19:02]`
     //   year [10,14), month [15,17), day [18,20), weekday [21,23),
     //   hour [24,26), minute [27,29).
     const closedCases: Case[] = [
@@ -213,7 +216,7 @@ suite('Timestamp cursor boundaries (issue #41)', () => {
         { label: 'CLOSED day boundary (on ` `)', line: CLOSED_LINE, cursor: 20, expectContains: '2026-05-26' },
         { label: 'CLOSED weekday boundary (on ` `)', line: CLOSED_LINE, cursor: 23, expectContains: '2026-05-26' },
         { label: 'CLOSED hour boundary (on `:`)', line: CLOSED_LINE, cursor: 26, expectContains: '20:02' },
-        { label: 'CLOSED minute boundary (on `>`)', line: CLOSED_LINE, cursor: 29, expectContains: '19:03' }
+        { label: 'CLOSED minute boundary (on `]`)', line: CLOSED_LINE, cursor: 29, expectContains: '19:03' }
     ];
 
     for (const c of closedCases) {

@@ -17,7 +17,7 @@ suite('CLOCK Integration Tests', () => {
         testFilePath = path.join(workspaceFolder.uri.fsPath, 'test-clock.md');
 
         const initialContent = `## TODO Test task
-\`CREATED: <2025-12-09 Пн 10:00>\`
+\`CREATED: [2025-12-09 Пн 10:00]\`
 
 ## TODO Another task
 \`SCHEDULED: <2025-12-10 Вт 14:00>\`
@@ -51,7 +51,7 @@ suite('CLOCK Integration Tests', () => {
         const lines = text.split('\n');
 
         assert.strictEqual(lines[0], '## TODO Test task');
-        assert.strictEqual(lines[1], '`CREATED: <2025-12-09 Пн 10:00>`');
+        assert.strictEqual(lines[1], '`CREATED: [2025-12-09 Пн 10:00]`');
         assert.match(lines[2], /^`CLOCK: \[\d{4}-\d{2}-\d{2} [^\]]+\]`$/);
     });
 
@@ -97,7 +97,7 @@ suite('CLOCK Integration Tests', () => {
         await vscode.workspace.getConfiguration('markdown-org').update('clockRoundMinutes', 30, true);
 
         const content = `## TODO Test task
-\`CREATED: <2025-12-09 Пн 10:00>\`
+\`CREATED: [2025-12-09 Пн 10:00]\`
 \`CLOCK: [2025-12-09 Пн 10:30]\`
 `;
 
@@ -130,7 +130,7 @@ suite('CLOCK Integration Tests', () => {
 
     test('Cannot insert CLOCK start when open CLOCK exists', async () => {
         const content = `## TODO Test task
-\`CREATED: <2025-12-09 Пн 10:00>\`
+\`CREATED: [2025-12-09 Пн 10:00]\`
 \`CLOCK: [2025-12-09 Пн 10:30]\`
 `;
 
@@ -157,7 +157,7 @@ suite('CLOCK Integration Tests', () => {
         await vscode.workspace.getConfiguration('markdown-org').update('clockRoundMinutes', undefined, true);
 
         const content = `## TODO Test task
-\`CREATED: <2025-12-09 Пн 10:00>\`
+\`CREATED: [2025-12-09 Пн 10:00]\`
 \`CLOCK: [2025-12-09 Пн 14:00]--[2025-12-09 Пн 15:00] =>  1:00\`
 `;
 
@@ -201,7 +201,7 @@ suite('CLOCK Integration Tests', () => {
         await vscode.workspace.getConfiguration('markdown-org').update('clockRoundMinutes', undefined, true);
 
         const content = `## TODO Test task
-\`CREATED: <2025-12-09 Пн 10:00>\`
+\`CREATED: [2025-12-09 Пн 10:00]\`
 \`CLOCK: [2025-12-09 Пн 10:00]--[2025-12-09 Пн 11:00] =>  1:00\`
 \`CLOCK: [2025-12-09 Пн 12:00]--[2025-12-09 Пн 13:00] =>  1:00\`
 `;

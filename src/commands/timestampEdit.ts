@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { HEADING_REGEX, TIMESTAMP_LINE_REGEX } from '../orgPatterns';
+import { HEADING_REGEX, matchTimestampLine, TimestampLineMatch } from '../orgPatterns';
 import { formatDurationHM } from '../utils';
 import {
     getTimestampPartAt,
@@ -7,7 +7,7 @@ import {
     TimestampPart,
     ClockTimestampPart
 } from '../utils/timestampParts';
-import { toggleTimestampType } from '../utils/toggleTimestampType';
+import { cycleTimestampKeyword } from '../utils/toggleTimestampType';
 
 const PRIORITY_A_CODE = 'A'.charCodeAt(0);
 const PRIORITY_Z_CODE = 'Z'.charCodeAt(0);
@@ -26,27 +26,26 @@ function getClockTimestampAtCursor(
     return getClockTimestampPartAt(lineText, position.character);
 }
 
-function getTimestampTypeAtCursor(editor: vscode.TextEditor): { match: RegExpMatchArray; range: vscode.Range } | null {
+function getTimestampTypeAtCursor(editor: vscode.TextEditor): { hit: TimestampLineMatch; range: vscode.Range } | null {
     const position = editor.selection.active;
     const line = editor.document.lineAt(position.line);
     const lineText = line.text;
 
-    const match = lineText.match(TIMESTAMP_LINE_REGEX);
-    if (!match?.groups) return null;
+    const hit = matchTimestampLine(lineText);
+    if (!hit) return null;
 
-    const type = match.groups.type;
-    const typeStart = lineText.indexOf(type);
-    const typeEnd = typeStart + type.length;
+    const typeStart = lineText.indexOf(hit.type);
+    const typeEnd = typeStart + hit.type.length;
 
     if (position.character >= typeStart && position.character <= typeEnd) {
         const range = new vscode.Range(position.line, typeStart, position.line, typeEnd);
-        return { match, range };
+        return { hit, range };
     }
 
     return null;
 }
 
-// toggleTimestampType lives in utils/toggleTimestampType.ts so that unit tests
+// cycleTimestampKeyword lives in utils/toggleTimestampType.ts so that unit tests
 // can exercise it without pulling the whole vscode module graph in.
 
 function getHeadingPartAtCursor(
@@ -311,7 +310,7 @@ export async function adjustTimestamp(delta: number) {
 
     const timestampType = getTimestampTypeAtCursor(editor);
     if (timestampType) {
-        const newLine = toggleTimestampType(timestampType.match);
+        const newLine = cycleTimestampKeyword(timestampType.hit);
         const lineRange = editor.document.lineAt(editor.selection.active.line).range;
 
         return editor

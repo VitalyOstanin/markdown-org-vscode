@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
-import { TIMESTAMP_LINE_REGEX } from './orgPatterns';
+import { matchTimestampLine } from './orgPatterns';
 import { notifyError } from './utils/notify';
 
 export const DAY_NAMES_SHORT_RU = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
@@ -57,9 +57,9 @@ export { toIsoDate } from './utils/isoDate';
 export function getTimestampIndent(editor: vscode.TextEditor, headingLine: number): string {
     if (headingLine + 1 < editor.document.lineCount) {
         const line = editor.document.lineAt(headingLine + 1);
-        const match = line.text.match(TIMESTAMP_LINE_REGEX);
-        if (match?.groups) {
-            return match.groups.indent;
+        const hit = matchTimestampLine(line.text);
+        if (hit) {
+            return hit.indent;
         }
     }
     return '';

@@ -1,53 +1,53 @@
 import * as assert from 'assert';
-import { toggleTimestampType } from '../../utils/toggleTimestampType';
-import { TIMESTAMP_LINE_REGEX } from '../../orgPatterns';
+import { cycleTimestampKeyword, normaliseBracket } from '../../utils/toggleTimestampType';
+import { matchTimestampLine } from '../../orgPatterns';
 
-function matchOrThrow(line: string): RegExpMatchArray {
-    const match = line.match(TIMESTAMP_LINE_REGEX);
-    if (!match?.groups) {
+function matchOrThrow(line: string) {
+    const hit = matchTimestampLine(line);
+    if (!hit) {
         throw new Error(`fixture did not match TIMESTAMP_LINE_REGEX: ${line}`);
     }
-    return match;
+    return hit;
 }
 
-suite('toggleTimestampType', () => {
-    test('SCHEDULED -> DEADLINE', () => {
-        const result = toggleTimestampType(matchOrThrow('`SCHEDULED: <2025-12-06 Fri>`'));
+suite('cycleTimestampKeyword', () => {
+    test('SCHEDULED -> DEADLINE (both active, bracket stays `<...>`)', () => {
+        const result = cycleTimestampKeyword(matchOrThrow('`SCHEDULED: <2025-12-06 Fri>`'));
         assert.strictEqual(result, '`DEADLINE: <2025-12-06 Fri>`');
     });
 
-    test('DEADLINE -> CLOSED', () => {
-        const result = toggleTimestampType(matchOrThrow('`DEADLINE: <2025-12-06 Fri>`'));
-        assert.strictEqual(result, '`CLOSED: <2025-12-06 Fri>`');
+    test('DEADLINE -> CLOSED flips bracket to inactive `[...]`', () => {
+        const result = cycleTimestampKeyword(matchOrThrow('`DEADLINE: <2025-12-06 Fri>`'));
+        assert.strictEqual(result, '`CLOSED: [2025-12-06 Fri]`');
     });
 
-    test('CLOSED -> SCHEDULED (wraps around)', () => {
-        const result = toggleTimestampType(matchOrThrow('`CLOSED: <2025-12-06 Fri>`'));
+    test('CLOSED -> SCHEDULED flips bracket back to active `<...>`', () => {
+        const result = cycleTimestampKeyword(matchOrThrow('`CLOSED: [2025-12-06 Fri]`'));
         assert.strictEqual(result, '`SCHEDULED: <2025-12-06 Fri>`');
     });
 
-    test('CREATED is preserved (not cycled)', () => {
-        const result = toggleTimestampType(matchOrThrow('`CREATED: <2025-12-06 Fri>`'));
-        assert.strictEqual(result, '`CREATED: <2025-12-06 Fri>`');
+    test('CREATED is preserved (not cycled, bracket untouched)', () => {
+        const result = cycleTimestampKeyword(matchOrThrow('`CREATED: [2025-12-06 Fri]`'));
+        assert.strictEqual(result, '`CREATED: [2025-12-06 Fri]`');
     });
 
-    test('indented line preserves indent across the toggle', () => {
-        const result = toggleTimestampType(matchOrThrow('    `SCHEDULED: <2025-12-06 Fri>`'));
+    test('indented line preserves indent across the cycle', () => {
+        const result = cycleTimestampKeyword(matchOrThrow('    `SCHEDULED: <2025-12-06 Fri>`'));
         assert.strictEqual(result, '    `DEADLINE: <2025-12-06 Fri>`');
     });
+});
 
-    test('unknown type is left untouched instead of cycling to SCHEDULED', () => {
-        // Defensive: TIMESTAMP_LINE_REGEX prevents this in practice (it only
-        // matches the four known types), but if a caller fabricates a match
-        // with an unknown `type` group, the old code returned 'SCHEDULED'
-        // via (-1 + 1) % 3 = 0. The guarded version returns the line as-is.
-        const fakeMatch = {
-            groups: {
-                indent: '',
-                type: 'NOTANTYPE',
-                timestamp: '<2025-12-06 Fri>'
-            }
-        } as unknown as RegExpMatchArray;
-        assert.strictEqual(toggleTimestampType(fakeMatch), '`NOTANTYPE: <2025-12-06 Fri>`');
+suite('normaliseBracket', () => {
+    test('converts active to inactive', () => {
+        assert.strictEqual(normaliseBracket('<2025-12-06 Fri 14:30>', false), '[2025-12-06 Fri 14:30]');
+    });
+
+    test('converts inactive to active', () => {
+        assert.strictEqual(normaliseBracket('[2025-12-06 Fri 14:30]', true), '<2025-12-06 Fri 14:30>');
+    });
+
+    test('idempotent when target matches source', () => {
+        assert.strictEqual(normaliseBracket('<2025-12-06>', true), '<2025-12-06>');
+        assert.strictEqual(normaliseBracket('[2025-12-06]', false), '[2025-12-06]');
     });
 });

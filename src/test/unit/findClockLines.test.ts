@@ -15,7 +15,7 @@ suite('findClockLinesInLines', () => {
     test('TIMESTAMP lines before CLOCK are skipped', () => {
         const lines = [
             '## TODO Task',
-            '`CREATED: <2025-12-09 Tue>`',
+            '`CREATED: [2025-12-09 Tue]`',
             '`SCHEDULED: <2025-12-10 Wed>`',
             '`CLOCK: [2025-12-09 Tue 14:30]--[2025-12-09 Tue 15:30] => 1:00`'
         ];
@@ -63,7 +63,7 @@ suite('findClockLinesInLines', () => {
     });
 
     test('blank line *before* CLOCK but after TIMESTAMP terminates the search', () => {
-        const lines = ['## TODO Task', '`CREATED: <2025-12-09 Tue>`', '', '`CLOCK: [2025-12-09 Tue 14:30]`'];
+        const lines = ['## TODO Task', '`CREATED: [2025-12-09 Tue]`', '', '`CLOCK: [2025-12-09 Tue 14:30]`'];
         assert.deepStrictEqual(findClockLinesInLines(lines, 0), []);
     });
 

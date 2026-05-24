@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import { TIMESTAMP_LINE_REGEX } from '../../orgPatterns';
+import { matchTimestampLine } from '../../orgPatterns';
 
 suite('Timestamp Tests', () => {
     // Local copy: this is the cursor-aware variant from timestampEdit.ts,
@@ -69,47 +69,53 @@ suite('Timestamp Tests', () => {
         assert.strictEqual(match.groups?.weekday, 'Пятница');
     });
 
-    test('Parse SCHEDULED timestamp line', () => {
-        const line = '`SCHEDULED: <2025-12-06 Fri 10:00>`';
-        const match = line.match(TIMESTAMP_LINE_REGEX);
-
-        assert.ok(match);
-        assert.strictEqual(match.groups?.indent, '');
-        assert.strictEqual(match.groups?.type, 'SCHEDULED');
-        assert.strictEqual(match.groups?.timestamp, '<2025-12-06 Fri 10:00>');
+    test('Parse SCHEDULED timestamp line (active)', () => {
+        const hit = matchTimestampLine('`SCHEDULED: <2025-12-06 Fri 10:00>`');
+        assert.ok(hit);
+        assert.strictEqual(hit!.indent, '');
+        assert.strictEqual(hit!.type, 'SCHEDULED');
+        assert.strictEqual(hit!.timestamp, '<2025-12-06 Fri 10:00>');
+        assert.strictEqual(hit!.active, true);
     });
 
-    test('Parse DEADLINE timestamp line', () => {
-        const line = '`DEADLINE: <2025-12-06 Fri>`';
-        const match = line.match(TIMESTAMP_LINE_REGEX);
-
-        assert.ok(match);
-        assert.strictEqual(match.groups?.type, 'DEADLINE');
+    test('Parse DEADLINE timestamp line (active)', () => {
+        const hit = matchTimestampLine('`DEADLINE: <2025-12-06 Fri>`');
+        assert.ok(hit);
+        assert.strictEqual(hit!.type, 'DEADLINE');
+        assert.strictEqual(hit!.active, true);
     });
 
-    test('Parse CREATED timestamp line', () => {
-        const line = '`CREATED: <2025-12-01 Sun 09:15>`';
-        const match = line.match(TIMESTAMP_LINE_REGEX);
-
-        assert.ok(match);
-        assert.strictEqual(match.groups?.type, 'CREATED');
+    test('Parse CREATED timestamp line (inactive per ADR-0014)', () => {
+        const hit = matchTimestampLine('`CREATED: [2025-12-01 Sun 09:15]`');
+        assert.ok(hit);
+        assert.strictEqual(hit!.type, 'CREATED');
+        assert.strictEqual(hit!.active, false);
     });
 
-    test('Parse CLOSED timestamp line', () => {
-        const line = '`CLOSED: <2025-12-03 Tue 14:30>`';
-        const match = line.match(TIMESTAMP_LINE_REGEX);
+    test('Parse CLOSED timestamp line (inactive per ADR-0014)', () => {
+        const hit = matchTimestampLine('`CLOSED: [2025-12-03 Tue 14:30]`');
+        assert.ok(hit);
+        assert.strictEqual(hit!.type, 'CLOSED');
+        assert.strictEqual(hit!.active, false);
+    });
 
-        assert.ok(match);
-        assert.strictEqual(match.groups?.type, 'CLOSED');
+    test('Reject SCHEDULED with inactive bracket (ADR-0014 violation)', () => {
+        assert.strictEqual(matchTimestampLine('`SCHEDULED: [2025-12-06 Fri]`'), null);
+    });
+
+    test('Reject CLOSED with active bracket (legacy form)', () => {
+        assert.strictEqual(matchTimestampLine('`CLOSED: <2025-12-03 Tue>`'), null);
+    });
+
+    test('Reject CREATED with active bracket (legacy form)', () => {
+        assert.strictEqual(matchTimestampLine('`CREATED: <2025-12-01 Sun>`'), null);
     });
 
     test('Parse timestamp line with indent', () => {
-        const line = '  `SCHEDULED: <2025-12-06 Fri>`';
-        const match = line.match(TIMESTAMP_LINE_REGEX);
-
-        assert.ok(match);
-        assert.strictEqual(match.groups?.indent, '  ');
-        assert.strictEqual(match.groups?.type, 'SCHEDULED');
+        const hit = matchTimestampLine('  `SCHEDULED: <2025-12-06 Fri>`');
+        assert.ok(hit);
+        assert.strictEqual(hit!.indent, '  ');
+        assert.strictEqual(hit!.type, 'SCHEDULED');
     });
 
     test('Toggle timestamp type SCHEDULED to DEADLINE', () => {

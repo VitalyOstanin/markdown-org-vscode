@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { findNearestHeading, formatOrgTimestamp, getTimestampIndent, requireActiveEditor } from '../utils';
-import { HEADING_REGEX, TIMESTAMP_LINE_REGEX } from '../orgPatterns';
+import { HEADING_REGEX, matchTimestampLine } from '../orgPatterns';
 
 function formatTimestamp(date: Date): string {
     return formatOrgTimestamp(date, 'angle');
@@ -91,12 +91,11 @@ export async function insertCreatedTimestamp() {
     }
 
     for (let i = headingLine + 1; i < editor.document.lineCount; i++) {
-        const lineText = editor.document.lineAt(i).text;
-        const tsMatch = lineText.match(TIMESTAMP_LINE_REGEX);
-        if (!tsMatch?.groups) {
+        const hit = matchTimestampLine(editor.document.lineAt(i).text);
+        if (!hit) {
             break;
         }
-        if (tsMatch.groups.type === 'CREATED') {
+        if (hit.type === 'CREATED') {
             return;
         }
     }
@@ -138,12 +137,11 @@ async function insertOrReplaceTimestamp(type: 'SCHEDULED' | 'DEADLINE') {
     let blockEnd = headingLine + 1;
 
     for (let i = headingLine + 1; i < editor.document.lineCount; i++) {
-        const line = editor.document.lineAt(i);
-        const match = line.text.match(TIMESTAMP_LINE_REGEX);
-        if (!match?.groups) {
+        const hit = matchTimestampLine(editor.document.lineAt(i).text);
+        if (!hit) {
             break;
         }
-        if (match.groups.type === type) {
+        if (hit.type === type) {
             existingLines.push(i);
         }
         blockEnd = i + 1;

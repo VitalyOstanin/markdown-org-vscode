@@ -90,7 +90,7 @@ suite('parseClockEntries', () => {
     test('TIMESTAMP lines between heading and CLOCK do not break the block scan', () => {
         const text =
             '## TODO With metadata\n' +
-            '`CREATED: <2025-12-09 Tue 09:00>`\n' +
+            '`CREATED: [2025-12-09 Tue 09:00]`\n' +
             '`SCHEDULED: <2025-12-10 Wed>`\n' +
             '`CLOCK: [2025-12-09 Tue 10:00]--[2025-12-09 Tue 11:00] => 1:00`\n';
         const rows = parseClockEntries(text);

@@ -75,22 +75,46 @@ suite('orgPatterns named groups', () => {
         });
     });
 
-    suite('TIMESTAMP_LINE_REGEX', () => {
-        test('exposes indent, type, timestamp via named groups', () => {
+    suite('TIMESTAMP_LINE_REGEX (ADR-0014 strict bracket policy)', () => {
+        test('SCHEDULED with active bracket matches', () => {
             const match = '  `SCHEDULED: <2025-12-06 Fri 10:00>`'.match(TIMESTAMP_LINE_REGEX);
             assert.ok(match);
-            assert.ok(match.groups, 'TIMESTAMP_LINE_REGEX must expose match.groups');
-            assert.strictEqual(match.groups.indent, '  ');
-            assert.strictEqual(match.groups.type, 'SCHEDULED');
-            assert.strictEqual(match.groups.timestamp, '<2025-12-06 Fri 10:00>');
+            assert.strictEqual(match.groups?.indent, '  ');
+            assert.strictEqual(match.groups?.schedTs, '<2025-12-06 Fri 10:00>');
         });
 
-        test('all four timestamp types are captured', () => {
-            for (const type of ['CREATED', 'SCHEDULED', 'DEADLINE', 'CLOSED']) {
-                const match = `\`${type}: <2025-12-06 Fri>\``.match(TIMESTAMP_LINE_REGEX);
-                assert.ok(match, `expected to match ${type} line`);
-                assert.strictEqual(match.groups?.type, type);
-            }
+        test('DEADLINE with active bracket matches', () => {
+            const match = '`DEADLINE: <2025-12-06 Fri>`'.match(TIMESTAMP_LINE_REGEX);
+            assert.ok(match);
+            assert.strictEqual(match.groups?.deadTs, '<2025-12-06 Fri>');
+        });
+
+        test('CLOSED with inactive bracket matches', () => {
+            const match = '`CLOSED: [2025-12-06 Fri]`'.match(TIMESTAMP_LINE_REGEX);
+            assert.ok(match);
+            assert.strictEqual(match.groups?.closedTs, '[2025-12-06 Fri]');
+        });
+
+        test('CREATED with inactive bracket matches', () => {
+            const match = '`CREATED: [2025-12-06 Fri]`'.match(TIMESTAMP_LINE_REGEX);
+            assert.ok(match);
+            assert.strictEqual(match.groups?.createdTs, '[2025-12-06 Fri]');
+        });
+
+        test('SCHEDULED with inactive bracket is rejected', () => {
+            assert.strictEqual('`SCHEDULED: [2025-12-06 Fri]`'.match(TIMESTAMP_LINE_REGEX), null);
+        });
+
+        test('DEADLINE with inactive bracket is rejected', () => {
+            assert.strictEqual('`DEADLINE: [2025-12-06 Fri]`'.match(TIMESTAMP_LINE_REGEX), null);
+        });
+
+        test('CLOSED with active bracket (legacy form) is rejected', () => {
+            assert.strictEqual('`CLOSED: <2025-12-06 Fri>`'.match(TIMESTAMP_LINE_REGEX), null);
+        });
+
+        test('CREATED with active bracket (legacy form) is rejected', () => {
+            assert.strictEqual('`CREATED: <2025-12-06 Fri>`'.match(TIMESTAMP_LINE_REGEX), null);
         });
     });
 

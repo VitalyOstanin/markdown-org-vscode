@@ -94,7 +94,7 @@ suite('Timestamp Integration Tests', () => {
         document = await vscode.workspace.openTextDocument({
             content:
                 '## TODO Task title\n' +
-                '`CREATED: <2025-12-01 Mon>`\n' +
+                '`CREATED: [2025-12-01 Mon]`\n' +
                 '`DEADLINE: <2025-12-31 Wed>`\n' +
                 '`SCHEDULED: <2025-12-06 Fri>`\n' +
                 '`SCHEDULED: <2025-12-07 Sat>`\n',
