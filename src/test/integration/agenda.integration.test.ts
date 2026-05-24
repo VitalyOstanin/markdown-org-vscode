@@ -227,7 +227,12 @@ suite('AgendaPanel.openTaskInEditor', () => {
     });
 
     after(() => {
-        fs.rmSync(sandboxDir, { recursive: true, force: true });
+        // Windows: VS Code may still hold a handle to the file that was last
+        // shown in the editor, so rmSync trips on EBUSY. `maxRetries` is the
+        // native node 14.14+ knob for exactly this case -- linear backoff
+        // around the documented set of recoverable errors (EBUSY, EMFILE,
+        // ENFILE, ENOTEMPTY, EPERM).
+        fs.rmSync(sandboxDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
     });
 
     function assertOpened(expectedRealPath: string) {
