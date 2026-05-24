@@ -1,6 +1,7 @@
 import * as assert from 'assert';
 import * as path from 'path';
 import * as fs from 'fs';
+import { setTimeout as sleep } from 'node:timers/promises';
 import * as vscode from 'vscode';
 import * as sinon from 'sinon';
 import type * as cp from 'child_process';
@@ -90,7 +91,7 @@ suite('Agenda webview ServiceWorker-race retry', () => {
         await vscode.commands.executeCommand('markdown-org.showAgendaWeek');
         // Wait noticeably longer than the timeout so a buggy implementation
         // that fails to clear the timer would have retried by now.
-        await new Promise((r) => setTimeout(r, TEST_READY_TIMEOUT_MS * 4));
+        await sleep(TEST_READY_TIMEOUT_MS * 4);
 
         const delta = AgendaPanel.__testGetCreateCount() - before;
         assert.strictEqual(delta, 1, `expected exactly one createWebviewPanel call, got ${delta}`);
@@ -106,7 +107,7 @@ suite('Agenda webview ServiceWorker-race retry', () => {
         await vscode.commands.executeCommand('markdown-org.showAgendaWeek');
         // One timeout window for the suppressed first ready, then enough
         // for the second create's handshake to land.
-        await new Promise((r) => setTimeout(r, TEST_READY_TIMEOUT_MS * 4));
+        await sleep(TEST_READY_TIMEOUT_MS * 4);
 
         const delta = AgendaPanel.__testGetCreateCount() - before;
         assert.strictEqual(delta, 2, `expected one retry (2 creates total), got ${delta}`);
@@ -120,7 +121,7 @@ suite('Agenda webview ServiceWorker-race retry', () => {
         await vscode.commands.executeCommand('markdown-org.showAgendaWeek');
         // Two suppressed handshakes -> two retry windows + slack for the
         // third create's handshake.
-        await new Promise((r) => setTimeout(r, TEST_READY_TIMEOUT_MS * 6));
+        await sleep(TEST_READY_TIMEOUT_MS * 6);
 
         const delta = AgendaPanel.__testGetCreateCount() - before;
         assert.strictEqual(delta, 3, `expected two retries (3 creates total), got ${delta}`);
