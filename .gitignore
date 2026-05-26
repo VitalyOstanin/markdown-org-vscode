@@ -5,8 +5,19 @@ out
 test-workspace/
 test-workspace-demo*/
 docs/reviews/
+docs/superpowers/
 coverage/
 .nyc_output/
 temp/
 bin/
 .claude-dir-settings.yaml
+
+# Secrets -- prevent accidental commits (none are tracked today)
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+id_rsa*

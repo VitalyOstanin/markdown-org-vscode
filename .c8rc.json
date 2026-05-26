@@ -4,9 +4,9 @@
   "exclude": ["out/test/**", "out/**/*.d.ts", "**/*.test.js", "**/*.integration.test.js"],
   "reporter": ["text", "lcov", "html"],
   "reports-dir": "coverage",
-  "lines": 9,
+  "lines": 29,
   "branches": 70,
   "functions": 45,
-  "statements": 9,
+  "statements": 29,
   "check-coverage": true
 }
