@@ -23,3 +23,38 @@ export function buildOrgPropertiesBlock(props: Record<string, string>, indent = 
     });
     return [`${indent}\`\`\`${ORG_PROPERTIES_INFO}`, ...body, `${indent}\`\`\``];
 }
+
+const OPEN_FENCE = /^\s*```org-properties\s*$/;
+const CLOSE_FENCE = /^\s*```\s*$/;
+
+/** Half-open line range `[startLine, endLineExclusive)` of a found block. */
+export interface OrgPropertiesRange {
+    startLine: number;
+    endLineExclusive: number;
+}
+
+/**
+ * Locate an `org-properties` block that belongs to the heading at
+ * `headingLine`: skip the consecutive planning-line run after the heading,
+ * then require an opening `org-properties` fence and find its closing fence.
+ * Returns the half-open line range, or `null` if there is no such block (or
+ * it is unterminated, in which case the caller must not corrupt the file).
+ */
+export function findOrgPropertiesBlock(lines: string[], headingLine: number): OrgPropertiesRange | null {
+    let i = headingLine + 1;
+    while (i < lines.length && matchTimestampLine(lines[i])) {
+        i++;
+    }
+    if (i >= lines.length || !OPEN_FENCE.test(lines[i])) {
+        return null;
+    }
+    const startLine = i;
+    i++;
+    while (i < lines.length && !CLOSE_FENCE.test(lines[i])) {
+        i++;
+    }
+    if (i >= lines.length) {
+        return null; // unterminated: refuse to guess a range
+    }
+    return { startLine, endLineExclusive: i + 1 };
+}
