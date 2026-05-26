@@ -325,10 +325,11 @@
   },
   "overrides": {
     "diff": "^9.0.0",
-    "serialize-javascript": "^7.0.5"
+    "serialize-javascript": "^7.0.5",
+    "qs": "^6.15.2"
   },
   "x-markdown-org": {
-    "extractorVersion": "0.5.0"
+    "extractorVersion": "0.6.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -344,10 +345,10 @@
     "eslint": "^10.4.0",
     "husky": "^9.1.7",
     "jsdom": "^29.1.1",
-    "mocha": "^11.7.5",
+    "mocha": "^11.7.6",
     "prettier": "^3.8.3",
     "sinon": "^22.0.0",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.59.3"
+    "typescript-eslint": "^8.60.0"
   }
 }
