@@ -2,6 +2,22 @@
 
 All notable changes to the "Markdown Org" extension will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- Reads the optional `properties` object emitted per task by
+  markdown-org-extract (parsed from an `org-properties` fenced code
+  block). See ADR-0009.
+
+### Internal
+
+- Pure, vscode-free `src/utils/orgProperties.ts` builds and upserts an
+  `org-properties` block in document text (insert after planning lines, or
+  replace in place; sorted keys; idempotent). The editor binding and a
+  sync trigger that consume it are deferred to the Google Calendar sync
+  change.
+
 ## [0.7.0] - 2026-05-26
 
 ### Changed

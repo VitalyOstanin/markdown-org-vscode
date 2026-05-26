@@ -57,6 +57,7 @@ to Markdown files in VS Code:
 - **Tag filtering** -- Filter agenda by file-name patterns (e.g. `WORK` / `PRIVATE`), toggled from the agenda or by hotkey.
 - **Live updates** -- Agenda refreshes automatically when underlying markdown files change.
 - **Heading management** -- Archive completed tasks to `*.archive.md` or promote them to a maintenance file.
+- **Properties** -- A per-task properties block: a fenced code block with the info string `org-properties` holding `KEY: value` lines, placed under the heading and its planning lines. It round-trips through markdown viewers as a folded block. See [ADR-0009](docs/adr/0009-task-properties-org-properties-block.md).
 
 ## Quick Start
 
