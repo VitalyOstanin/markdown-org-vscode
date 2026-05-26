@@ -1,5 +1,13 @@
 import * as vscode from 'vscode';
 import { validateLines, BracketViolation } from './bracketPolicy';
+import { debounce, DebouncedFunction } from '../utils/debounce';
+
+/**
+ * Debounce window for re-validating a document after an edit. Without it the
+ * whole document is re-scanned synchronously on every keystroke; 300ms
+ * collapses a typing burst into one pass (the agenda debounces similarly).
+ */
+const REFRESH_DEBOUNCE_MS = 300;
 
 /** Source string surfaced on every diagnostic this module produces. */
 export const DIAGNOSTIC_SOURCE = 'markdown-org';
@@ -95,10 +103,28 @@ export function registerBracketDiagnostics(context: vscode.ExtensionContext): vs
         refresh(doc);
     }
 
+    // Edits are debounced per-document so a typing burst triggers one re-scan,
+    // not one per keystroke. Open/close stay immediate (they are not bursty).
+    const debouncedByUri = new Map<string, DebouncedFunction<[vscode.TextDocument]>>();
+    const scheduleRefresh = (doc: vscode.TextDocument) => {
+        const key = doc.uri.toString();
+        let pending = debouncedByUri.get(key);
+        if (!pending) {
+            pending = debounce(refresh, REFRESH_DEBOUNCE_MS);
+            debouncedByUri.set(key, pending);
+        }
+        pending(doc);
+    };
+
     context.subscriptions.push(
         vscode.workspace.onDidOpenTextDocument(refresh),
-        vscode.workspace.onDidChangeTextDocument((e) => refresh(e.document)),
-        vscode.workspace.onDidCloseTextDocument((doc) => collection.delete(doc.uri)),
+        vscode.workspace.onDidChangeTextDocument((e) => scheduleRefresh(e.document)),
+        vscode.workspace.onDidCloseTextDocument((doc) => {
+            const key = doc.uri.toString();
+            debouncedByUri.get(key)?.cancel();
+            debouncedByUri.delete(key);
+            collection.delete(doc.uri);
+        }),
         vscode.languages.registerCodeActionsProvider({ language: 'markdown' }, new BracketPolicyCodeActionProvider(), {
             providedCodeActionKinds: BracketPolicyCodeActionProvider.providedCodeActionKinds
         })
