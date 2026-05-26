@@ -6,7 +6,7 @@ import { exec } from '../utils/exec';
 import { filterTasksByTag } from '../utils/tagFilter';
 import { EXTRACTOR_MAX_BUFFER_BYTES, EXTRACTOR_TIMEOUT_MS, extractor } from '../utils/extractor';
 import { formatError, notifyError, notifyInfo, notifyWarn } from '../utils/notify';
-import { computeNextTag } from '../utils/cycleTag';
+import { buildTagCycle, computeNextTag } from '../utils/cycleTag';
 import { buildExecError } from '../utils/execError';
 import { getCachedHolidays } from '../utils/holidaysCache';
 
@@ -119,10 +119,16 @@ export async function cycleTag(_context: vscode.ExtensionContext) {
         return;
     }
 
-    const nextTag = computeNextTag(
-        currentTag,
-        fileTags.map((t) => t.name)
-    );
+    const tagNames = fileTags.map((t) => t.name);
+
+    // A cycle of just [ALL] means there is nothing to rotate to -- every
+    // configured entry is named "ALL". Warn instead of silently staying on ALL.
+    if (buildTagCycle(tagNames).length <= 1) {
+        notifyWarn('Only "ALL" is configured in markdown-org.fileTags; nothing to cycle to');
+        return;
+    }
+
+    const nextTag = computeNextTag(currentTag, tagNames);
 
     const target =
         (vscode.workspace.workspaceFolders?.length ?? 0) > 0

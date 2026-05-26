@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import { TAG_ALL, computeNextTag } from '../../utils/cycleTag';
+import { TAG_ALL, computeNextTag, buildTagCycle } from '../../utils/cycleTag';
 
 suite('computeNextTag', () => {
     test('ALL advances to the first configured tag', () => {
@@ -42,5 +42,30 @@ suite('computeNextTag', () => {
         assert.strictEqual(computeNextTag(TAG_ALL, [TAG_ALL, 'WORK', 'PERSONAL']), 'WORK');
         assert.strictEqual(computeNextTag('WORK', [TAG_ALL, 'WORK', 'PERSONAL']), 'PERSONAL');
         assert.strictEqual(computeNextTag('PERSONAL', [TAG_ALL, 'WORK', 'PERSONAL']), TAG_ALL);
+    });
+
+    test('when every configured tag is ALL, the rotation degenerates to ALL', () => {
+        // Caller is expected to detect this via buildTagCycle().length <= 1
+        // and warn instead of cycling; the helper itself stays a no-op here.
+        assert.strictEqual(computeNextTag(TAG_ALL, [TAG_ALL, TAG_ALL]), TAG_ALL);
+    });
+});
+
+suite('buildTagCycle', () => {
+    test('prepends the implicit ALL and keeps configured tags in order', () => {
+        assert.deepStrictEqual(buildTagCycle(['work', 'home']), [TAG_ALL, 'work', 'home']);
+    });
+
+    test('empty configuration yields a cycle of just ALL', () => {
+        assert.deepStrictEqual(buildTagCycle([]), [TAG_ALL]);
+    });
+
+    test('an explicit ALL entry is deduplicated', () => {
+        assert.deepStrictEqual(buildTagCycle([TAG_ALL, 'WORK']), [TAG_ALL, 'WORK']);
+    });
+
+    test('all-ALL configuration collapses to a single-element cycle (degenerate)', () => {
+        // length <= 1 is the signal the caller uses to report "nothing to cycle".
+        assert.deepStrictEqual(buildTagCycle([TAG_ALL, TAG_ALL]), [TAG_ALL]);
     });
 });
