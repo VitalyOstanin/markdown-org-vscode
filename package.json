@@ -56,79 +56,98 @@
     "commands": [
       {
         "command": "markdown-org.setTodo",
-        "title": "Markdown Org: Set TODO"
+        "title": "Set TODO",
+        "category": "Markdown Org"
       },
       {
         "command": "markdown-org.setDone",
-        "title": "Markdown Org: Set DONE"
+        "title": "Set DONE",
+        "category": "Markdown Org"
       },
       {
         "command": "markdown-org.togglePriority",
-        "title": "Markdown Org: Toggle Priority"
+        "title": "Toggle Priority",
+        "category": "Markdown Org"
       },
       {
         "command": "markdown-org.insertCreated",
-        "title": "Markdown Org: Insert CREATED Timestamp"
+        "title": "Insert CREATED Timestamp",
+        "category": "Markdown Org"
       },
       {
         "command": "markdown-org.insertScheduled",
-        "title": "Markdown Org: Insert SCHEDULED Timestamp"
+        "title": "Insert SCHEDULED Timestamp",
+        "category": "Markdown Org"
       },
       {
         "command": "markdown-org.insertDeadline",
-        "title": "Markdown Org: Insert DEADLINE Timestamp"
+        "title": "Insert DEADLINE Timestamp",
+        "category": "Markdown Org"
       },
       {
         "command": "markdown-org.insertClockStart",
-        "title": "Markdown Org: Insert CLOCK Start"
+        "title": "Insert CLOCK Start",
+        "category": "Markdown Org"
       },
       {
         "command": "markdown-org.insertClockFinish",
-        "title": "Markdown Org: Insert CLOCK Finish"
+        "title": "Insert CLOCK Finish",
+        "category": "Markdown Org"
       },
       {
         "command": "markdown-org.insertClockTable",
-        "title": "Markdown Org: Insert CLOCK Table"
+        "title": "Insert CLOCK Table",
+        "category": "Markdown Org"
       },
       {
         "command": "markdown-org.showAgendaDay",
-        "title": "Markdown Org: Show Agenda (Day)"
+        "title": "Show Agenda (Day)",
+        "category": "Markdown Org"
       },
       {
         "command": "markdown-org.showAgendaWeek",
-        "title": "Markdown Org: Show Agenda (Week)"
+        "title": "Show Agenda (Week)",
+        "category": "Markdown Org"
       },
       {
         "command": "markdown-org.showAgendaMonth",
-        "title": "Markdown Org: Show Agenda (Month)"
+        "title": "Show Agenda (Month)",
+        "category": "Markdown Org"
       },
       {
         "command": "markdown-org.showTasks",
-        "title": "Markdown Org: Show Tasks"
+        "title": "Show Tasks",
+        "category": "Markdown Org"
       },
       {
         "command": "markdown-org.timestampUp",
-        "title": "Markdown Org: Timestamp Up"
+        "title": "Timestamp Up",
+        "category": "Markdown Org"
       },
       {
         "command": "markdown-org.timestampDown",
-        "title": "Markdown Org: Timestamp Down"
+        "title": "Timestamp Down",
+        "category": "Markdown Org"
       },
       {
         "command": "markdown-org.toggleTimestampActive",
-        "title": "Markdown Org: Toggle Timestamp Active/Inactive"
+        "title": "Toggle Timestamp Active/Inactive",
+        "category": "Markdown Org"
       },
       {
         "command": "markdown-org.moveToArchive",
-        "title": "Markdown Org: Move to Archive"
+        "title": "Move to Archive",
+        "category": "Markdown Org"
       },
       {
         "command": "markdown-org.promoteToMaintain",
-        "title": "Markdown Org: Promote to Maintain"
+        "title": "Promote to Maintain",
+        "category": "Markdown Org"
       },
       {
         "command": "markdown-org.cycleTag",
-        "title": "Markdown Org: Cycle Tag Filter"
+        "title": "Cycle Tag Filter",
+        "category": "Markdown Org"
       }
     ],
     "keybindings": [
