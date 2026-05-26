@@ -1,10 +1,13 @@
 import * as vscode from 'vscode';
 import * as path from 'path';
 import { matchTimestampLine } from './orgPatterns';
+import { buildOrgTimestamp } from './utils/orgTimestamp';
 import { notifyError } from './utils/notify';
 
 export const DAY_NAMES_SHORT_RU = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
 export const DAY_NAMES_SHORT_EN = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+export const DAY_NAMES_FULL_RU = ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'];
+export const DAY_NAMES_FULL_EN = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 /**
  * Legacy export: kept as-is (Russian short names) so any downstream caller
@@ -30,16 +33,8 @@ export function getWeekdayLocale(): WeekdayLocale {
  * fixtures and unit tests do to stay independent of workspace config.
  */
 export function formatOrgTimestamp(date: Date, bracket: 'angle' | 'square', locale?: WeekdayLocale): string {
-    const year = date.getFullYear();
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const day = date.getDate().toString().padStart(2, '0');
-    const hour = date.getHours().toString().padStart(2, '0');
-    const minute = date.getMinutes().toString().padStart(2, '0');
     const days = (locale ?? getWeekdayLocale()) === 'en' ? DAY_NAMES_SHORT_EN : DAY_NAMES_SHORT_RU;
-    const weekday = days[date.getDay()];
-    const open = bracket === 'angle' ? '<' : '[';
-    const close = bracket === 'angle' ? '>' : ']';
-    return `${open}${year}-${month}-${day} ${weekday} ${hour}:${minute}${close}`;
+    return buildOrgTimestamp({ date, bracket, weekday: days[date.getDay()] });
 }
 
 /** Format a duration in ms as `H:MM`; pad hours with leading space for table alignment if requested. */

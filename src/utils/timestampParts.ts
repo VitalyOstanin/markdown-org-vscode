@@ -46,7 +46,10 @@ function isPairedBracket(open: string, close: string): boolean {
     return (open === '<' && close === '>') || (open === '[' && close === ']');
 }
 
-const CLOCK_REGEX =
+// Named CLOCK_PARTS_REGEX (not CLOCK_REGEX) to avoid clashing with the public
+// orgPatterns.CLOCK_REGEX: that one captures the body as a single `startBody`,
+// whereas this cursor-aware variant splits weekday/hour/minute into groups.
+const CLOCK_PARTS_REGEX =
     /^(?<indent>\s*)`CLOCK: (?<startOpenBracket>[[<])(?<startYear>\d{4})-(?<startMonth>\d{2})-(?<startDay>\d{2}) (?<startWeekday>[А-Яа-яA-Za-z]+) (?<startHour>\d{2}):(?<startMinute>\d{2})(?<startCloseBracket>[\]>])(?:--(?<endOpenBracket>[[<])(?<endYear>\d{4})-(?<endMonth>\d{2})-(?<endDay>\d{2}) (?<endWeekday>[А-Яа-яA-Za-z]+) (?<endHour>\d{2}):(?<endMinute>\d{2})(?<endCloseBracket>[\]>]) => +(?<durationHours>-?\d+):(?<durationMinutes>-?\d+))?`$/;
 
 interface Span {
@@ -96,6 +99,9 @@ export function getTimestampPartAt(lineText: string, character: number): Timesta
                 return { match, part: leftLeaning as TimestampPart, start: tsStart, end: tsEnd, active };
             }
         }
+        // The cursor is inside this timestamp (checked above) but on no
+        // shiftable part. Timestamp ranges on a line never overlap, so no
+        // other match can contain it -- stop instead of scanning the rest.
         return null;
     }
     return null;
@@ -143,7 +149,7 @@ function findPart(character: number, spans: Span[]): Span['part'] | null {
  * leak negative offsets into the spans.
  */
 export function getClockTimestampPartAt(lineText: string, character: number): ClockTimestampPartHit | null {
-    const match = lineText.match(CLOCK_REGEX);
+    const match = lineText.match(CLOCK_PARTS_REGEX);
     if (!match || match.index === undefined || !match.groups) return null;
 
     const timestampRegex = /(\d{4})-(\d{2})-(\d{2}) ([А-Яа-яA-Za-z]+) (\d{2}):(\d{2})/g;

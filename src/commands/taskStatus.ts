@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { findNearestHeading, formatOrgTimestamp, getTimestampIndent, requireActiveEditor } from '../utils';
 import { HEADING_REGEX, matchTimestampLine } from '../orgPatterns';
+import { buildHeading } from '../utils/buildHeading';
 
 function formatActiveTimestamp(date: Date): string {
     return formatOrgTimestamp(date, 'angle');
@@ -32,14 +33,13 @@ export async function setTaskStatus(status: 'TODO' | 'DONE') {
 
     const { hashes, status: currentStatus, priority, title } = match.groups;
 
-    let newText = `${hashes} `;
-    if (currentStatus !== status) {
-        newText += `${status} `;
-    }
-    if (priority) {
-        newText += `[#${priority}] `;
-    }
-    newText += title;
+    // Toggle: re-applying the same keyword clears it, anything else sets it.
+    const newText = buildHeading({
+        hashes,
+        status: currentStatus !== status ? status : undefined,
+        priority,
+        title
+    });
 
     return editor.edit((editBuilder) => {
         editBuilder.replace(line.range, newText);
@@ -68,14 +68,13 @@ export async function togglePriority() {
 
     const { hashes, status, priority: currentPriority, title } = match.groups;
 
-    let newText = `${hashes} `;
-    if (status) {
-        newText += `${status} `;
-    }
-    if (!currentPriority) {
-        newText += `[#A] `;
-    }
-    newText += title;
+    // Toggle: clear an existing priority, otherwise default a fresh one to A.
+    const newText = buildHeading({
+        hashes,
+        status,
+        priority: currentPriority ? undefined : 'A',
+        title
+    });
 
     return editor.edit((editBuilder) => {
         editBuilder.replace(line.range, newText);

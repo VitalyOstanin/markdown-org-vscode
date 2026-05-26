@@ -1,6 +1,14 @@
 import * as vscode from 'vscode';
 import { HEADING_REGEX, matchTimestampLine, TimestampLineMatch } from '../orgPatterns';
-import { formatDurationHM } from '../utils';
+import {
+    formatDurationHM,
+    DAY_NAMES_SHORT_RU,
+    DAY_NAMES_SHORT_EN,
+    DAY_NAMES_FULL_RU,
+    DAY_NAMES_FULL_EN
+} from '../utils';
+import { buildOrgTimestamp } from '../utils/orgTimestamp';
+import { buildHeading } from '../utils/buildHeading';
 import {
     getTimestampPartAt,
     getClockTimestampPartAt,
@@ -128,16 +136,7 @@ function adjustHeadingPart(match: RegExpMatchArray, part: HeadingPart, delta: nu
         }
     }
 
-    let result = `${hashes} `;
-    if (newStatus) {
-        result += `${newStatus} `;
-    }
-    if (newPriority) {
-        result += `[#${newPriority}] `;
-    }
-    result += title;
-
-    return result;
+    return buildHeading({ hashes, status: newStatus, priority: newPriority, title });
 }
 
 function getTimestampAtCursor(
@@ -153,9 +152,9 @@ function getTimestampAtCursor(
 
 function incrementTimestamp(match: RegExpMatchArray, part: TimestampPart, delta: number, active: boolean): string {
     const g = match.groups!;
-    let year = parseInt(g.year, 10);
-    let month = parseInt(g.month, 10);
-    let day = parseInt(g.day, 10);
+    const year = parseInt(g.year, 10);
+    const month = parseInt(g.month, 10);
+    const day = parseInt(g.day, 10);
     const weekday = g.weekday || '';
     const hour = g.hour ? parseInt(g.hour, 10) : undefined;
     const minute = g.minute ? parseInt(g.minute, 10) : undefined;
@@ -182,29 +181,15 @@ function incrementTimestamp(match: RegExpMatchArray, part: TimestampPart, delta:
             break;
     }
 
-    year = date.getFullYear();
-    month = date.getMonth() + 1;
-    day = date.getDate();
-
     const newWeekday = weekday ? getWeekdayName(date, weekday) : '';
 
-    const open = active ? '<' : '[';
-    const close = active ? '>' : ']';
-    let result = `${open}${year.toString().padStart(4, '0')}-${month.toString().padStart(2, '0')}-${day.toString().padStart(2, '0')}`;
-    if (newWeekday) {
-        result += ` ${newWeekday}`;
-    }
-    if (hour !== undefined && minute !== undefined) {
-        const newHour = date.getHours();
-        const newMinute = date.getMinutes();
-        result += ` ${newHour.toString().padStart(2, '0')}:${newMinute.toString().padStart(2, '0')}`;
-    }
-    if (repeater) {
-        result += ` ${repeater}`;
-    }
-    result += close;
-
-    return result;
+    return buildOrgTimestamp({
+        date,
+        bracket: active ? 'angle' : 'square',
+        weekday: newWeekday || undefined,
+        includeTime: hour !== undefined && minute !== undefined,
+        repeater: repeater || undefined
+    });
 }
 
 function getWeekdayName(date: Date, originalFormat: string): string {
@@ -213,14 +198,10 @@ function getWeekdayName(date: Date, originalFormat: string): string {
     const dayIndex = date.getDay();
 
     if (isRussian) {
-        const days = isFull
-            ? ['Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота']
-            : ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
+        const days = isFull ? DAY_NAMES_FULL_RU : DAY_NAMES_SHORT_RU;
         return days[dayIndex];
     } else {
-        const days = isFull
-            ? ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-            : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const days = isFull ? DAY_NAMES_FULL_EN : DAY_NAMES_SHORT_EN;
         return days[dayIndex];
     }
 }
@@ -229,7 +210,6 @@ function adjustClockTimestamp(match: RegExpMatchArray, part: ClockTimestampPart,
     const g = match.groups!;
     const indent = g.indent;
     const startBracket = g.startOpenBracket;
-    const endBracket = g.startCloseBracket;
 
     const startDate = new Date(
         parseInt(g.startYear, 10),
@@ -248,14 +228,20 @@ function adjustClockTimestamp(match: RegExpMatchArray, part: ClockTimestampPart,
     else if (part === 'start-minute') startDate.setMinutes(startDate.getMinutes() + delta);
 
     const newStartWeekday = getWeekdayName(startDate, startWeekday);
-    const startTimestamp = `${startBracket}${startDate.getFullYear()}-${(startDate.getMonth() + 1).toString().padStart(2, '0')}-${startDate.getDate().toString().padStart(2, '0')} ${newStartWeekday} ${startDate.getHours().toString().padStart(2, '0')}:${startDate.getMinutes().toString().padStart(2, '0')}${endBracket}`;
+    // The close bracket is derived from the open one: a well-formed CLOCK is
+    // always `[...]`, and CLOCK_PARTS_REGEX permits (but org never emits) a
+    // mismatched pair like `[...>`, which this normalizes to a matching pair.
+    const startTimestamp = buildOrgTimestamp({
+        date: startDate,
+        bracket: startBracket === '<' ? 'angle' : 'square',
+        weekday: newStartWeekday
+    });
 
     if (!g.endOpenBracket) {
         return `${indent}\`CLOCK: ${startTimestamp}\``;
     }
 
     const endStartBracket = g.endOpenBracket;
-    const endEndBracket = g.endCloseBracket;
 
     const endDate = new Date(
         parseInt(g.endYear, 10),
@@ -274,11 +260,32 @@ function adjustClockTimestamp(match: RegExpMatchArray, part: ClockTimestampPart,
     else if (part === 'end-minute') endDate.setMinutes(endDate.getMinutes() + delta);
 
     const newEndWeekday = getWeekdayName(endDate, endWeekday);
-    const endTimestamp = `${endStartBracket}${endDate.getFullYear()}-${(endDate.getMonth() + 1).toString().padStart(2, '0')}-${endDate.getDate().toString().padStart(2, '0')} ${newEndWeekday} ${endDate.getHours().toString().padStart(2, '0')}:${endDate.getMinutes().toString().padStart(2, '0')}${endEndBracket}`;
+    const endTimestamp = buildOrgTimestamp({
+        date: endDate,
+        bracket: endStartBracket === '<' ? 'angle' : 'square',
+        weekday: newEndWeekday
+    });
 
     const duration = formatDurationHM(endDate.getTime() - startDate.getTime(), { padHoursWithSpace: true });
 
     return `${indent}\`CLOCK: ${startTimestamp}--${endTimestamp} => ${duration}\``;
+}
+
+/**
+ * Replace `range` with `newText`, then collapse the selection to the cursor
+ * caret. Every adjust branch needs the same post-edit cleanup, so it lives
+ * here once instead of being repeated as `.edit(...).then(...)` chains.
+ */
+async function replaceAndCollapseSelection(
+    editor: vscode.TextEditor,
+    range: vscode.Range,
+    newText: string
+): Promise<void> {
+    await editor.edit((editBuilder) => {
+        editBuilder.replace(range, newText);
+    });
+    const position = editor.selection.active;
+    editor.selection = new vscode.Selection(position, position);
 }
 
 /**
@@ -296,29 +303,13 @@ export async function adjustTimestamp(delta: number) {
     if (clockTimestamp) {
         const newLine = adjustClockTimestamp(clockTimestamp.match, clockTimestamp.part, delta);
         const lineRange = editor.document.lineAt(editor.selection.active.line).range;
-
-        return editor
-            .edit((editBuilder) => {
-                editBuilder.replace(lineRange, newLine);
-            })
-            .then(() => {
-                const newPosition = editor.selection.active;
-                editor.selection = new vscode.Selection(newPosition, newPosition);
-            });
+        return replaceAndCollapseSelection(editor, lineRange, newLine);
     }
 
     const timestamp = getTimestampAtCursor(editor);
     if (timestamp) {
         const newTimestamp = incrementTimestamp(timestamp.match, timestamp.part, delta, timestamp.active);
-
-        return editor
-            .edit((editBuilder) => {
-                editBuilder.replace(timestamp.range, newTimestamp);
-            })
-            .then(() => {
-                const newPosition = editor.selection.active;
-                editor.selection = new vscode.Selection(newPosition, newPosition);
-            });
+        return replaceAndCollapseSelection(editor, timestamp.range, newTimestamp);
     }
 
     const timestampType = getTimestampTypeAtCursor(editor);
@@ -345,29 +336,14 @@ export async function adjustTimestamp(delta: number) {
         }
 
         const lineRange = editor.document.lineAt(cursorLine).range;
-        return editor
-            .edit((editBuilder) => {
-                editBuilder.replace(lineRange, cycle.line);
-            })
-            .then(() => {
-                const newPosition = editor.selection.active;
-                editor.selection = new vscode.Selection(newPosition, newPosition);
-            });
+        return replaceAndCollapseSelection(editor, lineRange, cycle.line);
     }
 
     const headingPart = getHeadingPartAtCursor(editor);
     if (headingPart) {
         const newLine = adjustHeadingPart(headingPart.match, headingPart.part, delta);
         const lineRange = editor.document.lineAt(editor.selection.active.line).range;
-
-        return editor
-            .edit((editBuilder) => {
-                editBuilder.replace(lineRange, newLine);
-            })
-            .then(() => {
-                const newPosition = editor.selection.active;
-                editor.selection = new vscode.Selection(newPosition, newPosition);
-            });
+        return replaceAndCollapseSelection(editor, lineRange, newLine);
     }
 
     return vscode.commands.executeCommand(delta > 0 ? 'cursorUpSelect' : 'cursorDownSelect');
