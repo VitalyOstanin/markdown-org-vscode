@@ -7,6 +7,8 @@ import { resolveHeadingClass } from '../utils/agendaHeadingTint';
 import { buildTimeInfo } from '../utils/agendaTimeInfo';
 import { resolveAgendaWatchBase } from '../utils/agendaWatchPattern';
 import { toIsoDate } from '../utils/isoDate';
+import { formatDayHeaderParts } from '../utils/agendaDayHeader';
+import { AGENDA_STYLES } from './agendaStyles';
 import { formatError, notifyError } from '../utils/notify';
 
 const REFRESH_DEBOUNCE_MS = 500;
@@ -499,179 +501,16 @@ export class AgendaPanel {
         // Local-date formatter shared with host code; unit-tested in
         // isoDate.test.ts.
         const toIsoDateSource = toIsoDate.toString();
+        // Day-header parts (weekday/day/month/year) extracted by token type
+        // via Intl.DateTimeFormat#formatToParts; unit-tested in
+        // agendaDayHeader.test.ts. Replaces positional parsing that swapped
+        // day/month on en-US and dropped the month on ja-JP.
+        const formatDayHeaderPartsSource = formatDayHeaderParts.toString();
         return `<!DOCTYPE html>
 <html>
 <head>
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'nonce-${nonce}'; script-src 'nonce-${nonce}';">
-    <style nonce="${nonce}">
-        body { 
-            font-family: 'Courier New', monospace; 
-            padding: 20px;
-            background: #1e1e1e;
-            color: #e0e0e0;
-            line-height: 1.6;
-        }
-        .nav-bar {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            align-items: center;
-        }
-        .nav-btn {
-            background: #0e639c;
-            color: #fff;
-            border: none;
-            padding: 6px 12px;
-            cursor: pointer;
-            font-family: inherit;
-            font-size: 14px;
-        }
-        .nav-btn:hover {
-            background: #1177bb;
-        }
-        .mode-switch {
-            display: inline-flex;
-            margin-right: 8px;
-        }
-        .mode-btn {
-            background: #2d2d30;
-            color: #d4d4d4;
-            border: 1px solid #3e3e42;
-            padding: 5px 10px;
-            cursor: pointer;
-            font-family: inherit;
-            font-size: 13px;
-        }
-        .mode-btn + .mode-btn {
-            border-left: none;
-        }
-        .mode-btn:hover {
-            background: #3e3e42;
-        }
-        .mode-btn.active {
-            background: #0e639c;
-            color: #fff;
-            border-color: #0e639c;
-            font-weight: bold;
-        }
-        .current-date {
-            color: #4fc1ff;
-            font-weight: bold;
-            font-size: 1.05em;
-            margin: 4px 0 16px 0;
-        }
-        .tag-indicator {
-            color: #dcdcaa;
-            font-weight: bold;
-            margin-left: auto;
-            cursor: pointer;
-        }
-        .tag-indicator:hover {
-            color: #4fc1ff;
-        }
-        .day-header {
-            color: #4fc1ff;
-            font-weight: bold;
-            margin: 20px 0 5px 0;
-            display: grid;
-            /* 3-column day header (see formatDayHeader): weekday | day | month+year. */
-            grid-template-columns: 120px 30px 1fr;
-            column-gap: 1ch;
-        }
-        .task-line {
-            display: grid;
-            /* 6-column task line (see renderTask): todo: | time | status | priority | heading | date.
-               When adding/removing a column, update renderTask in lockstep — the grid does not
-               span-collapse, so a missing span shifts every column right of it. */
-            grid-template-columns: auto 140px 60px 60px 1fr 90px;
-            gap: 8px;
-            margin: 2px 0;
-            cursor: pointer;
-            font-size: 1.1em;
-        }
-        .task-line:hover {
-            background: #2d2d30;
-        }
-        /* timeInfo cell -- forced vertical stack so a SCHEDULED time and
-           a DEADLINE marker always render as two stacked lines, regardless
-           of font width. This replaced an older "DEADLINE ⌃" caret that
-           relied on CSS wrap inside a fixed-width cell and broke on narrow
-           monospace fonts (caret pointed at unrelated content above). */
-        .time-info-cell {
-            display: flex;
-            flex-direction: column;
-            line-height: 1.2;
-        }
-        .todo-label { color: #f48771; }
-        .todo-keyword { color: #f48771; font-weight: bold; }
-        .done-keyword { color: #73c991; font-weight: bold; }
-        .priority-a { color: #f48771; font-weight: bold; }
-        .priority-b { color: #dcdcaa; font-weight: bold; }
-        .priority-c { color: #4ec9b0; font-weight: bold; }
-        /* Heading tint by priority -- same hue AND weight as the marker
-           (full font match). Loses to .deadline-heading (DEADLINE wins
-           by design -- it's the louder signal). */
-        .heading-priority-a { color: #f48771; font-weight: bold; }
-        .heading-priority-b { color: #dcdcaa; font-weight: bold; }
-        .heading-priority-c { color: #4ec9b0; font-weight: bold; }
-        .time-display { color: #4fc1ff; font-weight: bold; }
-        .timestamp-type { font-weight: bold; }
-        .timestamp-deadline { color: #f48771; font-weight: bold; }
-        .date-overdue { color: #808080; text-align: right; }
-        .date-upcoming { color: #4fc1ff; text-align: right; font-weight: bold; }
-        .deadline-heading { color: #f48771; font-weight: bold; }
-        .calendar {
-            display: grid;
-            grid-template-columns: repeat(7, 1fr);
-            gap: 2px;
-            margin: 20px 0;
-            max-width: 800px;
-        }
-        .calendar-header {
-            text-align: center;
-            font-weight: bold;
-            color: #4fc1ff;
-            padding: 8px;
-            background: #2d2d30;
-        }
-        .calendar-day {
-            aspect-ratio: 1;
-            border: 1px solid #3e3e42;
-            padding: 8px;
-            cursor: pointer;
-            background: #252526;
-            position: relative;
-        }
-        .calendar-day.weekend {
-            background: #2a2a2d;
-        }
-        .calendar-day.holiday {
-            background: #3a2a2d;
-        }
-        .calendar-day.has-tasks {
-            border-color: #4fc1ff;
-            font-weight: bold;
-        }
-        .calendar-day.today {
-            border: 2px solid #4fc1ff;
-            background: #1e3a4f;
-        }
-        .calendar-day.other-month {
-            opacity: 0.3;
-        }
-        .day-number {
-            font-size: 14px;
-        }
-        .task-indicator {
-            position: absolute;
-            bottom: 4px;
-            right: 4px;
-            width: 6px;
-            height: 6px;
-            background: #4fc1ff;
-            border-radius: 50%;
-        }
-    </style>
+    <style nonce="${nonce}">${AGENDA_STYLES}</style>
 </head>
 <body>
     <div class="nav-bar" id="nav-bar"></div>
@@ -686,6 +525,7 @@ export class AgendaPanel {
         ${resolveHeadingClassSource}
         ${buildTimeInfoSource}
         ${toIsoDateSource}
+        ${formatDayHeaderPartsSource}
         const vscode = acquireVsCodeApi();
         // Handshake for the ServiceWorker-race retry path on the extension
         // side: tells AgendaPanel.armReadyTimeout the webview script is alive
@@ -883,13 +723,7 @@ export class AgendaPanel {
         }
         
         function formatDayHeader(date, isToday) {
-            const d = parseLocalDate(date);
-            const weekday = d.toLocaleDateString(locale, { weekday: 'long' });
-            const dayMonth = d.toLocaleDateString(locale, { day: 'numeric', month: 'long' });
-            const year = d.toLocaleDateString(locale, { year: 'numeric' });
-            const parts = dayMonth.split(' ');
-            const day = parts[0];
-            const month = parts.slice(1).join(' ');
+            const { weekday, day, month, year } = formatDayHeaderParts(date, locale);
             const arrowL = isToday ? '❯ ' : '';
             const arrowR = isToday ? ' ❮' : '';
             return '<span>' + arrowL + weekday + '</span><span style="text-align: right">' + day + '</span><span>' + month + ' ' + year + arrowR + '</span>';
@@ -1042,7 +876,7 @@ export class AgendaPanel {
             rememberScroll(scrollHistory, shiftedToday, window.scrollY);
             const d = parseLocalDate(shiftedToday);
             if (offset === 0) {
-                d.setTime(new Date().getTime());
+                d.setTime(Date.now());
             } else if (initialMode === 'day') {
                 d.setDate(d.getDate() + offset);
             } else if (initialMode === 'week') {
