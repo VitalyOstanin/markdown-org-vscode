@@ -279,17 +279,17 @@ Markdown editor has focus.
 | `Markdown Org: Insert CREATED Timestamp`         | `Ctrl+K Ctrl+K Ctrl+C` | Insert CREATED timestamp under the heading (inactive `[...]` form)                                                                                     |
 | `Markdown Org: Insert SCHEDULED Timestamp`       | `Ctrl+K Ctrl+K Ctrl+S` | Insert SCHEDULED timestamp; repeating the command removes it (toggle off)                                                                              |
 | `Markdown Org: Insert DEADLINE Timestamp`        | `Ctrl+K Ctrl+K Ctrl+D` | Insert DEADLINE timestamp; repeating the command removes it (toggle off)                                                                               |
-| `Markdown Org: Timestamp Up`                     | `Shift+Up`             | Increment date / time / task status / timestamp type under cursor                                                                                      |
-| `Markdown Org: Timestamp Down`                   | `Shift+Down`           | Decrement date / time / task status / timestamp type under cursor                                                                                      |
+| `Markdown Org: Timestamp Up`                     | `Shift+Up`             | Increment date / time / task status / timestamp type under cursor; with a non-adjustable caret or an active selection, extends the selection as usual  |
+| `Markdown Org: Timestamp Down`                   | `Shift+Down`           | Decrement date / time / task status / timestamp type under cursor; with a non-adjustable caret or an active selection, extends the selection as usual  |
 | `Markdown Org: Toggle Timestamp Active/Inactive` | -                      | Flip `<...>` ↔ `[...]` on a bare inline timestamp under the cursor (Command Palette only; see [ADR-0006](docs/adr/0006-bracket-toggle-keybindings.md)) |
 
 ### CLOCK Commands
 
-| Command                             | Hotkey                        | Description                                           |
-| ----------------------------------- | ----------------------------- | ----------------------------------------------------- |
-| `Markdown Org: Insert CLOCK Start`  | `Ctrl+K Ctrl+K Ctrl+C Ctrl+S` | Start a new CLOCK entry (opens timer)                 |
-| `Markdown Org: Insert CLOCK Finish` | `Ctrl+K Ctrl+K Ctrl+C Ctrl+F` | Close the open CLOCK entry and calculate its duration |
-| `Markdown Org: Insert CLOCK Table`  | `Ctrl+K Ctrl+K Ctrl+C Ctrl+V` | Insert an aggregated CLOCK table for the current file |
+| Command                             | Hotkey                 | Description                                           |
+| ----------------------------------- | ---------------------- | ----------------------------------------------------- |
+| `Markdown Org: Insert CLOCK Start`  | `Ctrl+K Ctrl+C Ctrl+S` | Start a new CLOCK entry (opens timer)                 |
+| `Markdown Org: Insert CLOCK Finish` | `Ctrl+K Ctrl+C Ctrl+F` | Close the open CLOCK entry and calculate its duration |
+| `Markdown Org: Insert CLOCK Table`  | `Ctrl+K Ctrl+C Ctrl+V` | Insert an aggregated CLOCK table for the current file |
 
 ### Agenda Commands
 

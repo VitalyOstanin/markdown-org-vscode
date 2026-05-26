@@ -27,7 +27,7 @@
     ## TODO Test task
     ```
 3. Place cursor on the heading
-4. Press `Ctrl+K Ctrl+K Ctrl+C Ctrl+S` to start CLOCK
+4. Press `Ctrl+K Ctrl+C Ctrl+S` to start CLOCK
 5. Verify open CLOCK entry appears:
 
     ```markdown
@@ -37,7 +37,7 @@
     ```
 
 6. Wait a few seconds
-7. Press `Ctrl+K Ctrl+K Ctrl+C Ctrl+F` to finish CLOCK
+7. Press `Ctrl+K Ctrl+C Ctrl+F` to finish CLOCK
 8. Verify closed CLOCK with duration:
 
     ```markdown

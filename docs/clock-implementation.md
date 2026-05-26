@@ -27,14 +27,14 @@ Implemented CLOCK time tracking functionality for the Markdown Org VS Code exten
 
 ### 1. CLOCK Commands
 
-**Insert CLOCK Start** (`Ctrl+K Ctrl+K Ctrl+C Ctrl+S`)
+**Insert CLOCK Start** (`Ctrl+K Ctrl+C Ctrl+S`)
 
 - Creates open CLOCK entry with current timestamp
 - Prevents multiple open CLOCKs per task
 - Places entry after timestamp lines
 - Supports optional time rounding
 
-**Insert CLOCK Finish** (`Ctrl+K Ctrl+K Ctrl+C Ctrl+F`)
+**Insert CLOCK Finish** (`Ctrl+K Ctrl+C Ctrl+F`)
 
 - Closes open CLOCK entry
 - Calculates and formats duration

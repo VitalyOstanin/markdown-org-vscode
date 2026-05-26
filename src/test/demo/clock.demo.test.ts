@@ -113,8 +113,8 @@ suite('Demo: CLOCK', () => {
         await moveCursorTo(editor, wireUpLine);
         await sleep(900);
 
-        // insertClockStart is a 4-step chord: ctrl+k ctrl+k ctrl+c ctrl+s
-        await pressKey('ctrl+k ctrl+k ctrl+c ctrl+s');
+        // insertClockStart is a 3-step chord: ctrl+k ctrl+c ctrl+s
+        await pressKey('ctrl+k ctrl+c ctrl+s');
         await sleep(1400);
 
         // Close the just-opened CLOCK: cursor must be on the CLOCK line
@@ -125,8 +125,8 @@ suite('Demo: CLOCK', () => {
         await moveCursorTo(editor, openClockLine);
         await sleep(700);
 
-        // insertClockFinish: ctrl+k ctrl+k ctrl+c ctrl+f
-        await pressKey('ctrl+k ctrl+k ctrl+c ctrl+f');
+        // insertClockFinish: ctrl+k ctrl+c ctrl+f
+        await pressKey('ctrl+k ctrl+c ctrl+f');
         await sleep(1500);
 
         // Jump to the bottom of the document and insert the clock table
@@ -137,8 +137,8 @@ suite('Demo: CLOCK', () => {
         await moveCursorTo(editor, editor.document.lineCount - 1);
         await sleep(800);
 
-        // insertClockTable: ctrl+k ctrl+k ctrl+c ctrl+v
-        await pressKey('ctrl+k ctrl+k ctrl+c ctrl+v');
+        // insertClockTable: ctrl+k ctrl+c ctrl+v
+        await pressKey('ctrl+k ctrl+c ctrl+v');
         await sleep(3000);
     });
 });

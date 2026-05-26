@@ -183,17 +183,17 @@
       },
       {
         "command": "markdown-org.insertClockStart",
-        "key": "ctrl+k ctrl+k ctrl+c ctrl+s",
+        "key": "ctrl+k ctrl+c ctrl+s",
         "when": "editorTextFocus && editorLangId == markdown"
       },
       {
         "command": "markdown-org.insertClockFinish",
-        "key": "ctrl+k ctrl+k ctrl+c ctrl+f",
+        "key": "ctrl+k ctrl+c ctrl+f",
         "when": "editorTextFocus && editorLangId == markdown"
       },
       {
         "command": "markdown-org.insertClockTable",
-        "key": "ctrl+k ctrl+k ctrl+c ctrl+v",
+        "key": "ctrl+k ctrl+c ctrl+v",
         "when": "editorTextFocus && editorLangId == markdown"
       },
       {
@@ -209,12 +209,12 @@
       {
         "command": "markdown-org.timestampUp",
         "key": "shift+up",
-        "when": "editorTextFocus && editorLangId == markdown"
+        "when": "editorTextFocus && editorLangId == markdown && markdown-org.timestampAdjustable"
       },
       {
         "command": "markdown-org.timestampDown",
         "key": "shift+down",
-        "when": "editorTextFocus && editorLangId == markdown"
+        "when": "editorTextFocus && editorLangId == markdown && markdown-org.timestampAdjustable"
       },
       {
         "command": "markdown-org.moveToArchive",

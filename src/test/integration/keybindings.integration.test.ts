@@ -93,4 +93,72 @@ suite('Keybindings: package.json contract', () => {
             await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
         }
     });
+
+    test('CLOCK commands use the 3-chord Ctrl+K Ctrl+C Ctrl+<letter> scheme (#9)', () => {
+        const start = findKeybinding(pkg, 'markdown-org.insertClockStart');
+        const finish = findKeybinding(pkg, 'markdown-org.insertClockFinish');
+        const table = findKeybinding(pkg, 'markdown-org.insertClockTable');
+
+        assert.ok(start && finish && table, 'all three CLOCK keybindings must exist');
+        assert.strictEqual(start!.key, 'ctrl+k ctrl+c ctrl+s');
+        assert.strictEqual(finish!.key, 'ctrl+k ctrl+c ctrl+f');
+        assert.strictEqual(table!.key, 'ctrl+k ctrl+c ctrl+v');
+    });
+
+    test('insertCreated stays on Ctrl+K Ctrl+K Ctrl+C (no longer a CLOCK prefix) (#9)', () => {
+        const created = findKeybinding(pkg, 'markdown-org.insertCreated');
+        assert.ok(created);
+        assert.strictEqual(created!.key, 'ctrl+k ctrl+k ctrl+c');
+    });
+
+    test('Shift+Up/Down are gated by the markdown-org.timestampAdjustable context (#10)', () => {
+        const up = findKeybinding(pkg, 'markdown-org.timestampUp');
+        const down = findKeybinding(pkg, 'markdown-org.timestampDown');
+
+        assert.ok(up && down, 'timestampUp/Down keybindings must exist');
+        assert.strictEqual(up!.key, 'shift+up');
+        assert.strictEqual(down!.key, 'shift+down');
+        // Without this gate the bindings shadow cursorUpSelect/cursorDownSelect
+        // in every markdown file and break multi-line selection.
+        assert.ok(
+            up!.when?.includes('markdown-org.timestampAdjustable'),
+            `timestampUp when must require the adjustable context: ${up!.when}`
+        );
+        assert.ok(
+            down!.when?.includes('markdown-org.timestampAdjustable'),
+            `timestampDown when must require the adjustable context: ${down!.when}`
+        );
+    });
+
+    test('no markdown-org keybinding is a strict chord-prefix of another (guards #9 shadowing)', () => {
+        // A complete binding that is also a strict prefix of a longer chord
+        // never fires: VS Code waits for the continuation instead of running
+        // the shorter command. This was the #9 bug -- insertCreated on
+        // `ctrl+k ctrl+k ctrl+c` was shadowed by the CLOCK 4-chords that
+        // extended it. The extension's bindings all share the markdown
+        // when-clause (or have none), so any prefix pair here is a real
+        // in-context collision, not a theoretical one.
+        const bindings = (pkg.contributes?.keybindings ?? []).filter((kb) => kb.command.startsWith('markdown-org.'));
+        const tokens = (key: string): string[] => key.trim().split(/\s+/);
+        const isStrictPrefix = (a: string[], b: string[]): boolean =>
+            a.length < b.length && a.every((token, i) => token === b[i]);
+
+        const offenders: string[] = [];
+        for (const shorter of bindings) {
+            for (const longer of bindings) {
+                if (shorter === longer) continue;
+                if (isStrictPrefix(tokens(shorter.key), tokens(longer.key))) {
+                    offenders.push(
+                        `${shorter.command} (${shorter.key}) is shadowed by ${longer.command} (${longer.key})`
+                    );
+                }
+            }
+        }
+
+        assert.strictEqual(
+            offenders.length,
+            0,
+            `keybindings that never fire because a longer chord extends them:\n${offenders.join('\n')}`
+        );
+    });
 });

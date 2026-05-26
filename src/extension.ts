@@ -14,6 +14,7 @@ import { insertClockTable } from './commands/clocktable';
 import { notifyError } from './utils/notify';
 import { withErrorReporting } from './utils/orgCommandWrap';
 import { registerBracketDiagnostics } from './diagnostics/timestampBrackets';
+import { registerTimestampAdjustableContext } from './commands/timestampAdjustableContext';
 
 function registerOrgCommand<A extends unknown[]>(
     context: vscode.ExtensionContext,
@@ -46,6 +47,7 @@ export function activate(context: vscode.ExtensionContext) {
     registerOrgCommand(context, 'markdown-org.cycleTag', () => cycleTag(context));
 
     registerBracketDiagnostics(context);
+    registerTimestampAdjustableContext(context);
 }
 
 export function deactivate() {}

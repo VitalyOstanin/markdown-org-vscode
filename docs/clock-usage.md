@@ -22,7 +22,7 @@
 ### Starting a CLOCK Entry
 
 1. Place cursor on or under a heading
-2. Press `Ctrl+K Ctrl+K Ctrl+C Ctrl+S`
+2. Press `Ctrl+K Ctrl+C Ctrl+S`
 3. An open CLOCK entry is created:
 
 ```markdown
@@ -35,7 +35,7 @@
 ### Finishing a CLOCK Entry
 
 1. Place cursor on or under the same heading
-2. Press `Ctrl+K Ctrl+K Ctrl+C Ctrl+F`
+2. Press `Ctrl+K Ctrl+C Ctrl+F`
 3. The CLOCK entry is closed with duration:
 
 ```markdown
