@@ -142,40 +142,9 @@ suite('Timestamp Tests', () => {
         assert.strictEqual(types[newIndex], 'SCHEDULED');
     });
 
-    test('Increment day', () => {
-        const date = new Date('2025-12-06');
-        date.setDate(date.getDate() + 1);
-
-        assert.strictEqual(date.getDate(), 7);
-        assert.strictEqual(date.getMonth(), 11); // December
-    });
-
-    test('Decrement day', () => {
-        const date = new Date('2025-12-06');
-        date.setDate(date.getDate() - 1);
-
-        assert.strictEqual(date.getDate(), 5);
-    });
-
-    test('Increment month', () => {
-        const date = new Date('2025-12-06');
-        date.setMonth(date.getMonth() + 1);
-
-        assert.strictEqual(date.getMonth(), 0); // January
-        assert.strictEqual(date.getFullYear(), 2026);
-    });
-
-    test('Increment hour', () => {
-        const date = new Date('2025-12-06T14:30:00');
-        date.setHours(date.getHours() + 1);
-
-        assert.strictEqual(date.getHours(), 15);
-    });
-
-    test('Increment minute', () => {
-        const date = new Date('2025-12-06T14:30:00');
-        date.setMinutes(date.getMinutes() + 1);
-
-        assert.strictEqual(date.getMinutes(), 31);
-    });
+    // Per-part increment/decrement behaviour (month overflow, weekday recompute,
+    // bracket/repeater/time preservation) is covered against the real
+    // `incrementTimestamp` in incrementTimestamp.test.ts. The earlier
+    // `Increment*`/`Decrement*` cases here only re-tested native `Date.setMonth`
+    // on a throwaway Date, so they were dropped as tautological.
 });

@@ -1,13 +1,8 @@
 import * as vscode from 'vscode';
 import { HEADING_REGEX, matchTimestampLine, TimestampLineMatch } from '../orgPatterns';
-import {
-    formatDurationHM,
-    DAY_NAMES_SHORT_RU,
-    DAY_NAMES_SHORT_EN,
-    DAY_NAMES_FULL_RU,
-    DAY_NAMES_FULL_EN
-} from '../utils';
+import { formatDurationHM } from '../utils';
 import { buildOrgTimestamp } from '../utils/orgTimestamp';
+import { incrementTimestamp, getWeekdayName } from '../utils/incrementTimestamp';
 import { buildHeading } from '../utils/buildHeading';
 import {
     getTimestampPartAt,
@@ -148,62 +143,6 @@ function getTimestampAtCursor(
     if (!hit) return null;
     const range = new vscode.Range(position.line, hit.start, position.line, hit.end);
     return { match: hit.match, range, part: hit.part, active: hit.active };
-}
-
-function incrementTimestamp(match: RegExpMatchArray, part: TimestampPart, delta: number, active: boolean): string {
-    const g = match.groups!;
-    const year = parseInt(g.year, 10);
-    const month = parseInt(g.month, 10);
-    const day = parseInt(g.day, 10);
-    const weekday = g.weekday || '';
-    const hour = g.hour ? parseInt(g.hour, 10) : undefined;
-    const minute = g.minute ? parseInt(g.minute, 10) : undefined;
-    const repeater = g.repeater || '';
-
-    const date = new Date(year, month - 1, day, hour ?? 0, minute ?? 0);
-
-    switch (part) {
-        case 'year':
-            date.setFullYear(date.getFullYear() + delta);
-            break;
-        case 'month':
-            date.setMonth(date.getMonth() + delta);
-            break;
-        case 'day':
-        case 'weekday':
-            date.setDate(date.getDate() + delta);
-            break;
-        case 'hour':
-            date.setHours(date.getHours() + delta);
-            break;
-        case 'minute':
-            date.setMinutes(date.getMinutes() + delta);
-            break;
-    }
-
-    const newWeekday = weekday ? getWeekdayName(date, weekday) : '';
-
-    return buildOrgTimestamp({
-        date,
-        bracket: active ? 'angle' : 'square',
-        weekday: newWeekday || undefined,
-        includeTime: hour !== undefined && minute !== undefined,
-        repeater: repeater || undefined
-    });
-}
-
-function getWeekdayName(date: Date, originalFormat: string): string {
-    const isRussian = /[А-Яа-я]/.test(originalFormat);
-    const isFull = originalFormat.length > 3;
-    const dayIndex = date.getDay();
-
-    if (isRussian) {
-        const days = isFull ? DAY_NAMES_FULL_RU : DAY_NAMES_SHORT_RU;
-        return days[dayIndex];
-    } else {
-        const days = isFull ? DAY_NAMES_FULL_EN : DAY_NAMES_SHORT_EN;
-        return days[dayIndex];
-    }
 }
 
 function adjustClockTimestamp(match: RegExpMatchArray, part: ClockTimestampPart, delta: number): string {
