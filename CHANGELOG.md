@@ -2,6 +2,32 @@
 
 All notable changes to the "Markdown Org" extension will be documented in this file.
 
+## [0.7.0] - 2026-05-26
+
+### Changed
+
+- The agenda webview now follows the active VS Code theme (light / dark / high contrast) instead of a hardcoded dark palette, and its padding / margins are unified onto a single 4/8/12/16/20 spacing scale. Day headers render weekday names per the configured `markdown-org.weekdayLocale` rather than a fixed locale.
+- CLOCK keybindings shortened from `Ctrl+K Ctrl+K Ctrl+C Ctrl+{S,F,V}` to `Ctrl+K Ctrl+C Ctrl+{S,F,V}` (Insert CLOCK Start / Finish / Table). This frees the `Ctrl+K Ctrl+K Ctrl+C` chord for `insertCreated`, which the longer CLOCK chords previously shadowed.
+- Timestamp adjustment (`Shift+Up` / `Shift+Down`) is now gated behind a new `markdown-org.timestampAdjustable` when-context, so the keys only rebind on timestamp lines and fall through to the editor's default behaviour elsewhere.
+- Commands are grouped under a `Markdown Org` category in the Command Palette instead of repeating a `Markdown Org:` prefix in every title; the visible palette label is unchanged.
+- Bundled extractor bumped from 0.5.0 to 0.6.0.
+
+### Fixed
+
+- The agenda tag filter (`cycleTag`) no longer loops without advancing when every task carries the same `ALL` tag.
+
+### Performance
+
+- Bracket-policy diagnostics are debounced on rapid document edits, so large files no longer re-validate on every keystroke.
+
+### Internal
+
+- Agenda theme tokens and the spacing scale live in the vscode-free `src/views/agendaStyles.ts`, guarded by unit-tested theming and spacing invariants; the command category contract is unit-tested too.
+- `incrementTimestamp` and the weekday-name tables were moved into the vscode-free `src/utils/incrementTimestamp.ts` / `src/utils/dayNames.ts` and covered by a unit test that pins month-overflow parity with org-mode (`2026-05-31` +1 month produces `2026-07-01`, with no clamp to the last day of the target month, exactly like Emacs `org-timestamp-change`). The old tautological `Increment*`/`Decrement*` cases were dropped.
+- Transitive `qs` pinned to `^6.15.2`; devDependencies bumped (`mocha` 11.7.6, `typescript-eslint` 8.60.0); `codecov-action` bumped with a coverage ratchet and a secret-ignore rule in CI.
+- Timestamp / heading builders unified; `scanSiblingKeywords` shared through a lazy accessor; test files migrated to `node:timers/promises`; the agenda after-hook uses a per-suite `mkdtemp`.
+- Documentation: settings reference, new ADRs, anchor fixes and TOCs; demo GIFs and README screenshots regenerated to reflect the theme/spacing and CLOCK chord changes.
+
 ## [0.6.1] - 2026-05-25
 
 ### Added
