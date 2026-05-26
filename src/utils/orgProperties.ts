@@ -58,3 +58,38 @@ export function findOrgPropertiesBlock(lines: string[], headingLine: number): Or
     }
     return { startLine, endLineExclusive: i + 1 };
 }
+
+/**
+ * Indent to use for the block: taken from the first planning line after the
+ * heading (so the block aligns with SCHEDULED/DEADLINE/...), or '' if there
+ * are no planning lines.
+ */
+function deriveIndent(lines: string[], headingLine: number): string {
+    const next = lines[headingLine + 1];
+    const hit = next ? matchTimestampLine(next) : null;
+    return hit ? hit.indent : '';
+}
+
+/**
+ * Return a new line array with the task's `org-properties` block set to
+ * `props`. If a block already exists (per `findOrgPropertiesBlock`) it is
+ * replaced in place; otherwise a fresh block is inserted right after the
+ * heading's planning-line run. Pure: `lines` is not mutated. Designed to be
+ * adapted to a `WorkspaceEdit` by the calendar-sync consumer.
+ */
+export function upsertOrgProperties(lines: string[], headingLine: number, props: Record<string, string>): string[] {
+    const indent = deriveIndent(lines, headingLine);
+    const block = buildOrgPropertiesBlock(props, indent);
+    const existing = findOrgPropertiesBlock(lines, headingLine);
+    const result = [...lines];
+    if (existing) {
+        result.splice(existing.startLine, existing.endLineExclusive - existing.startLine, ...block);
+        return result;
+    }
+    let insertAt = headingLine + 1;
+    while (insertAt < lines.length && matchTimestampLine(lines[insertAt])) {
+        insertAt++;
+    }
+    result.splice(insertAt, 0, ...block);
+    return result;
+}

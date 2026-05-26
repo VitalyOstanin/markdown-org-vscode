@@ -1,5 +1,5 @@
 import * as assert from 'node:assert/strict';
-import { buildOrgPropertiesBlock, findOrgPropertiesBlock } from '../../utils/orgProperties';
+import { buildOrgPropertiesBlock, findOrgPropertiesBlock, upsertOrgProperties } from '../../utils/orgProperties';
 
 suite('orgProperties.buildOrgPropertiesBlock', () => {
     test('wraps sorted key/value pairs in an org-properties fence', () => {
@@ -37,5 +37,68 @@ suite('orgProperties.findOrgPropertiesBlock', () => {
     test('returns null for an unterminated block (no closing fence)', () => {
         const lines = ['### TODO T', '```org-properties', 'K: v'];
         assert.equal(findOrgPropertiesBlock(lines, 0), null);
+    });
+});
+
+suite('orgProperties.upsertOrgProperties', () => {
+    test('inserts a block after the planning lines when none exists', () => {
+        const lines = ['### TODO T', '`SCHEDULED: <2026-06-01 Mon>`', '', 'Body.'];
+        const result = upsertOrgProperties(lines, 0, { GCAL_EVENT_ID: 'abc/primary' });
+        assert.deepEqual(result, [
+            '### TODO T',
+            '`SCHEDULED: <2026-06-01 Mon>`',
+            '```org-properties',
+            'GCAL_EVENT_ID: abc/primary',
+            '```',
+            '',
+            'Body.'
+        ]);
+    });
+
+    test('inserts directly under the heading when there are no planning lines', () => {
+        const lines = ['### TODO T', 'Body.'];
+        const result = upsertOrgProperties(lines, 0, { K: 'v' });
+        assert.deepEqual(result, ['### TODO T', '```org-properties', 'K: v', '```', 'Body.']);
+    });
+
+    test('replaces an existing block in place', () => {
+        const lines = [
+            '### TODO T',
+            '`SCHEDULED: <2026-06-01 Mon>`',
+            '```org-properties',
+            'GCAL_EVENT_ID: old',
+            '```',
+            'Body.'
+        ];
+        const result = upsertOrgProperties(lines, 0, { GCAL_EVENT_ID: 'new', ID: 'uuid' });
+        assert.deepEqual(result, [
+            '### TODO T',
+            '`SCHEDULED: <2026-06-01 Mon>`',
+            '```org-properties',
+            'GCAL_EVENT_ID: new',
+            'ID: uuid',
+            '```',
+            'Body.'
+        ]);
+    });
+
+    test('is idempotent: applying the same props twice yields the same lines', () => {
+        const lines = ['### TODO T', '`SCHEDULED: <2026-06-01 Mon>`', 'Body.'];
+        const once = upsertOrgProperties(lines, 0, { K: 'v' });
+        const twice = upsertOrgProperties(once, 0, { K: 'v' });
+        assert.deepEqual(twice, once);
+    });
+
+    test('preserves the indent of the planning lines', () => {
+        const lines = ['  ### TODO T', '  `SCHEDULED: <2026-06-01 Mon>`', '  Body.'];
+        const result = upsertOrgProperties(lines, 0, { K: 'v' });
+        assert.deepEqual(result, [
+            '  ### TODO T',
+            '  `SCHEDULED: <2026-06-01 Mon>`',
+            '  ```org-properties',
+            '  K: v',
+            '  ```',
+            '  Body.'
+        ]);
     });
 });
