@@ -11,28 +11,31 @@ const KEYWORD_PREFIX_REGEX = /^\s*`(SCHEDULED|DEADLINE|CLOSED|CREATED):/;
 const ALL_KEYWORDS_COUNT = 4;
 
 /**
- * Pure variant of {@link collectSiblingKeywords} that operates on a
- * plain string array. Kept separate so unit tests can exercise the
- * scan without instantiating a VS Code `TextDocument` mock. Scan
- * semantics match the adapter below.
+ * Shared scan behind both public entry points. Lines are read through the
+ * `getLine` accessor rather than a materialized array, so the TextDocument
+ * adapter stays lazy -- `lineAt` is called only for the lines actually
+ * visited, and the loop still stops at the section boundary. Materializing
+ * the whole document (e.g. `getText().split('\n')`) on every Shift+Up/Down
+ * would defeat that.
  */
-export function collectSiblingKeywordsFromLines(
-    lines: ReadonlyArray<string>,
+function scanSiblingKeywords(
+    getLine: (index: number) => string,
+    lineCount: number,
     cursorLine: number
 ): Set<TimestampLineKeyword> {
     const used = new Set<TimestampLineKeyword>();
 
     let sectionStart = 0;
     for (let i = cursorLine - 1; i >= 0; i--) {
-        if (HEADING_REGEX.test(lines[i])) {
+        if (HEADING_REGEX.test(getLine(i))) {
             sectionStart = i + 1;
             break;
         }
     }
 
-    for (let i = sectionStart; i < lines.length; i++) {
+    for (let i = sectionStart; i < lineCount; i++) {
         if (i === cursorLine) continue;
-        const text = lines[i];
+        const text = getLine(i);
         if (HEADING_REGEX.test(text)) break;
         const m = KEYWORD_PREFIX_REGEX.exec(text);
         if (m) {
@@ -42,6 +45,19 @@ export function collectSiblingKeywordsFromLines(
     }
 
     return used;
+}
+
+/**
+ * Pure variant of {@link collectSiblingKeywords} that operates on a
+ * plain string array. Kept separate so unit tests can exercise the
+ * scan without instantiating a VS Code `TextDocument` mock. Scan
+ * semantics match the adapter below.
+ */
+export function collectSiblingKeywordsFromLines(
+    lines: ReadonlyArray<string>,
+    cursorLine: number
+): Set<TimestampLineKeyword> {
+    return scanSiblingKeywords((i) => lines[i], lines.length, cursorLine);
 }
 
 /**
@@ -60,27 +76,5 @@ export function collectSiblingKeywordsFromLines(
  * preamble), the scan starts at line 0 -- same idea, just no anchor.
  */
 export function collectSiblingKeywords(doc: TextDocument, cursorLine: number): Set<TimestampLineKeyword> {
-    const used = new Set<TimestampLineKeyword>();
-
-    let sectionStart = 0;
-    for (let i = cursorLine - 1; i >= 0; i--) {
-        if (HEADING_REGEX.test(doc.lineAt(i).text)) {
-            sectionStart = i + 1;
-            break;
-        }
-    }
-
-    const lineCount = doc.lineCount;
-    for (let i = sectionStart; i < lineCount; i++) {
-        if (i === cursorLine) continue;
-        const text = doc.lineAt(i).text;
-        if (HEADING_REGEX.test(text)) break;
-        const m = KEYWORD_PREFIX_REGEX.exec(text);
-        if (m) {
-            used.add(m[1] as TimestampLineKeyword);
-            if (used.size === ALL_KEYWORDS_COUNT) break;
-        }
-    }
-
-    return used;
+    return scanSiblingKeywords((i) => doc.lineAt(i).text, doc.lineCount, cursorLine);
 }
