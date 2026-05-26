@@ -34,6 +34,8 @@ was decided, and the trade-offs that came with it.
 | 0004 | [Distribute via Open VSX and GitHub Releases, not Microsoft Marketplace](0004-open-vsx-distribution.md) | Accepted |
 | 0005 | [Active and inactive timestamps (editor side)](0005-active-and-inactive-timestamps.md)                  | Accepted |
 | 0006 | [Bracket-toggle keybindings and scope](0006-bracket-toggle-keybindings.md)                              | Accepted |
+| 0007 | [Local wall-clock dates; timezone awareness lives in the extractor](0007-local-time-and-timezones.md)   | Accepted |
+| 0008 | [No community meta-docs until a community exists](0008-no-community-meta-docs.md)                       | Accepted |
 
 ## Adding a new ADR
 

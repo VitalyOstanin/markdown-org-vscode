@@ -92,8 +92,8 @@ New-Item -ItemType SymbolicLink `
 
 Then reload the VS Code window (`Ctrl+Shift+P` -> `Developer: Reload
 Window`). On Windows, building a VSIX (`npm run package`) and
-installing it via [README > Installation > From
-VSIX](README.md#from-vsix) avoids the symlink requirement entirely.
+installing it via [README > Quick Start](README.md#quick-start) avoids
+the symlink requirement entirely.
 
 ## Project Structure
 

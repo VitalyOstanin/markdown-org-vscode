@@ -1,5 +1,23 @@
 # Month View Tests
 
+## Table of Contents
+
+- [Unit Tests (`monthView.test.ts`)](#unit-tests-monthviewtestts)
+    - [isHoliday](#isholiday)
+    - [Calendar Grid Generation](#calendar-grid-generation)
+    - [Task Indicators](#task-indicators)
+    - [Date Formatting](#date-formatting)
+- [Integration Tests (`monthView.integration.test.ts`)](#integration-tests-monthviewintegrationtestts)
+    - [Rendering](#rendering)
+    - [Task Detection](#task-detection)
+    - [Calendar Logic](#calendar-logic)
+    - [Navigation](#navigation)
+    - [Date Consistency](#date-consistency)
+- [Запуск тестов](#запуск-тестов)
+- [Покрытие](#покрытие)
+- [Тестовые данные](#тестовые-данные)
+- [Источник данных о праздниках](#источник-данных-о-праздниках)
+
 ## Unit Tests (`monthView.test.ts`)
 
 ### isHoliday

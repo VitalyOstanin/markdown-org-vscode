@@ -37,6 +37,7 @@ tasks travel with the repository.
     - [`markdown-org.fileTags`](#markdown-orgfiletags)
     - [`markdown-org.currentTag`](#markdown-orgcurrenttag)
     - [`markdown-org.clockRoundMinutes`](#markdown-orgclockroundminutes)
+    - [`markdown-org.weekdayLocale`](#markdown-orgweekdaylocale)
 - [Workspace Trust](#workspace-trust)
 - [Dependencies](#dependencies)
 - [Development](#development)
@@ -423,9 +424,25 @@ Currently selected tag filter. Usually updated by `Cycle Tag Filter`. Stored at 
 ### `markdown-org.clockRoundMinutes`
 
 **Type:** `number`
-**Default:** `undefined` (no rounding)
+**Default:** `0` (no rounding)
+**Range:** `0`--`60`
 
-Round CLOCK timestamps to the specified number of minutes. Start time rounds down, finish time rounds up to keep duration non-zero.
+Round CLOCK timestamps to the specified number of minutes (e.g. `15`, `30`). Start time rounds down, finish time rounds up to keep duration non-zero.
+
+`0` disables rounding. Negative and out-of-range values are also treated as "no rounding".
+
+### `markdown-org.weekdayLocale`
+
+**Type:** `"ru" | "en"`
+**Default:** `"ru"`
+
+Language for the weekday short name inserted into timestamps (`CREATED`, `SCHEDULED`, `DEADLINE`, `CLOCK`). `"ru"` produces `Пн`/`Вт`/...; `"en"` produces `Mon`/`Tue`/....
+
+```json
+{
+    "markdown-org.weekdayLocale": "en"
+}
+```
 
 ## Workspace Trust
 
