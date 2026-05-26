@@ -103,7 +103,7 @@ jobs:
 
       - name: Upload unit coverage to Codecov
         # codecov/codecov-action pinned to v6.0.0
-        uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2
+        uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354
         with:
           # OIDC removes the need for a long-lived CODECOV_TOKEN secret --
           # the action exchanges a short-lived GitHub-issued JWT for an
@@ -124,7 +124,7 @@ jobs:
         run: npm run test:integration:coverage
 
       - name: Upload integration coverage to Codecov
-        uses: codecov/codecov-action@57e3a136b779b570ffcdbf80b3bdc90e7fab3de2
+        uses: codecov/codecov-action@e79a6962e0d4c0c17b229090214935d2e33f8354
         with:
           use_oidc: true
           files: ./coverage/integration/lcov.info
