@@ -158,6 +158,11 @@
         "command": "markdown-org.gcalSync.disconnect",
         "title": "Disconnect Google Calendar",
         "category": "Markdown Org"
+      },
+      {
+        "command": "markdown-org.gcalSync.selectCalendar",
+        "title": "Select Google Calendar",
+        "category": "Markdown Org"
       }
     ],
     "keybindings": [
@@ -318,6 +323,16 @@
           "default": "",
           "scope": "machine",
           "description": "Google OAuth Desktop client_id for Calendar sync (BYO). The client_secret is entered on connect and stored in the OS keychain, not here."
+        },
+        "markdown-org.gcalSync.calendarName": {
+          "type": "string",
+          "default": "markdown-org",
+          "description": "Name used to find-or-create the sync calendar when no calendarId is pinned."
+        },
+        "markdown-org.gcalSync.calendarId": {
+          "type": "string",
+          "default": "",
+          "description": "Pinned Google calendar id for sync (takes precedence over calendarName). Usually set by the Select Google Calendar command."
         }
       }
     }

@@ -2,6 +2,8 @@ import * as vscode from 'vscode';
 import { TokenStore } from '../utils/gcal/tokenStore';
 import { startLoopbackServer } from '../utils/gcal/loopback';
 import { runConnect, runDisconnect } from '../utils/gcal/connect';
+import { createAccessTokenProvider } from '../utils/gcal/accessToken';
+import { listWritableCalendars, ensureCalendar } from '../utils/gcal/calendarClient';
 import { notifyInfo } from '../utils/notify';
 
 const CONNECT_TIMEOUT_MS = 5 * 60 * 1000;
@@ -84,4 +86,35 @@ export async function connectGcal(context: vscode.ExtensionContext): Promise<voi
 export async function disconnectGcal(context: vscode.ExtensionContext): Promise<void> {
     await runDisconnect({ tokens: new TokenStore(context.secrets) });
     await notifyInfo('Disconnected from Google Calendar.');
+}
+
+/** Pick (or create) the Google Calendar used for sync; writes calendarId. */
+export async function selectCalendar(context: vscode.ExtensionContext): Promise<void> {
+    const cfg = vscode.workspace.getConfiguration('markdown-org');
+    const clientId = clientIdSetting();
+    if (!clientId) {
+        throw new Error('set markdown-org.gcalSync.clientId and run Connect first');
+    }
+    const calendarName = (cfg.get<string>('gcalSync.calendarName') ?? 'markdown-org').trim() || 'markdown-org';
+    const tokens = new TokenStore(context.secrets);
+    const getToken = createAccessTokenProvider({ clientId, tokens, fetchFn: fetch });
+
+    const calendars = await listWritableCalendars(fetch, getToken);
+    const createItem = { label: `$(add) Create new calendar "${calendarName}"`, id: '' as string };
+    const picks = [createItem, ...calendars.map((c) => ({ label: c.summary, description: c.id, id: c.id }))];
+    const chosen = await vscode.window.showQuickPick(picks, {
+        title: 'Select Google Calendar for markdown-org sync',
+        ignoreFocusOut: true
+    });
+    if (!chosen) {
+        return;
+    }
+    const calendarId = chosen.id || (await ensureCalendar(fetch, getToken, { name: calendarName }));
+
+    const target =
+        (vscode.workspace.workspaceFolders?.length ?? 0) > 0
+            ? vscode.ConfigurationTarget.Workspace
+            : vscode.ConfigurationTarget.Global;
+    await cfg.update('gcalSync.calendarId', calendarId, target);
+    await notifyInfo(`Calendar set: ${chosen.id ? chosen.label : calendarName}`);
 }

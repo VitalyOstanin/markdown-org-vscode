@@ -13,6 +13,9 @@ All notable changes to the "Markdown Org" extension will be documented in this f
   disconnect via BYO Desktop OAuth client, loopback + PKCE, refresh token
   stored in the OS keychain (`SecretStorage`). Zero runtime dependencies.
   See ADR-0010.
+- Google Calendar sync: calendar selection (settings `gcalSync.calendarName`
+  / `gcalSync.calendarId` and a "Select Google Calendar" command), REST
+  client, deterministic event id, and task-to-event mapping.
 
 ### Internal
 
