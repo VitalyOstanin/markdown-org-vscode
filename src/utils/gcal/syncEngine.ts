@@ -32,6 +32,19 @@ export interface SyncDeps {
     signal?: RunHandle;
 }
 
+/** Actions worth listing per task. `skipped` is intentionally absent: those
+ *  tasks had nothing to do (no active date, no linked event) and are usually
+ *  many, so they stay a count only -- not a per-item log line. */
+export type SyncAction = 'created' | 'updated' | 'deleted' | 'deferred' | 'failed';
+
+/** One affected task, for the summary toast / details channel. */
+export interface SyncChange {
+    action: SyncAction;
+    /** The task's date (`YYYY-MM-DD`) if it has one, else undefined. */
+    date?: string;
+    heading: string;
+}
+
 export interface SyncSummary {
     created: number;
     updated: number;
@@ -40,6 +53,8 @@ export interface SyncSummary {
     /** Tasks whose property write-back was deferred (file dirty/shifted). */
     deferred: number;
     failed: number;
+    /** Per-task log of everything except `skipped`, in processing order. */
+    changes: SyncChange[];
 }
 
 function linkedEventId(props: Record<string, string>): string | undefined {
@@ -54,7 +69,17 @@ function linkedEventId(props: Record<string, string>): string | undefined {
 }
 
 export async function runSync(deps: SyncDeps): Promise<SyncSummary> {
-    const summary: SyncSummary = { created: 0, updated: 0, deleted: 0, skipped: 0, deferred: 0, failed: 0 };
+    const summary: SyncSummary = {
+        created: 0,
+        updated: 0,
+        deleted: 0,
+        skipped: 0,
+        deferred: 0,
+        failed: 0,
+        changes: []
+    };
+    const note = (action: SyncAction, task: Task) =>
+        summary.changes.push({ action, date: task.timestamp_date, heading: task.heading });
 
     // Within a file, handle tasks bottom-up so writing one task's
     // org-properties block (which grows the file) never shifts the 1-based
@@ -78,6 +103,7 @@ export async function runSync(deps: SyncDeps): Promise<SyncSummary> {
                 if (eid) {
                     await deleteEvent(deps.fetchFn, deps.getToken, deps.calendarId, eid);
                     summary.deleted++;
+                    note('deleted', task);
                 } else {
                     summary.skipped++;
                 }
@@ -95,6 +121,7 @@ export async function runSync(deps: SyncDeps): Promise<SyncSummary> {
                     // insert so we never create an event keyed by an ID we failed
                     // to store; retried on the next sync once the file is clean.
                     summary.deferred++;
+                    note('deferred', task);
                     continue;
                 }
             }
@@ -106,8 +133,10 @@ export async function runSync(deps: SyncDeps): Promise<SyncSummary> {
             if (res.status === 'conflict') {
                 await patchEvent(deps.fetchFn, deps.getToken, deps.calendarId, eventId, event);
                 summary.updated++;
+                note('updated', task);
             } else {
                 summary.created++;
+                note('created', task);
             }
 
             if (props.GCAL_EVENT_ID !== eventId) {
@@ -119,6 +148,7 @@ export async function runSync(deps: SyncDeps): Promise<SyncSummary> {
             }
         } catch {
             summary.failed++;
+            note('failed', task);
         }
     }
 

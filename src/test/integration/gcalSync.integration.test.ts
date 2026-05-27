@@ -241,6 +241,19 @@ suite('Google Calendar sync: DONE -> delete', () => {
             'the sync work itself completed (event deleted) before the toast wait'
         );
     });
+
+    test('summary toast lists the affected event and offers a Show details button', async function () {
+        this.timeout(15000);
+
+        await syncNow(makeContext());
+
+        assert.ok(infoStub.called, 'expected a summary toast');
+        const [message, action] = infoStub.firstCall.args as [string, string];
+        assert.match(message, /1 deleted/, 'toast should include the counts');
+        assert.match(message, /Done task/, 'toast should list the affected event heading');
+        assert.match(message, /2026-05-27/, 'toast should show the event date');
+        assert.strictEqual(action, 'Show details', 'toast should offer a details button');
+    });
 });
 
 // makePropertiesWriter is the editor binding for the sync engine's local

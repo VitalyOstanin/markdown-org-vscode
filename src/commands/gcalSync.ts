@@ -8,7 +8,13 @@ import { createAccessTokenProvider } from '../utils/gcal/accessToken';
 import { listWritableCalendars, ensureCalendar } from '../utils/gcal/calendarClient';
 import { SingleFlight, type ConcurrencyPolicy } from '../utils/gcal/mutex';
 import { acquireLock } from '../utils/gcal/lock';
-import { runSync, type PropertiesWriter, type SyncDeps, type SyncSummary } from '../utils/gcal/syncEngine';
+import {
+    runSync,
+    type PropertiesWriter,
+    type SyncDeps,
+    type SyncSummary,
+    type SyncChange
+} from '../utils/gcal/syncEngine';
 import type { MapOptions } from '../utils/gcal/eventMapping';
 import { computeOrgPropertiesEdit } from '../utils/orgProperties';
 import { HEADING_REGEX } from '../orgPatterns';
@@ -144,6 +150,79 @@ function getSingleFlight(): SingleFlight {
         singleFlight = new SingleFlight(policy);
     }
     return singleFlight;
+}
+
+// How many changed events to list inline in the summary toast; the rest are
+// only in the details channel (a toast with hundreds of lines is unusable).
+const SYNC_TOAST_LIMIT = 5;
+const HEADING_MAX = 40;
+// Compact glyphs for the toast. Only created/updated/deleted are shown there;
+// deferred/failed appear (spelled out) in the details channel.
+const TOAST_SYMBOL: Record<SyncChange['action'], string> = {
+    created: '+',
+    updated: '~',
+    deleted: '-',
+    deferred: '?',
+    failed: '!'
+};
+
+// Lazily-created output channel holding the full per-run event list (history
+// across runs). Opened on demand via the toast's "Show details" button.
+let syncChannel: vscode.OutputChannel | undefined;
+function getSyncChannel(): vscode.OutputChannel {
+    if (!syncChannel) {
+        syncChannel = vscode.window.createOutputChannel('Markdown Org: Calendar Sync');
+    }
+    return syncChannel;
+}
+
+function truncateHeading(heading: string): string {
+    const s = heading.trim();
+    return s.length > HEADING_MAX ? `${s.slice(0, HEADING_MAX - 1)}…` : s;
+}
+
+/** Toast line: glyph + date + truncated heading, e.g. `+ 2026-05-28  Meeting…`. */
+function toastLine(c: SyncChange): string {
+    return `${TOAST_SYMBOL[c.action]} ${c.date ?? '—'}  ${truncateHeading(c.heading)}`;
+}
+
+/** Channel line: spelled-out action + date + full heading. */
+function channelLine(c: SyncChange): string {
+    return `  ${c.action.padEnd(7)} ${c.date ?? '—'}  ${c.heading.trim()}`;
+}
+
+/**
+ * Report a finished sync: append the full per-run list to the details channel,
+ * then show a toast with the counts and up to SYNC_TOAST_LIMIT changed events
+ * (created/updated/deleted). The toast's "Show details" button reveals the
+ * channel. notifyInfo is deliberately not used: this needs an action button.
+ */
+async function reportSyncSummary(summary: SyncSummary): Promise<void> {
+    const counts =
+        `${summary.created} created, ${summary.updated} updated, ${summary.deleted} deleted, ` +
+        `${summary.skipped} skipped, ${summary.deferred} deferred, ${summary.failed} failed`;
+
+    const channel = getSyncChannel();
+    channel.appendLine(`[${new Date().toLocaleTimeString()}] sync: ${counts}`);
+    for (const c of summary.changes) {
+        channel.appendLine(channelLine(c));
+    }
+
+    const changed = summary.changes.filter(
+        (c) => c.action === 'created' || c.action === 'updated' || c.action === 'deleted'
+    );
+    const shown = changed.slice(0, SYNC_TOAST_LIMIT).map(toastLine);
+    const more = changed.length - shown.length;
+    const lines = [`Calendar sync — ${counts}`, ...shown];
+    if (more > 0) {
+        lines.push(`…and ${more} more`);
+    }
+
+    const DETAILS = 'Show details';
+    const pick = await vscode.window.showInformationMessage(`Markdown Org: ${lines.join('\n')}`, DETAILS);
+    if (pick === DETAILS) {
+        channel.show(true);
+    }
 }
 
 /**
@@ -313,10 +392,7 @@ export async function syncNow(context: vscode.ExtensionContext): Promise<void> {
     );
 
     if (summary) {
-        await notifyInfo(
-            `Calendar sync: ${summary.created} created, ${summary.updated} updated, ${summary.deleted} deleted, ` +
-                `${summary.skipped} skipped, ${summary.deferred} deferred, ${summary.failed} failed`
-        );
+        await reportSyncSummary(summary);
     }
 }
 

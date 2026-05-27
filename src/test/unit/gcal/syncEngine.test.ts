@@ -157,6 +157,37 @@ suite('gcal/syncEngine', () => {
         };
     }
 
+    test('records affected tasks (action, date, heading) in changes; skipped is not listed', async () => {
+        const r = recorder((c) =>
+            c.method === 'POST' ? { status: 200, body: { id: 'x' } } : { status: 200, body: {} }
+        );
+        const w = recordingWriter();
+        const created = task({ file: '/w/a.md', line: 1, heading: 'New event', timestamp_date: '2026-06-01' });
+        const deleted = task({
+            file: '/w/a.md',
+            line: 5,
+            task_type: 'DONE',
+            heading: 'Done event',
+            timestamp_date: '2026-06-02',
+            properties: { ID: '11111111-2222-3333-4444-555555555555' }
+        });
+        const skipped = task({ file: '/w/a.md', line: 9, timestamp_active: false, heading: 'No date' });
+
+        const summary = await runSync(baseDeps([created, deleted, skipped], r.fn, w.writer));
+
+        // skipped has nothing to do and is not recorded as a change.
+        assert.equal(summary.changes.length, 2);
+        const byAction = Object.fromEntries(summary.changes.map((c) => [c.action, c]));
+        assert.deepEqual(
+            { action: byAction.created.action, date: byAction.created.date, heading: byAction.created.heading },
+            { action: 'created', date: '2026-06-01', heading: 'New event' }
+        );
+        assert.deepEqual(
+            { action: byAction.deleted.action, date: byAction.deleted.date, heading: byAction.deleted.heading },
+            { action: 'deleted', date: '2026-06-02', heading: 'Done event' }
+        );
+    });
+
     test('two new-ID tasks in one file both sync (bottom-up write avoids line-shift defers)', async () => {
         const r = recorder(() => ({ status: 200, body: { id: 'x' } }));
         const writer = fileModelWriter([
