@@ -181,9 +181,32 @@ function truncateHeading(heading: string): string {
     return s.length > HEADING_MAX ? `${s.slice(0, HEADING_MAX - 1)}…` : s;
 }
 
-/** Toast line: glyph + date + truncated heading, e.g. `+ 2026-05-28  Meeting…`. */
+/** Toast line: glyph + date + truncated heading, e.g. `+ 2026-05-28 Meeting…`. */
 function toastLine(c: SyncChange): string {
-    return `${TOAST_SYMBOL[c.action]} ${c.date ?? '—'}  ${truncateHeading(c.heading)}`;
+    return `${TOAST_SYMBOL[c.action]} ${c.date ?? '—'} ${truncateHeading(c.heading)}`;
+}
+
+/**
+ * Compact, toast-friendly counts: only the non-zero categories, comma-joined
+ * (e.g. `3 created, 1 deleted`). VS Code notification toasts collapse newlines
+ * to spaces, so the whole summary has to read on a single (word-wrapped) line;
+ * dropping the zero categories keeps it short. Falls back to `no changes` when
+ * the sync touched nothing.
+ */
+function compactCounts(summary: SyncSummary): string {
+    const parts: string[] = [];
+    const add = (n: number, label: string): void => {
+        if (n > 0) {
+            parts.push(`${n} ${label}`);
+        }
+    };
+    add(summary.created, 'created');
+    add(summary.updated, 'updated');
+    add(summary.deleted, 'deleted');
+    add(summary.skipped, 'skipped');
+    add(summary.deferred, 'deferred');
+    add(summary.failed, 'failed');
+    return parts.length > 0 ? parts.join(', ') : 'no changes';
 }
 
 /** Channel line: spelled-out action + date + full heading. */
@@ -213,13 +236,16 @@ async function reportSyncSummary(summary: SyncSummary): Promise<void> {
     );
     const shown = changed.slice(0, SYNC_TOAST_LIMIT).map(toastLine);
     const more = changed.length - shown.length;
-    const lines = [`Calendar sync — ${counts}`, ...shown];
+    // One line, ` · `-separated: counts first, then the changed events. Toasts
+    // collapse `\n`, so a multi-line list would render as a run-on paragraph --
+    // the full per-event log lives in the details channel instead.
+    const segments = [`Calendar sync — ${compactCounts(summary)}`, ...shown];
     if (more > 0) {
-        lines.push(`…and ${more} more`);
+        segments.push(`…and ${more} more`);
     }
 
     const DETAILS = 'Show details';
-    const pick = await vscode.window.showInformationMessage(`Markdown Org: ${lines.join('\n')}`, DETAILS);
+    const pick = await vscode.window.showInformationMessage(`Markdown Org: ${segments.join(' · ')}`, DETAILS);
     if (pick === DETAILS) {
         channel.show(true);
     }

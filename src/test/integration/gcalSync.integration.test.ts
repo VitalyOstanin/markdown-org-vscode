@@ -253,6 +253,11 @@ suite('Google Calendar sync: DONE -> delete', () => {
         assert.match(message, /Done task/, 'toast should list the affected event heading');
         assert.match(message, /2026-05-27/, 'toast should show the event date');
         assert.strictEqual(action, 'Show details', 'toast should offer a details button');
+        // Toasts collapse newlines, so the summary must be one line with the
+        // events `·`-separated, and the zero-count categories must be dropped.
+        assert.ok(!message.includes('\n'), `toast must be single-line: ${JSON.stringify(message)}`);
+        assert.ok(message.includes(' · '), `events should be ·-separated: ${JSON.stringify(message)}`);
+        assert.ok(!/\b0 (created|updated|skipped|deferred|failed)\b/.test(message), `zero counts dropped: ${message}`);
     });
 });
 
