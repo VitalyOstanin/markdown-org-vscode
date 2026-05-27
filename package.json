@@ -148,6 +148,16 @@
         "command": "markdown-org.cycleTag",
         "title": "Cycle Tag Filter",
         "category": "Markdown Org"
+      },
+      {
+        "command": "markdown-org.gcalSync.connect",
+        "title": "Connect Google Calendar",
+        "category": "Markdown Org"
+      },
+      {
+        "command": "markdown-org.gcalSync.disconnect",
+        "title": "Disconnect Google Calendar",
+        "category": "Markdown Org"
       }
     ],
     "keybindings": [
@@ -302,6 +312,12 @@
           ],
           "default": "ru",
           "description": "Language for the weekday short name inserted into timestamps (CREATED/SCHEDULED/DEADLINE/CLOCK). 'ru' produces Пн/Вт/..., 'en' produces Mon/Tue/...."
+        },
+        "markdown-org.gcalSync.clientId": {
+          "type": "string",
+          "default": "",
+          "scope": "machine",
+          "description": "Google OAuth Desktop client_id for Calendar sync (BYO). The client_secret is entered on connect and stored in the OS keychain, not here."
         }
       }
     }
