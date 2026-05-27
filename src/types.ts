@@ -13,6 +13,8 @@ export interface Task {
     timestamp_date?: string;
     timestamp_time?: string;
     timestamp_type?: string;
+    timestamp_active?: boolean;
+    timestamp_end_time?: string;
     // Per-task key/value pairs parsed by markdown-org-extract from an
     // `org-properties` fenced code block. Absent when the task has no such
     // block. Optional and additive on the wire (extractor ADR-0015), so an
