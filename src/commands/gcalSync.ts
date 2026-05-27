@@ -150,9 +150,14 @@ function getSingleFlight(): SingleFlight {
  * Run the extractor in `--tasks` mode over `dir` and parse its JSON task list.
  * Mirrors the agenda invocation (`--dir <dir> --format json --absolute-paths
  * --tasks`) so paths come back absolute and properties are included.
+ *
+ * `--tasks-include-done` surfaces DONE tasks as well (the flat list is TODO-only
+ * by default). The sync needs them: a task that became DONE must still reach the
+ * engine so its event can be deleted (`onDone=delete`) or kept (`onDone=keep`);
+ * without the flag the task simply vanishes and its event is orphaned.
  */
 function runExtractorTasks(extractorPath: string, dir: string): Promise<Task[]> {
-    const args = ['--dir', dir, '--format', 'json', '--absolute-paths', '--tasks'];
+    const args = ['--dir', dir, '--format', 'json', '--absolute-paths', '--tasks', '--tasks-include-done'];
     return new Promise<Task[]>((resolve, reject) => {
         const timeout = setTimeout(() => {
             reject(new Error(`Command timeout after ${EXTRACTOR_TIMEOUT_MS / 1000} seconds`));
