@@ -39,6 +39,12 @@ All notable changes to the "Markdown Org" extension will be documented in this f
   `gcalSync.syncOnSaveDebounceMs`, `gcalSync.onDone`,
   `gcalSync.defaultEventMinutes`.
 
+### Changed
+
+- macOS keybindings: every `Ctrl+K …` chord now ships a `Cmd+K …` mac
+  override (VS Code does not auto-map `Ctrl` to `Cmd`), so the shortcuts
+  match macOS conventions. `Shift+Up` / `Shift+Down` are unchanged.
+
 ### Internal
 
 - Pure, vscode-free `src/utils/orgProperties.ts` builds and upserts an

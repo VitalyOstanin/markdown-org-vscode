@@ -7,6 +7,7 @@ import { suite, test } from 'mocha';
 interface Keybinding {
     command: string;
     key: string;
+    mac?: string;
     when?: string;
 }
 
@@ -128,6 +129,42 @@ suite('Keybindings: package.json contract', () => {
             down!.when?.includes('markdown-org.timestampAdjustable'),
             `timestampDown when must require the adjustable context: ${down!.when}`
         );
+    });
+
+    test('every ctrl-based keybinding carries a mac override with ctrl swapped for cmd', () => {
+        // VS Code does NOT auto-map ctrl -> cmd on macOS (ctrl and cmd are
+        // distinct physical modifiers there); a `key` with no `mac` keeps the
+        // physical Control key on macOS, which is unidiomatic for Mac users.
+        // So each ctrl chord must ship an explicit `mac` that mirrors it with
+        // cmd. See https://code.visualstudio.com/docs/configure/keybindings.
+        const bindings = (pkg.contributes?.keybindings ?? []).filter((kb) => kb.command.startsWith('markdown-org.'));
+        const offenders: string[] = [];
+        for (const kb of bindings) {
+            if (!/\bctrl\+/.test(kb.key)) {
+                continue; // shift+up / shift+down are identical on every platform
+            }
+            const expectedMac = kb.key.replace(/ctrl\+/g, 'cmd+');
+            if (kb.mac !== expectedMac) {
+                offenders.push(
+                    `${kb.command}: key=${kb.key} -> mac expected ${expectedMac}, got ${kb.mac ?? '(none)'}`
+                );
+            }
+        }
+        assert.strictEqual(
+            offenders.length,
+            0,
+            `ctrl keybindings missing a matching mac override:\n${offenders.join('\n')}`
+        );
+    });
+
+    test('non-ctrl keybindings (shift+up/down) intentionally have no mac override', () => {
+        // shift is the same modifier on all platforms; adding a mac clone would
+        // be redundant and would drift from `key` on edits.
+        const up = findKeybinding(pkg, 'markdown-org.timestampUp');
+        const down = findKeybinding(pkg, 'markdown-org.timestampDown');
+        assert.ok(up && down);
+        assert.strictEqual(up!.mac, undefined, 'shift+up must not carry a mac override');
+        assert.strictEqual(down!.mac, undefined, 'shift+down must not carry a mac override');
     });
 
     test('no markdown-org keybinding is a strict chord-prefix of another (guards #9 shadowing)', () => {

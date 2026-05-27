@@ -174,56 +174,67 @@
       {
         "command": "markdown-org.setTodo",
         "key": "ctrl+k ctrl+t",
+        "mac": "cmd+k cmd+t",
         "when": "editorTextFocus && editorLangId == markdown"
       },
       {
         "command": "markdown-org.setDone",
         "key": "ctrl+k ctrl+d",
+        "mac": "cmd+k cmd+d",
         "when": "editorTextFocus && editorLangId == markdown"
       },
       {
         "command": "markdown-org.togglePriority",
         "key": "ctrl+k ctrl+p",
+        "mac": "cmd+k cmd+p",
         "when": "editorTextFocus && editorLangId == markdown"
       },
       {
         "command": "markdown-org.insertCreated",
         "key": "ctrl+k ctrl+k ctrl+c",
+        "mac": "cmd+k cmd+k cmd+c",
         "when": "editorTextFocus && editorLangId == markdown"
       },
       {
         "command": "markdown-org.insertScheduled",
         "key": "ctrl+k ctrl+k ctrl+s",
+        "mac": "cmd+k cmd+k cmd+s",
         "when": "editorTextFocus && editorLangId == markdown"
       },
       {
         "command": "markdown-org.insertDeadline",
         "key": "ctrl+k ctrl+k ctrl+d",
+        "mac": "cmd+k cmd+k cmd+d",
         "when": "editorTextFocus && editorLangId == markdown"
       },
       {
         "command": "markdown-org.insertClockStart",
         "key": "ctrl+k ctrl+c ctrl+s",
+        "mac": "cmd+k cmd+c cmd+s",
         "when": "editorTextFocus && editorLangId == markdown"
       },
       {
         "command": "markdown-org.insertClockFinish",
         "key": "ctrl+k ctrl+c ctrl+f",
+        "mac": "cmd+k cmd+c cmd+f",
         "when": "editorTextFocus && editorLangId == markdown"
       },
       {
         "command": "markdown-org.insertClockTable",
         "key": "ctrl+k ctrl+c ctrl+v",
+        "mac": "cmd+k cmd+c cmd+v",
         "when": "editorTextFocus && editorLangId == markdown"
       },
       {
         "command": "markdown-org.showAgendaWeek",
         "key": "ctrl+k ctrl+w",
+        "mac": "cmd+k cmd+w",
         "when": "(editorTextFocus && editorLangId == markdown) || markdown-org.agendaFocused"
       },
       {
         "command": "markdown-org.showAgendaMonth",
         "key": "ctrl+k ctrl+m",
+        "mac": "cmd+k cmd+m",
         "when": "(editorTextFocus && editorLangId == markdown) || markdown-org.agendaFocused"
       },
       {
@@ -239,16 +250,19 @@
       {
         "command": "markdown-org.moveToArchive",
         "key": "ctrl+k ctrl+k ctrl+m ctrl+a",
+        "mac": "cmd+k cmd+k cmd+m cmd+a",
         "when": "editorTextFocus && editorLangId == markdown"
       },
       {
         "command": "markdown-org.promoteToMaintain",
         "key": "ctrl+k ctrl+k ctrl+m ctrl+p",
+        "mac": "cmd+k cmd+k cmd+m cmd+p",
         "when": "editorTextFocus && editorLangId == markdown"
       },
       {
         "command": "markdown-org.cycleTag",
-        "key": "ctrl+k ctrl+k ctrl+t"
+        "key": "ctrl+k ctrl+k ctrl+t",
+        "mac": "cmd+k cmd+k cmd+t"
       }
     ],
     "configuration": {

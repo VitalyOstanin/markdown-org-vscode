@@ -270,6 +270,9 @@ Hotkeys below match the bindings declared in `package.json`. All
 keybindings except `Cycle Tag Filter` are only active when an active
 Markdown editor has focus.
 
+On macOS every `Ctrl+K …` chord uses `Cmd` instead, e.g. `Cmd+K Cmd+T`
+for `Set TODO` (the `Shift+Up`/`Shift+Down` bindings are unchanged).
+
 ### Task Status Commands
 
 | Command                         | Hotkey          | Description                         |
