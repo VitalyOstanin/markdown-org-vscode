@@ -11,7 +11,7 @@ import { adjustTimestamp, toggleTimestampActive } from './commands/timestampEdit
 import { moveToArchive, promoteToMaintain } from './commands/moveHeading';
 import { insertClockStart, insertClockFinish } from './commands/clock';
 import { insertClockTable } from './commands/clocktable';
-import { connectGcal, disconnectGcal, selectCalendar } from './commands/gcalSync';
+import { connectGcal, disconnectGcal, selectCalendar, syncNow, registerGcalSaveTrigger } from './commands/gcalSync';
 import { notifyError } from './utils/notify';
 import { withErrorReporting } from './utils/orgCommandWrap';
 import { registerBracketDiagnostics } from './diagnostics/timestampBrackets';
@@ -49,9 +49,11 @@ export function activate(context: vscode.ExtensionContext) {
     registerOrgCommand(context, 'markdown-org.gcalSync.connect', () => connectGcal(context));
     registerOrgCommand(context, 'markdown-org.gcalSync.disconnect', () => disconnectGcal(context));
     registerOrgCommand(context, 'markdown-org.gcalSync.selectCalendar', () => selectCalendar(context));
+    registerOrgCommand(context, 'markdown-org.gcalSync.syncNow', () => syncNow(context));
 
     registerBracketDiagnostics(context);
     registerTimestampAdjustableContext(context);
+    registerGcalSaveTrigger(context);
 }
 
 export function deactivate() {}

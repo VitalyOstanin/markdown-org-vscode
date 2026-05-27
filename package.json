@@ -163,6 +163,11 @@
         "command": "markdown-org.gcalSync.selectCalendar",
         "title": "Select Google Calendar",
         "category": "Markdown Org"
+      },
+      {
+        "command": "markdown-org.gcalSync.syncNow",
+        "title": "Sync Now (Google Calendar)",
+        "category": "Markdown Org"
       }
     ],
     "keybindings": [
@@ -333,6 +338,39 @@
           "type": "string",
           "default": "",
           "description": "Pinned Google calendar id for sync (takes precedence over calendarName). Usually set by the Select Google Calendar command."
+        },
+        "markdown-org.gcalSync.concurrencyPolicy": {
+          "type": "string",
+          "enum": [
+            "queue",
+            "cancel"
+          ],
+          "default": "queue",
+          "description": "Behaviour when a sync is requested while one is running (within a window): 'queue' coalesces into a single rerun; 'cancel' aborts the current run and restarts."
+        },
+        "markdown-org.gcalSync.syncOnSave": {
+          "type": "boolean",
+          "default": false,
+          "description": "Run a Google Calendar sync (debounced) after saving a markdown file."
+        },
+        "markdown-org.gcalSync.syncOnSaveDebounceMs": {
+          "type": "number",
+          "default": 5000,
+          "description": "Debounce interval (ms) for the sync-on-save trigger."
+        },
+        "markdown-org.gcalSync.onDone": {
+          "type": "string",
+          "enum": [
+            "delete",
+            "keep"
+          ],
+          "default": "delete",
+          "description": "When a task becomes DONE: 'delete' removes its calendar event; 'keep' leaves it."
+        },
+        "markdown-org.gcalSync.defaultEventMinutes": {
+          "type": "number",
+          "default": 60,
+          "description": "Duration for a timed task event when no end time is given."
         }
       }
     }
