@@ -79,6 +79,11 @@ export function mapTaskToEvent(task: Task, orgId: string, opts: MapOptions): Gca
 
     return {
         id: undefined, // assigned by the caller from eventId(orgId)
+        // Explicit 'confirmed' revives a previously soft-deleted (cancelled)
+        // event when the task goes DONE -> TODO again: the deterministic id is
+        // still held by the cancelled event, so insert 409s and we patch; the
+        // patch must carry status to flip it back from cancelled to confirmed.
+        status: 'confirmed',
         summary: task.heading,
         description: buildDescription(task.content, opts.relPath, task.line),
         start,

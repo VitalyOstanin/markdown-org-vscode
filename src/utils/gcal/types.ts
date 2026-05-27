@@ -8,6 +8,10 @@ export interface GcalEventDateTime {
 
 export interface GcalEventResource {
     id?: string;
+    // 'confirmed' is sent explicitly so that re-publishing a task whose event
+    // was soft-deleted (DELETE leaves it status='cancelled' and keeps the id)
+    // revives it: the insert 409s, then the patch sets status back to confirmed.
+    status?: 'confirmed' | 'tentative' | 'cancelled';
     summary: string;
     description?: string;
     start: GcalEventDateTime;

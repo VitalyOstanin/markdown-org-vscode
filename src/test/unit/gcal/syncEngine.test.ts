@@ -6,12 +6,14 @@ import type { FetchFn } from '../../../utils/gcal/oauth';
 interface Call {
     url: string;
     method: string;
+    body?: Record<string, unknown>;
 }
 
 function recorder(responder: (c: Call) => { status: number; body: unknown }): { fn: FetchFn; calls: Call[] } {
     const calls: Call[] = [];
-    const fn = (async (url: string, init?: { method?: string }) => {
-        const call = { url, method: init?.method ?? 'GET' };
+    const fn = (async (url: string, init?: { method?: string; body?: string }) => {
+        const parsed = init?.body ? (JSON.parse(init.body) as Record<string, unknown>) : undefined;
+        const call = { url, method: init?.method ?? 'GET', body: parsed };
         calls.push(call);
         const r = responder(call);
         return { ok: r.status >= 200 && r.status < 300, status: r.status, json: async () => r.body };
@@ -87,7 +89,12 @@ suite('gcal/syncEngine', () => {
         const summary = await runSync(baseDeps([t], r.fn, w.writer));
         assert.equal(summary.updated, 1);
         assert.equal(summary.created, 0);
-        assert.ok(r.calls.some((c) => c.method === 'PATCH'));
+        const patch = r.calls.find((c) => c.method === 'PATCH');
+        assert.ok(patch);
+        // The patch must carry status:'confirmed' so that a 409 caused by a
+        // soft-deleted (cancelled) event with the same id revives it instead of
+        // silently updating an invisible cancelled event.
+        assert.equal(patch.body?.status, 'confirmed');
     });
 
     test('DONE with onDone=delete deletes the event', async () => {

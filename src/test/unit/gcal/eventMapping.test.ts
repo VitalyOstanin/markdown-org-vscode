@@ -36,6 +36,15 @@ suite('gcal/eventMapping', () => {
         assert.equal(ev.extendedProperties?.private?.mdOrgTsType, 'SCHEDULED');
     });
 
+    test("event carries status 'confirmed' so re-publish revives a cancelled event", () => {
+        // DONE -> TODO again reuses the deterministic id still held by the
+        // soft-deleted (cancelled) event; the patch must set status back to
+        // confirmed, otherwise the event stays invisible. Holds for all-day
+        // and timed events alike.
+        assert.equal(mapTaskToEvent(base, 'oid', opts).status, 'confirmed');
+        assert.equal(mapTaskToEvent({ ...base, timestamp_time: '10:00' }, 'oid', opts).status, 'confirmed');
+    });
+
     test('timed event with explicit end', () => {
         const ev = mapTaskToEvent({ ...base, timestamp_time: '10:00', timestamp_end_time: '11:30' }, 'oid', opts);
         assert.deepEqual(ev.start, { dateTime: '2026-06-01T10:00:00', timeZone: 'Europe/Belgrade' });
