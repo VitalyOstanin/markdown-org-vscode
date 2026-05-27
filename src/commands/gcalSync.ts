@@ -187,8 +187,12 @@ function runExtractorTasks(extractorPath: string, dir: string): Promise<Task[]> 
  * 'deferred') when the file has unsaved edits or the line no longer anchors
  * the expected heading -- the sync engine then retries on a later run rather
  * than writing to a shifted/dirty file.
+ *
+ * Exported for integration testing: the pure edit computation is unit-tested
+ * in orgProperties, but the editor binding (openTextDocument, isDirty guard,
+ * heading-anchor guard, applyEdit, save) only runs against a real workspace.
  */
-function makePropertiesWriter(): PropertiesWriter {
+export function makePropertiesWriter(): PropertiesWriter {
     return {
         async write(file, line, expectedHeading, props) {
             const uri = vscode.Uri.file(file);

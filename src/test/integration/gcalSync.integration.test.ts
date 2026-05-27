@@ -8,7 +8,7 @@ import type * as cp from 'child_process';
 import { suite, beforeEach, afterEach, test } from 'mocha';
 import { exec } from '../../utils/exec';
 import { extractor } from '../../utils/extractor';
-import { syncNow } from '../../commands/gcalSync';
+import { syncNow, makePropertiesWriter } from '../../commands/gcalSync';
 
 type ExecFileCallback = (error: Error | null, stdout: string, stderr: string) => void;
 
@@ -166,5 +166,125 @@ suite('Google Calendar sync: DONE -> delete', () => {
             deleteCall.url.endsWith(`/calendars/cal/events/${EVENT_ID}`),
             `DELETE hit an unexpected url: ${deleteCall.url}`
         );
+    });
+});
+
+// makePropertiesWriter is the editor binding for the sync engine's local
+// write-back: it opens the file, refuses to touch it when it is dirty or the
+// line no longer anchors the expected heading, and otherwise applies a
+// targeted org-properties edit and saves. The pure edit math lives in
+// orgProperties (unit-tested); these tests cover the VS Code binding against a
+// real workspace -- open/dirty/anchor/applyEdit/save -- which a unit test
+// cannot reach.
+suite('Google Calendar sync: makePropertiesWriter', () => {
+    const PLANNING = '`SCHEDULED: <2026-05-27 Wed>`';
+    let sandboxDir: string;
+
+    beforeEach(async () => {
+        sandboxDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gcal-writer-it-'));
+        // VS Code's Local History copies every saved file into its store
+        // asynchronously; with our short-lived tmpdir that copy can race the
+        // afterEach cleanup and log a (non-fatal) ENOENT. Disable it for these
+        // tests so the save path stays quiet.
+        await vscode.workspace
+            .getConfiguration('workbench')
+            .update('localHistory.enabled', false, vscode.ConfigurationTarget.Global);
+    });
+
+    afterEach(async () => {
+        await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+        fs.rmSync(sandboxDir, { recursive: true, force: true });
+        await vscode.workspace
+            .getConfiguration('workbench')
+            .update('localHistory.enabled', undefined, vscode.ConfigurationTarget.Global);
+    });
+
+    function writeFile(name: string, content: string): string {
+        const p = path.join(sandboxDir, name);
+        fs.writeFileSync(p, content);
+        return p;
+    }
+
+    test('inserts a new org-properties block under the planning line and saves (written)', async function () {
+        this.timeout(10000);
+        const file = writeFile('insert.md', `## TODO My heading\n${PLANNING}\n`);
+
+        const outcome = await makePropertiesWriter().write(file, 1, 'My heading', {
+            ID: 'abc',
+            GCAL_EVENT_ID: 'def'
+        });
+
+        assert.strictEqual(outcome, 'written');
+        const onDisk = fs.readFileSync(file, 'utf-8');
+        // Keys are sorted ascending, so GCAL_EVENT_ID precedes ID.
+        assert.ok(onDisk.includes('```org-properties'), `block fence missing:\n${onDisk}`);
+        assert.ok(/GCAL_EVENT_ID: def\nID: abc/.test(onDisk), `keys not written in sorted order:\n${onDisk}`);
+        // The block sits after the planning line, not before it.
+        assert.ok(
+            onDisk.indexOf(PLANNING) < onDisk.indexOf('```org-properties'),
+            `block was placed before the planning line:\n${onDisk}`
+        );
+    });
+
+    test('replaces an existing org-properties block in place (written)', async function () {
+        this.timeout(10000);
+        const file = writeFile(
+            'replace.md',
+            `## TODO My heading\n${PLANNING}\n\`\`\`org-properties\nID: old\n\`\`\`\n`
+        );
+
+        const outcome = await makePropertiesWriter().write(file, 1, 'My heading', {
+            ID: 'new',
+            GCAL_EVENT_ID: 'gid'
+        });
+
+        assert.strictEqual(outcome, 'written');
+        const onDisk = fs.readFileSync(file, 'utf-8');
+        assert.ok(onDisk.includes('ID: new'), `new ID missing:\n${onDisk}`);
+        assert.ok(onDisk.includes('GCAL_EVENT_ID: gid'), `GCAL_EVENT_ID missing:\n${onDisk}`);
+        assert.ok(!onDisk.includes('ID: old'), `stale block was not replaced:\n${onDisk}`);
+        // Still exactly one block (no duplication).
+        assert.strictEqual(
+            onDisk.match(/```org-properties/g)?.length,
+            1,
+            `expected exactly one org-properties block:\n${onDisk}`
+        );
+    });
+
+    test('defers when the line no longer anchors the expected heading', async function () {
+        this.timeout(10000);
+        const file = writeFile('mismatch.md', `## TODO My heading\n${PLANNING}\n`);
+        const before = fs.readFileSync(file, 'utf-8');
+
+        const outcome = await makePropertiesWriter().write(file, 1, 'A different heading', { ID: 'abc' });
+
+        assert.strictEqual(outcome, 'deferred');
+        assert.strictEqual(fs.readFileSync(file, 'utf-8'), before, 'file must be untouched on a heading mismatch');
+    });
+
+    test('defers when the document has unsaved edits (dirty)', async function () {
+        this.timeout(10000);
+        const file = writeFile('dirty.md', `## TODO My heading\n${PLANNING}\n`);
+        const before = fs.readFileSync(file, 'utf-8');
+
+        // Open the file and make an unsaved edit so the in-memory document is
+        // dirty. The writer opens the same document instance and must bail.
+        const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(file));
+        const editor = await vscode.window.showTextDocument(doc);
+        await editor.edit((eb) => eb.insert(new vscode.Position(doc.lineCount - 1, 0), 'scratch\n'));
+        assert.ok(doc.isDirty, 'precondition: document should be dirty after the edit');
+
+        const outcome = await makePropertiesWriter().write(file, 1, 'My heading', { ID: 'abc' });
+
+        assert.strictEqual(outcome, 'deferred');
+        assert.strictEqual(
+            fs.readFileSync(file, 'utf-8'),
+            before,
+            'file on disk must be untouched while the document is dirty'
+        );
+
+        // Drop the unsaved edit so closeAllEditors in afterEach does not raise a
+        // save prompt that would stall the run.
+        await vscode.commands.executeCommand('workbench.action.files.revert');
     });
 });
