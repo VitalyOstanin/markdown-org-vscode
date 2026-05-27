@@ -37,6 +37,7 @@ suite('Google Calendar sync: DONE -> delete', () => {
     let fetchStub: sinon.SinonStub;
     let warnStub: sinon.SinonStub;
     let infoStub: sinon.SinonStub;
+    let withProgressStub: sinon.SinonStub;
     let storageRoot: string;
     let fetchCalls: Array<{ url: string; method: string }>;
 
@@ -91,6 +92,23 @@ suite('Google Calendar sync: DONE -> delete', () => {
         warnStub = sinon.stub(vscode.window, 'showWarningMessage');
         infoStub = sinon.stub(vscode.window, 'showInformationMessage');
 
+        // Run the wrapped work synchronously so the sync still executes; we only
+        // assert how the progress is requested (status bar, not notification).
+        withProgressStub = sinon.stub(vscode.window, 'withProgress');
+        withProgressStub.callsFake(
+            (
+                _options: vscode.ProgressOptions,
+                task: (
+                    progress: vscode.Progress<{ message?: string; increment?: number }>,
+                    token: vscode.CancellationToken
+                ) => Thenable<unknown>
+            ) =>
+                task({ report: () => {} }, {
+                    isCancellationRequested: false,
+                    onCancellationRequested: () => ({ dispose: () => {} })
+                } as vscode.CancellationToken)
+        );
+
         const config = vscode.workspace.getConfiguration('markdown-org');
         await config.update('workspaceDir', testWorkspaceDir, vscode.ConfigurationTarget.Workspace);
         // gcalSync.clientId is scope=machine -- it can only be written to User
@@ -106,6 +124,7 @@ suite('Google Calendar sync: DONE -> delete', () => {
         fetchStub.restore();
         warnStub.restore();
         infoStub.restore();
+        withProgressStub.restore();
         fs.rmSync(storageRoot, { recursive: true, force: true });
 
         const config = vscode.workspace.getConfiguration('markdown-org');
@@ -165,6 +184,20 @@ suite('Google Calendar sync: DONE -> delete', () => {
         assert.ok(
             deleteCall.url.endsWith(`/calendars/cal/events/${EVENT_ID}`),
             `DELETE hit an unexpected url: ${deleteCall.url}`
+        );
+    });
+
+    test('wraps the sync in a status-bar (Window) progress indicator', async function () {
+        this.timeout(15000);
+
+        await syncNow(makeContext());
+
+        assert.ok(withProgressStub.called, 'expected the sync to be wrapped in withProgress');
+        const opts = withProgressStub.firstCall.args[0] as vscode.ProgressOptions;
+        assert.strictEqual(
+            opts.location,
+            vscode.ProgressLocation.Window,
+            'progress must render in the status bar (Window), not as a notification'
         );
     });
 });

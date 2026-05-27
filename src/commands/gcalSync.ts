@@ -261,47 +261,56 @@ export async function syncNow(context: vscode.ExtensionContext): Promise<void> {
         // resolveExtractorPath already surfaced a user-facing error toast.
         return;
     }
-    await getSingleFlight().run(async (signal) => {
-        const lockPath = await lockPathFor(context, workspaceDir);
-        const lock = await acquireLock({ path: lockPath });
-        if (!lock) {
-            await notifyWarn('another Google Calendar sync is already running');
-            return;
-        }
-        try {
-            const tokens = new TokenStore(context.secrets);
-            const getToken = createAccessTokenProvider({ clientId, tokens, fetchFn: fetch });
-            const calendarName = (cfg.get<string>('gcalSync.calendarName') ?? 'markdown-org').trim() || 'markdown-org';
-            const pinnedId = (cfg.get<string>('gcalSync.calendarId') ?? '').trim() || undefined;
-            const calendarId = await ensureCalendar(fetch, getToken, { name: calendarName, pinnedId });
-            const tasks = await runExtractorTasks(extractorPath, workspaceDir);
-            const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-            const defaultEventMinutes = cfg.get<number>('gcalSync.defaultEventMinutes') ?? 60;
-            const onDone = (cfg.get<string>('gcalSync.onDone') ?? 'delete') === 'keep' ? 'keep' : 'delete';
-            const deps: SyncDeps = {
-                tasks,
-                fetchFn: fetch,
-                getToken,
-                calendarId,
-                writer: makePropertiesWriter(),
-                genUuid: () => randomUUID(),
-                mapOptions: (t): MapOptions => ({
-                    timeZone,
-                    defaultEventMinutes,
-                    relPath: path.relative(workspaceDir, t.file) || t.file
-                }),
-                onDone,
-                signal
-            };
-            const s = await runSync(deps);
-            await notifyInfo(
-                `Calendar sync: ${s.created} created, ${s.updated} updated, ${s.deleted} deleted, ` +
-                    `${s.skipped} skipped, ${s.deferred} deferred, ${s.failed} failed`
-            );
-        } finally {
-            await lock.release();
-        }
-    });
+    // Show a status-bar spinner for the whole run so a sync (manual or
+    // on-save) is visibly "in progress" rather than silent until the final
+    // toast. ProgressLocation.Window renders `$(sync~spin) <title>` and clears
+    // itself when the promise settles.
+    await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Window, title: 'Markdown Org: syncing Google Calendar…' },
+        () =>
+            getSingleFlight().run(async (signal) => {
+                const lockPath = await lockPathFor(context, workspaceDir);
+                const lock = await acquireLock({ path: lockPath });
+                if (!lock) {
+                    await notifyWarn('another Google Calendar sync is already running');
+                    return;
+                }
+                try {
+                    const tokens = new TokenStore(context.secrets);
+                    const getToken = createAccessTokenProvider({ clientId, tokens, fetchFn: fetch });
+                    const calendarName =
+                        (cfg.get<string>('gcalSync.calendarName') ?? 'markdown-org').trim() || 'markdown-org';
+                    const pinnedId = (cfg.get<string>('gcalSync.calendarId') ?? '').trim() || undefined;
+                    const calendarId = await ensureCalendar(fetch, getToken, { name: calendarName, pinnedId });
+                    const tasks = await runExtractorTasks(extractorPath, workspaceDir);
+                    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                    const defaultEventMinutes = cfg.get<number>('gcalSync.defaultEventMinutes') ?? 60;
+                    const onDone = (cfg.get<string>('gcalSync.onDone') ?? 'delete') === 'keep' ? 'keep' : 'delete';
+                    const deps: SyncDeps = {
+                        tasks,
+                        fetchFn: fetch,
+                        getToken,
+                        calendarId,
+                        writer: makePropertiesWriter(),
+                        genUuid: () => randomUUID(),
+                        mapOptions: (t): MapOptions => ({
+                            timeZone,
+                            defaultEventMinutes,
+                            relPath: path.relative(workspaceDir, t.file) || t.file
+                        }),
+                        onDone,
+                        signal
+                    };
+                    const s = await runSync(deps);
+                    await notifyInfo(
+                        `Calendar sync: ${s.created} created, ${s.updated} updated, ${s.deleted} deleted, ` +
+                            `${s.skipped} skipped, ${s.deferred} deferred, ${s.failed} failed`
+                    );
+                } finally {
+                    await lock.release();
+                }
+            })
+    );
 }
 
 /** Register the optional debounce-on-save trigger (disabled by default). */
