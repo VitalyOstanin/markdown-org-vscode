@@ -56,7 +56,16 @@ function linkedEventId(props: Record<string, string>): string | undefined {
 export async function runSync(deps: SyncDeps): Promise<SyncSummary> {
     const summary: SyncSummary = { created: 0, updated: 0, deleted: 0, skipped: 0, deferred: 0, failed: 0 };
 
-    for (const task of deps.tasks) {
+    // Within a file, handle tasks bottom-up so writing one task's
+    // org-properties block (which grows the file) never shifts the 1-based
+    // line of a task we have not handled yet -- otherwise the writer's
+    // heading-anchor check fails and the lower task is deferred for no reason.
+    // We hold no live, auto-tracking marker on each task (unlike Emacs
+    // org-gcal); bottom-up ordering is the equivalent for our snapshot model.
+    // Order across files is irrelevant: edits and Google calls are independent.
+    const ordered = [...deps.tasks].sort((a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : b.line - a.line));
+
+    for (const task of ordered) {
         if (deps.signal?.aborted) {
             break;
         }

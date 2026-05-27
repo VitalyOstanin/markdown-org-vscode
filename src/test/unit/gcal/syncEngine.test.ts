@@ -126,4 +126,55 @@ suite('gcal/syncEngine', () => {
         assert.equal(summary.deferred, 1);
         assert.ok(!r.calls.some((c) => c.method === 'POST'), 'insert is skipped');
     });
+
+    // Models makePropertiesWriter's line anchoring against a real file: the
+    // 1-based `line` must still point at the task's heading, and inserting a
+    // brand-new org-properties block grows the file, shifting every line below
+    // it. Two new-ID tasks in one file would otherwise defer the lower one,
+    // because writing the upper task's block invalidates the lower task's line.
+    // runSync must therefore handle a file's tasks bottom-up.
+    function fileModelWriter(headings: { line: number; heading: string }[]): PropertiesWriter {
+        const maxLine = Math.max(...headings.map((h) => h.line));
+        const lines: string[] = Array.from({ length: maxLine }, () => '');
+        for (const h of headings) {
+            lines[h.line - 1] = `## ${h.heading}`;
+        }
+        const blocked = new Set<string>();
+        return {
+            write: async (_file, line, heading) => {
+                const idx = line - 1;
+                if (lines[idx] !== `## ${heading}`) {
+                    return 'deferred';
+                }
+                // Inserting a fresh block shifts everything below; replacing an
+                // existing block (a later write for the same heading) does not.
+                if (!blocked.has(heading)) {
+                    lines.splice(idx + 1, 0, `<<block:${heading}>>`);
+                    blocked.add(heading);
+                }
+                return 'written';
+            }
+        };
+    }
+
+    test('two new-ID tasks in one file both sync (bottom-up write avoids line-shift defers)', async () => {
+        const r = recorder(() => ({ status: 200, body: { id: 'x' } }));
+        const writer = fileModelWriter([
+            { line: 1, heading: 'A' },
+            { line: 2, heading: 'B' }
+        ]);
+        const tasks = [
+            task({ file: '/w/f.md', line: 1, heading: 'A' }),
+            task({ file: '/w/f.md', line: 2, heading: 'B' })
+        ];
+        const ids = ['11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222'];
+        let n = 0;
+        const deps = baseDeps(tasks, r.fn, writer);
+        deps.genUuid = () => ids[n++];
+
+        const summary = await runSync(deps);
+
+        assert.equal(summary.created, 2, 'both tasks publish in a single run');
+        assert.equal(summary.deferred, 0, 'no task is deferred by a sibling write-back shifting its line');
+    });
 });
