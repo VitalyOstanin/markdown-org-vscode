@@ -19,6 +19,17 @@ function jsonResponse(status: number, body: unknown): unknown {
     return { ok: status >= 200 && status < 300, status, json: async () => body };
 }
 
+async function waitUntil(pred: () => boolean, timeoutMs: number): Promise<boolean> {
+    const start = Date.now();
+    while (Date.now() - start < timeoutMs) {
+        if (pred()) {
+            return true;
+        }
+        await new Promise((r) => setTimeout(r, 20));
+    }
+    return pred();
+}
+
 // The DONE task carries an active SCHEDULED timestamp, so `isSyncable` is true
 // and the deletion is attributable specifically to the `DONE && onDone=delete`
 // branch in the sync engine -- the branch that was unreachable while the
@@ -38,6 +49,7 @@ suite('Google Calendar sync: DONE -> delete', () => {
     let warnStub: sinon.SinonStub;
     let infoStub: sinon.SinonStub;
     let withProgressStub: sinon.SinonStub;
+    let progressSettled: boolean;
     let storageRoot: string;
     let fetchCalls: Array<{ url: string; method: string }>;
 
@@ -93,7 +105,10 @@ suite('Google Calendar sync: DONE -> delete', () => {
         infoStub = sinon.stub(vscode.window, 'showInformationMessage');
 
         // Run the wrapped work synchronously so the sync still executes; we only
-        // assert how the progress is requested (status bar, not notification).
+        // assert how the progress is requested (status bar, not notification)
+        // and when it settles. progressSettled flips once the wrapped task's
+        // promise resolves -- i.e. when the spinner would be hidden.
+        progressSettled = false;
         withProgressStub = sinon.stub(vscode.window, 'withProgress');
         withProgressStub.callsFake(
             (
@@ -103,10 +118,15 @@ suite('Google Calendar sync: DONE -> delete', () => {
                     token: vscode.CancellationToken
                 ) => Thenable<unknown>
             ) =>
-                task({ report: () => {} }, {
-                    isCancellationRequested: false,
-                    onCancellationRequested: () => ({ dispose: () => {} })
-                } as vscode.CancellationToken)
+                Promise.resolve(
+                    task({ report: () => {} }, {
+                        isCancellationRequested: false,
+                        onCancellationRequested: () => ({ dispose: () => {} })
+                    } as vscode.CancellationToken)
+                ).then((r) => {
+                    progressSettled = true;
+                    return r;
+                })
         );
 
         const config = vscode.workspace.getConfiguration('markdown-org');
@@ -198,6 +218,27 @@ suite('Google Calendar sync: DONE -> delete', () => {
             opts.location,
             vscode.ProgressLocation.Window,
             'progress must render in the status bar (Window), not as a notification'
+        );
+    });
+
+    test('hides the status-bar spinner without waiting for the summary toast to be dismissed', async function () {
+        this.timeout(15000);
+
+        // A summary toast the user never dismisses: showInformationMessage stays
+        // pending. If the toast were awaited inside withProgress, the wrapped
+        // task would never resolve and the spinner would turn forever.
+        infoStub.returns(new Promise<undefined>(() => {}));
+
+        // Do not await syncNow: the final notifyInfo is awaited after the
+        // progress wrapper and intentionally never resolves here. We only assert
+        // that the progress (spinner) settled, and that the sync work ran.
+        void syncNow(makeContext());
+
+        const settled = await waitUntil(() => progressSettled, 5000);
+        assert.ok(settled, 'withProgress must settle (spinner hidden) before the sync awaits the summary toast');
+        assert.ok(
+            fetchCalls.some((c) => c.method === 'DELETE'),
+            'the sync work itself completed (event deleted) before the toast wait'
         );
     });
 });

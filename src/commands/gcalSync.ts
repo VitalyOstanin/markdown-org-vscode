@@ -8,7 +8,7 @@ import { createAccessTokenProvider } from '../utils/gcal/accessToken';
 import { listWritableCalendars, ensureCalendar } from '../utils/gcal/calendarClient';
 import { SingleFlight, type ConcurrencyPolicy } from '../utils/gcal/mutex';
 import { acquireLock } from '../utils/gcal/lock';
-import { runSync, type PropertiesWriter, type SyncDeps } from '../utils/gcal/syncEngine';
+import { runSync, type PropertiesWriter, type SyncDeps, type SyncSummary } from '../utils/gcal/syncEngine';
 import type { MapOptions } from '../utils/gcal/eventMapping';
 import { computeOrgPropertiesEdit } from '../utils/orgProperties';
 import { HEADING_REGEX } from '../orgPatterns';
@@ -264,7 +264,11 @@ export async function syncNow(context: vscode.ExtensionContext): Promise<void> {
     // Show a status-bar spinner for the whole run so a sync (manual or
     // on-save) is visibly "in progress" rather than silent until the final
     // toast. ProgressLocation.Window renders `$(sync~spin) <title>` and clears
-    // itself when the promise settles.
+    // itself when the promise settles. The summary toast is shown *after* this
+    // wrapper resolves: notifyInfo's promise only settles when the user
+    // dismisses the toast, so awaiting it inside withProgress would keep the
+    // spinner turning until then.
+    let summary: SyncSummary | undefined;
     await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Window, title: 'Markdown Org: syncing Google Calendar…' },
         () =>
@@ -301,16 +305,19 @@ export async function syncNow(context: vscode.ExtensionContext): Promise<void> {
                         onDone,
                         signal
                     };
-                    const s = await runSync(deps);
-                    await notifyInfo(
-                        `Calendar sync: ${s.created} created, ${s.updated} updated, ${s.deleted} deleted, ` +
-                            `${s.skipped} skipped, ${s.deferred} deferred, ${s.failed} failed`
-                    );
+                    summary = await runSync(deps);
                 } finally {
                     await lock.release();
                 }
             })
     );
+
+    if (summary) {
+        await notifyInfo(
+            `Calendar sync: ${summary.created} created, ${summary.updated} updated, ${summary.deleted} deleted, ` +
+                `${summary.skipped} skipped, ${summary.deferred} deferred, ${summary.failed} failed`
+        );
+    }
 }
 
 /** Register the optional debounce-on-save trigger (disabled by default). */
