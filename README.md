@@ -28,6 +28,7 @@ tasks travel with the repository.
     - [CLOCK Commands](#clock-commands)
     - [Agenda Commands](#agenda-commands)
     - [Heading Management Commands](#heading-management-commands)
+    - [Google Calendar Commands](#google-calendar-commands)
 - [Settings](#settings)
     - [`markdown-org.extractorPath`](#markdown-orgextractorpath)
     - [`markdown-org.workspaceDir`](#markdown-orgworkspacedir)
@@ -38,7 +39,9 @@ tasks travel with the repository.
     - [`markdown-org.currentTag`](#markdown-orgcurrenttag)
     - [`markdown-org.clockRoundMinutes`](#markdown-orgclockroundminutes)
     - [`markdown-org.weekdayLocale`](#markdown-orgweekdaylocale)
+    - [`markdown-org.gcalSync.clientId`](#markdown-orggcalsyncclientid)
 - [Workspace Trust](#workspace-trust)
+- [Google Calendar Sync](#google-calendar-sync)
 - [Dependencies](#dependencies)
 - [Development](#development)
 - [Release notes](#release-notes)
@@ -58,6 +61,7 @@ to Markdown files in VS Code:
 - **Live updates** -- Agenda refreshes automatically when underlying markdown files change.
 - **Heading management** -- Archive completed tasks to `*.archive.md` or promote them to a maintenance file.
 - **Properties** -- A per-task properties block: a fenced code block with the info string `org-properties` holding `KEY: value` lines, placed under the heading and its planning lines. It round-trips through markdown viewers as a folded block. See [ADR-0009](docs/adr/0009-task-properties-org-properties-block.md).
+- **Google Calendar sync** -- Opt-in, one-way push of tasks with an active `SCHEDULED` / `DEADLINE` timestamp to Google Calendar, using your own OAuth client. See [Google Calendar Sync](#google-calendar-sync) and [ADR-0010](docs/adr/0010-google-calendar-sync.md).
 
 ## Quick Start
 
@@ -322,6 +326,15 @@ Markdown editor has focus.
 | `Markdown Org: Move to Archive`     | `Ctrl+K Ctrl+K Ctrl+M Ctrl+A` | Move current heading into the file's `*.archive.md`                          |
 | `Markdown Org: Promote to Maintain` | `Ctrl+K Ctrl+K Ctrl+M Ctrl+P` | Move heading to the maintain file (requires `markdown-org.maintainFilePath`) |
 
+### Google Calendar Commands
+
+| Command                                    | Hotkey | Description                                                        |
+| ------------------------------------------ | ------ | ------------------------------------------------------------------ |
+| `Markdown Org: Connect Google Calendar`    | -      | Run the BYO OAuth flow and store the refresh token in the keychain |
+| `Markdown Org: Disconnect Google Calendar` | -      | Remove the stored token and client secret from the keychain        |
+
+See [Google Calendar Sync](#google-calendar-sync) for the one-time setup.
+
 ## Settings
 
 ### `markdown-org.extractorPath`
@@ -445,9 +458,69 @@ Language for the weekday short name inserted into timestamps (`CREATED`, `SCHEDU
 }
 ```
 
+### `markdown-org.gcalSync.clientId`
+
+**Type:** `string`
+**Default:** `""` (sync disabled)
+**Scope:** `machine` (set in user settings only -- not per-workspace, and excluded from Settings Sync, since it is a per-machine credential)
+
+Google OAuth Desktop `client_id` for Google Calendar sync (bring your
+own). The matching `client_secret` is entered once when you run
+`Connect Google Calendar` and is stored in the OS keychain via
+`SecretStorage`, never in this setting or in the VSIX. See
+[Google Calendar Sync](#google-calendar-sync) for the full setup.
+
+```json
+{
+    "markdown-org.gcalSync.clientId": "1234567890-abc.apps.googleusercontent.com"
+}
+```
+
 ## Workspace Trust
 
 The extension is **limited in untrusted workspaces**. The following commands are disabled because they read configured executable/file paths: `Show Agenda*`, `Show Tasks`, `Cycle Tag Filter`, `Insert CLOCK Table`, `Move to Archive`, `Promote to Maintain`.
+
+## Google Calendar Sync
+
+Optional, opt-in one-way sync designed to push tasks carrying an active
+`SCHEDULED` / `DEADLINE` timestamp to Google Calendar. It is off until
+you supply your own OAuth client and connect. See
+[ADR-0010](docs/adr/0010-google-calendar-sync.md) for the design.
+
+### One-time setup (bring your own OAuth client)
+
+The extension ships **no** Google credentials; you create a Desktop
+OAuth client in your own Google Cloud project. The client secret is
+stored only in your OS keychain, never in the extension.
+
+1. In the [Google Cloud Console](https://console.cloud.google.com/),
+   create (or pick) a project.
+2. Enable the **Google Calendar API** for that project.
+3. Create an **OAuth client ID** of type **Desktop app**.
+4. Put the generated `client_id` in the
+   [`markdown-org.gcalSync.clientId`](#markdown-orggcalsyncclientid)
+   setting.
+5. Run **Markdown Org: Connect Google Calendar** from the Command
+   Palette. You are prompted for the `client_secret` once; it is stored
+   in the OS keychain via `SecretStorage`. A browser opens for Google's
+   consent screen; the extension listens on a loopback redirect
+   (`127.0.0.1`) with PKCE to receive the authorization code.
+
+After connecting, the refresh token lives in `SecretStorage` (the OS
+keychain on all three platforms). **Markdown Org: Disconnect Google
+Calendar** removes the stored token and client secret.
+
+> **Linux:** `SecretStorage` requires an active keyring service
+> (gnome-keyring or a compatible Secret Service implementation). Without
+> one, VS Code cannot persist the token and connecting will fail.
+
+### Current limitations (MVP)
+
+- **Push only.** Changes flow from your `.md` files to Google Calendar.
+  Reverse sync (calendar -> markdown) is planned for a later phase.
+- This release ships the **connection foundation** (connect / disconnect,
+  token storage). The calendar mapping and the sync engine itself land in
+  follow-up releases.
 
 ## Dependencies
 

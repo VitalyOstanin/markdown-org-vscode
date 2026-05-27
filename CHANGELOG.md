@@ -9,6 +9,10 @@ All notable changes to the "Markdown Org" extension will be documented in this f
 - Reads the optional `properties` object emitted per task by
   markdown-org-extract (parsed from an `org-properties` fenced code
   block). See ADR-0009.
+- Google Calendar sync (opt-in, push only) -- foundation: connect /
+  disconnect via BYO Desktop OAuth client, loopback + PKCE, refresh token
+  stored in the OS keychain (`SecretStorage`). Zero runtime dependencies.
+  See ADR-0010.
 
 ### Internal
 
