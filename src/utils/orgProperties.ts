@@ -71,6 +71,45 @@ function deriveIndent(lines: string[], headingLine: number): string {
 }
 
 /**
+ * The targeted edit needed to set the task's `org-properties` block: the
+ * half-open line range `[startLine, endLineExclusive)` to replace and the
+ * `blockLines` to put there. A replace returns the range of the existing
+ * block; an insert returns an empty range (`startLine === endLineExclusive`)
+ * at the insertion point. Lets the consumer build a minimal `WorkspaceEdit`
+ * instead of rewriting the whole document (preserves EOL, smaller diffs).
+ */
+export interface OrgPropertiesEdit {
+    startLine: number;
+    endLineExclusive: number;
+    blockLines: string[];
+}
+
+/**
+ * Compute the targeted edit for setting the task's `org-properties` block to
+ * `props` without mutating `lines`. If a block already exists (per
+ * `findOrgPropertiesBlock`) its range is returned for in-place replacement;
+ * otherwise the range is empty and points right after the heading's
+ * planning-line run (the same insertion point `upsertOrgProperties` uses).
+ */
+export function computeOrgPropertiesEdit(
+    lines: string[],
+    headingLine: number,
+    props: Record<string, string>
+): OrgPropertiesEdit {
+    const indent = deriveIndent(lines, headingLine);
+    const blockLines = buildOrgPropertiesBlock(props, indent);
+    const existing = findOrgPropertiesBlock(lines, headingLine);
+    if (existing) {
+        return { startLine: existing.startLine, endLineExclusive: existing.endLineExclusive, blockLines };
+    }
+    let insertAt = headingLine + 1;
+    while (insertAt < lines.length && matchTimestampLine(lines[insertAt])) {
+        insertAt++;
+    }
+    return { startLine: insertAt, endLineExclusive: insertAt, blockLines };
+}
+
+/**
  * Return a new line array with the task's `org-properties` block set to
  * `props`. If a block already exists (per `findOrgPropertiesBlock`) it is
  * replaced in place; otherwise a fresh block is inserted right after the
@@ -78,18 +117,8 @@ function deriveIndent(lines: string[], headingLine: number): string {
  * adapted to a `WorkspaceEdit` by the calendar-sync consumer.
  */
 export function upsertOrgProperties(lines: string[], headingLine: number, props: Record<string, string>): string[] {
-    const indent = deriveIndent(lines, headingLine);
-    const block = buildOrgPropertiesBlock(props, indent);
-    const existing = findOrgPropertiesBlock(lines, headingLine);
+    const e = computeOrgPropertiesEdit(lines, headingLine, props);
     const result = [...lines];
-    if (existing) {
-        result.splice(existing.startLine, existing.endLineExclusive - existing.startLine, ...block);
-        return result;
-    }
-    let insertAt = headingLine + 1;
-    while (insertAt < lines.length && matchTimestampLine(lines[insertAt])) {
-        insertAt++;
-    }
-    result.splice(insertAt, 0, ...block);
+    result.splice(e.startLine, e.endLineExclusive - e.startLine, ...e.blockLines);
     return result;
 }

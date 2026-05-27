@@ -1,5 +1,10 @@
 import * as assert from 'node:assert/strict';
-import { buildOrgPropertiesBlock, findOrgPropertiesBlock, upsertOrgProperties } from '../../utils/orgProperties';
+import {
+    buildOrgPropertiesBlock,
+    findOrgPropertiesBlock,
+    upsertOrgProperties,
+    computeOrgPropertiesEdit
+} from '../../utils/orgProperties';
 
 suite('orgProperties.buildOrgPropertiesBlock', () => {
     test('wraps sorted key/value pairs in an org-properties fence', () => {
@@ -100,5 +105,30 @@ suite('orgProperties.upsertOrgProperties', () => {
             '  ```',
             '  Body.'
         ]);
+    });
+});
+
+suite('orgProperties.computeOrgPropertiesEdit', () => {
+    test('insert: empty range (startLine === endLineExclusive) after the planning run', () => {
+        const lines = ['### TODO Foo', '`SCHEDULED: <2026-06-01 Mon>`', 'Body.'];
+        const e = computeOrgPropertiesEdit(lines, 0, { ID: 'x' });
+        assert.equal(e.startLine, 2);
+        assert.equal(e.endLineExclusive, 2);
+        assert.deepEqual(e.blockLines, ['```org-properties', 'ID: x', '```']);
+    });
+
+    test('insert at EOF: heading with no body — range points past the last line', () => {
+        const lines = ['### TODO Foo'];
+        const e = computeOrgPropertiesEdit(lines, 0, { ID: 'x' });
+        assert.equal(e.startLine, 1);
+        assert.equal(e.endLineExclusive, 1);
+    });
+
+    test('replace: existing block range is returned', () => {
+        const lines = ['### TODO Foo', '```org-properties', 'ID: old', '```', 'Body.'];
+        const e = computeOrgPropertiesEdit(lines, 0, { ID: 'new' });
+        assert.equal(e.startLine, 1);
+        assert.equal(e.endLineExclusive, 4);
+        assert.deepEqual(e.blockLines, ['```org-properties', 'ID: new', '```']);
     });
 });
