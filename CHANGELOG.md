@@ -16,6 +16,18 @@ All notable changes to the "Markdown Org" extension will be documented in this f
 - Google Calendar sync: calendar selection (settings `gcalSync.calendarName`
   / `gcalSync.calendarId` and a "Select Google Calendar" command), REST
   client, deterministic event id, and task-to-event mapping.
+- Google Calendar sync: "Sync Now" command and an optional
+  debounce-on-save trigger; idempotent push (create / update / delete)
+  keyed by org-id, with an in-process queue / cancel policy and a
+  cross-process workspace lock so only one sync runs at a time. Property
+  write-back (`ID` / `GCAL_EVENT_ID`) is conflict-safe: it is deferred
+  (not forced) when the target file has unsaved edits or has shifted
+  since extraction, reported as `deferred` in the sync summary, and
+  retried on the next sync -- a task with a freshly minted id is not
+  published until its id is written back, so no duplicate events are
+  created. Settings: `gcalSync.concurrencyPolicy`, `gcalSync.syncOnSave`,
+  `gcalSync.syncOnSaveDebounceMs`, `gcalSync.onDone`,
+  `gcalSync.defaultEventMinutes`.
 
 ### Internal
 

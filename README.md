@@ -332,6 +332,8 @@ Markdown editor has focus.
 | ------------------------------------------ | ------ | ------------------------------------------------------------------ |
 | `Markdown Org: Connect Google Calendar`    | -      | Run the BYO OAuth flow and store the refresh token in the keychain |
 | `Markdown Org: Disconnect Google Calendar` | -      | Remove the stored token and client secret from the keychain        |
+| `Markdown Org: Select Google Calendar`     | -      | Pick the calendar to sync into; pins `gcalSync.calendarId`         |
+| `Markdown Org: Sync Now (Google Calendar)` | -      | Push tasks to Google Calendar once, on demand                      |
 
 See [Google Calendar Sync](#google-calendar-sync) for the one-time setup.
 
@@ -514,13 +516,86 @@ Calendar** removes the stored token and client secret.
 > (gnome-keyring or a compatible Secret Service implementation). Without
 > one, VS Code cannot persist the token and connecting will fail.
 
+### Choosing the calendar
+
+Run **Markdown Org: Select Google Calendar** to pick which calendar
+receives the events; it pins the choice in
+`markdown-org.gcalSync.calendarId`. With no pinned id, the sync finds
+(or creates) a calendar named after `markdown-org.gcalSync.calendarName`.
+
+### Running a sync
+
+Two ways to trigger a sync:
+
+- **Markdown Org: Sync Now (Google Calendar)** pushes once, on demand.
+- The **sync-on-save** trigger (`markdown-org.gcalSync.syncOnSave`) runs a
+  sync after you save a markdown file. It is **off by default**; when
+  enabled, runs are debounced by
+  `markdown-org.gcalSync.syncOnSaveDebounceMs` (5000 ms by default) so a
+  burst of saves coalesces into one sync.
+
+Each sync extracts the tasks that carry an active `SCHEDULED` /
+`DEADLINE` timestamp and pushes the corresponding events: a task with no
+end time gets a timed event of `markdown-org.gcalSync.defaultEventMinutes`
+duration (60 minutes by default). When a task becomes DONE, the
+`markdown-org.gcalSync.onDone` setting decides whether to `delete` its
+event or `keep` it.
+
+### One sync at a time
+
+Only one sync runs at a time:
+
+- **Within one VS Code window**, requests that arrive while a sync is
+  running are serialised per `markdown-org.gcalSync.concurrencyPolicy`:
+  `queue` coalesces them into a single rerun, `cancel` aborts the
+  in-flight run and restarts.
+- **Across windows / processes**, a file lock in the workspace prevents a
+  second sync from starting while another already holds it.
+
+### Property write-back is deferred, never forced
+
+To address an event by a stable key, the sync writes an `ID` (and the
+returned `GCAL_EVENT_ID`) into the task's `org-properties` block. This
+write-back is conflict-safe: if the target file currently has **unsaved
+edits**, or has **shifted on disk since the tasks were extracted**, the
+write is **deferred** rather than forced over your changes. Deferred
+files are counted as `deferred` in the sync summary and retried on the
+next sync. A task whose `ID` was freshly minted is **not published**
+until that id is successfully written back, so a deferred write never
+produces a duplicate event -- the same task reuses the same id on the
+next run.
+
 ### Current limitations (MVP)
 
 - **Push only.** Changes flow from your `.md` files to Google Calendar.
   Reverse sync (calendar -> markdown) is planned for a later phase.
-- This release ships the **connection foundation** (connect / disconnect,
-  token storage). The calendar mapping and the sync engine itself land in
-  follow-up releases.
+- **No orphan cleanup.** Events left behind by tasks that were deleted
+  outright (heading removed, not marked DONE) are not purged
+  automatically.
+- **Repeaters collapse to one event.** A repeating task syncs as a single
+  event on its base date; the recurrence is not expanded into a Google
+  recurring event.
+- **Second-window edits are invisible.** If the same file is open in a
+  second VS Code window with unsaved edits, this extension cannot see
+  that other window's in-memory state. A sync writing back to disk there
+  may trigger VS Code's standard "file changed on disk" prompt in the
+  other window.
+
+### Settings
+
+All Google Calendar sync settings live under the
+`markdown-org.gcalSync.*` namespace:
+
+| Setting                                      | Type                  | Default          | Description                                                                                                                                                     |
+| -------------------------------------------- | --------------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `markdown-org.gcalSync.clientId`             | `string`              | `""`             | Google OAuth Desktop `client_id` (BYO). The `client_secret` is entered on connect and kept in the OS keychain, not here. Scope `machine`.                       |
+| `markdown-org.gcalSync.calendarName`         | `string`              | `"markdown-org"` | Name used to find-or-create the sync calendar when no `calendarId` is pinned.                                                                                   |
+| `markdown-org.gcalSync.calendarId`           | `string`              | `""`             | Pinned Google calendar id (takes precedence over `calendarName`). Usually set by **Select Google Calendar**.                                                    |
+| `markdown-org.gcalSync.concurrencyPolicy`    | `"queue" \| "cancel"` | `"queue"`        | Behaviour when a sync is requested while one is running (within a window): `queue` coalesces into a single rerun; `cancel` aborts the current run and restarts. |
+| `markdown-org.gcalSync.syncOnSave`           | `boolean`             | `false`          | Run a (debounced) sync after saving a markdown file.                                                                                                            |
+| `markdown-org.gcalSync.syncOnSaveDebounceMs` | `number`              | `5000`           | Debounce interval (ms) for the sync-on-save trigger.                                                                                                            |
+| `markdown-org.gcalSync.onDone`               | `"delete" \| "keep"`  | `"delete"`       | When a task becomes DONE: `delete` removes its calendar event; `keep` leaves it.                                                                                |
+| `markdown-org.gcalSync.defaultEventMinutes`  | `number`              | `60`             | Duration for a timed task event when no end time is given.                                                                                                      |
 
 ## Dependencies
 
