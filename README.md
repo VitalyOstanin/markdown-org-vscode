@@ -489,6 +489,15 @@ Optional, opt-in one-way sync designed to push tasks carrying an active
 you supply your own OAuth client and connect. See
 [ADR-0010](docs/adr/0010-google-calendar-sync.md) for the design.
 
+**Sync Now** pushes the dated tasks, shows a status-bar spinner while it
+runs, and reports what changed; **Show details** opens the full per-event
+log:
+
+![Sync Now: spinner, summary, and the per-event details channel](media/demo-gcal-sync.gif)
+
+Three commands cover the whole flow: connect once, choose a calendar, then
+sync on demand (or on save).
+
 ### One-time setup (bring your own OAuth client)
 
 The extension ships **no** Google credentials; you create a Desktop
@@ -516,12 +525,19 @@ Calendar** removes the stored token and client secret.
 > (gnome-keyring or a compatible Secret Service implementation). Without
 > one, VS Code cannot persist the token and connecting will fail.
 
+Connect prompts for the `client_secret`, then completes the browser
+authorization and stores the token:
+
+![Connect Google Calendar: client-secret prompt, connecting, connected](media/demo-gcal-connect.gif)
+
 ### Choosing the calendar
 
 Run **Markdown Org: Select Google Calendar** to pick which calendar
 receives the events; it pins the choice in
 `markdown-org.gcalSync.calendarId`. With no pinned id, the sync finds
 (or creates) a calendar named after `markdown-org.gcalSync.calendarName`.
+
+![Select Google Calendar: pick from your writable calendars](media/demo-gcal-select.gif)
 
 ### Running a sync
 

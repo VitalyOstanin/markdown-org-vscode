@@ -28,6 +28,9 @@ export default defineConfig({
         demoEntry('demo-timestamps', 'timestamps.demo.test.js', 'test-workspace-demo-timestamps'),
         demoEntry('demo-clock', 'clock.demo.test.js', 'test-workspace-demo-clock'),
         demoEntry('demo-agenda', 'agenda.demo.test.js', 'test-workspace-demo-agenda'),
+        demoEntry('demo-gcal-connect', 'gcalConnect.demo.test.js', 'test-workspace-demo-gcal-connect'),
+        demoEntry('demo-gcal-select', 'gcalSelectCalendar.demo.test.js', 'test-workspace-demo-gcal-select'),
+        demoEntry('demo-gcal-sync', 'gcalSyncNow.demo.test.js', 'test-workspace-demo-gcal-sync'),
         demoEntry('demo-screenshots', 'screenshots.demo.test.js', 'test-workspace-demo-screenshots')
     ]
 });

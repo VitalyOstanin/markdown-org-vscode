@@ -325,7 +325,7 @@ function splitToken(token: string): { modifiers: string[]; key: string } {
  * `name` should match the palette query a user would type, e.g.
  * "Markdown Org Show Agenda Day".
  */
-export async function runCommandViaPalette(name: string): Promise<void> {
+export async function runCommandViaPalette(name: string, pauseBeforeEnterMs = 450): Promise<void> {
     await ensureVscodeWindowFocused();
     // Clear any stale chord/modifier state from a previous pressKey.
     for (const mod of ['ctrl', 'shift', 'alt', 'super']) {
@@ -341,8 +341,72 @@ export async function runCommandViaPalette(name: string): Promise<void> {
     await runXdotool(['keyup', 'ctrl']);
     await sleep(350);
     await runXdotool(['type', '--delay', '25', name]);
-    await sleep(450);
+    // Hold on the highlighted match before accepting so the recording shows
+    // which command is about to run (callers raise this for demo clarity).
+    await sleep(pauseBeforeEnterMs);
     await runXdotool(['key', 'Return']);
+}
+
+/**
+ * Type literal text into the focused widget (input box, QuickInput) at the
+ * X-server level, then optionally submit with Return. Used by the connect demo
+ * to fill the client-secret prompt the same way a user would. Goes through
+ * `xdotool type` so the keystrokes reach VS Code's focused input.
+ */
+export async function typeText(text: string, submit = false): Promise<void> {
+    // No window re-activation: the target is an already-open input box / QuickInput
+    // that holds focus; activating the window would hand focus back to the editor
+    // (see pressKeyInPicker). The window is already focused from the demo setup.
+    await runXdotool(['type', '--delay', '30', text]);
+    if (submit) {
+        await sleep(200);
+        await runXdotool(['key', 'Return']);
+    }
+}
+
+/**
+ * Give the VS Code window X-server keyboard focus once. Call this just before
+ * opening a QuickPick / input box programmatically: the picker then captures
+ * internal focus, and subsequent `pressKeyInPicker` / `typeText` calls -- which
+ * deliberately do not re-activate the window -- land in the picker rather than
+ * being lost to an unfocused root window.
+ */
+export async function focusVscodeWindow(): Promise<void> {
+    await ensureVscodeWindowFocused();
+}
+
+/**
+ * Send a key sequence WITHOUT the chord-reset Escape that `pressKey` injects.
+ * `pressKey` presses Escape first to clear any stale chord prefix, but Escape
+ * dismisses a QuickPick / QuickInput -- so navigating an open picker (arrows,
+ * Enter) must use this variant. Stuck modifiers are still cleared defensively.
+ */
+export async function pressKeyInPicker(sequence: string): Promise<void> {
+    // Deliberately do NOT re-activate/raise the VS Code window here: an open
+    // QuickPick already holds keyboard focus, and xdotool's windowactivate +
+    // windowraise hand focus back to the editor, so the arrows/Enter would move
+    // the editor cursor and never pick. The window is already focused from the
+    // demo setup; send the keys straight to whatever currently has X focus.
+    for (const mod of ['ctrl', 'shift', 'alt', 'super']) {
+        await runXdotool(['keyup', mod]);
+    }
+    const tokens = sequence.split(/\s+/).filter(Boolean);
+    for (let i = 0; i < tokens.length; i++) {
+        const { modifiers, key } = splitToken(tokens[i]);
+        for (const mod of modifiers) {
+            const r = await runXdotool(['keydown', mod]);
+            if (r.status !== 0) throw new Error(`xdotool keydown ${mod} failed`);
+        }
+        const tap = await runXdotool(['key', key]);
+        if (tap.status !== 0) throw new Error(`xdotool key ${key} failed`);
+        for (const mod of [...modifiers].reverse()) {
+            const r = await runXdotool(['keyup', mod]);
+            if (r.status !== 0) throw new Error(`xdotool keyup ${mod} failed`);
+        }
+        if (i < tokens.length - 1) {
+            await sleep(200);
+        }
+    }
 }
 
 export async function pressKey(sequence: string): Promise<void> {

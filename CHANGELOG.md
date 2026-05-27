@@ -6,6 +6,16 @@ All notable changes to the "Markdown Org" extension will be documented in this f
 
 ### Added
 
+- **Google Calendar sync (opt-in, push only).** Push tasks that carry an
+  active `SCHEDULED` / `DEADLINE` timestamp to your own Google Calendar:
+  connect once with your OAuth client, pick a calendar, then **Sync Now**
+  (or sync on save). A status-bar spinner shows progress; the summary toast
+  lists the affected events on a single line and **Show details** opens a
+  per-event log. Marking a task DONE deletes its event (configurable), and
+  re-opening it (DONE → TODO) revives that event rather than leaving an
+  empty calendar. See the [README](README.md#google-calendar-sync) section
+  (with connect / select / sync demos) and ADR-0010. The bullets below
+  break the feature down by build phase.
 - Reads the optional `properties` object emitted per task by
   markdown-org-extract (parsed from an `org-properties` fenced code
   block). See ADR-0009.

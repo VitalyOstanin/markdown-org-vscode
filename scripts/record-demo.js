@@ -7,7 +7,7 @@
 //   node scripts/record-demo.js <scenario>
 //   node scripts/record-demo.js all
 //
-// scenario ∈ { task-status, timestamps, clock, agenda }.
+// scenario ∈ { task-status, timestamps, clock, agenda, gcal-connect, gcal-select, gcal-sync }.
 //
 // Логика одного прогона:
 //   1. Запустить Xvfb на DISPLAY :99 в разрешении RECORD_GEOMETRY (см. ниже).
@@ -28,7 +28,7 @@ const repoRoot = path.join(__dirname, '..');
 const mediaDir = path.join(repoRoot, 'media');
 fs.mkdirSync(mediaDir, { recursive: true });
 
-const SCENARIOS = ['task-status', 'timestamps', 'clock', 'agenda'];
+const SCENARIOS = ['task-status', 'timestamps', 'clock', 'agenda', 'gcal-connect', 'gcal-select', 'gcal-sync'];
 
 // Resolution of the Xvfb screen the recording runs on. Kept in one place so
 // that the value flows into ffmpeg's video_size, the env that
@@ -43,7 +43,10 @@ const SCENARIO_WORKSPACES = {
     'task-status': 'test-workspace-demo-task-status',
     timestamps: 'test-workspace-demo-timestamps',
     clock: 'test-workspace-demo-clock',
-    agenda: 'test-workspace-demo-agenda'
+    agenda: 'test-workspace-demo-agenda',
+    'gcal-connect': 'test-workspace-demo-gcal-connect',
+    'gcal-select': 'test-workspace-demo-gcal-select',
+    'gcal-sync': 'test-workspace-demo-gcal-sync'
 };
 
 // Seed the demo workspace's settings.json before VS Code starts. The demo
@@ -61,7 +64,7 @@ function seedWorkspaceSettings(workspaceDir, scenario) {
     if (scenario === 'clock') {
         settings['markdown-org.clockRoundMinutes'] = 60;
     }
-    if (scenario === 'agenda') {
+    if (scenario === 'agenda' || scenario.startsWith('gcal-')) {
         settings['markdown-org.workspaceDir'] = workspaceDir;
     }
     const vscodeDir = path.join(workspaceDir, '.vscode');
