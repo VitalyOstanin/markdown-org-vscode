@@ -214,21 +214,40 @@ function channelLine(c: SyncChange): string {
     return `  ${c.action.padEnd(7)} ${c.date ?? '—'}  ${c.heading.trim()}`;
 }
 
+/** What invoked syncNow: a user action vs. an automatic save trigger. */
+export type SyncTrigger = 'manual' | 'onSave';
+
 /**
  * Report a finished sync: append the full per-run list to the details channel,
- * then show a toast with the counts and up to SYNC_TOAST_LIMIT changed events
- * (created/updated/deleted). The toast's "Show details" button reveals the
- * channel. notifyInfo is deliberately not used: this needs an action button.
+ * then -- depending on the trigger -- show a summary toast with up to
+ * SYNC_TOAST_LIMIT changed events (created/updated/deleted). The toast's
+ * "Show details" button reveals the channel. notifyInfo is deliberately not
+ * used: this needs an action button.
+ *
+ * Toast policy:
+ *   * `manual`  -- always show the summary toast (the user asked for it).
+ *   * `onSave`  -- silent on success / `no changes` (background automation);
+ *                  toast only when `failed > 0` so the user notices breakage.
+ * The details channel is appended in both cases, so the full per-event log
+ * is always reachable from the **Calendar Sync** output channel.
  */
-async function reportSyncSummary(summary: SyncSummary): Promise<void> {
+async function reportSyncSummary(summary: SyncSummary, trigger: SyncTrigger): Promise<void> {
     const counts =
         `${summary.created} created, ${summary.updated} updated, ${summary.deleted} deleted, ` +
         `${summary.skipped} skipped, ${summary.deferred} deferred, ${summary.failed} failed`;
 
     const channel = getSyncChannel();
-    channel.appendLine(`[${new Date().toLocaleTimeString()}] sync: ${counts}`);
+    channel.appendLine(`[${new Date().toLocaleTimeString()}] sync (${trigger}): ${counts}`);
     for (const c of summary.changes) {
         channel.appendLine(channelLine(c));
+    }
+
+    // Background on-save runs stay silent unless something failed: a toast on
+    // every save is spam (no-ops are common, the spinner already signalled the
+    // run, and the channel keeps the log). Failures still surface so a broken
+    // token / network issue is visible.
+    if (trigger === 'onSave' && summary.failed === 0) {
+        return;
     }
 
     const changed = summary.changes.filter(
@@ -346,8 +365,17 @@ async function lockPathFor(context: vscode.ExtensionContext, workspaceDir: strin
     return path.join(dir, `gcal-sync-${key}.lock`);
 }
 
-/** Sync now: push tasks to the configured Google Calendar. */
-export async function syncNow(context: vscode.ExtensionContext): Promise<void> {
+/**
+ * Sync now: push tasks to the configured Google Calendar.
+ *
+ * `opts.trigger` controls the post-run summary toast (see `reportSyncSummary`):
+ *   * `'manual'` (default) -- summary toast always shown.
+ *   * `'onSave'`            -- silent on success; toast only when `failed > 0`.
+ * The status-bar spinner and the **Calendar Sync** output channel are the
+ * same for both triggers.
+ */
+export async function syncNow(context: vscode.ExtensionContext, opts: { trigger?: SyncTrigger } = {}): Promise<void> {
+    const trigger: SyncTrigger = opts.trigger ?? 'manual';
     if (!vscode.workspace.isTrusted) {
         await notifyWarn('Google Calendar sync is disabled in untrusted workspaces');
         return;
@@ -418,7 +446,7 @@ export async function syncNow(context: vscode.ExtensionContext): Promise<void> {
     );
 
     if (summary) {
-        await reportSyncSummary(summary);
+        await reportSyncSummary(summary, trigger);
     }
 }
 
@@ -436,7 +464,9 @@ export function registerGcalSaveTrigger(context: vscode.ExtensionContext): void 
         const delay = cfg.get<number>('gcalSync.syncOnSaveDebounceMs') ?? 5000;
         if (!debounced) {
             debounced = debounce(() => {
-                void syncNow(context).catch(() => {});
+                // Background automation: silent on success/no-changes, toast
+                // only on failures. See reportSyncSummary's toast policy.
+                void syncNow(context, { trigger: 'onSave' }).catch(() => {});
             }, delay);
         }
         debounced();

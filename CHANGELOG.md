@@ -44,6 +44,11 @@ All notable changes to the "Markdown Org" extension will be documented in this f
 - macOS keybindings: every `Ctrl+K …` chord now ships a `Cmd+K …` mac
   override (VS Code does not auto-map `Ctrl` to `Cmd`), so the shortcuts
   match macOS conventions. `Shift+Up` / `Shift+Down` are unchanged.
+- Sync-on-save is now silent on success and "no changes"; a toast
+  appears only when something failed (`failed > 0`). Manual **Sync Now**
+  keeps the full summary toast. The status-bar spinner and the
+  **Calendar Sync** output channel run on every sync regardless of
+  trigger.
 
 ### Internal
 

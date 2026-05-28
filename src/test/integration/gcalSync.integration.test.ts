@@ -259,6 +259,48 @@ suite('Google Calendar sync: DONE -> delete', () => {
         assert.ok(message.includes(' · '), `events should be ·-separated: ${JSON.stringify(message)}`);
         assert.ok(!/\b0 (created|updated|skipped|deferred|failed)\b/.test(message), `zero counts dropped: ${message}`);
     });
+
+    test('on-save trigger: silent on success (no toast for background sync)', async function () {
+        this.timeout(15000);
+
+        await syncNow(makeContext(), { trigger: 'onSave' });
+
+        // The DELETE succeeded (DONE -> delete branch with status 200), so
+        // summary.failed === 0. On-save is background automation -- no toast.
+        assert.ok(
+            fetchCalls.some((c) => c.method === 'DELETE'),
+            'sanity: the sync did run and deleted the event'
+        );
+        assert.strictEqual(infoStub.called, false, 'on-save success must not show a summary toast');
+    });
+
+    test('on-save trigger: toast on failure so breakage is visible', async function () {
+        this.timeout(15000);
+
+        // Force the DELETE branch to return 500 so the engine catches and
+        // increments summary.failed. The on-save trigger must surface that.
+        fetchStub.callsFake((async (input: unknown, init?: { method?: string }) => {
+            const url = String(input);
+            const method = (init?.method ?? 'GET').toUpperCase();
+            fetchCalls.push({ url, method });
+            if (url === 'https://oauth2.googleapis.com/token') {
+                return jsonResponse(200, { access_token: 'at', expires_in: 3600 });
+            }
+            if (method === 'GET' && url === 'https://www.googleapis.com/calendar/v3/calendars/cal') {
+                return jsonResponse(200, { id: 'cal' });
+            }
+            if (method === 'DELETE' && url.startsWith('https://www.googleapis.com/calendar/v3/calendars/cal/events/')) {
+                return jsonResponse(500, { error: { message: 'boom' } });
+            }
+            return jsonResponse(404, { error: { message: `unexpected ${method} ${url}` } });
+        }) as unknown as typeof fetch);
+
+        await syncNow(makeContext(), { trigger: 'onSave' });
+
+        assert.ok(infoStub.called, 'on-save with failures must still show a toast');
+        const [message] = infoStub.firstCall.args as [string, string];
+        assert.match(message, /1 failed/, `toast should report the failure count: ${message}`);
+    });
 });
 
 // makePropertiesWriter is the editor binding for the sync engine's local

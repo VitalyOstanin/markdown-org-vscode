@@ -571,6 +571,16 @@ Two ways to trigger a sync:
   `markdown-org.gcalSync.syncOnSaveDebounceMs` (5000 ms by default) so a
   burst of saves coalesces into one sync.
 
+The two triggers differ in how they surface the result so that on-save
+runs stay out of the way:
+
+- **Sync Now** -- always shows the summary toast (you asked for it).
+- **Sync on save** -- silent on success and "no changes"; a toast appears
+  only when something failed (`failed > 0`), so a broken token or a
+  network error is still visible. The status-bar spinner runs during
+  every sync, and the **Calendar Sync** output channel keeps the full
+  per-event log for both triggers.
+
 Each sync extracts the tasks that carry an active `SCHEDULED` /
 `DEADLINE` timestamp and pushes the corresponding events: a task with no
 end time gets a timed event of `markdown-org.gcalSync.defaultEventMinutes`
