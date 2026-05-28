@@ -31,6 +31,7 @@ travel with the repository.
     - [CLOCK Commands](#clock-commands)
     - [Agenda Commands](#agenda-commands)
     - [Heading Management Commands](#heading-management-commands)
+        - [Migrating into a maintain file with **Promote to Maintain**](#migrating-into-a-maintain-file-with-promote-to-maintain)
     - [Google Calendar Commands](#google-calendar-commands)
 - [Settings](#settings)
     - [`markdown-org.extractorPath`](#markdown-orgextractorpath)
@@ -346,6 +347,39 @@ for `Set TODO` (the `Shift+Up`/`Shift+Down` bindings are unchanged).
 | ----------------------------------- | ----------------------------- | ---------------------------------------------------------------------------- |
 | `Markdown Org: Move to Archive`     | `Ctrl+K Ctrl+K Ctrl+M Ctrl+A` | Move current heading into the file's `*.archive.md`                          |
 | `Markdown Org: Promote to Maintain` | `Ctrl+K Ctrl+K Ctrl+M Ctrl+P` | Move heading to the maintain file (requires `markdown-org.maintainFilePath`) |
+
+#### Migrating into a maintain file with **Promote to Maintain**
+
+`Promote to Maintain` was built for a specific workflow: gradually migrating
+tasks from an older planner into a single, current markdown file. Use cases
+include moving entries out of a legacy org-mode `todo.org`, consolidating
+several scratch `.md` files into one, or triaging an export from a tracker
+that arrives as headings.
+
+Set `markdown-org.maintainFilePath` to the target file (relative to the
+workspace root). Place the cursor on any markdown heading and trigger the
+command. The heading -- with its body and any child headings -- is cut
+from the active document and appended to the maintain file under a
+`# incoming` section. Behaviour in detail:
+
+- The promoted heading is rewritten as a level-2 (`## `) heading
+  regardless of its original level, so promoted blocks share a single
+  inbox layout no matter where they came from.
+- Child headings shift by `delta = 2 - <source level>` and are clamped
+  to `[1, 6]`: an `### Subtask` under a `## ` source keeps `###`; an
+  `## Subtask` under a `# ` source becomes `###`; an already-`######`
+  child stays `######`.
+- The first `# incoming` heading in the maintain file (case-insensitive
+  match) is reused; the block is spliced in directly after it. If the
+  file has no `# incoming`, the section is appended at the bottom; if
+  the file does not exist yet, it is created.
+- The maintain write is atomic (write to `*.tmp-<pid>-<ts>` + rename) and
+  refuses to follow a symlink at the maintain path. The source document
+  edit is applied through `vscode.WorkspaceEdit` -- the source remains
+  open and unsaved until the user saves it, so the cut can be reviewed
+  or undone.
+- The command is disabled in untrusted workspaces and refuses paths
+  outside the workspace, in line with the rest of the extension.
 
 ### Google Calendar Commands
 

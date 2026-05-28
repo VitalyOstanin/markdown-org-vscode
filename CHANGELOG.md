@@ -2,6 +2,27 @@
 
 All notable changes to the "Markdown Org" extension will be documented in this file.
 
+## [Unreleased]
+
+### Documentation
+
+- **Promote to Maintain**: README gained a dedicated subsection explaining
+  the migration workflow (cut a heading + body + children, append under
+  `# incoming` in the configured maintain file, re-level to `## `). The
+  command itself is unchanged.
+
+### Internal
+
+- `src/utils/maintainPromote.ts` extracts the level-shift / `# incoming`
+  insertion math out of the `promoteToMaintain` command as a pure,
+  vscode-free helper (`computeMaintainInsertion`). The editor binding in
+  `src/commands/moveHeading.ts` now calls into it.
+- Added unit coverage for the helper (12 cases: re-level math, clamp,
+  `# incoming` case-insensitive / first-match-wins, three append-shapes)
+  and integration coverage for the command itself (`# incoming` exists,
+  missing, maintain file missing, `maintainFilePath` not configured;
+  source edit + atomic maintain write checked end-to-end).
+
 ## [0.8.0] - 2026-05-28
 
 ### Added

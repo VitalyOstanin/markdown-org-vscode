@@ -5,6 +5,7 @@ import { findNearestHeading, isPathInsideWorkspace, requireActiveEditor, resolve
 import { notifyError, notifyInfo, notifyWarn } from '../utils/notify';
 import { computeBlockDeletionCoords } from '../utils/blockDeletion';
 import { extractHeadingBlockLines } from '../utils/extractHeading';
+import { computeMaintainInsertion } from '../utils/maintainPromote';
 
 async function readIfExists(filePath: string): Promise<string | null> {
     try {
@@ -206,38 +207,16 @@ export async function promoteToMaintain() {
         return;
     }
 
-    let maintainContent = (await readIfExists(maintainPath)) ?? '';
-
-    const lines = maintainContent.split('\n');
-    let incomingIndex = -1;
-
-    for (let i = 0; i < lines.length; i++) {
-        if (lines[i].match(/^#\s+incoming$/i)) {
-            incomingIndex = i;
-            break;
-        }
-    }
-
-    const delta = 2 - heading.level;
-    const newHeading = '## ' + heading.text;
-    const newContent = heading.content.slice(1).map((line) => {
-        const match = line.match(/^(#+)\s+(.+)$/);
-        if (match) {
-            const newLevel = Math.min(6, Math.max(1, match[1].length + delta));
-            return '#'.repeat(newLevel) + ' ' + match[2];
-        }
-        return line;
+    const maintainContent = (await readIfExists(maintainPath)) ?? '';
+    const updatedMaintainContent = computeMaintainInsertion(maintainContent, {
+        headingText: heading.text,
+        headingLevel: heading.level,
+        // heading.content starts at the heading line itself; the helper only
+        // re-levels child headings inside the body, so drop the heading row.
+        bodyLines: heading.content.slice(1)
     });
 
-    if (incomingIndex === -1) {
-        maintainContent += (maintainContent && !maintainContent.endsWith('\n\n') ? '\n\n' : '') + '# incoming\n';
-        maintainContent += newHeading + '\n' + newContent.join('\n') + '\n';
-    } else {
-        lines.splice(incomingIndex + 1, 0, newHeading, ...newContent, '');
-        maintainContent = lines.join('\n');
-    }
-
-    await atomicWrite(maintainPath, maintainContent);
+    await atomicWrite(maintainPath, updatedMaintainContent);
 
     const edit = new vscode.WorkspaceEdit();
     edit.delete(document.uri, computeBlockDeletionRange(document, heading.line, heading.content.length));
