@@ -2,7 +2,7 @@
 
 All notable changes to the "Markdown Org" extension will be documented in this file.
 
-## [Unreleased]
+## [0.8.0] - 2026-05-28
 
 ### Added
 
@@ -68,6 +68,10 @@ All notable changes to the "Markdown Org" extension will be documented in this f
   replace in place; sorted keys; idempotent). The editor binding and a
   sync trigger that consume it are deferred to the Google Calendar sync
   change.
+- Bundled extractor bumped from 0.6.0 to 0.7.0 (Google Calendar sync
+  needs `--tasks-include-done`, which lands in 0.7.0); the matching
+  binary is downloaded per-target by `scripts/download-extractor.sh`
+  during the release packaging job.
 
 ## [0.7.0] - 2026-05-26
 
