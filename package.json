@@ -44,7 +44,9 @@
     "time tracking",
     "todo"
   ],
-  "activationEvents": [],
+  "activationEvents": [
+    "onLanguage:markdown"
+  ],
   "main": "./out/extension.js",
   "capabilities": {
     "untrustedWorkspaces": {

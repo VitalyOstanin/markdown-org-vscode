@@ -50,6 +50,17 @@ All notable changes to the "Markdown Org" extension will be documented in this f
   **Calendar Sync** output channel run on every sync regardless of
   trigger.
 
+### Fixed
+
+- `Shift+Up` / `Shift+Down` (timestamp / keyword cycling) now works
+  immediately after a fresh VS Code start, without first opening the
+  agenda. The extension was activating lazily on its first contributed
+  command, so the `markdown-org.timestampAdjustable` when-context was
+  unset and the keystroke fell through to the editor's default
+  `cursorUpSelect`. Added `onLanguage:markdown` to `activationEvents` so
+  the context (and the bracket diagnostics and sync-on-save trigger)
+  wire up as soon as a markdown file is opened.
+
 ### Internal
 
 - Pure, vscode-free `src/utils/orgProperties.ts` builds and upserts an
