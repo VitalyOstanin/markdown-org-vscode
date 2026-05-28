@@ -6,14 +6,17 @@
 
 Org-mode style task management in Markdown -- TODO/DONE workflow,
 priorities, SCHEDULED/DEADLINE timestamps, day/week/month agenda views,
-and CLOCK time tracking. Everything lives in plain `.md` files, so your
-tasks travel with the repository.
+CLOCK time tracking, and **one-way [Google Calendar sync](#google-calendar-sync)**
+of scheduled tasks. Everything lives in plain `.md` files, so your tasks
+travel with the repository.
 
 ![Day / Week / Month agenda demo](media/demo-agenda.gif)
 
 ## Table of Contents
 
 - [Features](#features)
+    - [Google Calendar sync (new)](#google-calendar-sync-new)
+    - [Core](#core)
 - [Quick Start](#quick-start)
 - [Syntax Examples](#syntax-examples)
     - [Task Statuses](#task-statuses)
@@ -50,7 +53,23 @@ tasks travel with the repository.
 ## Features
 
 Brings the [Org mode](https://orgmode.org/) task management workflow
-to Markdown files in VS Code:
+to Markdown files in VS Code.
+
+### Google Calendar sync (new)
+
+**Opt-in, one-way push of `SCHEDULED` / `DEADLINE` tasks to your own
+Google Calendar.** Connect with your OAuth Desktop client (refresh
+token stays in the OS keychain via VS Code's `SecretStorage`), pick the
+target calendar, then **Sync Now** on demand or enable debounced
+**sync on save**. Marking a task DONE deletes its event (configurable);
+re-opening it (DONE → TODO) revives the event instead of leaving an
+orphan. Property write-back (`ID` / `GCAL_EVENT_ID`) is conflict-safe.
+See the full [Google Calendar Sync](#google-calendar-sync) section with
+connect / select / sync demos and [ADR-0010](docs/adr/0010-google-calendar-sync.md).
+
+![Sync Now: spinner, summary, and the per-event details channel](media/demo-gcal-sync.gif)
+
+### Core
 
 - **Task management** -- TODO / DONE statuses with priorities (`[#A]` -- `[#Z]` or numeric `[#0]` -- `[#64]`).
 - **Timestamps** -- `CREATED`, `SCHEDULED`, `DEADLINE`, `CLOSED` with full date / time, in both active `<...>` and inactive `[...]` forms per [ADR-0005](docs/adr/0005-active-and-inactive-timestamps.md).
@@ -61,7 +80,6 @@ to Markdown files in VS Code:
 - **Live updates** -- Agenda refreshes automatically when underlying markdown files change.
 - **Heading management** -- Archive completed tasks to `*.archive.md` or promote them to a maintenance file.
 - **Properties** -- A per-task properties block: a fenced code block with the info string `org-properties` holding `KEY: value` lines, placed under the heading and its planning lines. It round-trips through markdown viewers as a folded block. See [ADR-0009](docs/adr/0009-task-properties-org-properties-block.md).
-- **Google Calendar sync** -- Opt-in, one-way push of tasks with an active `SCHEDULED` / `DEADLINE` timestamp to Google Calendar, using your own OAuth client. See [Google Calendar Sync](#google-calendar-sync) and [ADR-0010](docs/adr/0010-google-calendar-sync.md).
 
 ## Quick Start
 
