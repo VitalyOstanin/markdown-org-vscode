@@ -86,16 +86,23 @@ suite('Promote to Maintain: integration', () => {
         const tmpRoot = path.join(getTestWorkspaceDir(), tmpRootName);
         if (fs.existsSync(tmpRoot)) {
             for (const child of fs.readdirSync(tmpRoot)) {
-                // maxRetries/retryDelay: on Windows the OS may still hold a handle
-                // on a just-closed editor's file when this teardown runs, so a bare
-                // rmSync hits EBUSY (`force` only swallows ENOENT, not EBUSY). Node's
-                // rimraf retries on EBUSY/EPERM when maxRetries > 0.
-                fs.rmSync(path.join(tmpRoot, child), {
-                    recursive: true,
-                    force: true,
-                    maxRetries: 10,
-                    retryDelay: 100
-                });
+                // Best-effort cleanup. On Windows the extension host may still hold
+                // a handle on a just-closed editor's file when this teardown runs,
+                // so rmSync hits EBUSY (`force` only swallows ENOENT, not EBUSY);
+                // retries help but the handle can outlive them. Each test uses a
+                // unique mkdtemp dir, so a leftover scratch dir never collides with
+                // a later test -- failing to delete it is harmless, so swallow the
+                // error rather than failing the suite on a teardown race.
+                try {
+                    fs.rmSync(path.join(tmpRoot, child), {
+                        recursive: true,
+                        force: true,
+                        maxRetries: 10,
+                        retryDelay: 100
+                    });
+                } catch {
+                    // ignore (see comment above): scratch dir, unique name, no test impact
+                }
             }
         }
     });
