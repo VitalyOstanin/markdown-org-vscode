@@ -4,6 +4,21 @@ All notable changes to the "Markdown Org" extension will be documented in this f
 
 ## [Unreleased]
 
+### Added
+
+- **CANCELLED task status.** Headings can be marked `CANCELLED` via the
+  new **Set CANCELLED** command (`Ctrl+K Ctrl+X` / `Cmd+K Cmd+X`; repeat
+  to clear). Both spellings are recognised on read -- `CANCELLED` (the
+  common convention) and `CANCELED` (the Org manual's single-`L` form);
+  the command writes `CANCELLED`. A cancelled task renders struck-through
+  in the agenda. Recognising both spellings requires markdown-org-extract
+  0.9.0 (bundled).
+- Google Calendar sync now excludes `CANCELLED` tasks from the push and
+  deletes any event they already had, unconditionally (independent of the
+  `gcalSync.onDone` setting, which governs `DONE`). The extractor is
+  invoked with `--tasks-include-cancelled` so a freshly cancelled task
+  still reaches the sync engine to have its event removed. See ADR-0010.
+
 ### Documentation
 
 - **Promote to Maintain**: README gained a dedicated subsection explaining

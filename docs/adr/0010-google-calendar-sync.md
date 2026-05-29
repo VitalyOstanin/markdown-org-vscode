@@ -44,9 +44,15 @@ scope (Phase 2).
   "Select Google Calendar" QuickPick command. Update/delete are always
   addressed by our event id, so a shared calendar is safe.
 - **Lifecycle**: create/update for syncable tasks; delete when a task
-  stops qualifying; on `DONE`, delete by default (`onDone` setting).
-  Repeaters push a single event at the base date (MVP). Orphans from
-  fully deleted headings are not cleaned in the push MVP.
+  stops qualifying; on `DONE`, delete by default (`onDone` setting). A
+  `CANCELLED` task (both spellings `CANCELLED`/`CANCELED`, tested via the
+  `isCancelled` predicate) is never pushed and its event is deleted
+  unconditionally, independent of `onDone` -- it forces `wantDelete` in
+  `runSync` even when its timestamp would otherwise make it syncable, and
+  the extractor is invoked with `--tasks-include-cancelled` so the task
+  still reaches the engine. Repeaters push a single event at the base date
+  (MVP). Orphans from fully deleted headings are not cleaned in the push
+  MVP.
 - **Triggers**: manual "Sync now"; optional debounce-on-save, off by
   default.
 
