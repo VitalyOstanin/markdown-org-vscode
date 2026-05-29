@@ -78,4 +78,41 @@ suite('Task Status Tests', () => {
 
         assert.strictEqual(statuses[newIndex], 'TODO');
     });
+
+    test('Parse heading with CANCELLED status', () => {
+        const heading = '### CANCELLED Foo';
+        const match = heading.match(/^(#+)\s+(?:(TODO|DONE|CANCELLED)\s+)?(?:\[#([A-Z])\]\s+)?(.+)$/);
+
+        assert.ok(match);
+        assert.strictEqual(match[1], '###');
+        assert.strictEqual(match[2], 'CANCELLED');
+        assert.strictEqual(match[3], undefined);
+        assert.strictEqual(match[4], 'Foo');
+    });
+
+    // Mirrors the toggle rule used by setTaskStatus:
+    // `currentStatus !== status ? status : undefined`.
+    function nextStatus(current: string | undefined, applied: string): string | undefined {
+        return current !== applied ? applied : undefined;
+    }
+
+    test('setTaskStatus(CANCELLED) on TODO heading -> CANCELLED', () => {
+        // '### TODO Foo' -> apply CANCELLED -> '### CANCELLED Foo'
+        assert.strictEqual(nextStatus('TODO', 'CANCELLED'), 'CANCELLED');
+    });
+
+    test('Roundtrip TODO -> CANCELLED -> DONE', () => {
+        // Start with TODO, switch to CANCELLED.
+        const afterCancelled = nextStatus('TODO', 'CANCELLED');
+        assert.strictEqual(afterCancelled, 'CANCELLED');
+
+        // From CANCELLED, switch to DONE.
+        const afterDone = nextStatus(afterCancelled, 'DONE');
+        assert.strictEqual(afterDone, 'DONE');
+    });
+
+    test('Toggle-off: setTaskStatus(CANCELLED) on CANCELLED heading clears it', () => {
+        // '### CANCELLED Foo' -> apply CANCELLED again -> '### Foo'
+        assert.strictEqual(nextStatus('CANCELLED', 'CANCELLED'), undefined);
+    });
 });

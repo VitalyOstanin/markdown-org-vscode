@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import {
     setTaskStatus,
+    setCancelled,
     togglePriority,
     insertCreatedTimestamp,
     insertScheduledTimestamp,
@@ -29,6 +30,7 @@ function registerOrgCommand<A extends unknown[]>(
 export function activate(context: vscode.ExtensionContext) {
     registerOrgCommand(context, 'markdown-org.setTodo', () => setTaskStatus('TODO'));
     registerOrgCommand(context, 'markdown-org.setDone', () => setTaskStatus('DONE'));
+    registerOrgCommand(context, 'markdown-org.setCancelled', () => setCancelled());
     registerOrgCommand(context, 'markdown-org.togglePriority', () => togglePriority());
     registerOrgCommand(context, 'markdown-org.insertCreated', () => insertCreatedTimestamp());
     registerOrgCommand(context, 'markdown-org.insertScheduled', () => insertScheduledTimestamp());

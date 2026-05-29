@@ -58,6 +58,55 @@ suite('Task Status Integration Tests', () => {
         assert.strictEqual(document.lineAt(0).text, '## DONE Task title');
     });
 
+    test('Set CANCELLED command adds CANCELLED to heading', async () => {
+        document = await vscode.workspace.openTextDocument({
+            content: '## Task title',
+            language: 'markdown'
+        });
+        editor = await vscode.window.showTextDocument(document);
+
+        await vscode.commands.executeCommand('markdown-org.setCancelled');
+
+        assert.strictEqual(document.lineAt(0).text, '## CANCELLED Task title');
+    });
+
+    test('Set CANCELLED command transitions TODO -> CANCELLED', async () => {
+        document = await vscode.workspace.openTextDocument({
+            content: '### TODO Foo',
+            language: 'markdown'
+        });
+        editor = await vscode.window.showTextDocument(document);
+        editor.selection = new vscode.Selection(0, 0, 0, 0);
+
+        await vscode.commands.executeCommand('markdown-org.setCancelled');
+
+        assert.strictEqual(document.lineAt(0).text, '### CANCELLED Foo');
+    });
+
+    test('Set CANCELLED on CANCELLED heading toggles it off', async () => {
+        document = await vscode.workspace.openTextDocument({
+            content: '### CANCELLED Foo',
+            language: 'markdown'
+        });
+        editor = await vscode.window.showTextDocument(document);
+
+        await vscode.commands.executeCommand('markdown-org.setCancelled');
+
+        assert.strictEqual(document.lineAt(0).text, '### Foo');
+    });
+
+    test('Set CANCELLED preserves priority', async () => {
+        document = await vscode.workspace.openTextDocument({
+            content: '## [#A] Task title',
+            language: 'markdown'
+        });
+        editor = await vscode.window.showTextDocument(document);
+
+        await vscode.commands.executeCommand('markdown-org.setCancelled');
+
+        assert.strictEqual(document.lineAt(0).text, '## CANCELLED [#A] Task title');
+    });
+
     test('Toggle priority adds [#A]', async () => {
         document = await vscode.workspace.openTextDocument({
             content: '## TODO Task title',

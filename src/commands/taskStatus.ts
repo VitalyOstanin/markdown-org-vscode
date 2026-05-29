@@ -3,6 +3,7 @@ import { findNearestHeading, formatOrgTimestamp, getTimestampIndent, requireActi
 import { HEADING_REGEX, matchTimestampLine } from '../orgPatterns';
 import { buildHeading } from '../utils/buildHeading';
 import { normalizeTaskType } from '../utils/normalizeTaskType';
+import type { TaskStatus } from '../types';
 
 function formatActiveTimestamp(date: Date): string {
     return formatOrgTimestamp(date, 'angle');
@@ -12,8 +13,8 @@ function formatInactiveTimestamp(date: Date): string {
     return formatOrgTimestamp(date, 'square');
 }
 
-/** Toggle the TODO/DONE keyword on the nearest heading; preserves priority. Silent if no active markdown editor. */
-export async function setTaskStatus(status: 'TODO' | 'DONE') {
+/** Toggle the TODO/DONE/CANCELLED keyword on the nearest heading; preserves priority. Silent if no active markdown editor. */
+export async function setTaskStatus(status: TaskStatus) {
     const editor = requireActiveEditor({ markdownOnly: true });
     if (!editor) {
         return;
@@ -45,6 +46,11 @@ export async function setTaskStatus(status: 'TODO' | 'DONE') {
     return editor.edit((editBuilder) => {
         editBuilder.replace(line.range, newText);
     });
+}
+
+/** Shorthand for `setTaskStatus('CANCELLED')`. */
+export async function setCancelled(): Promise<void> {
+    await setTaskStatus('CANCELLED');
 }
 
 /** Toggle priority `[#A]` on the nearest heading; preserves TODO/DONE keyword. */
