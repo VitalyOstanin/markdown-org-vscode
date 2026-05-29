@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import { AgendaPanel } from '../views/agendaPanel';
-import { FileTag } from '../types';
+import { AgendaData, FileTag } from '../types';
+import { normalizeAgendaTaskTypes } from '../utils/normalizeTaskType';
 import { toIsoDate } from '../utils';
 import { exec } from '../utils/exec';
 import { filterTasksByTag } from '../utils/tagFilter';
@@ -80,7 +81,11 @@ export async function showAgenda(
 
         try {
             const result = await execCommand(extractorPath, args);
-            const rawData = JSON.parse(result);
+            // Parse boundary: the extractor JSON arrives untyped. Normalize
+            // every task's `task_type` to the known keyword set here so the
+            // `Task.task_type: TaskStatus | undefined` contract holds for all
+            // downstream code; unknown future keywords degrade to `undefined`.
+            const rawData = normalizeAgendaTaskTypes(JSON.parse(result) as AgendaData);
             const config = vscode.workspace.getConfiguration('markdown-org');
             const currentTag = config.get<string>('currentTag', 'ALL');
             const fileTags = config.get<FileTag[]>('fileTags', []);

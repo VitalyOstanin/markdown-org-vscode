@@ -75,6 +75,28 @@ suite('orgPatterns named groups', () => {
         });
     });
 
+    suite('HEADING_REGEX CANCELLED support', () => {
+        test('matches "### CANCELLED Foo"', () => {
+            const m = HEADING_REGEX.exec('### CANCELLED Foo');
+            assert.ok(m);
+            assert.strictEqual(m!.groups!.status, 'CANCELLED');
+            assert.strictEqual(m!.groups!.title, 'Foo');
+        });
+        test('matches "### CANCELLED [#A] Foo"', () => {
+            const m = HEADING_REGEX.exec('### CANCELLED [#A] Foo');
+            assert.ok(m);
+            assert.strictEqual(m!.groups!.status, 'CANCELLED');
+            assert.strictEqual(m!.groups!.priority, 'A');
+            assert.strictEqual(m!.groups!.title, 'Foo');
+        });
+        test('does not match lowercase "cancelled"', () => {
+            const m = HEADING_REGEX.exec('### cancelled Foo');
+            assert.ok(m);
+            assert.strictEqual(m!.groups!.status, undefined);
+            assert.strictEqual(m!.groups!.title, 'cancelled Foo');
+        });
+    });
+
     suite('TIMESTAMP_LINE_REGEX (ADR-0014 strict bracket policy)', () => {
         test('SCHEDULED with active bracket matches', () => {
             const match = '  `SCHEDULED: <2025-12-06 Fri 10:00>`'.match(TIMESTAMP_LINE_REGEX);

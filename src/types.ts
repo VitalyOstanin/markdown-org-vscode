@@ -1,3 +1,11 @@
+/**
+ * Известные значения `task_type`, эмитируемые `markdown-org-extract` 0.8.0+.
+ * Живёт здесь, рядом с полем `Task.task_type`, которое типизирует;
+ * runtime-guard `normalizeTaskType` (src/utils/normalizeTaskType.ts) импортирует
+ * этот тип, а не наоборот, чтобы зависимость шла utils -> types.
+ */
+export type TaskStatus = 'TODO' | 'DONE' | 'CANCELLED';
+
 // snake_case field names mirror the JSON contract produced by
 // `markdown-org-extract` (see ADR-0001). Renaming any field here breaks
 // wire compatibility with the extractor binary -- bump the extractor in
@@ -7,7 +15,11 @@ export interface Task {
     line: number;
     heading: string;
     content: string;
-    task_type?: string;
+    // Narrowed to the known keyword set (TODO/DONE/CANCELLED). The extractor
+    // may emit other strings in future versions; normalize unknown values to
+    // `undefined` at the JSON parse boundary via `normalizeTaskType` so this
+    // typed contract holds (see src/commands/agenda.ts).
+    task_type?: TaskStatus;
     priority?: string;
     timestamp?: string;
     timestamp_date?: string;
