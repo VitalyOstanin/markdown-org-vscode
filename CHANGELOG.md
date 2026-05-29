@@ -4,6 +4,8 @@ All notable changes to the "Markdown Org" extension will be documented in this f
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-05-29
+
 ### Added
 
 - **CANCELLED task status.** Headings can be marked `CANCELLED` via the
