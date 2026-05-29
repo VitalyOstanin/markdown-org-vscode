@@ -86,7 +86,16 @@ suite('Promote to Maintain: integration', () => {
         const tmpRoot = path.join(getTestWorkspaceDir(), tmpRootName);
         if (fs.existsSync(tmpRoot)) {
             for (const child of fs.readdirSync(tmpRoot)) {
-                fs.rmSync(path.join(tmpRoot, child), { recursive: true, force: true });
+                // maxRetries/retryDelay: on Windows the OS may still hold a handle
+                // on a just-closed editor's file when this teardown runs, so a bare
+                // rmSync hits EBUSY (`force` only swallows ENOENT, not EBUSY). Node's
+                // rimraf retries on EBUSY/EPERM when maxRetries > 0.
+                fs.rmSync(path.join(tmpRoot, child), {
+                    recursive: true,
+                    force: true,
+                    maxRetries: 10,
+                    retryDelay: 100
+                });
             }
         }
     });
