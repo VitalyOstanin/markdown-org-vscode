@@ -39,4 +39,4 @@ export function matchTimestampLine(text: string): TimestampLineMatch | null {
 // long-to-short so the regex engine never matches `6` before `64` or `1`
 // before `12`.
 export const HEADING_REGEX =
-    /^(?<hashes>#+)\s+(?:(?<status>TODO|DONE|CANCELLED)\s+)?(?:\[#(?<priority>[A-Z]|6[0-4]|[1-5][0-9]|[0-9])\]\s+)?(?<title>.+)$/;
+    /^(?<hashes>#+)\s+(?:(?<status>TODO|DONE|CANCELLED|CANCELED)\s+)?(?:\[#(?<priority>[A-Z]|6[0-4]|[1-5][0-9]|[0-9])\]\s+)?(?<title>.+)$/;

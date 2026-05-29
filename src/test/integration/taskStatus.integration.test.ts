@@ -95,6 +95,30 @@ suite('Task Status Integration Tests', () => {
         assert.strictEqual(document.lineAt(0).text, '### Foo');
     });
 
+    test('Set CANCELLED on CANCELED (single-L) heading toggles it off across spelling', async () => {
+        document = await vscode.workspace.openTextDocument({
+            content: '### CANCELED Foo',
+            language: 'markdown'
+        });
+        editor = await vscode.window.showTextDocument(document);
+
+        await vscode.commands.executeCommand('markdown-org.setCancelled');
+
+        assert.strictEqual(document.lineAt(0).text, '### Foo');
+    });
+
+    test('Set CANCELLED on TODO heading writes CANCELLED (two-L canonical form)', async () => {
+        document = await vscode.workspace.openTextDocument({
+            content: '### TODO Foo',
+            language: 'markdown'
+        });
+        editor = await vscode.window.showTextDocument(document);
+
+        await vscode.commands.executeCommand('markdown-org.setCancelled');
+
+        assert.strictEqual(document.lineAt(0).text, '### CANCELLED Foo');
+    });
+
     test('Set CANCELLED preserves priority', async () => {
         document = await vscode.workspace.openTextDocument({
             content: '## [#A] Task title',

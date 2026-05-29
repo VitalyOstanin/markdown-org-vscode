@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { findNearestHeading, formatOrgTimestamp, getTimestampIndent, requireActiveEditor } from '../utils';
 import { HEADING_REGEX, matchTimestampLine } from '../orgPatterns';
 import { buildHeading } from '../utils/buildHeading';
-import { normalizeTaskType } from '../utils/normalizeTaskType';
+import { isCancelled, normalizeTaskType } from '../utils/normalizeTaskType';
 import type { TaskStatus } from '../types';
 
 function formatActiveTimestamp(date: Date): string {
@@ -13,7 +13,7 @@ function formatInactiveTimestamp(date: Date): string {
     return formatOrgTimestamp(date, 'square');
 }
 
-/** Toggle the TODO/DONE/CANCELLED keyword on the nearest heading; preserves priority. Silent if no active markdown editor. */
+/** Toggle the TODO/DONE/CANCELLED/CANCELED keyword on the nearest heading; preserves priority. Silent if no active markdown editor. */
 export async function setTaskStatus(status: TaskStatus) {
     const editor = requireActiveEditor({ markdownOnly: true });
     if (!editor) {
@@ -35,10 +35,16 @@ export async function setTaskStatus(status: TaskStatus) {
 
     const { hashes, status: currentStatus, priority, title } = match.groups;
 
-    // Toggle: re-applying the same keyword clears it, anything else sets it.
+    // Toggle: re-applying the same logical keyword clears it, anything else
+    // sets it. The two cancelled spellings (CANCELLED / CANCELED) are one
+    // logical status, so applying CANCELLED to a `CANCELED` heading toggles it
+    // off rather than respelling it. For non-cancelled statuses `isCancelled`
+    // is false on both sides, so the OR branch never fires and TODO/DONE
+    // toggling is unchanged.
+    const clearing = currentStatus === status || (isCancelled(currentStatus) && isCancelled(status));
     const newText = buildHeading({
         hashes,
-        status: currentStatus !== status ? status : undefined,
+        status: clearing ? undefined : status,
         priority,
         title
     });
@@ -78,7 +84,7 @@ export async function togglePriority() {
     // Toggle: clear an existing priority, otherwise default a fresh one to A.
     // `status` is the raw HEADING_REGEX capture (string | undefined); normalize
     // it to the typed TaskStatus boundary. HEADING_REGEX only captures
-    // TODO/DONE/CANCELLED, so this is observably identical to passing it through.
+    // TODO/DONE/CANCELLED/CANCELED, so this is observably identical to passing it through.
     const newText = buildHeading({
         hashes,
         status: normalizeTaskType(status),

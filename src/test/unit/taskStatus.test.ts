@@ -115,4 +115,28 @@ suite('Task Status Tests', () => {
         // '### CANCELLED Foo' -> apply CANCELLED again -> '### Foo'
         assert.strictEqual(nextStatus('CANCELLED', 'CANCELLED'), undefined);
     });
+
+    // Mirrors the cross-spelling toggle rule used by setTaskStatus: the two
+    // cancelled spellings are the same logical status, so re-applying either
+    // one clears an existing cancelled heading regardless of its spelling.
+    function isCancelled(s: string | undefined): boolean {
+        return s === 'CANCELLED' || s === 'CANCELED';
+    }
+    function nextStatusCrossSpelling(current: string | undefined, applied: string): string | undefined {
+        const clearing = current === applied || (isCancelled(current) && isCancelled(applied));
+        return clearing ? undefined : applied;
+    }
+
+    test('Cross-spelling toggle-off: CANCELED heading + apply CANCELLED clears it', () => {
+        // '### CANCELED Foo' -> apply CANCELLED -> '### Foo' (toggle off, not respell)
+        assert.strictEqual(nextStatusCrossSpelling('CANCELED', 'CANCELLED'), undefined);
+    });
+
+    test('Toggle-off: CANCELLED heading + apply CANCELLED clears it', () => {
+        assert.strictEqual(nextStatusCrossSpelling('CANCELLED', 'CANCELLED'), undefined);
+    });
+
+    test('Cross-spelling rule: TODO heading + apply CANCELLED sets CANCELLED', () => {
+        assert.strictEqual(nextStatusCrossSpelling('TODO', 'CANCELLED'), 'CANCELLED');
+    });
 });

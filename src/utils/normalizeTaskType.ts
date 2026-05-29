@@ -10,10 +10,16 @@ import type { AgendaData, DayAgenda, Task, TaskStatus, TaskWithOffset } from '..
  * graceful handling из ADR-0015 extract.
  */
 export function normalizeTaskType(raw: string | undefined): TaskStatus | undefined {
-    if (raw === 'TODO' || raw === 'DONE' || raw === 'CANCELLED') {
+    if (raw === 'TODO' || raw === 'DONE' || raw === 'CANCELLED' || raw === 'CANCELED') {
         return raw;
     }
     return undefined;
+}
+
+/** True for either cancelled spelling (`CANCELLED` / `CANCELED`). Centralises the
+ *  two-spelling check so call sites never hard-code one form. */
+export function isCancelled(status: string | undefined): boolean {
+    return status === 'CANCELLED' || status === 'CANCELED';
 }
 
 /**

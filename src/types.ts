@@ -3,8 +3,14 @@
  * Живёт здесь, рядом с полем `Task.task_type`, которое типизирует;
  * runtime-guard `normalizeTaskType` (src/utils/normalizeTaskType.ts) импортирует
  * этот тип, а не наоборот, чтобы зависимость шла utils -> types.
+ *
+ * Both cancelled spellings are accepted: `CANCELLED` (two L) and `CANCELED`
+ * (one L, the org-mode manual spelling). markdown-org-extract 0.9.0+ preserves
+ * the original spelling from the file in `task_type` (extract ADR-0021), so the
+ * type carries both rather than collapsing them; use `isCancelled` to test
+ * either form (src/utils/normalizeTaskType.ts).
  */
-export type TaskStatus = 'TODO' | 'DONE' | 'CANCELLED';
+export type TaskStatus = 'TODO' | 'DONE' | 'CANCELLED' | 'CANCELED';
 
 // snake_case field names mirror the JSON contract produced by
 // `markdown-org-extract` (see ADR-0001). Renaming any field here breaks

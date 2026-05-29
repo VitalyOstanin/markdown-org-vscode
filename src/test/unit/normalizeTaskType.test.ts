@@ -1,12 +1,13 @@
 import * as assert from 'assert';
-import { normalizeAgendaTaskTypes, normalizeTaskType } from '../../utils/normalizeTaskType';
+import { isCancelled, normalizeAgendaTaskTypes, normalizeTaskType } from '../../utils/normalizeTaskType';
 import type { DayAgenda, Task } from '../../types';
 
 suite('normalizeTaskType', () => {
-    test('returns TODO/DONE/CANCELLED unchanged', () => {
+    test('returns TODO/DONE/CANCELLED/CANCELED unchanged', () => {
         assert.strictEqual(normalizeTaskType('TODO'), 'TODO');
         assert.strictEqual(normalizeTaskType('DONE'), 'DONE');
         assert.strictEqual(normalizeTaskType('CANCELLED'), 'CANCELLED');
+        assert.strictEqual(normalizeTaskType('CANCELED'), 'CANCELED');
     });
     test('returns undefined for unknown values', () => {
         assert.strictEqual(normalizeTaskType('MAYBE'), undefined);
@@ -15,6 +16,20 @@ suite('normalizeTaskType', () => {
         assert.strictEqual(normalizeTaskType(undefined), undefined);
         assert.strictEqual(normalizeTaskType(null as unknown as string), undefined);
         assert.strictEqual(normalizeTaskType(42 as unknown as string), undefined);
+    });
+});
+
+suite('isCancelled', () => {
+    test('true for both cancelled spellings', () => {
+        assert.strictEqual(isCancelled('CANCELLED'), true);
+        assert.strictEqual(isCancelled('CANCELED'), true);
+    });
+    test('false for non-cancelled and malformed values', () => {
+        assert.strictEqual(isCancelled('TODO'), false);
+        assert.strictEqual(isCancelled('DONE'), false);
+        assert.strictEqual(isCancelled('cancelled'), false);
+        assert.strictEqual(isCancelled(''), false);
+        assert.strictEqual(isCancelled(undefined), false);
     });
 });
 
