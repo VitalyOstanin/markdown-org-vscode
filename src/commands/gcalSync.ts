@@ -309,6 +309,11 @@ function runExtractorTasks(extractorPath: string, dir: string): Promise<Task[]> 
                     return;
                 }
                 try {
+                    // Unlike the agenda path (which runs normalizeAgendaTaskTypes),
+                    // the sync path leaves task_type raw on purpose: runSync only
+                    // reads it via isCancelled(...) (matches both spellings on the
+                    // raw string) and an exact `=== 'DONE'` check, so a value not in
+                    // TaskStatus behaves exactly as a normalized `undefined` would.
                     resolve(JSON.parse(stdout) as Task[]);
                 } catch (e) {
                     reject(e instanceof Error ? e : new Error(String(e)));

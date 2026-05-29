@@ -1,5 +1,5 @@
 /**
- * Известные значения `task_type`, эмитируемые `markdown-org-extract` 0.8.0+.
+ * Известные значения `task_type`, эмитируемые `markdown-org-extract` 0.9.0+.
  * Живёт здесь, рядом с полем `Task.task_type`, которое типизирует;
  * runtime-guard `normalizeTaskType` (src/utils/normalizeTaskType.ts) импортирует
  * этот тип, а не наоборот, чтобы зависимость шла utils -> types.
