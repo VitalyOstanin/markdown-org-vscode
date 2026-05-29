@@ -23,6 +23,22 @@ export function isCancelled(status: string | undefined): boolean {
 }
 
 /**
+ * Toggle rule for `setTaskStatus`: re-applying the same logical keyword clears
+ * it (returns `undefined`); anything else sets `applied`. The two cancelled
+ * spellings (`CANCELLED` / `CANCELED`) are one logical status, so applying
+ * `CANCELLED` to a `CANCELED` heading toggles it off rather than respelling it.
+ * For non-cancelled statuses `isCancelled` is false on both sides, so the OR
+ * branch never fires and TODO/DONE toggling is unchanged.
+ *
+ * `current` is the raw `HEADING_REGEX` capture (`string | undefined`); `applied`
+ * is the typed status the command is applying.
+ */
+export function computeToggledStatus(current: string | undefined, applied: TaskStatus): TaskStatus | undefined {
+    const clearing = current === applied || (isCancelled(current) && isCancelled(applied));
+    return clearing ? undefined : applied;
+}
+
+/**
  * Нормализует `task_type` у одной задачи через `normalizeTaskType`, не мутируя
  * исходный объект (возвращает поверхностную копию с переписанным полем).
  */

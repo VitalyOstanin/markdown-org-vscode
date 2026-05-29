@@ -2,7 +2,7 @@ import * as vscode from 'vscode';
 import { findNearestHeading, formatOrgTimestamp, getTimestampIndent, requireActiveEditor } from '../utils';
 import { HEADING_REGEX, matchTimestampLine } from '../orgPatterns';
 import { buildHeading } from '../utils/buildHeading';
-import { isCancelled, normalizeTaskType } from '../utils/normalizeTaskType';
+import { computeToggledStatus, normalizeTaskType } from '../utils/normalizeTaskType';
 import type { TaskStatus } from '../types';
 
 function formatActiveTimestamp(date: Date): string {
@@ -35,16 +35,11 @@ export async function setTaskStatus(status: TaskStatus) {
 
     const { hashes, status: currentStatus, priority, title } = match.groups;
 
-    // Toggle: re-applying the same logical keyword clears it, anything else
-    // sets it. The two cancelled spellings (CANCELLED / CANCELED) are one
-    // logical status, so applying CANCELLED to a `CANCELED` heading toggles it
-    // off rather than respelling it. For non-cancelled statuses `isCancelled`
-    // is false on both sides, so the OR branch never fires and TODO/DONE
-    // toggling is unchanged.
-    const clearing = currentStatus === status || (isCancelled(currentStatus) && isCancelled(status));
+    // Toggle rule lives in computeToggledStatus (unit-tested): re-applying the
+    // same logical keyword clears it; cancelled spellings count as one status.
     const newText = buildHeading({
         hashes,
-        status: clearing ? undefined : status,
+        status: computeToggledStatus(currentStatus, status),
         priority,
         title
     });
