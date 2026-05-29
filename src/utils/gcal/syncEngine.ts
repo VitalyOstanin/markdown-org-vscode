@@ -3,6 +3,7 @@ import type { FetchFn } from './oauth';
 import type { AccessTokenProvider } from './accessToken';
 import type { MapOptions } from './eventMapping';
 import { isSyncable, mapTaskToEvent } from './eventMapping';
+import { isCancelled } from '../normalizeTaskType';
 import { taskIdToEventId } from './eventId';
 import { insertEvent, patchEvent, deleteEvent } from './calendarClient';
 import type { RunHandle } from './mutex';
@@ -95,7 +96,12 @@ export async function runSync(deps: SyncDeps): Promise<SyncSummary> {
             break;
         }
         const props: Record<string, string> = { ...(task.properties ?? {}) };
-        const wantDelete = !isSyncable(task) || (task.task_type === 'DONE' && deps.onDone === 'delete');
+        // A CANCELLED task must NEVER be pushed: it can still carry an active
+        // SCHEDULED/DEADLINE timestamp (so isSyncable is true), but its linked
+        // event must be deleted unconditionally -- unlike DONE, this does not
+        // depend on deps.onDone (which only governs DONE).
+        const wantDelete =
+            !isSyncable(task) || isCancelled(task.task_type) || (task.task_type === 'DONE' && deps.onDone === 'delete');
 
         try {
             if (wantDelete) {

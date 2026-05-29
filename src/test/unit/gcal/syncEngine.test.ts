@@ -106,6 +106,51 @@ suite('gcal/syncEngine', () => {
         assert.ok(r.calls.some((c) => c.method === 'DELETE'));
     });
 
+    test('CANCELLED task with linkage is deleted, never created/updated despite an active timestamp', async () => {
+        const r = recorder(() => ({ status: 200, body: {} }));
+        const w = recordingWriter();
+        // Active SCHEDULED date -> isSyncable(task) is true; the CANCELLED status
+        // must still force a delete rather than a (re)create/update.
+        const t = task({ task_type: 'CANCELLED', properties: { ID: '11111111-2222-3333-4444-555555555555' } });
+        const summary = await runSync(baseDeps([t], r.fn, w.writer));
+        assert.equal(summary.deleted, 1);
+        assert.ok(r.calls.some((c) => c.method === 'DELETE'));
+        assert.ok(!r.calls.some((c) => c.method === 'POST'), 'never created');
+        assert.ok(!r.calls.some((c) => c.method === 'PATCH'), 'never updated');
+        // No ID is generated/persisted for a cancelled task: it is deleted via its
+        // existing linkage, never given a fresh org-id before the delete branch.
+        assert.equal(w.writes.length, 0, 'no property write-back for a cancelled task');
+    });
+
+    test('CANCELED (one L) task with linkage is deleted (both spellings via isCancelled)', async () => {
+        const r = recorder(() => ({ status: 200, body: {} }));
+        const w = recordingWriter();
+        const t = task({ task_type: 'CANCELED', properties: { GCAL_EVENT_ID: 'abc' } });
+        const summary = await runSync(baseDeps([t], r.fn, w.writer));
+        assert.equal(summary.deleted, 1);
+        assert.ok(r.calls.some((c) => c.method === 'DELETE'));
+    });
+
+    test('CANCELLED deletion is independent of onDone=keep (unlike DONE)', async () => {
+        const r = recorder(() => ({ status: 200, body: {} }));
+        const w = recordingWriter();
+        const t = task({ task_type: 'CANCELLED', properties: { GCAL_EVENT_ID: 'abc' } });
+        const deps = baseDeps([t], r.fn, w.writer);
+        deps.onDone = 'keep';
+        const summary = await runSync(deps);
+        assert.equal(summary.deleted, 1, 'CANCELLED deletes its event regardless of onDone');
+        assert.ok(r.calls.some((c) => c.method === 'DELETE'));
+    });
+
+    test('CANCELLED task without linkage is skipped (nothing to delete)', async () => {
+        const r = recorder(() => ({ status: 200, body: {} }));
+        const w = recordingWriter();
+        const t = task({ task_type: 'CANCELLED' });
+        const summary = await runSync(baseDeps([t], r.fn, w.writer));
+        assert.equal(summary.skipped, 1);
+        assert.ok(!r.calls.some((c) => c.method === 'DELETE'));
+    });
+
     test('unsyncable task with linkage is deleted; without linkage is skipped', async () => {
         const r = recorder(() => ({ status: 200, body: {} }));
         const w = recordingWriter();

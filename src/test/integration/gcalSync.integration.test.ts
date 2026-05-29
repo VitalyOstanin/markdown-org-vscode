@@ -196,6 +196,12 @@ suite('Google Calendar sync: DONE -> delete', () => {
             args.includes('--tasks-include-done'),
             `extractor args missing --tasks-include-done: ${args.join(' ')}`
         );
+        // CANCELLED tasks must be surfaced too so their events get deleted; the
+        // flag mirrors --tasks-include-done in the flat scope.
+        assert.ok(
+            args.includes('--tasks-include-cancelled'),
+            `extractor args missing --tasks-include-cancelled: ${args.join(' ')}`
+        );
 
         // The DONE task's event must be deleted, keyed by the id derived from
         // its org-id ID (dashes stripped, lowercased).

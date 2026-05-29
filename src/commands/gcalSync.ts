@@ -275,13 +275,25 @@ async function reportSyncSummary(summary: SyncSummary, trigger: SyncTrigger): Pr
  * Mirrors the agenda invocation (`--dir <dir> --format json --absolute-paths
  * --tasks`) so paths come back absolute and properties are included.
  *
- * `--tasks-include-done` surfaces DONE tasks as well (the flat list is TODO-only
- * by default). The sync needs them: a task that became DONE must still reach the
- * engine so its event can be deleted (`onDone=delete`) or kept (`onDone=keep`);
- * without the flag the task simply vanishes and its event is orphaned.
+ * `--tasks-include-done` and `--tasks-include-cancelled` surface DONE and
+ * CANCELLED tasks as well (the flat list is TODO-only by default). The sync
+ * needs both: a task that became DONE must still reach the engine so its event
+ * can be deleted (`onDone=delete`) or kept (`onDone=keep`); a task that became
+ * CANCELLED must reach the engine so its event is always deleted (CANCELLED is
+ * never published). Without these flags such a task simply vanishes from the
+ * list and its event is orphaned (never deleted).
  */
 function runExtractorTasks(extractorPath: string, dir: string): Promise<Task[]> {
-    const args = ['--dir', dir, '--format', 'json', '--absolute-paths', '--tasks', '--tasks-include-done'];
+    const args = [
+        '--dir',
+        dir,
+        '--format',
+        'json',
+        '--absolute-paths',
+        '--tasks',
+        '--tasks-include-done',
+        '--tasks-include-cancelled'
+    ];
     return new Promise<Task[]>((resolve, reject) => {
         const timeout = setTimeout(() => {
             reject(new Error(`Command timeout after ${EXTRACTOR_TIMEOUT_MS / 1000} seconds`));
