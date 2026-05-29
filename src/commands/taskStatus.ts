@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import { findNearestHeading, formatOrgTimestamp, getTimestampIndent, requireActiveEditor } from '../utils';
 import { HEADING_REGEX, matchTimestampLine } from '../orgPatterns';
 import { buildHeading } from '../utils/buildHeading';
+import { normalizeTaskType } from '../utils/normalizeTaskType';
 
 function formatActiveTimestamp(date: Date): string {
     return formatOrgTimestamp(date, 'angle');
@@ -69,9 +70,12 @@ export async function togglePriority() {
     const { hashes, status, priority: currentPriority, title } = match.groups;
 
     // Toggle: clear an existing priority, otherwise default a fresh one to A.
+    // `status` is the raw HEADING_REGEX capture (string | undefined); normalize
+    // it to the typed TaskStatus boundary. HEADING_REGEX only captures
+    // TODO/DONE/CANCELLED, so this is observably identical to passing it through.
     const newText = buildHeading({
         hashes,
-        status,
+        status: normalizeTaskType(status),
         priority: currentPriority ? undefined : 'A',
         title
     });

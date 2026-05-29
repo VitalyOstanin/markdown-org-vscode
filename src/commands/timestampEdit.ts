@@ -4,6 +4,7 @@ import { formatDurationHM } from '../utils';
 import { buildOrgTimestamp } from '../utils/orgTimestamp';
 import { incrementTimestamp, getWeekdayName } from '../utils/incrementTimestamp';
 import { buildHeading } from '../utils/buildHeading';
+import { normalizeTaskType } from '../utils/normalizeTaskType';
 import {
     getTimestampPartAt,
     getClockTimestampPartAt,
@@ -131,7 +132,11 @@ function adjustHeadingPart(match: RegExpMatchArray, part: HeadingPart, delta: nu
         }
     }
 
-    return buildHeading({ hashes, status: newStatus, priority: newPriority, title });
+    // `newStatus` is a raw string (cycled TODO/DONE, the unchanged raw capture,
+    // or '' when the heading has no keyword). Normalize to the typed boundary;
+    // '' and unrecognized values map to undefined, which buildHeading omits the
+    // same way it omits a falsy string -- observably identical.
+    return buildHeading({ hashes, status: normalizeTaskType(newStatus), priority: newPriority, title });
 }
 
 function getTimestampAtCursor(

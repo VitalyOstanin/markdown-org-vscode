@@ -1,8 +1,10 @@
+import type { TaskStatus } from '../types';
+
 export interface HeadingParts {
     /** Leading `#` run that fixes the heading level. */
     hashes: string;
-    /** Final TODO/DONE keyword; omitted from the output when falsy. */
-    status?: string;
+    /** Final TODO/DONE/CANCELLED keyword; omitted from the output when falsy. */
+    status?: TaskStatus;
     /** Bare priority value (e.g. `A`, `5`); wrapped as `[#...]`, omitted when falsy. */
     priority?: string;
     /** Heading text after the keyword/priority tokens. */
