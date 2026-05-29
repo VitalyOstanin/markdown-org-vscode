@@ -202,6 +202,59 @@ suite('Agenda Show Integration Tests', () => {
         // their own .day-header rendered in the DOM.
         assert.deepStrictEqual(info.dayHeaders, ['2025-12-08', '2025-12-09']);
     });
+
+    // CANCELLED/CANCELED styling. The per-task status class is computed
+    // client-side inside the inlined `renderTask` function, so the generated
+    // webview HTML carries the renderTask SOURCE plus the AGENDA_STYLES CSS,
+    // not the rendered <span class="cancelled-keyword"> markup. The most
+    // meaningful seam without a live DOM harness is therefore the webview
+    // `html` string itself: it must contain (a) the .cancelled-keyword CSS
+    // rule and (b) the two-spelling branch in the renderTask source, while
+    // keeping the CSP/escape invariants intact (see CLAUDE.md "Безопасность
+    // webview").
+    test('webview HTML carries the cancelled-keyword styling and renderTask branch', async function () {
+        this.timeout(10000);
+        await vscode.commands.executeCommand('markdown-org.showAgendaDay', '2025-12-09');
+        await sleep(300);
+        const panel = (AgendaPanel as unknown as { currentPanel?: { webview: vscode.Webview } }).currentPanel;
+        assert.ok(panel, 'expected AgendaPanel to be open after showAgendaDay');
+        const html = panel.webview.html;
+
+        // (a) The CSS rule that visually distinguishes a cancelled task
+        // (grey + strikethrough) must be present in the injected styles.
+        assert.ok(
+            html.includes('.cancelled-keyword {'),
+            'expected the .cancelled-keyword CSS rule to be injected into the webview'
+        );
+        assert.ok(
+            html.includes('text-decoration: line-through'),
+            'expected the cancelled-keyword rule to strike through the status text'
+        );
+
+        // (b) The cancelled-spelling check is shared with host code: the
+        // `isCancelled` helper (which knows both 'CANCELLED' two L and
+        // 'CANCELED' one L) is inlined into the webview and used by renderTask,
+        // so the spelling list cannot drift from the regex/toggle/normalizer.
+        // The helper's own spelling coverage is unit-tested in
+        // normalizeTaskType.test.ts.
+        assert.ok(
+            html.includes("status === 'CANCELLED' || status === 'CANCELED'"),
+            'expected the inlined isCancelled source (both spellings) to be present in the webview'
+        );
+        assert.ok(
+            html.includes("isCancelled(status) ? 'cancelled-keyword'"),
+            'expected renderTask to assign cancelled-keyword via the shared isCancelled helper'
+        );
+
+        // CSP/escape invariants must still hold: the security meta tag is
+        // present and the status text is still rendered via escapeHtml (no
+        // raw interpolation was introduced).
+        assert.ok(html.includes('http-equiv="Content-Security-Policy"'), 'expected the CSP meta tag to remain present');
+        assert.ok(
+            html.includes('escapeHtml(status)'),
+            'expected the status text to remain escaped via escapeHtml(status)'
+        );
+    });
 });
 
 // The agenda lists every task that `markdown-org-extract` returns, regardless

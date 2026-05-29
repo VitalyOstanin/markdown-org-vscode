@@ -8,6 +8,7 @@ import { buildTimeInfo } from '../utils/agendaTimeInfo';
 import { resolveAgendaWatchBase } from '../utils/agendaWatchPattern';
 import { toIsoDate } from '../utils/isoDate';
 import { formatDayHeaderParts } from '../utils/agendaDayHeader';
+import { isCancelled } from '../utils/normalizeTaskType';
 import { AGENDA_STYLES } from './agendaStyles';
 import { formatError, notifyError } from '../utils/notify';
 
@@ -506,6 +507,11 @@ export class AgendaPanel {
         // agendaDayHeader.test.ts. Replaces positional parsing that swapped
         // day/month on en-US and dropped the month on ja-JP.
         const formatDayHeaderPartsSource = formatDayHeaderParts.toString();
+        // Cancelled-spelling check (CANCELLED / CANCELED) shared with host code;
+        // unit-tested in normalizeTaskType.test.ts. Inlined so the webview uses
+        // the exact same spelling list as the regex/toggle/normalizer and cannot
+        // drift if a spelling is ever added.
+        const isCancelledSource = isCancelled.toString();
         return `<!DOCTYPE html>
 <html>
 <head>
@@ -526,6 +532,7 @@ export class AgendaPanel {
         ${buildTimeInfoSource}
         ${toIsoDateSource}
         ${formatDayHeaderPartsSource}
+        ${isCancelledSource}
         const vscode = acquireVsCodeApi();
         // Handshake for the ServiceWorker-race retry path on the extension
         // side: tells AgendaPanel.armReadyTimeout the webview script is alive
@@ -734,7 +741,10 @@ export class AgendaPanel {
             const status = task.task_type || '';
             const priority = task.priority ? '[#' + task.priority + ']' : '';
             const priorityClass = task.priority ? 'priority-' + task.priority.toLowerCase() : '';
-            const statusClass = status === 'TODO' ? 'todo-keyword' : status === 'DONE' ? 'done-keyword' : '';
+            const statusClass = status === 'TODO' ? 'todo-keyword'
+                : status === 'DONE' ? 'done-keyword'
+                : isCancelled(status) ? 'cancelled-keyword'
+                : '';
 
             const dateDisplay = (daysOffset !== undefined && daysOffset !== 0 && task.timestamp_date)
                 ? formatDateForTitle(task.timestamp_date)

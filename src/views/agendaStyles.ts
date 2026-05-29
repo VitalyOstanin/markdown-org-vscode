@@ -127,6 +127,7 @@ export const AGENDA_STYLES = `
         .todo-label { color: var(--vscode-charts-red); }
         .todo-keyword { color: var(--vscode-charts-red); font-weight: bold; }
         .done-keyword { color: var(--vscode-charts-green); font-weight: bold; }
+        .cancelled-keyword { color: var(--vscode-disabledForeground); text-decoration: line-through; font-weight: bold; }
         .priority-a { color: var(--vscode-charts-red); font-weight: bold; }
         .priority-b { color: var(--vscode-charts-yellow); font-weight: bold; }
         .priority-c { color: var(--vscode-charts-blue); font-weight: bold; }
