@@ -72,7 +72,7 @@ connect / select / sync demos and [ADR-0010](docs/adr/0010-google-calendar-sync.
 
 ### Core
 
-- **Task management** -- TODO / DONE statuses with priorities (`[#A]` -- `[#Z]` or numeric `[#0]` -- `[#64]`).
+- **Task management** -- TODO / DONE / CANCELLED statuses with priorities (`[#A]` -- `[#Z]` or numeric `[#0]` -- `[#64]`). A CANCELLED task (both spellings `CANCELLED` and `CANCELED` are recognised) renders struck-through in the agenda and is excluded from Google Calendar sync -- its event is deleted if it had one.
 - **Timestamps** -- `CREATED`, `SCHEDULED`, `DEADLINE`, `CLOSED` with full date / time, in both active `<...>` and inactive `[...]` forms per [ADR-0005](docs/adr/0005-active-and-inactive-timestamps.md).
 - **Repeating tasks** -- Org-mode repeaters `+1d`, `+1w`, `+1m`, `.+1m`, `++1w`, and `+1wd` for workdays (skips weekends and Russian holidays).
 - **CLOCK entries** -- Time tracking with start / finish events and an aggregated CLOCK table per file.
@@ -135,8 +135,16 @@ become tasks, inline code spans hold timestamps:
 
 ## DONE Completed task
 
+## CANCELLED Abandoned task
+
 ## Regular heading without status
 ```
+
+Both spellings of the cancelled keyword are recognised on read --
+`CANCELLED` (the common convention) and `CANCELED` (the Org manual's
+single-`L` form); `Set CANCELLED` writes `CANCELLED`. A cancelled task is
+shown struck-through in the agenda and is never pushed to Google Calendar
+(any event it already had is deleted).
 
 ### Timestamps
 
@@ -294,11 +302,12 @@ for `Set TODO` (the `Shift+Up`/`Shift+Down` bindings are unchanged).
 
 ### Task Status Commands
 
-| Command                         | Hotkey          | Description                         |
-| ------------------------------- | --------------- | ----------------------------------- |
-| `Markdown Org: Set TODO`        | `Ctrl+K Ctrl+T` | Mark heading as TODO                |
-| `Markdown Org: Set DONE`        | `Ctrl+K Ctrl+D` | Mark heading as DONE                |
-| `Markdown Org: Toggle Priority` | `Ctrl+K Ctrl+P` | Toggle priority: none → [#A] → none |
+| Command                         | Hotkey          | Description                                 |
+| ------------------------------- | --------------- | ------------------------------------------- |
+| `Markdown Org: Set TODO`        | `Ctrl+K Ctrl+T` | Mark heading as TODO                        |
+| `Markdown Org: Set DONE`        | `Ctrl+K Ctrl+D` | Mark heading as DONE                        |
+| `Markdown Org: Set CANCELLED`   | `Ctrl+K Ctrl+X` | Mark heading as CANCELLED (repeat to clear) |
+| `Markdown Org: Toggle Priority` | `Ctrl+K Ctrl+P` | Toggle priority: none → [#A] → none         |
 
 ### Timestamp Commands
 
@@ -620,7 +629,9 @@ Each sync extracts the tasks that carry an active `SCHEDULED` /
 end time gets a timed event of `markdown-org.gcalSync.defaultEventMinutes`
 duration (60 minutes by default). When a task becomes DONE, the
 `markdown-org.gcalSync.onDone` setting decides whether to `delete` its
-event or `keep` it.
+event or `keep` it. A CANCELLED task (either spelling) is always excluded
+from the push and its event is deleted unconditionally, independent of
+`onDone`.
 
 ### One sync at a time
 
