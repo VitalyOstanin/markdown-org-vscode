@@ -91,7 +91,13 @@ suite('Demo: Screenshots', () => {
                 `\`DEADLINE: ${iso(6)}\`\n` +
                 '\n' +
                 '## TODO Daily standup\n' +
-                `\`SCHEDULED: ${iso(0, { hour: 9, minute: 30, repeater: '+1d' })}\`\n`,
+                `\`SCHEDULED: ${iso(0, { hour: 9, minute: 30, repeater: '+1d' })}\`\n` +
+                '\n' +
+                // A cancelled task still shows in the agenda (only DONE is hidden),
+                // rendered struck-through -- this is what the CANCELLED status looks
+                // like in the day/week views.
+                '## CANCELLED Drop deprecated endpoint\n' +
+                `\`SCHEDULED: ${iso(0, { hour: 16, minute: 0 })}\`\n`,
             'utf-8'
         );
 

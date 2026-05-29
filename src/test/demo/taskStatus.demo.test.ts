@@ -24,7 +24,7 @@ async function moveCursorIntoPriorityCookie(editor: vscode.TextEditor, line: num
 }
 
 suite('Demo: Task Status', () => {
-    test('TODO -> priority (letter + numeric) -> DONE workflow', async function () {
+    test('TODO -> priority (letter + numeric) -> DONE / CANCELLED workflow', async function () {
         this.timeout(90000);
 
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
@@ -102,10 +102,14 @@ suite('Demo: Task Status', () => {
         await pressKey('shift+Up');
         await sleep(1500);
 
-        // Task 3: plain TODO, no priority
+        // Task 3: TODO -> CANCELLED (the task is abandoned, not completed).
+        // Ctrl+K Ctrl+X is the cancel chord; the keyword renders struck-through
+        // wherever the agenda shows it.
         await moveCursorTo(editor, 6);
         await sleep(700);
         await pressKey('ctrl+k ctrl+t');
+        await sleep(1100);
+        await pressKey('ctrl+k ctrl+x');
         await sleep(1500);
     });
 });

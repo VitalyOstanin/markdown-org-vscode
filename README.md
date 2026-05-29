@@ -126,7 +126,7 @@ become tasks, inline code spans hold timestamps:
 
 ### Task Statuses
 
-![TODO / priority / DONE workflow](media/demo-task-status.gif)
+![TODO / priority / DONE / CANCELLED workflow](media/demo-task-status.gif)
 
 ```markdown
 ## TODO Task without priority
