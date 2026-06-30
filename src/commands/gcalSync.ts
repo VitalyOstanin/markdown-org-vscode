@@ -5,6 +5,15 @@ import { TokenStore } from '../utils/gcal/tokenStore';
 import { startLoopbackServer } from '../utils/gcal/loopback';
 import { runConnect, runDisconnect } from '../utils/gcal/connect';
 import { createAccessTokenProvider } from '../utils/gcal/accessToken';
+import { defaultDbusRun } from '../utils/gcal/dbus';
+import {
+    listGoaGoogleAccounts,
+    resolveGoaAccount,
+    createGoaAccessTokenProvider,
+    type GoaAccount
+} from '../utils/gcal/goa';
+import { chooseAuthProvider, type AuthProviderSetting, type ResolvedAuthProvider } from '../utils/gcal/authProvider';
+import type { AccessTokenProvider } from '../utils/gcal/accessToken';
 import { listWritableCalendars, ensureCalendar } from '../utils/gcal/calendarClient';
 import { SingleFlight, type ConcurrencyPolicy } from '../utils/gcal/mutex';
 import { acquireLock } from '../utils/gcal/lock';
@@ -31,8 +40,117 @@ function clientIdSetting(): string {
     return (vscode.workspace.getConfiguration('markdown-org').get<string>('gcalSync.clientId') ?? '').trim();
 }
 
-/** Connect Google Calendar: BYO Desktop client, loopback + PKCE. */
+const DEFAULT_CALENDAR_NAME = 'markdown-org';
+
+/** The configured sync calendar name, falling back to DEFAULT_CALENDAR_NAME. */
+function calendarNameSetting(cfg: vscode.WorkspaceConfiguration): string {
+    return (cfg.get<string>('gcalSync.calendarName') ?? DEFAULT_CALENDAR_NAME).trim() || DEFAULT_CALENDAR_NAME;
+}
+
+/** Resolve the effective auth provider and (for GOA) the available accounts.
+ *  Throws a user-facing error when the chosen provider cannot be used. Under an
+ *  explicit `goa` setting a DBus/busctl failure surfaces (rather than masking as
+ *  "no account"); under `auto` it degrades silently to OAuth. */
+async function resolveProviderAndAccounts(
+    cfg: vscode.WorkspaceConfiguration
+): Promise<{ provider: ResolvedAuthProvider; accounts: GoaAccount[]; setting: AuthProviderSetting }> {
+    const setting = (cfg.get<string>('gcalSync.authProvider') ?? 'auto') as AuthProviderSetting;
+    let accounts: GoaAccount[] = [];
+    if (setting !== 'oauth' && process.platform === 'linux') {
+        try {
+            accounts = await listGoaGoogleAccounts(defaultDbusRun);
+        } catch (e) {
+            // Under explicit 'goa' a transient DBus/busctl failure must surface,
+            // not be masked as "no account". Under 'auto' it is graceful
+            // degradation to OAuth.
+            if (setting === 'goa') {
+                throw new Error(
+                    `failed to query GNOME Online Accounts: ${e instanceof Error ? e.message : String(e)}`,
+                    { cause: e }
+                );
+            }
+            accounts = [];
+        }
+    }
+    const { provider, error } = chooseAuthProvider({
+        setting,
+        platform: process.platform,
+        hasGoaGoogleAccount: accounts.length > 0
+    });
+    if (error) {
+        throw new Error(error);
+    }
+    return { provider, accounts, setting };
+}
+
+/** Resolve the access-token provider for the current settings/platform.
+ *  Throws a user-facing error when the chosen provider cannot be used. */
+async function resolveTokenProvider(
+    context: vscode.ExtensionContext,
+    cfg: vscode.WorkspaceConfiguration
+): Promise<AccessTokenProvider> {
+    const { provider, accounts } = await resolveProviderAndAccounts(cfg);
+    if (provider === 'goa') {
+        const want = (cfg.get<string>('gcalSync.goaAccount') ?? '').trim();
+        const res = resolveGoaAccount(accounts, want);
+        if (res.error) {
+            throw new Error(
+                `${res.error} — add a Google account in GNOME Settings → Online Accounts (enable Calendar), ` +
+                    `or set markdown-org.gcalSync.authProvider to "oauth"`
+            );
+        }
+        if (res.needsPick || !res.account) {
+            throw new Error(
+                'multiple Google accounts in GNOME Online Accounts — run "Connect Google Calendar" to choose one, ' +
+                    'or set markdown-org.gcalSync.goaAccount'
+            );
+        }
+        return createGoaAccessTokenProvider({ run: defaultDbusRun, accountPath: res.account.path });
+    }
+    const clientId = clientIdSetting();
+    if (!clientId) {
+        throw new Error('set markdown-org.gcalSync.clientId and run Connect first');
+    }
+    const tokens = new TokenStore(context.secrets);
+    return createAccessTokenProvider({ clientId, tokens, fetchFn: fetch });
+}
+
+/** Connect Google Calendar. Provider-aware: GOA selects an Online Accounts
+ *  Google account; OAuth runs the BYO loopback+PKCE flow. */
 export async function connectGcal(context: vscode.ExtensionContext): Promise<void> {
+    const cfg = vscode.workspace.getConfiguration('markdown-org');
+    const { provider, accounts } = await resolveProviderAndAccounts(cfg);
+    if (provider === 'goa') {
+        await connectGoa(cfg, accounts);
+        return;
+    }
+    await connectOAuth(context);
+}
+
+/** GOA connect: pick the account (when several) and persist its email. */
+async function connectGoa(cfg: vscode.WorkspaceConfiguration, accounts: GoaAccount[]): Promise<void> {
+    if (accounts.length === 0) {
+        throw new Error(
+            'no Google account in GNOME Online Accounts — add one in GNOME Settings → Online Accounts (enable Calendar)'
+        );
+    }
+    let email = accounts[0].email;
+    if (accounts.length > 1) {
+        const chosen = await vscode.window.showQuickPick(
+            accounts.map((a) => ({ label: a.email })),
+            { title: 'Select GNOME Online Accounts Google account for sync', ignoreFocusOut: true }
+        );
+        if (!chosen) {
+            return;
+        }
+        email = chosen.label;
+    }
+    await cfg.update('gcalSync.goaAccount', email, vscode.ConfigurationTarget.Global);
+    await notifyInfo(`Connected to Google Calendar via GNOME Online Accounts (${email}).`);
+}
+
+/** Connect Google Calendar: BYO Desktop client, loopback + PKCE. */
+async function connectOAuth(context: vscode.ExtensionContext): Promise<void> {
     let clientId = clientIdSetting();
     if (!clientId) {
         clientId =
@@ -103,6 +221,12 @@ export async function connectGcal(context: vscode.ExtensionContext): Promise<voi
  *  setting is intentionally left in place — it is not a secret and is reused on
  *  reconnect (which then only re-prompts for the client secret). */
 export async function disconnectGcal(context: vscode.ExtensionContext): Promise<void> {
+    const cfg = vscode.workspace.getConfiguration('markdown-org');
+    const setting = (cfg.get<string>('gcalSync.authProvider') ?? 'auto') as AuthProviderSetting;
+    // Under GOA there is no stored secret we own; clear the pinned account.
+    if (setting === 'goa' || (setting === 'auto' && process.platform === 'linux')) {
+        await cfg.update('gcalSync.goaAccount', '', vscode.ConfigurationTarget.Global);
+    }
     await runDisconnect({ tokens: new TokenStore(context.secrets) });
     await notifyInfo('Disconnected from Google Calendar.');
 }
@@ -110,13 +234,8 @@ export async function disconnectGcal(context: vscode.ExtensionContext): Promise<
 /** Pick (or create) the Google Calendar used for sync; writes calendarId. */
 export async function selectCalendar(context: vscode.ExtensionContext): Promise<void> {
     const cfg = vscode.workspace.getConfiguration('markdown-org');
-    const clientId = clientIdSetting();
-    if (!clientId) {
-        throw new Error('set markdown-org.gcalSync.clientId and run Connect first');
-    }
-    const calendarName = (cfg.get<string>('gcalSync.calendarName') ?? 'markdown-org').trim() || 'markdown-org';
-    const tokens = new TokenStore(context.secrets);
-    const getToken = createAccessTokenProvider({ clientId, tokens, fetchFn: fetch });
+    const calendarName = calendarNameSetting(cfg);
+    const getToken = await resolveTokenProvider(context, cfg);
 
     const calendars = await listWritableCalendars(fetch, getToken);
     const createItem = { label: `$(add) Create new calendar "${calendarName}"`, id: '' as string };
@@ -398,10 +517,7 @@ export async function syncNow(context: vscode.ExtensionContext, opts: { trigger?
         return;
     }
     const cfg = vscode.workspace.getConfiguration('markdown-org');
-    const clientId = (cfg.get<string>('gcalSync.clientId') ?? '').trim();
-    if (!clientId) {
-        throw new Error('set markdown-org.gcalSync.clientId and run Connect first');
-    }
+    const getToken = await resolveTokenProvider(context, cfg);
     const workspaceDir = cfg.get<string>('workspaceDir') || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!workspaceDir) {
         throw new Error('open a workspace folder or set markdown-org.workspaceDir');
@@ -430,10 +546,7 @@ export async function syncNow(context: vscode.ExtensionContext, opts: { trigger?
                     return;
                 }
                 try {
-                    const tokens = new TokenStore(context.secrets);
-                    const getToken = createAccessTokenProvider({ clientId, tokens, fetchFn: fetch });
-                    const calendarName =
-                        (cfg.get<string>('gcalSync.calendarName') ?? 'markdown-org').trim() || 'markdown-org';
+                    const calendarName = calendarNameSetting(cfg);
                     const pinnedId = (cfg.get<string>('gcalSync.calendarId') ?? '').trim() || undefined;
                     const calendarId = await ensureCalendar(fetch, getToken, { name: calendarName, pinnedId });
                     const tasks = await runExtractorTasks(extractorPath, workspaceDir);

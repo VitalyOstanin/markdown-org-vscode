@@ -398,6 +398,21 @@
           "type": "number",
           "default": 60,
           "description": "Duration for a timed task event when no end time is given."
+        },
+        "markdown-org.gcalSync.authProvider": {
+          "type": "string",
+          "enum": [
+            "auto",
+            "goa",
+            "oauth"
+          ],
+          "default": "auto",
+          "description": "Source of the Google OAuth access token. 'oauth': BYO Desktop client (loopback + PKCE, stored in the OS keychain). 'goa': on Linux, take the token from GNOME Online Accounts (no per-user OAuth setup, GOA refreshes it). 'auto' (default): use GOA on Linux when a Google account is present there, otherwise BYO OAuth."
+        },
+        "markdown-org.gcalSync.goaAccount": {
+          "type": "string",
+          "default": "",
+          "description": "Email of the GNOME Online Accounts Google account to use when authProvider resolves to 'goa'. Empty: auto-pick when exactly one Google account exists, otherwise chosen via the Connect command."
         }
       }
     }
