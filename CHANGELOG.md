@@ -4,6 +4,28 @@ All notable changes to the "Markdown Org" extension will be documented in this f
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-06-30
+
+### Added
+
+- **GNOME Online Accounts (GOA) token provider for Google Calendar sync
+  on Linux.** On Linux the OAuth access token can now come from a Google
+  account already set up in GNOME Online Accounts instead of a
+  bring-your-own OAuth client. GNOME holds the credentials and refreshes
+  the token under its verified client, so there is no Google Cloud project
+  to create and no 7-day test-client token expiry. Controlled by the new
+  `markdown-org.gcalSync.authProvider` setting (`auto` (default) | `goa` |
+  `oauth`): `auto` uses GOA on Linux when a Google account is present,
+  otherwise the existing OAuth flow. `markdown-org.gcalSync.goaAccount`
+  pins which account to use; **Connect Google Calendar** picks one when
+  several exist. The token is read over DBus (`busctl`, with a `gdbus`
+  fallback); nothing is stored in the OS keychain in this mode. The REST
+  sync pipeline is unchanged. See ADR-0011.
+
+### Documentation
+
+- README documents the GOA setup path; new ADR-0011 records the design.
+
 ## [0.9.0] - 2026-05-29
 
 ### Added
