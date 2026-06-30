@@ -38,6 +38,7 @@ was decided, and the trade-offs that came with it.
 | 0008 | [No community meta-docs until a community exists](0008-no-community-meta-docs.md)                          | Accepted |
 | 0009 | [On-disk task properties via an org-properties fenced block](0009-task-properties-org-properties-block.md) | Accepted |
 | 0010 | [Google Calendar sync (push MVP)](0010-google-calendar-sync.md)                                            | Accepted |
+| 0011 | [Google Calendar sync: GOA token provider (Linux)](0011-google-calendar-sync-goa-provider.md)              | Accepted |
 
 ## Adding a new ADR
 

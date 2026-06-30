@@ -392,12 +392,12 @@ from the active document and appended to the maintain file under a
 
 ### Google Calendar Commands
 
-| Command                                    | Hotkey | Description                                                        |
-| ------------------------------------------ | ------ | ------------------------------------------------------------------ |
-| `Markdown Org: Connect Google Calendar`    | -      | Run the BYO OAuth flow and store the refresh token in the keychain |
-| `Markdown Org: Disconnect Google Calendar` | -      | Remove the stored token and client secret from the keychain        |
-| `Markdown Org: Select Google Calendar`     | -      | Pick the calendar to sync into; pins `gcalSync.calendarId`         |
-| `Markdown Org: Sync Now (Google Calendar)` | -      | Push tasks to Google Calendar once, on demand                      |
+| Command                                    | Hotkey | Description                                                                                                                               |
+| ------------------------------------------ | ------ | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `Markdown Org: Connect Google Calendar`    | -      | Authorize sync: pick a GNOME Online Accounts Google account (Linux) or run the BYO OAuth flow and store the refresh token in the keychain |
+| `Markdown Org: Disconnect Google Calendar` | -      | Remove the stored token and client secret from the keychain                                                                               |
+| `Markdown Org: Select Google Calendar`     | -      | Pick the calendar to sync into; pins `gcalSync.calendarId`                                                                                |
+| `Markdown Org: Sync Now (Google Calendar)` | -      | Push tasks to Google Calendar once, on demand                                                                                             |
 
 See [Google Calendar Sync](#google-calendar-sync) for the one-time setup.
 
@@ -549,9 +549,12 @@ The extension is **limited in untrusted workspaces**. The following commands are
 ## Google Calendar Sync
 
 Optional, opt-in one-way sync designed to push tasks carrying an active
-`SCHEDULED` / `DEADLINE` timestamp to Google Calendar. It is off until
-you supply your own OAuth client and connect. See
-[ADR-0010](docs/adr/0010-google-calendar-sync.md) for the design.
+`SCHEDULED` / `DEADLINE` timestamp to Google Calendar. It is off until you
+connect. On **Linux** you can authorize via a Google account already set up
+in **GNOME Online Accounts** (no OAuth client to create); on every platform
+you can bring your own OAuth Desktop client. See
+[ADR-0010](docs/adr/0010-google-calendar-sync.md) and
+[ADR-0011](docs/adr/0011-google-calendar-sync-goa-provider.md) for the design.
 
 **Sync Now** pushes the dated tasks, shows a status-bar spinner while it
 runs, and reports what changed; **Show details** opens the full per-event
@@ -593,6 +596,28 @@ Connect prompts for the `client_secret`, then completes the browser
 authorization and stores the token:
 
 ![Connect Google Calendar: client-secret prompt, connecting, connected](media/demo-gcal-connect.gif)
+
+### Linux: GNOME Online Accounts (no OAuth client)
+
+On Linux you can skip the Google Cloud setup entirely and reuse a Google
+account already configured in **GNOME Online Accounts** (GNOME Settings →
+Online Accounts, with **Calendar** enabled). GNOME holds the OAuth
+credentials and refreshes the token, so there is no `client_id` /
+`client_secret` to manage and no test-client token expiry.
+
+The source of the token is controlled by `markdown-org.gcalSync.authProvider`:
+
+- `auto` (default) -- on Linux, use GNOME Online Accounts when a Google
+  account is present there; otherwise fall back to the BYO OAuth flow above.
+- `goa` -- always use GNOME Online Accounts (Linux only).
+- `oauth` -- always use the BYO OAuth flow.
+
+With a single GNOME Google account it is picked automatically. With several,
+**Markdown Org: Connect Google Calendar** shows a picker and stores the
+chosen email in `markdown-org.gcalSync.goaAccount`. Nothing is written to the
+keychain in this mode -- GNOME owns the credentials. This path needs a session
+DBus bus reachable from VS Code; where it is not (some remote / Flatpak
+setups), `auto` falls back to the OAuth flow.
 
 ### Choosing the calendar
 
