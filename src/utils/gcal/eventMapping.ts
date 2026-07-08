@@ -1,6 +1,7 @@
 // Pure mapping from an org task to a Google Calendar event resource (no VS Code, no I/O).
 import type { Task } from '../../types';
 import type { GcalEventResource } from './types';
+import { repeaterToRrule } from './rrule';
 
 export interface MapOptions {
     timeZone: string; // IANA
@@ -77,6 +78,21 @@ export function mapTaskToEvent(task: Task, orgId: string, opts: MapOptions): Gca
         end = { date: addDaysToIsoDate(date, 1) };
     }
 
+    // Map the org repeater to an RRULE when it has a single-rule form;
+    // unrepresentable or absent repeaters produce an empty array. The field
+    // is always present (never omitted): the sync upserts unconditionally
+    // (insert, then patch on 409), and Google's PATCH is partial, so an
+    // omitted `recurrence` would leave a previously-recurring event stale
+    // when its repeater is later removed. An explicit `[]` clears the series;
+    // push stays the source of truth (design spec).
+    let recurrence = repeaterToRrule(task.timestamp_repeater) ?? [];
+    // A sub-daily rule (FREQ=HOURLY) requires a timed start; Google rejects
+    // it on an all-day (date-only) event with HTTP 400. Drop it so an all-day
+    // task with an hourly repeater stays a valid one-shot event.
+    if (!task.timestamp_time && recurrence.some((r) => r.includes('FREQ=HOURLY'))) {
+        recurrence = [];
+    }
+
     return {
         id: undefined, // assigned by the caller from eventId(orgId)
         // Explicit 'confirmed' revives a previously soft-deleted (cancelled)
@@ -88,6 +104,7 @@ export function mapTaskToEvent(task: Task, orgId: string, opts: MapOptions): Gca
         description: buildDescription(task.content, opts.relPath, task.line),
         start,
         end,
+        recurrence,
         extendedProperties: ext
     };
 }

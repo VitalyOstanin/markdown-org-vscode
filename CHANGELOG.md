@@ -4,6 +4,15 @@ All notable changes to the "Markdown Org" extension will be documented in this f
 
 ## [Unreleased]
 
+### Added
+
+- Google Calendar sync now maps an org repeater to a recurring event. A task
+  with a repeater (`++7d`, `+1w`, `.+1m`, `+1wd`, ...) becomes a Google
+  Calendar series via an `RRULE`, instead of a one-shot event. Requires an
+  extractor that emits the `timestamp_repeater` field; older extractors leave
+  events one-shot. Unrepresentable repeaters (e.g. `+2wd`, or an hourly
+  repeater on an all-day task) stay one-shot.
+
 ## [0.10.0] - 2026-06-30
 
 ### Added

@@ -33,6 +33,14 @@ export interface Task {
     timestamp_type?: string;
     timestamp_active?: boolean;
     timestamp_end_time?: string;
+    // Canonical org repeater string of the active timestamp (`++7d`,
+    // `.+1m`, `+1wd`), emitted by markdown-org-extract as an additive
+    // optional field (extractor ADR-0015). Absent when the timestamp has
+    // no repeater or when produced by an older extractor. The gcal sync
+    // maps it to a Google Calendar RRULE when the repeater has a single-rule
+    // form; unrepresentable repeaters (e.g. `+2wd`) leave the event one-shot
+    // (see utils/gcal/rrule.ts).
+    timestamp_repeater?: string;
     // Per-task key/value pairs parsed by markdown-org-extract from an
     // `org-properties` fenced code block. Absent when the task has no such
     // block. Optional and additive on the wire (extractor ADR-0015), so an

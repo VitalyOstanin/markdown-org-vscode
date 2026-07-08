@@ -16,6 +16,10 @@ export interface GcalEventResource {
     description?: string;
     start: GcalEventDateTime;
     end: GcalEventDateTime;
+    // RFC 5545 recurrence lines (e.g. `["RRULE:FREQ=WEEKLY"]`), mapped
+    // from an org repeater. Omitted for one-shot events. The instance
+    // start/end describe a single occurrence; Google expands the series.
+    recurrence?: string[];
     extendedProperties?: { private?: Record<string, string> };
 }
 

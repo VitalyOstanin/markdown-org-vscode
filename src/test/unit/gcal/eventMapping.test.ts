@@ -84,4 +84,36 @@ suite('gcal/eventMapping', () => {
         assert.equal(addDaysToIsoDate('2026-12-31', 1), '2027-01-01');
         assert.equal(addDaysToIsoDate('2026-01-01', -1), '2025-12-31');
     });
+
+    test('repeater becomes a recurrence rule; instance start/end stay single-occurrence', () => {
+        const ev = mapTaskToEvent({ ...base, timestamp_time: '14:00', timestamp_repeater: '++7d' }, 'oid', opts);
+        assert.deepEqual(ev.recurrence, ['RRULE:FREQ=DAILY;INTERVAL=7']);
+        // The start/end still describe one instance; Google expands the series.
+        assert.deepEqual(ev.start, { dateTime: '2026-06-01T14:00:00', timeZone: 'Europe/Belgrade' });
+        assert.deepEqual(ev.end, { dateTime: '2026-06-01T15:00:00', timeZone: 'Europe/Belgrade' });
+    });
+
+    test('no repeater sends an empty recurrence array (clears any prior series on patch)', () => {
+        // Always present, never omitted: the upsert patches unconditionally
+        // and Google PATCH is partial, so an absent field would leave a
+        // formerly-recurring event stale after its repeater is removed.
+        const ev = mapTaskToEvent(base, 'oid', opts);
+        assert.deepEqual(ev.recurrence, []);
+    });
+
+    test('unrepresentable repeater (+2wd) leaves the event one-shot (empty recurrence)', () => {
+        const ev = mapTaskToEvent({ ...base, timestamp_repeater: '+2wd' }, 'oid', opts);
+        assert.deepEqual(ev.recurrence, []);
+    });
+
+    test('hourly repeater on an all-day task is dropped (Google rejects sub-daily on date-only)', () => {
+        // base has no timestamp_time -> all-day event; FREQ=HOURLY would 400.
+        const ev = mapTaskToEvent({ ...base, timestamp_repeater: '+1h' }, 'oid', opts);
+        assert.deepEqual(ev.recurrence, []);
+    });
+
+    test('hourly repeater on a timed task is kept', () => {
+        const ev = mapTaskToEvent({ ...base, timestamp_time: '10:00', timestamp_repeater: '+2h' }, 'oid', opts);
+        assert.deepEqual(ev.recurrence, ['RRULE:FREQ=HOURLY;INTERVAL=2']);
+    });
 });
