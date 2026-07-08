@@ -440,7 +440,7 @@
     "qs": "^6.15.2"
   },
   "x-markdown-org": {
-    "extractorVersion": "0.9.0"
+    "extractorVersion": "0.10.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
