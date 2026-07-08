@@ -4,6 +4,8 @@ All notable changes to the "Markdown Org" extension will be documented in this f
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-07-08
+
 ### Added
 
 - Google Calendar sync now maps an org repeater to a recurring event. A task
@@ -12,6 +14,11 @@ All notable changes to the "Markdown Org" extension will be documented in this f
   extractor that emits the `timestamp_repeater` field; older extractors leave
   events one-shot. Unrepresentable repeaters (e.g. `+2wd`, or an hourly
   repeater on an all-day task) stay one-shot.
+
+### Changed
+
+- Bundled extractor bumped to 0.10.0, which emits the `timestamp_repeater`
+  field the recurrence mapping above depends on.
 
 ## [0.10.0] - 2026-06-30
 

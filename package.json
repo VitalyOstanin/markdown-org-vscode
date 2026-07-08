@@ -2,7 +2,7 @@
   "name": "markdown-org-vscode",
   "displayName": "Markdown Org",
   "description": "Org-mode style task management in Markdown: TODO/DONE workflow, priorities, SCHEDULED/DEADLINE timestamps, agenda views, and CLOCK time tracking.",
-  "version": "0.10.0",
+  "version": "0.11.0",
   "publisher": "vitalyostanin",
   "repository": {
     "type": "git",
