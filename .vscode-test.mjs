@@ -20,6 +20,11 @@ export default defineConfig({
             files: 'out/test/integration/**/*.integration.test.js',
             extensionDevelopmentPath: here,
             workspaceFolder: testWorkspace,
+            // Pin the test VS Code to the X11/Ozone backend. On a Wayland
+            // session Electron would otherwise auto-select Wayland and open a
+            // real window even under xvfb (which only provides an X server).
+            // Forcing x11 keeps the test host on xvfb's virtual display.
+            launchArgs: ['--ozone-platform=x11'],
             mocha: {
                 ui: 'tdd',
                 color: true,

@@ -47,16 +47,36 @@ function findXvfbRun() {
     return 'xvfb-run';
 }
 
+// Force the Electron-based test VS Code onto xvfb's virtual X server.
+// `xvfb-run` only sets $DISPLAY (X11); it does NOT touch Wayland. On a
+// Wayland session Electron auto-selects the Wayland backend from
+// XDG_SESSION_TYPE and, even with WAYLAND_DISPLAY unset, falls back to the
+// default `wayland-0` socket -- connecting to the real compositor and
+// popping a live window on the developer's screen despite xvfb. Pin the
+// session type and backend to X11 so the auto-detection picks xvfb's X
+// server. The decisive lever is the explicit `--ozone-platform=x11` launch
+// arg in `.vscode-test.mjs`; these env vars are belt-and-suspenders.
+function xvfbChildEnv() {
+    const env = { ...process.env };
+    delete env.WAYLAND_DISPLAY;
+    env.XDG_SESSION_TYPE = 'x11';
+    env.GDK_BACKEND = 'x11';
+    env.ELECTRON_OZONE_PLATFORM_HINT = 'x11';
+    return env;
+}
+
 function main() {
     const xvfbRun = findXvfbRun();
     const nodeBin = process.execPath;
     const forwarded = process.argv.slice(2);
     let command;
     let args;
+    let spawnEnv = process.env;
 
     if (xvfbRun) {
         command = xvfbRun;
         args = ['-a', '--server-args=-screen 0 1280x720x24', nodeBin, VSCODE_TEST_BIN, ...forwarded];
+        spawnEnv = xvfbChildEnv();
     } else if (process.platform === 'linux') {
         // No xvfb-run on Linux. Running the test VS Code on the real
         // $DISPLAY pops a live window on the developer's screen mid-run.
@@ -86,7 +106,7 @@ function main() {
         args = [VSCODE_TEST_BIN, ...forwarded];
     }
 
-    const child = spawn(command, args, { stdio: 'inherit' });
+    const child = spawn(command, args, { stdio: 'inherit', env: spawnEnv });
     child.on('exit', (code, signal) => {
         if (signal) {
             process.kill(process.pid, signal);
