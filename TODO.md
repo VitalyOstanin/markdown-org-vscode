@@ -1,5 +1,16 @@
 # TODO
 
+## Design
+
+- [ ] Redesign the visual language of the agenda/webview UI
+    - Revisit the overall visual language: typography scale, spacing,
+      status/priority color semantics, icons, and layout of the agenda panel.
+    - Support both light and dark themes explicitly. Drive all colors from VS
+      Code theme tokens (`var(--vscode-*)`) so the UI adapts to the active
+      theme; verify contrast and readability in both light and dark.
+    - Add a setting to control the theme behavior (e.g. follow the editor
+      theme vs. force light/dark for the webview), with a sensible default.
+
 ## Configuration
 
 - [x] Remove hardcoded path from package.json default settings
