@@ -1,5 +1,6 @@
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
+import prettier from 'eslint-config-prettier';
 
 export default tseslint.config(
     {
@@ -36,5 +37,10 @@ export default tseslint.config(
                 }
             ]
         }
-    }
+    },
+    // Must be last: disables any ESLint rules that would conflict with
+    // Prettier's formatting. The current config declares no stylistic rules, so
+    // this is defence-in-depth for future rule additions rather than a fix for
+    // an active conflict.
+    prettier
 );
