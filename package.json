@@ -275,8 +275,7 @@
       {
         "command": "markdown-org.cycleTag",
         "key": "ctrl+k ctrl+k ctrl+t",
-        "mac": "cmd+k cmd+k cmd+t",
-        "when": "editorTextFocus && editorLangId == markdown"
+        "mac": "cmd+k cmd+k cmd+t"
       }
     ],
     "configuration": {
