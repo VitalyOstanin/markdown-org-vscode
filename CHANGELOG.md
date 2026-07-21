@@ -4,6 +4,14 @@ All notable changes to the "Markdown Org" extension will be documented in this f
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-07-18
+
+### Changed
+
+- CI maintenance only; no user-facing extension changes. Bumped pinned GitHub
+  Actions in the `github-actions` group: `actions/setup-node` 6.4.0 → 7.0.0 and
+  `softprops/action-gh-release` 3.0.1 → 3.0.2.
+
 ## [0.11.0] - 2026-07-08
 
 ### Added
