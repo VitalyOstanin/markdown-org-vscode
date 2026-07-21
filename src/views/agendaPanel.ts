@@ -9,6 +9,8 @@ import { resolveAgendaWatchBase } from '../utils/agendaWatchPattern';
 import { toIsoDate } from '../utils/isoDate';
 import { formatDayHeaderParts } from '../utils/agendaDayHeader';
 import { isCancelled } from '../utils/normalizeTaskType';
+import { priorityClass } from '../utils/agendaPriorityClass';
+import { shiftMonthAnchor } from '../utils/monthNav';
 import { AGENDA_STYLES } from './agendaStyles';
 import { formatError, notifyError } from '../utils/notify';
 
@@ -512,6 +514,13 @@ export class AgendaPanel {
         // the exact same spelling list as the regex/toggle/normalizer and cannot
         // drift if a spelling is ever added.
         const isCancelledSource = isCancelled.toString();
+        // Priority-cell class derivation with attribute-injection guard
+        // (whitelist ASCII alphanumerics); unit-tested in
+        // agendaPriorityClass.test.ts.
+        const priorityClassSource = priorityClass.toString();
+        // Month-anchor shift that avoids the short-month rollover (Jan 31 +1 ->
+        // February, not March); unit-tested in monthNav.test.ts.
+        const shiftMonthAnchorSource = shiftMonthAnchor.toString();
         return `<!DOCTYPE html>
 <html>
 <head>
@@ -533,6 +542,8 @@ export class AgendaPanel {
         ${toIsoDateSource}
         ${formatDayHeaderPartsSource}
         ${isCancelledSource}
+        ${priorityClassSource}
+        ${shiftMonthAnchorSource}
         const vscode = acquireVsCodeApi();
         // Handshake for the ServiceWorker-race retry path on the extension
         // side: tells AgendaPanel.armReadyTimeout the webview script is alive
@@ -740,7 +751,7 @@ export class AgendaPanel {
             const timeInfo = getTimeInfo(task, daysOffset);
             const status = task.task_type || '';
             const priority = task.priority ? '[#' + task.priority + ']' : '';
-            const priorityClass = task.priority ? 'priority-' + task.priority.toLowerCase() : '';
+            const priorityClassName = priorityClass(task.priority);
             const statusClass = status === 'TODO' ? 'todo-keyword'
                 : status === 'DONE' ? 'done-keyword'
                 : isCancelled(status) ? 'cancelled-keyword'
@@ -757,7 +768,7 @@ export class AgendaPanel {
                 '<span class="todo-label">todo:</span>' +
                 '<span class="time-info-cell">' + timeInfo + '</span>' +
                 '<span class="' + statusClass + '">' + escapeHtml(status) + '</span>' +
-                '<span class="' + priorityClass + '">' + escapeHtml(priority) + '</span>' +
+                '<span class="' + priorityClassName + '">' + escapeHtml(priority) + '</span>' +
                 '<span class="' + headingClass + '">' + escapeHtml(task.heading) + '</span>' +
                 '<span class="' + dateClass + '">' + dateDisplay + '</span>' +
                 '</div>';
@@ -891,10 +902,10 @@ export class AgendaPanel {
                 d.setDate(d.getDate() + offset);
             } else if (initialMode === 'week') {
                 d.setDate(d.getDate() + offset * 7);
-            } else if (initialMode === 'month') {
-                d.setMonth(d.getMonth() + offset);
             }
-            const newDate = toIsoDate(d);
+            const newDate = initialMode === 'month' && offset !== 0
+                ? toIsoDate(shiftMonthAnchor(d, offset))
+                : toIsoDate(d);
             // Today is an explicit "snap to today" -- drop any remembered
             // scroll for that anchor so the update handler falls back to
             // scrollToWeekFocus() instead of restoring an old position.
