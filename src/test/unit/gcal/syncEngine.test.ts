@@ -260,4 +260,17 @@ suite('gcal/syncEngine', () => {
         assert.equal(summary.created, 2, 'both tasks publish in a single run');
         assert.equal(summary.deferred, 0, 'no task is deferred by a sibling write-back shifting its line');
     });
+
+    test('failed task records the error reason in changes (not discarded)', async () => {
+        // A non-transient insert error (403) throws immediately (no backoff retry),
+        // so the per-task catch must capture the reason on the change entry.
+        const r = recorder(() => ({ status: 403, body: { error: { message: 'forbidden calendar' } } }));
+        const w = recordingWriter();
+        const t = task({ properties: { ID: '11111111-1111-1111-1111-111111111111' } });
+        const summary = await runSync(baseDeps([t], r.fn, w.writer));
+        assert.equal(summary.failed, 1);
+        const failed = summary.changes.find((c) => c.action === 'failed');
+        assert.ok(failed, 'a failed change is recorded');
+        assert.match(failed!.error ?? '', /forbidden calendar/, 'failure reason is preserved');
+    });
 });

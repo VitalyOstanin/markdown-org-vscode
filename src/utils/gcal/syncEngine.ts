@@ -44,6 +44,8 @@ export interface SyncChange {
     /** The task's date (`YYYY-MM-DD`) if it has one, else undefined. */
     date?: string;
     heading: string;
+    /** Failure reason (only set for `action: 'failed'`), for the details channel. */
+    error?: string;
 }
 
 export interface SyncSummary {
@@ -79,8 +81,8 @@ export async function runSync(deps: SyncDeps): Promise<SyncSummary> {
         failed: 0,
         changes: []
     };
-    const note = (action: SyncAction, task: Task) =>
-        summary.changes.push({ action, date: task.timestamp_date, heading: task.heading });
+    const note = (action: SyncAction, task: Task, error?: string) =>
+        summary.changes.push({ action, date: task.timestamp_date, heading: task.heading, error });
 
     // Within a file, handle tasks bottom-up so writing one task's
     // org-properties block (which grows the file) never shifts the 1-based
@@ -152,9 +154,9 @@ export async function runSync(deps: SyncDeps): Promise<SyncSummary> {
                 // patches. Outcome intentionally ignored.
                 await deps.writer.write(task.file, task.line, task.heading, props);
             }
-        } catch {
+        } catch (e) {
             summary.failed++;
-            note('failed', task);
+            note('failed', task, e instanceof Error ? e.message : String(e));
         }
     }
 

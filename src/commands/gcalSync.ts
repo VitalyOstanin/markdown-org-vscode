@@ -328,9 +328,12 @@ function compactCounts(summary: SyncSummary): string {
     return parts.length > 0 ? parts.join(', ') : 'no changes';
 }
 
-/** Channel line: spelled-out action + date + full heading. */
+/** Channel line: spelled-out action + date + full heading, plus the failure
+ *  reason for failed tasks so the details channel explains *why* a task failed
+ *  (the per-task catch would otherwise discard the error object). */
 function channelLine(c: SyncChange): string {
-    return `  ${c.action.padEnd(7)} ${c.date ?? '—'}  ${c.heading.trim()}`;
+    const base = `  ${c.action.padEnd(7)} ${c.date ?? '—'}  ${c.heading.trim()}`;
+    return c.action === 'failed' && c.error ? `${base}  — ${c.error}` : base;
 }
 
 /** What invoked syncNow: a user action vs. an automatic save trigger. */
@@ -596,7 +599,19 @@ export function registerGcalSaveTrigger(context: vscode.ExtensionContext): void 
             debounced = debounce(() => {
                 // Background automation: silent on success/no-changes, toast
                 // only on failures. See reportSyncSummary's toast policy.
-                void syncNow(context, { trigger: 'onSave' }).catch(() => {});
+                //
+                // Errors thrown *before* runSync (broken auth, missing
+                // extractor, calendar resolution) never reach reportSyncSummary,
+                // so they must not be swallowed silently here: log the reason to
+                // the details channel and surface a warning toast, otherwise an
+                // on-save sync that can never succeed fails invisibly.
+                void syncNow(context, { trigger: 'onSave' }).catch((e: unknown) => {
+                    const reason = e instanceof Error ? e.message : String(e);
+                    getSyncChannel().appendLine(
+                        `[${new Date().toLocaleTimeString()}] sync (onSave) failed before run: ${reason}`
+                    );
+                    void notifyWarn(`Calendar sync (on save) failed: ${reason}`);
+                });
             }, delay);
         }
         debounced();

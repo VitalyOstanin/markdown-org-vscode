@@ -1,6 +1,33 @@
-import { open, readFile, writeFile, unlink } from 'node:fs/promises';
+import { open, readFile, rename, unlink } from 'node:fs/promises';
 import { hostname as osHostname } from 'node:os';
 import { randomUUID } from 'node:crypto';
+
+/**
+ * Atomically replace the lock file's contents. Writes a uniquely-named temp
+ * file in the same directory, then rename()s it over the target — rename is
+ * atomic on POSIX and NTFS for same-filesystem paths, so a concurrent reader
+ * never observes a half-written file. A plain truncating writeFile is NOT
+ * atomic: a concurrent readLock could read a partial JSON, fail to parse, and
+ * treat a live lock as stale (stealing it).
+ */
+async function atomicWrite(path: string, contents: string): Promise<void> {
+    const tmp = `${path}.${process.pid}.${randomUUID()}.tmp`;
+    const fh = await open(tmp, 'wx');
+    try {
+        await fh.writeFile(contents);
+    } finally {
+        await fh.close();
+    }
+    try {
+        await rename(tmp, path);
+    } catch (e) {
+        await unlink(tmp).catch(() => {});
+        throw e;
+    }
+}
+
+/** Exported for unit testing the atomic replace in isolation. */
+export const __atomicWriteForTests = atomicWrite;
 
 interface LockData {
     pid: number;
@@ -80,7 +107,10 @@ export async function acquireLock(opts: AcquireOptions): Promise<Lock | null> {
     let timer: ReturnType<typeof setInterval> | undefined;
     if (hbMs > 0) {
         timer = setInterval(() => {
-            void writeFile(opts.path, JSON.stringify({ ...data, heartbeatAt: now() })).catch(() => {});
+            // Atomic replace (temp file + rename), never a truncating write:
+            // a concurrent readLock must not observe a partially-written file
+            // and mistake a live lock for a stale one.
+            void atomicWrite(opts.path, JSON.stringify({ ...data, heartbeatAt: now() })).catch(() => {});
         }, hbMs);
         timer.unref?.();
     }
