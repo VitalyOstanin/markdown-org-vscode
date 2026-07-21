@@ -57,14 +57,31 @@ function main() {
     if (xvfbRun) {
         command = xvfbRun;
         args = ['-a', '--server-args=-screen 0 1280x720x24', nodeBin, VSCODE_TEST_BIN, ...forwarded];
-    } else {
-        if (process.platform === 'linux') {
+    } else if (process.platform === 'linux') {
+        // No xvfb-run on Linux. Running the test VS Code on the real
+        // $DISPLAY pops a live window on the developer's screen mid-run.
+        // Refuse to fall back to the real display -- the only exception is
+        // CI, where the runner is headless and has no real display to
+        // disturb. Locally this is a hard error: install xvfb instead.
+        if (process.env.CI) {
             console.warn(
-                '[run-integration-tests] xvfb-run not found in PATH; running the test ' +
-                    'VS Code on the current $DISPLAY. Install xvfb (e.g. `apt install xvfb`) ' +
-                    'to keep tests off your real display.'
+                '[run-integration-tests] xvfb-run not found in PATH; CI detected, ' +
+                    'running the test VS Code directly (headless runner).'
             );
+            command = nodeBin;
+            args = [VSCODE_TEST_BIN, ...forwarded];
+        } else {
+            console.error(
+                '[run-integration-tests] xvfb-run not found in PATH. Refusing to run ' +
+                    'the test VS Code on your real $DISPLAY. Install xvfb ' +
+                    '(e.g. `apt install xvfb`) and retry. Direct display fallback is ' +
+                    'allowed only in CI (set CI=1 to force it).'
+            );
+            process.exit(1);
         }
+    } else {
+        // Non-Linux (macOS, Windows): xvfb does not exist on these
+        // platforms, so the test host manages its own display.
         command = nodeBin;
         args = [VSCODE_TEST_BIN, ...forwarded];
     }
