@@ -5,6 +5,7 @@ out
 test-workspace/
 test-workspace-demo*/
 docs/reviews/
+docs/__check/
 docs/superpowers/
 coverage/
 .nyc_output/
