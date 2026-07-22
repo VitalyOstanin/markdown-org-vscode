@@ -18,6 +18,15 @@
     - Follow-ups (deferred): capture README screenshots of the three styles;
       consider codicon-based status/priority icons.
 
+- [ ] Verify agenda localization across languages
+    - Check weekday/month names, date formats, and any user-facing strings
+      render correctly for several locales (RTL not required), not just the
+      current one.
+
+- [ ] Sticky day/date header at the top of the agenda
+    - Keep the current day/date heading pinned to the top of the webview while
+      scrolling through that day's tasks, so the active day stays visible.
+
 ## Configuration
 
 - [x] Remove hardcoded path from package.json default settings
