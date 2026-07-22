@@ -61,8 +61,9 @@ suite('AGENDA_STYLES theming invariant', () => {
     // presets hide .todo-label, so their .task-line grid MUST declare exactly
     // five columns -- a mismatch (e.g. four) makes `1fr` land on the wrong
     // cell and pushes the heading/offset columns off to the side.
-    for (const preset of ['native', 'hybrid'] as const) {
-        test(`${preset} .task-line grid declares five columns`, () => {
+    const EXPECTED_COLUMNS: Record<string, number> = { native: 5, hybrid: 5, ledger: 6 };
+    for (const [preset, cols] of Object.entries(EXPECTED_COLUMNS)) {
+        test(`${preset} .task-line grid declares ${cols} columns`, () => {
             const m = AGENDA_STYLES.match(
                 new RegExp(
                     `\\[data-agenda-style="${preset}"\\]\\s*\\.task-line\\s*\\{[^}]*grid-template-columns:\\s*([^;]+);`
@@ -72,11 +73,21 @@ suite('AGENDA_STYLES theming invariant', () => {
             const tracks = m[1].trim().split(/\s+/);
             assert.strictEqual(
                 tracks.length,
-                5,
-                `${preset} .task-line must have 5 columns (one per visible cell), found ${tracks.length}: ${m[1].trim()}`
+                cols,
+                `${preset} .task-line must have ${cols} columns (one per visible cell), found ${tracks.length}: ${m[1].trim()}`
             );
         });
     }
+
+    test('defines the ledger preset', () => {
+        assert.ok(AGENDA_STYLES.includes('[data-agenda-style="ledger"]'));
+    });
+
+    test('ledger preset declares all four flag glyphs', () => {
+        for (const glyph of ['⚑', '◷', '↻', '⊘']) {
+            assert.ok(AGENDA_STYLES.includes(`content: "${glyph}"`), `expected flag glyph ${glyph} in ledger CSS`);
+        }
+    });
 });
 
 /**

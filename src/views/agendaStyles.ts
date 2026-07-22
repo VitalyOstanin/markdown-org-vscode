@@ -170,6 +170,10 @@ export const AGENDA_STYLES = `
             flex-direction: column;
             line-height: 1.2;
         }
+        /* .flag holds the ledger-only type glyph; hidden (and thus out of the
+           grid) in every preset except ledger, so their column counts are
+           unaffected by the extra renderTask cell. */
+        .flag { display: none; }
         .todo-label { color: var(--vscode-charts-red); }
         .status[data-status="todo"] { color: var(--vscode-charts-red); font-weight: bold; }
         .status[data-status="done"] { color: var(--vscode-charts-green); font-weight: bold; }
@@ -330,6 +334,72 @@ export const AGENDA_STYLES = `
         }
         body[data-agenda-style="hybrid"] .time-info-cell,
         body[data-agenda-style="hybrid"] .offset {
+            font-family: 'Courier New', ui-monospace, monospace;
+            font-variant-numeric: tabular-nums;
+        }
+        /* ============ preset: ledger (D2+) ============ */
+        body[data-agenda-style="ledger"] {
+            font-family: var(--markdown-org-agenda-font);
+        }
+        body[data-agenda-style="ledger"] .task-line {
+            /* dot | big time | flag | priority | heading | offset */
+            grid-template-columns: 14px 56px 18px 18px 1fr 52px;
+            align-items: center;
+        }
+        body[data-agenda-style="ledger"] .todo-label { display: none; }
+        /* Visual order (DOM order stays shared across presets): dot first. */
+        body[data-agenda-style="ledger"] .status { order: 1; }
+        body[data-agenda-style="ledger"] .time-info-cell { order: 2; }
+        body[data-agenda-style="ledger"] .flag { order: 3; }
+        body[data-agenda-style="ledger"] .priority { order: 4; }
+        body[data-agenda-style="ledger"] .heading { order: 5; }
+        body[data-agenda-style="ledger"] .offset { order: 6; }
+        /* status rendered as a coloured dot, not text */
+        body[data-agenda-style="ledger"] .status {
+            font-size: 0;
+            justify-self: center;
+        }
+        body[data-agenda-style="ledger"] .status::before {
+            content: "";
+            display: block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+        body[data-agenda-style="ledger"] .status[data-status="todo"]::before { background: var(--vscode-charts-red); }
+        body[data-agenda-style="ledger"] .status[data-status="done"]::before { background: var(--vscode-charts-green); }
+        body[data-agenda-style="ledger"] .status[data-status="cancelled"]::before { background: var(--vscode-disabledForeground); }
+        /* big time */
+        body[data-agenda-style="ledger"] .time-info-cell {
+            font-family: 'Courier New', ui-monospace, monospace;
+            font-variant-numeric: tabular-nums;
+            font-size: 1.25em;
+            font-weight: 600;
+            text-align: right;
+            color: var(--vscode-charts-blue);
+        }
+        /* flag column */
+        body[data-agenda-style="ledger"] .flag {
+            display: block;
+            text-align: center;
+        }
+        body[data-agenda-style="ledger"] .flag[data-flag="deadline"]::before { content: "⚑"; color: var(--vscode-charts-red); }
+        body[data-agenda-style="ledger"] .flag[data-flag="scheduled"]::before { content: "◷"; color: var(--vscode-charts-blue); }
+        body[data-agenda-style="ledger"] .flag[data-flag="repeat"]::before { content: "↻"; color: var(--vscode-charts-yellow); }
+        body[data-agenda-style="ledger"] .flag[data-flag="cancelled"]::before { content: "⊘"; color: var(--vscode-disabledForeground); }
+        /* priority chip (mirrors hybrid) */
+        body[data-agenda-style="ledger"] .priority {
+            font-size: 0.8em;
+            width: 1.4em;
+            text-align: center;
+            border-radius: 3px;
+            color: var(--vscode-editor-background);
+        }
+        body[data-agenda-style="ledger"] .priority[data-priority="a"] { background: var(--vscode-charts-red); }
+        body[data-agenda-style="ledger"] .priority[data-priority="b"] { background: var(--vscode-charts-yellow); }
+        body[data-agenda-style="ledger"] .priority[data-priority="c"] { background: var(--vscode-charts-blue); }
+        body[data-agenda-style="ledger"] .priority:empty { visibility: hidden; }
+        body[data-agenda-style="ledger"] .offset {
             font-family: 'Courier New', ui-monospace, monospace;
             font-variant-numeric: tabular-nums;
         }
