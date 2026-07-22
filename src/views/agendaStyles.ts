@@ -417,4 +417,17 @@ export const AGENDA_STYLES = `
             font-family: var(--markdown-org-agenda-mono-font);
             font-variant-numeric: tabular-nums;
         }
+        /* Ledger headings stay neutral and regular: colour lives in the flag,
+           the priority chip and the offset -- not the heading (per the mockup).
+           Overrides the priority/deadline heading tint+bold from the shared
+           block; higher specificity than those .task-line[...] .heading rules. */
+        body[data-agenda-style="ledger"] .task-line .heading {
+            color: var(--vscode-editor-foreground);
+            font-weight: normal;
+        }
+        body[data-agenda-style="ledger"] .task-line[data-status="done"] .heading,
+        body[data-agenda-style="ledger"] .task-line[data-status="cancelled"] .heading {
+            color: var(--vscode-disabledForeground);
+            text-decoration: line-through;
+        }
     `;
