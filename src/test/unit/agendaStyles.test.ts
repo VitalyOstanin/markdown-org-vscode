@@ -10,7 +10,9 @@ import { AGENDA_STYLES } from '../../views/agendaStyles';
  */
 suite('AGENDA_STYLES theming invariant', () => {
     test('contains no hardcoded HEX colours', () => {
-        const hexes = AGENDA_STYLES.match(/#[0-9a-fA-F]{3,8}\b/g);
+        // Exclude `content: "[#"` -- the monospace-preset marker text, not a colour.
+        const withoutContent = AGENDA_STYLES.replace(/content:\s*"[^"]*"/g, '');
+        const hexes = withoutContent.match(/#[0-9a-fA-F]{3,8}\b/g);
         assert.strictEqual(hexes, null, `agenda CSS must not hardcode colours; found: ${hexes?.join(', ')}`);
     });
 
@@ -37,6 +39,21 @@ suite('AGENDA_STYLES theming invariant', () => {
         // color-mix()-ed from a semantic colour over the base background.
         const mixes = AGENDA_STYLES.match(/color-mix\(in srgb,/g) ?? [];
         assert.ok(mixes.length >= 3, `expected >=3 color-mix() tints, found ${mixes.length}`);
+    });
+
+    test('defines all three presets', () => {
+        assert.ok(AGENDA_STYLES.includes('[data-agenda-style="monospace"]'));
+        assert.ok(AGENDA_STYLES.includes('[data-agenda-style="native"]'));
+        assert.ok(AGENDA_STYLES.includes('[data-agenda-style="hybrid"]'));
+    });
+
+    test('no hardcoded hex colours anywhere', () => {
+        const withoutContent = AGENDA_STYLES.replace(/content:\s*"[^"]*"/g, '');
+        assert.strictEqual(/#[0-9a-fA-F]{3,8}\b/.test(withoutContent), false);
+    });
+
+    test('hybrid time/offset use tabular-nums', () => {
+        assert.ok(/font-variant-numeric:\s*tabular-nums/.test(AGENDA_STYLES));
     });
 });
 

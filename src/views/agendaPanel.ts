@@ -9,8 +9,8 @@ import { resolveAgendaWatchBase } from '../utils/agendaWatchPattern';
 import { toIsoDate } from '../utils/isoDate';
 import { formatDayHeaderParts } from '../utils/agendaDayHeader';
 import { isCancelled } from '../utils/normalizeTaskType';
-import { priorityClass } from '../utils/agendaPriorityClass';
 import { shiftMonthAnchor } from '../utils/monthNav';
+import { normalizeAgendaStyle } from '../utils/agendaStyle';
 import { AGENDA_STYLES } from './agendaStyles';
 import { formatError, notifyError } from '../utils/notify';
 
@@ -329,6 +329,7 @@ export class AgendaPanel {
         switchToDay?: boolean;
         date?: string;
         mode?: string;
+        style?: string;
     }) {
         if (message.command === 'ready') {
             AgendaPanel.handleReady();
@@ -362,6 +363,11 @@ export class AgendaPanel {
             if (targetCommand) {
                 await vscode.commands.executeCommand(targetCommand, AgendaPanel.shiftedToday);
             }
+        } else if (message.command === 'setAgendaStyle') {
+            const style = normalizeAgendaStyle(message.style);
+            await vscode.workspace
+                .getConfiguration('markdown-org')
+                .update('agendaStyle', style, vscode.ConfigurationTarget.Global);
         }
     }
 
@@ -514,20 +520,21 @@ export class AgendaPanel {
         // the exact same spelling list as the regex/toggle/normalizer and cannot
         // drift if a spelling is ever added.
         const isCancelledSource = isCancelled.toString();
-        // Priority-cell class derivation with attribute-injection guard
-        // (whitelist ASCII alphanumerics); unit-tested in
-        // agendaPriorityClass.test.ts.
-        const priorityClassSource = priorityClass.toString();
         // Month-anchor shift that avoids the short-month rollover (Jan 31 +1 ->
         // February, not March); unit-tested in monthNav.test.ts.
         const shiftMonthAnchorSource = shiftMonthAnchor.toString();
+        const styleConfig = vscode.workspace.getConfiguration('markdown-org');
+        const agendaStyle = normalizeAgendaStyle(styleConfig.get<string>('agendaStyle'));
+        const agendaFontRaw = (styleConfig.get<string>('agendaFontFamily') || '').trim();
+        const systemUiStack = "-apple-system, 'Segoe UI', system-ui, sans-serif";
+        const agendaFont = agendaFontRaw.length > 0 ? agendaFontRaw : systemUiStack;
         return `<!DOCTYPE html>
 <html>
 <head>
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'nonce-${nonce}'; script-src 'nonce-${nonce}';">
     <style nonce="${nonce}">${AGENDA_STYLES}</style>
 </head>
-<body>
+<body data-agenda-style="${agendaStyle}" style="--markdown-org-agenda-font: ${agendaFont};">
     <div class="nav-bar" id="nav-bar"></div>
     <div class="current-date" id="current-date"></div>
     <div id="content"></div>
@@ -542,7 +549,6 @@ export class AgendaPanel {
         ${toIsoDateSource}
         ${formatDayHeaderPartsSource}
         ${isCancelledSource}
-        ${priorityClassSource}
         ${shiftMonthAnchorSource}
         const vscode = acquireVsCodeApi();
         // Handshake for the ServiceWorker-race retry path on the extension
@@ -665,6 +671,20 @@ export class AgendaPanel {
         function navigateToDay(date) {
             vscode.postMessage({ command: 'navigate', date: date, switchToDay: true });
         }
+
+        function setAgendaStyle(style) {
+            document.body.dataset.agendaStyle = style;
+            vscode.postMessage({ command: 'setAgendaStyle', style: style });
+        }
+
+        function toggleStyleMenu(ev) {
+            ev.stopPropagation();
+            document.getElementById('styleMenu').classList.toggle('open');
+        }
+        document.addEventListener('click', function () {
+            const m = document.getElementById('styleMenu');
+            if (m) m.classList.remove('open');
+        });
         
         function attachCalendarListeners() {
             document.querySelectorAll('.calendar-day').forEach(el => {
@@ -750,27 +770,36 @@ export class AgendaPanel {
         function renderTask(task, daysOffset, taskType) {
             const timeInfo = getTimeInfo(task, daysOffset);
             const status = task.task_type || '';
-            const priority = task.priority ? '[#' + task.priority + ']' : '';
-            const priorityClassName = priorityClass(task.priority);
-            const statusClass = status === 'TODO' ? 'todo-keyword'
-                : status === 'DONE' ? 'done-keyword'
-                : isCancelled(status) ? 'cancelled-keyword'
+            const priorityLetter = task.priority || '';
+            const statusKind = status === 'TODO' ? 'todo'
+                : status === 'DONE' ? 'done'
+                : isCancelled(status) ? 'cancelled'
                 : '';
 
             const dateDisplay = (daysOffset !== undefined && daysOffset !== 0 && task.timestamp_date)
                 ? formatDateForTitle(task.timestamp_date)
                 : '';
-            const dateClass = taskType === 'upcoming' ? 'date-upcoming' : 'date-overdue';
+            const dateDir = taskType === 'upcoming' ? 'upcoming' : 'overdue';
             // Source of truth: src/utils/agendaHeadingTint.ts -- unit tested.
-            const headingClass = resolveHeadingClass(task);
+            // typeAttr feeds the [data-type="deadline"] preset selector that
+            // paints the heading red for a DEADLINE task; resolveHeadingClass
+            // still owns the DEADLINE > priority > default precedence rule.
+            const typeAttr = resolveHeadingClass(task).indexOf('deadline') !== -1 ? 'deadline' : 'scheduled';
 
-            return '<div class="task-line" data-file="' + escapeHtml(task.file) + '" data-line="' + sanitizeTaskLine(task.line) + '">' +
+            return '<div class="task-line"' +
+                ' data-status="' + statusKind + '"' +
+                ' data-priority="' + escapeHtml(priorityLetter.toLowerCase()) + '"' +
+                ' data-type="' + typeAttr + '"' +
+                ' data-file="' + escapeHtml(task.file) + '"' +
+                ' data-line="' + sanitizeTaskLine(task.line) + '">' +
                 '<span class="todo-label">todo:</span>' +
                 '<span class="time-info-cell">' + timeInfo + '</span>' +
-                '<span class="' + statusClass + '">' + escapeHtml(status) + '</span>' +
-                '<span class="' + priorityClassName + '">' + escapeHtml(priority) + '</span>' +
-                '<span class="' + headingClass + '">' + escapeHtml(task.heading) + '</span>' +
-                '<span class="' + dateClass + '">' + dateDisplay + '</span>' +
+                '<span class="status" data-status="' + statusKind + '">' + escapeHtml(status) + '</span>' +
+                '<span class="priority" data-priority="' + escapeHtml(priorityLetter.toLowerCase()) + '">' +
+                    escapeHtml(priorityLetter) +
+                '</span>' +
+                '<span class="heading">' + escapeHtml(task.heading) + '</span>' +
+                '<span class="offset" data-dir="' + dateDir + '">' + dateDisplay + '</span>' +
                 '</div>';
         }
         
@@ -930,6 +959,33 @@ export class AgendaPanel {
                 '</span>';
         }
 
+        function renderStyleMenu() {
+            const cur = document.body.dataset.agendaStyle || 'hybrid';
+            const items = [
+                { id: 'monospace', label: 'Monospace' },
+                { id: 'native', label: 'Native' },
+                { id: 'hybrid', label: 'Hybrid' }
+            ];
+            return '<div class="style-menu" id="styleMenu">' +
+                '<button class="style-menu-btn" id="styleMenuBtn" title="Agenda style">Aa &#9662;</button>' +
+                '<div class="style-menu-list">' +
+                items.map(it =>
+                    '<div class="style-menu-item' + (it.id === cur ? ' active' : '') +
+                    '" data-style="' + it.id + '">' + it.label + '</div>'
+                ).join('') +
+                '</div></div>';
+        }
+
+        function attachStyleMenuListeners() {
+            document.getElementById('styleMenuBtn').addEventListener('click', toggleStyleMenu);
+            document.querySelectorAll('.style-menu-item').forEach(el => {
+                el.addEventListener('click', () => {
+                    const style = el.getAttribute('data-style');
+                    if (style) setAgendaStyle(style);
+                });
+            });
+        }
+
         function attachModeSwitchListeners() {
             document.querySelectorAll('.mode-btn').forEach(btn => {
                 btn.addEventListener('click', () => {
@@ -945,10 +1001,11 @@ export class AgendaPanel {
             const navBar = document.getElementById('nav-bar');
             const dateEl = document.getElementById('current-date');
             const modeSwitchHtml = renderModeSwitch();
+            const styleMenuHtml = renderStyleMenu();
             const tagHtml = '<span class="tag-indicator" id="tag-indicator">Tag: ' + escapeHtml(currentTag) + '</span>';
 
             if (initialMode === 'tasks') {
-                navBar.innerHTML = modeSwitchHtml + tagHtml;
+                navBar.innerHTML = modeSwitchHtml + tagHtml + styleMenuHtml;
                 dateEl.textContent = '';
                 dateEl.style.display = 'none';
             } else {
@@ -958,7 +1015,8 @@ export class AgendaPanel {
                     '<button class="nav-btn" id="btn-prev">← Prev ' + unit + '</button>' +
                     '<button class="nav-btn" id="btn-today">Today</button>' +
                     '<button class="nav-btn" id="btn-next">Next ' + unit + ' →</button>' +
-                    tagHtml;
+                    tagHtml +
+                    styleMenuHtml;
 
                 const d = parseLocalDate(shiftedToday);
                 const weekday = d.toLocaleDateString(locale, { weekday: 'long' });
@@ -973,6 +1031,7 @@ export class AgendaPanel {
             }
 
             attachModeSwitchListeners();
+            attachStyleMenuListeners();
             document.getElementById('tag-indicator').addEventListener('click', () => {
                 vscode.postMessage({ command: 'cycleTag' });
             });

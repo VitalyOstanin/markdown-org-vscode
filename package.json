@@ -57,6 +57,11 @@
   "contributes": {
     "commands": [
       {
+        "command": "markdown-org.cycleAgendaStyle",
+        "title": "Cycle Agenda Style",
+        "category": "Markdown Org"
+      },
+      {
         "command": "markdown-org.setTodo",
         "title": "Set TODO",
         "category": "Markdown Org"
@@ -333,6 +338,26 @@
           "type": "string",
           "default": "ALL",
           "description": "Currently selected tag filter for agenda view. Stored per workspace when a workspace is open."
+        },
+        "markdown-org.agendaStyle": {
+          "type": "string",
+          "enum": [
+            "monospace",
+            "native",
+            "hybrid"
+          ],
+          "enumDescriptions": [
+            "Monospaced 'terminal' look (Courier New, fixed grid columns).",
+            "Native VS Code look: proportional UI font, status/priority badges.",
+            "Hybrid: proportional text, but monospaced tabular time/offset columns."
+          ],
+          "default": "hybrid",
+          "description": "Visual style of the agenda webview. Applies to all agenda modes (day/week/month/tasks)."
+        },
+        "markdown-org.agendaFontFamily": {
+          "type": "string",
+          "default": "",
+          "description": "Proportional font family for the native/hybrid agenda styles. Empty means the system UI stack. Ignored by the monospace style."
         },
         "markdown-org.clockRoundMinutes": {
           "type": "number",
