@@ -206,13 +206,13 @@ suite('Agenda Show Integration Tests', () => {
     // CANCELLED/CANCELED styling. The per-task status class is computed
     // client-side inside the inlined `renderTask` function, so the generated
     // webview HTML carries the renderTask SOURCE plus the AGENDA_STYLES CSS,
-    // not the rendered <span class="cancelled-keyword"> markup. The most
-    // meaningful seam without a live DOM harness is therefore the webview
-    // `html` string itself: it must contain (a) the .cancelled-keyword CSS
-    // rule and (b) the two-spelling branch in the renderTask source, while
-    // keeping the CSP/escape invariants intact (see CLAUDE.md "Безопасность
-    // webview").
-    test('webview HTML carries the cancelled-keyword styling and renderTask branch', async function () {
+    // not the rendered <span class="status" data-status="cancelled"> markup.
+    // The most meaningful seam without a live DOM harness is therefore the
+    // webview `html` string itself: it must contain (a) the
+    // .status[data-status="cancelled"] CSS rule and (b) the two-spelling
+    // branch in the renderTask source, while keeping the CSP/escape
+    // invariants intact (see CLAUDE.md "Безопасность webview").
+    test('webview HTML carries the data-status="cancelled" styling and renderTask branch', async function () {
         this.timeout(10000);
         await vscode.commands.executeCommand('markdown-org.showAgendaDay', '2025-12-09');
         await sleep(300);
@@ -223,12 +223,12 @@ suite('Agenda Show Integration Tests', () => {
         // (a) The CSS rule that visually distinguishes a cancelled task
         // (grey + strikethrough) must be present in the injected styles.
         assert.ok(
-            html.includes('.cancelled-keyword {'),
-            'expected the .cancelled-keyword CSS rule to be injected into the webview'
+            html.includes('.status[data-status="cancelled"]'),
+            'expected the .status[data-status="cancelled"] CSS rule to be injected into the webview'
         );
         assert.ok(
             html.includes('text-decoration: line-through'),
-            'expected the cancelled-keyword rule to strike through the status text'
+            'expected the cancelled status rule to strike through the status text'
         );
 
         // (b) The cancelled-spelling check is shared with host code: the
@@ -242,8 +242,8 @@ suite('Agenda Show Integration Tests', () => {
             'expected the inlined isCancelled source (both spellings) to be present in the webview'
         );
         assert.ok(
-            html.includes("isCancelled(status) ? 'cancelled-keyword'"),
-            'expected renderTask to assign cancelled-keyword via the shared isCancelled helper'
+            html.includes("isCancelled(status) ? 'cancelled'"),
+            'expected renderTask to assign the cancelled statusKind via the shared isCancelled helper'
         );
 
         // CSP/escape invariants must still hold: the security meta tag is
