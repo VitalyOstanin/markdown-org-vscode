@@ -8,6 +8,9 @@
 .claude/**
 CLAUDE.md
 
+# Local design/brainstorming artifacts (superpowers visual companion, etc.)
+.superpowers/**
+
 # Sources and build artifacts
 src/**
 out/test/**
