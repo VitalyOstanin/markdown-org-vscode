@@ -530,13 +530,22 @@ export class AgendaPanel {
         const agendaFontRaw = (styleConfig.get<string>('agendaFontFamily') || '').trim();
         const systemUiStack = "-apple-system, 'Segoe UI', system-ui, sans-serif";
         const agendaFont = agendaFontRaw.length > 0 ? agendaFontRaw : systemUiStack;
+        // Monospace family used by the monospace preset and by the tabular
+        // time/offset cells of hybrid/ledger; configurable, with a Courier
+        // fallback matching the previous hardcoded stack.
+        const monoFontRaw = (styleConfig.get<string>('agendaMonospaceFontFamily') || '').trim();
+        const monoStack = "'Courier New', ui-monospace, monospace";
+        const agendaMonoFont = monoFontRaw.length > 0 ? monoFontRaw : monoStack;
+        // When true, the ledger style renders every element in the monospace
+        // family (not just the time/offset numerics).
+        const ledgerAllMono = styleConfig.get<boolean>('agendaLedgerAllMono', false) === true;
         return `<!DOCTYPE html>
 <html>
 <head>
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'nonce-${nonce}'; script-src 'nonce-${nonce}';">
     <style nonce="${nonce}">${AGENDA_STYLES}</style>
 </head>
-<body data-agenda-style="${agendaStyle}" style="--markdown-org-agenda-font: ${agendaFont};">
+<body data-agenda-style="${agendaStyle}" data-ledger-mono="${ledgerAllMono}" style="--markdown-org-agenda-font: ${agendaFont}; --markdown-org-agenda-mono-font: ${agendaMonoFont};">
     <div class="nav-bar" id="nav-bar"></div>
     <div class="current-date" id="current-date"></div>
     <div id="content"></div>

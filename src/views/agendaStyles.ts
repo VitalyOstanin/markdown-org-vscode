@@ -141,8 +141,10 @@ export const AGENDA_STYLES = `
             font-weight: bold;
             margin: var(--space-5) 0 var(--space-1) 0;
             display: grid;
-            /* 3-column day header (see formatDayHeader): weekday | day | month+year. */
-            grid-template-columns: 120px 30px 1fr;
+            /* 3-column day header (see formatDayHeader): weekday | day | month+year.
+               Content-sized columns keep the parts tight together -- fixed widths
+               left large gaps after short weekdays (e.g. "среда"). */
+            grid-template-columns: max-content max-content 1fr;
             column-gap: 1ch;
         }
         .task-line {
@@ -249,7 +251,7 @@ export const AGENDA_STYLES = `
         }
         /* ============ preset: monospace (reproduces the pre-#/style-menu look) ============ */
         body[data-agenda-style="monospace"] {
-            font-family: 'Courier New', monospace;
+            font-family: var(--markdown-org-agenda-mono-font);
         }
         [data-agenda-style="monospace"] .priority[data-priority="a"]::before,
         [data-agenda-style="monospace"] .priority[data-priority="b"]::before,
@@ -337,12 +339,17 @@ export const AGENDA_STYLES = `
         }
         body[data-agenda-style="hybrid"] .time-info-cell,
         body[data-agenda-style="hybrid"] .offset {
-            font-family: 'Courier New', ui-monospace, monospace;
+            font-family: var(--markdown-org-agenda-mono-font);
             font-variant-numeric: tabular-nums;
         }
         /* ============ preset: ledger (D2+) ============ */
         body[data-agenda-style="ledger"] {
             font-family: var(--markdown-org-agenda-font);
+        }
+        /* markdown-org.agendaLedgerAllMono: render every ledger element in the
+           monospace family, not just the time/offset numerics. */
+        body[data-agenda-style="ledger"][data-ledger-mono="true"] {
+            font-family: var(--markdown-org-agenda-mono-font);
         }
         body[data-agenda-style="ledger"] .task-line {
             /* dot | big time | flag | priority | heading | offset */
@@ -378,7 +385,7 @@ export const AGENDA_STYLES = `
         body[data-agenda-style="ledger"] .time-info-cell { display: none; }
         body[data-agenda-style="ledger"] .time-plain {
             display: block;
-            font-family: 'Courier New', ui-monospace, monospace;
+            font-family: var(--markdown-org-agenda-mono-font);
             font-variant-numeric: tabular-nums;
             font-size: 1.25em;
             font-weight: 600;
@@ -407,7 +414,7 @@ export const AGENDA_STYLES = `
         body[data-agenda-style="ledger"] .priority[data-priority="c"] { background: var(--vscode-charts-blue); }
         body[data-agenda-style="ledger"] .priority:empty { visibility: hidden; }
         body[data-agenda-style="ledger"] .offset {
-            font-family: 'Courier New', ui-monospace, monospace;
+            font-family: var(--markdown-org-agenda-mono-font);
             font-variant-numeric: tabular-nums;
         }
     `;

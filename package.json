@@ -359,7 +359,17 @@
         "markdown-org.agendaFontFamily": {
           "type": "string",
           "default": "",
-          "description": "Proportional font family for the native/hybrid agenda styles. Empty means the system UI stack. Ignored by the monospace style."
+          "description": "Proportional font family for the native/hybrid/ledger agenda styles. Empty means the system UI stack. Ignored by the monospace style."
+        },
+        "markdown-org.agendaMonospaceFontFamily": {
+          "type": "string",
+          "default": "",
+          "description": "Monospace font family for the monospace style and for the tabular time/offset columns of the hybrid/ledger styles. Empty means the default Courier New stack."
+        },
+        "markdown-org.agendaLedgerAllMono": {
+          "type": "boolean",
+          "default": false,
+          "description": "In the ledger style, render every element (headings included) in the monospace font, not just the time/offset numerics."
         },
         "markdown-org.clockRoundMinutes": {
           "type": "number",

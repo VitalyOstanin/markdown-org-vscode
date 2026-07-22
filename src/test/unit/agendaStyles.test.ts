@@ -56,6 +56,22 @@ suite('AGENDA_STYLES theming invariant', () => {
         assert.ok(/font-variant-numeric:\s*tabular-nums/.test(AGENDA_STYLES));
     });
 
+    test('fonts are driven by config vars, not a hardcoded family', () => {
+        // Proportional and monospace families both come from configurable CSS
+        // vars so the settings can override them; no literal 'Courier New'.
+        assert.ok(AGENDA_STYLES.includes('var(--markdown-org-agenda-font)'));
+        assert.ok(AGENDA_STYLES.includes('var(--markdown-org-agenda-mono-font)'));
+        assert.strictEqual(AGENDA_STYLES.includes('Courier New'), false);
+    });
+
+    test('ledger all-mono override targets data-ledger-mono', () => {
+        assert.ok(
+            /\[data-agenda-style="ledger"\]\[data-ledger-mono="true"\]\s*\{[^}]*var\(--markdown-org-agenda-mono-font\)/.test(
+                AGENDA_STYLES
+            )
+        );
+    });
+
     // renderTask emits five visible cells once .todo-label is hidden
     // (time-info-cell, status, priority, heading, offset). The native/hybrid
     // presets hide .todo-label, so their .task-line grid MUST declare exactly
