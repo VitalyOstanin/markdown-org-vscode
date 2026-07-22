@@ -528,8 +528,13 @@ export class AgendaPanel {
         const styleConfig = vscode.workspace.getConfiguration('markdown-org');
         const agendaStyle = normalizeAgendaStyle(styleConfig.get<string>('agendaStyle'));
         const agendaFontRaw = (styleConfig.get<string>('agendaFontFamily') || '').trim();
-        const systemUiStack = "-apple-system, 'Segoe UI', system-ui, sans-serif";
-        const agendaFont = agendaFontRaw.length > 0 ? agendaFontRaw : systemUiStack;
+        // Default to VS Code's own UI font. A bare "-apple-system, 'Segoe UI',
+        // system-ui, sans-serif" stack made Electron pick a face without full
+        // Cyrillic coverage and fall back to a serif for Cyrillic glyphs;
+        // --vscode-font-family already renders the whole VS Code UI (Cyrillic
+        // included) as the expected sans.
+        const uiFontStack = 'var(--vscode-font-family)';
+        const agendaFont = agendaFontRaw.length > 0 ? agendaFontRaw : uiFontStack;
         // Monospace family used by the monospace preset and by the tabular
         // time/offset cells of hybrid/ledger; configurable, with a Courier
         // fallback matching the previous hardcoded stack.
