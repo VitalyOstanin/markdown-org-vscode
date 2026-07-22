@@ -55,6 +55,28 @@ suite('AGENDA_STYLES theming invariant', () => {
     test('hybrid time/offset use tabular-nums', () => {
         assert.ok(/font-variant-numeric:\s*tabular-nums/.test(AGENDA_STYLES));
     });
+
+    // renderTask emits five visible cells once .todo-label is hidden
+    // (time-info-cell, status, priority, heading, offset). The native/hybrid
+    // presets hide .todo-label, so their .task-line grid MUST declare exactly
+    // five columns -- a mismatch (e.g. four) makes `1fr` land on the wrong
+    // cell and pushes the heading/offset columns off to the side.
+    for (const preset of ['native', 'hybrid'] as const) {
+        test(`${preset} .task-line grid declares five columns`, () => {
+            const m = AGENDA_STYLES.match(
+                new RegExp(
+                    `\\[data-agenda-style="${preset}"\\]\\s*\\.task-line\\s*\\{[^}]*grid-template-columns:\\s*([^;]+);`
+                )
+            );
+            assert.ok(m, `expected a grid-template-columns rule for the ${preset} .task-line`);
+            const tracks = m[1].trim().split(/\s+/);
+            assert.strictEqual(
+                tracks.length,
+                5,
+                `${preset} .task-line must have 5 columns (one per visible cell), found ${tracks.length}: ${m[1].trim()}`
+            );
+        });
+    }
 });
 
 /**

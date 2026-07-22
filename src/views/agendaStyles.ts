@@ -259,7 +259,7 @@ export const AGENDA_STYLES = `
             font-family: var(--markdown-org-agenda-font);
         }
         body[data-agenda-style="native"] .task-line {
-            grid-template-columns: auto auto 1fr 90px;
+            grid-template-columns: auto auto auto 1fr auto;
             align-items: center;
         }
         body[data-agenda-style="native"] .todo-label {

@@ -674,6 +674,12 @@ export class AgendaPanel {
 
         function setAgendaStyle(style) {
             document.body.dataset.agendaStyle = style;
+            // Keep the menu's active marker in sync with the live choice; the
+            // menu is rendered once on open, so without this it would keep
+            // highlighting the style that was active at open time.
+            document.querySelectorAll('.style-menu-item').forEach(function (el) {
+                el.classList.toggle('active', el.getAttribute('data-style') === style);
+            });
             vscode.postMessage({ command: 'setAgendaStyle', style: style });
         }
 
