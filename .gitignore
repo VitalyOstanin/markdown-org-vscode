@@ -22,3 +22,6 @@ bin/
 *.pfx
 *.jks
 id_rsa*
+
+# Visual brainstorming companion (superpowers) — local artifacts
+.superpowers/

@@ -2,14 +2,21 @@
 
 ## Design
 
-- [ ] Redesign the visual language of the agenda/webview UI
-    - Revisit the overall visual language: typography scale, spacing,
-      status/priority color semantics, icons, and layout of the agenda panel.
-    - Support both light and dark themes explicitly. Drive all colors from VS
-      Code theme tokens (`var(--vscode-*)`) so the UI adapts to the active
-      theme; verify contrast and readability in both light and dark.
-    - Add a setting to control the theme behavior (e.g. follow the editor
-      theme vs. force light/dark for the webview), with a sensible default.
+- [x] Redesign the visual language of the agenda/webview UI
+    - Shipped as a selectable agenda style (`markdown-org.agendaStyle`:
+      `monospace` | `native` | `hybrid`, default `hybrid`) plus an in-panel
+      style menu and the `Cycle Agenda Style` command. Single semantic DOM with
+      three CSS presets selected by `body[data-agenda-style]`; applies to all
+      modes including the month calendar.
+    - Colors remain fully theme-driven via `var(--vscode-*)` tokens (light /
+      dark / high-contrast), enforced by a unit-test invariant (no hardcoded
+      HEX). A separate light/dark "force" setting was intentionally dropped:
+      the tokens already follow the active editor theme, so a webview-only
+      override would fight the theme rather than help.
+    - `markdown-org.agendaFontFamily` overrides the proportional font for the
+      native/hybrid styles.
+    - Follow-ups (deferred): capture README screenshots of the three styles;
+      consider codicon-based status/priority icons.
 
 ## Configuration
 
