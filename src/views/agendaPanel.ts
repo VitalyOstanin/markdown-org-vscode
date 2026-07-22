@@ -5,6 +5,7 @@ import { isMeaningfulSelection, resolveTaskClickIntent, sanitizeTaskLine } from 
 import { rememberScroll, recallScroll } from '../utils/agendaScroll';
 import { resolveHeadingClass } from '../utils/agendaHeadingTint';
 import { buildTimeInfo } from '../utils/agendaTimeInfo';
+import { resolveTaskFlag } from '../utils/agendaTaskFlag';
 import { resolveAgendaWatchBase } from '../utils/agendaWatchPattern';
 import { toIsoDate } from '../utils/isoDate';
 import { formatDayHeaderParts } from '../utils/agendaDayHeader';
@@ -520,6 +521,7 @@ export class AgendaPanel {
         // the exact same spelling list as the regex/toggle/normalizer and cannot
         // drift if a spelling is ever added.
         const isCancelledSource = isCancelled.toString();
+        const resolveTaskFlagSource = resolveTaskFlag.toString();
         // Month-anchor shift that avoids the short-month rollover (Jan 31 +1 ->
         // February, not March); unit-tested in monthNav.test.ts.
         const shiftMonthAnchorSource = shiftMonthAnchor.toString();
@@ -549,6 +551,7 @@ export class AgendaPanel {
         ${toIsoDateSource}
         ${formatDayHeaderPartsSource}
         ${isCancelledSource}
+        ${resolveTaskFlagSource}
         ${shiftMonthAnchorSource}
         const vscode = acquireVsCodeApi();
         // Handshake for the ServiceWorker-race retry path on the extension
@@ -801,6 +804,9 @@ export class AgendaPanel {
                 '<span class="todo-label">todo:</span>' +
                 '<span class="time-info-cell">' + timeInfo + '</span>' +
                 '<span class="status" data-status="' + statusKind + '">' + escapeHtml(status) + '</span>' +
+                // .flag: ledger-only type glyph (deadline/scheduled/repeat/cancelled);
+                // display:none in other presets, so it occupies no grid cell there.
+                '<span class="flag" data-flag="' + resolveTaskFlag(task) + '"></span>' +
                 '<span class="priority" data-priority="' + escapeHtml(priorityLetter.toLowerCase()) + '">' +
                     escapeHtml(priorityLetter) +
                 '</span>' +
