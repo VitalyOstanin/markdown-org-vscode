@@ -1,16 +1,23 @@
 import * as assert from 'assert';
 import { suite, test } from 'mocha';
 import { resolveTaskFlag } from '../../utils/agendaTaskFlag';
+import { isCancelled } from '../../utils/normalizeTaskType';
 import { Task } from '../../types';
 
 function task(over: Partial<Task>): Task {
     return { heading: 'h', file: 'f', line: 1, ...over } as Task;
 }
 
+// Bind the shared cancelled check the way the webview does (it passes its own
+// inlined isCancelled), so tests exercise the real precedence.
+function flag(t: Task) {
+    return resolveTaskFlag(t, isCancelled);
+}
+
 suite('resolveTaskFlag', () => {
     test('cancelled wins over everything', () => {
         assert.strictEqual(
-            resolveTaskFlag(
+            flag(
                 task({
                     task_type: 'CANCELLED',
                     timestamp_type: 'DEADLINE',
@@ -23,7 +30,7 @@ suite('resolveTaskFlag', () => {
     });
     test('deadline beats repeat and time', () => {
         assert.strictEqual(
-            resolveTaskFlag(
+            flag(
                 task({
                     task_type: 'TODO',
                     timestamp_type: 'DEADLINE',
@@ -36,7 +43,7 @@ suite('resolveTaskFlag', () => {
     });
     test('repeat beats plain scheduled time', () => {
         assert.strictEqual(
-            resolveTaskFlag(
+            flag(
                 task({
                     task_type: 'TODO',
                     timestamp_type: 'SCHEDULED',
@@ -49,17 +56,17 @@ suite('resolveTaskFlag', () => {
     });
     test('scheduled with time', () => {
         assert.strictEqual(
-            resolveTaskFlag(task({ task_type: 'TODO', timestamp_type: 'SCHEDULED', timestamp_time: '10:00' })),
+            flag(task({ task_type: 'TODO', timestamp_type: 'SCHEDULED', timestamp_time: '10:00' })),
             'scheduled'
         );
     });
     test('plain TODO with date has no flag', () => {
-        assert.strictEqual(resolveTaskFlag(task({ task_type: 'TODO', timestamp_type: 'SCHEDULED' })), '');
+        assert.strictEqual(flag(task({ task_type: 'TODO', timestamp_type: 'SCHEDULED' })), '');
     });
     test('done without special type has no flag', () => {
-        assert.strictEqual(resolveTaskFlag(task({ task_type: 'DONE' })), '');
+        assert.strictEqual(flag(task({ task_type: 'DONE' })), '');
     });
     test('empty task has no flag', () => {
-        assert.strictEqual(resolveTaskFlag(task({})), '');
+        assert.strictEqual(flag(task({})), '');
     });
 });

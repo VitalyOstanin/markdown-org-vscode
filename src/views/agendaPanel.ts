@@ -806,7 +806,7 @@ export class AgendaPanel {
                 '<span class="status" data-status="' + statusKind + '">' + escapeHtml(status) + '</span>' +
                 // .flag: ledger-only type glyph (deadline/scheduled/repeat/cancelled);
                 // display:none in other presets, so it occupies no grid cell there.
-                '<span class="flag" data-flag="' + resolveTaskFlag(task) + '"></span>' +
+                '<span class="flag" data-flag="' + resolveTaskFlag(task, isCancelled) + '"></span>' +
                 '<span class="priority" data-priority="' + escapeHtml(priorityLetter.toLowerCase()) + '">' +
                     escapeHtml(priorityLetter) +
                 '</span>' +

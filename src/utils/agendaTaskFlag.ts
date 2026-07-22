@@ -1,15 +1,20 @@
 import { Task } from '../types';
-import { isCancelled } from './normalizeTaskType';
 
 export type TaskFlag = 'cancelled' | 'deadline' | 'repeat' | 'scheduled' | '';
 
 /**
  * Ledger-style type flag for a task, first match wins:
  *   cancelled (⊘) > deadline (⚑) > repeat (↻) > scheduled-with-time (◷) > none.
- * Inlined into the agenda webview via `.toString()`; keep it dependency-light
- * (only `isCancelled`, which is inlined alongside).
+ *
+ * This function is inlined into the agenda webview via `.toString()`, so its
+ * body must not reference any module-level import (TypeScript rewrites such a
+ * reference to `<module>_1.name`, which is undefined inside the webview and
+ * throws). The cancelled check is therefore injected as the `isCancelled`
+ * parameter -- the same convention `buildTimeInfo` uses for `escapeHtml`. The
+ * webview passes its own inlined `isCancelled`; callers elsewhere pass the
+ * shared helper from `./normalizeTaskType`.
  */
-export function resolveTaskFlag(task: Task): TaskFlag {
+export function resolveTaskFlag(task: Task, isCancelled: (status: string | undefined) => boolean): TaskFlag {
     if (isCancelled(task.task_type)) {
         return 'cancelled';
     }
