@@ -174,6 +174,9 @@ export const AGENDA_STYLES = `
            grid) in every preset except ledger, so their column counts are
            unaffected by the extra renderTask cell. */
         .flag { display: none; }
+        /* .time-plain is the ledger-only clean HH:MM cell; hidden (out of the
+           grid) in every other preset so their column counts are unaffected. */
+        .time-plain { display: none; }
         .todo-label { color: var(--vscode-charts-red); }
         .status[data-status="todo"] { color: var(--vscode-charts-red); font-weight: bold; }
         .status[data-status="done"] { color: var(--vscode-charts-green); font-weight: bold; }
@@ -349,7 +352,7 @@ export const AGENDA_STYLES = `
         body[data-agenda-style="ledger"] .todo-label { display: none; }
         /* Visual order (DOM order stays shared across presets): dot first. */
         body[data-agenda-style="ledger"] .status { order: 1; }
-        body[data-agenda-style="ledger"] .time-info-cell { order: 2; }
+        body[data-agenda-style="ledger"] .time-plain { order: 2; }
         body[data-agenda-style="ledger"] .flag { order: 3; }
         body[data-agenda-style="ledger"] .priority { order: 4; }
         body[data-agenda-style="ledger"] .heading { order: 5; }
@@ -369,8 +372,12 @@ export const AGENDA_STYLES = `
         body[data-agenda-style="ledger"] .status[data-status="todo"]::before { background: var(--vscode-charts-red); }
         body[data-agenda-style="ledger"] .status[data-status="done"]::before { background: var(--vscode-charts-green); }
         body[data-agenda-style="ledger"] .status[data-status="cancelled"]::before { background: var(--vscode-disabledForeground); }
-        /* big time */
-        body[data-agenda-style="ledger"] .time-info-cell {
+        /* big time: ledger uses the clean .time-plain (HH:MM only) and hides
+           the buildTimeInfo cell, whose dot-trails / stacked DEADLINE label /
+           relative "Sched.Nx" text would break the single-line grid. */
+        body[data-agenda-style="ledger"] .time-info-cell { display: none; }
+        body[data-agenda-style="ledger"] .time-plain {
+            display: block;
             font-family: 'Courier New', ui-monospace, monospace;
             font-variant-numeric: tabular-nums;
             font-size: 1.25em;

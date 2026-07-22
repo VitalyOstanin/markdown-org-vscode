@@ -804,6 +804,12 @@ export class AgendaPanel {
                 ' data-line="' + sanitizeTaskLine(task.line) + '">' +
                 '<span class="todo-label">todo:</span>' +
                 '<span class="time-info-cell">' + timeInfo + '</span>' +
+                // .time-plain: ledger-only clean HH:MM (or empty). The ledger
+                // style hides .time-info-cell (whose buildTimeInfo output carries
+                // monospace dot-trails, a stacked DEADLINE label, and relative
+                // "Sched.Nx" text) and shows this instead, so the big-time column
+                // stays a single clean line; other styles keep .time-plain hidden.
+                '<span class="time-plain">' + escapeHtml(task.timestamp_time || '') + '</span>' +
                 '<span class="status" data-status="' + statusKind + '">' + escapeHtml(status) + '</span>' +
                 // .flag: ledger-only type glyph (deadline/scheduled/repeat/cancelled);
                 // display:none in other presets, so it occupies no grid cell there.
