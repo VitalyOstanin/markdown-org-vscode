@@ -4,7 +4,7 @@
  * the visual language it is rendered in. See
  * docs/superpowers/specs/2026-07-22-agenda-visual-style-design.md.
  */
-export const AGENDA_STYLES_LIST = ['monospace', 'native', 'hybrid'] as const;
+export const AGENDA_STYLES_LIST = ['monospace', 'native', 'hybrid', 'ledger'] as const;
 
 export type AgendaStyle = (typeof AGENDA_STYLES_LIST)[number];
 

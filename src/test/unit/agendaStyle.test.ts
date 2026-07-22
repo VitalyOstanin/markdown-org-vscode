@@ -6,8 +6,8 @@ suite('agendaStyle', () => {
         assert.strictEqual(DEFAULT_AGENDA_STYLE, 'hybrid');
     });
 
-    test('list is exactly the three presets', () => {
-        assert.deepStrictEqual([...AGENDA_STYLES_LIST], ['monospace', 'native', 'hybrid']);
+    test('list is exactly the four presets', () => {
+        assert.deepStrictEqual([...AGENDA_STYLES_LIST], ['monospace', 'native', 'hybrid', 'ledger']);
     });
 
     test('valid values pass through', () => {
@@ -26,5 +26,15 @@ suite('agendaStyle', () => {
     test('trims and lowercases before matching', () => {
         assert.strictEqual(normalizeAgendaStyle('  Hybrid '), 'hybrid');
         assert.strictEqual(normalizeAgendaStyle('NATIVE'), 'native');
+    });
+
+    test('includes ledger as a valid style', () => {
+        assert.ok((AGENDA_STYLES_LIST as readonly string[]).includes('ledger'));
+        assert.strictEqual(normalizeAgendaStyle('ledger'), 'ledger');
+        assert.strictEqual(normalizeAgendaStyle('LEDGER'), 'ledger');
+    });
+
+    test('default style is unchanged (hybrid)', () => {
+        assert.strictEqual(DEFAULT_AGENDA_STYLE, 'hybrid');
     });
 });

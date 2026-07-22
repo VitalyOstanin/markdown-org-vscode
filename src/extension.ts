@@ -17,7 +17,7 @@ import { notifyError } from './utils/notify';
 import { withErrorReporting } from './utils/orgCommandWrap';
 import { registerBracketDiagnostics } from './diagnostics/timestampBrackets';
 import { registerTimestampAdjustableContext } from './commands/timestampAdjustableContext';
-import { normalizeAgendaStyle } from './utils/agendaStyle';
+import { AGENDA_STYLES_LIST, normalizeAgendaStyle } from './utils/agendaStyle';
 
 function registerOrgCommand<A extends unknown[]>(
     context: vscode.ExtensionContext,
@@ -57,7 +57,7 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.commands.registerCommand('markdown-org.cycleAgendaStyle', async () => {
             const cfg = vscode.workspace.getConfiguration('markdown-org');
-            const order = ['monospace', 'native', 'hybrid'] as const;
+            const order = AGENDA_STYLES_LIST;
             const current = normalizeAgendaStyle(cfg.get<string>('agendaStyle'));
             const next = order[(order.indexOf(current) + 1) % order.length];
             await cfg.update('agendaStyle', next, vscode.ConfigurationTarget.Global);
