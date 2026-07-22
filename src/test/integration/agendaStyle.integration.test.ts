@@ -160,3 +160,112 @@ suite('Agenda Style Integration Tests', () => {
         );
     });
 });
+
+// The ledger style adds a per-task type-flag column. `renderTask` emits a
+// `<span class="flag" data-flag="...">` for every task, where the value is
+// computed by `resolveTaskFlag` (precedence: cancelled > deadline > repeat >
+// scheduled-with-time > none). These tests drive a day payload whose tasks
+// exercise each branch and read the rendered `data-flag` values back out of
+// the webview DOM via `queryRenderedInfoForTesting().flags`.
+suite('Agenda Ledger Flags Integration Tests', () => {
+    const testWorkspaceDir = path.join(__dirname, '../../test-workspace');
+    const testFile = path.join(testWorkspaceDir, 'agenda-ledger-flags.md');
+
+    let execFileStub: sinon.SinonStub;
+    let resolveExtractorStub: sinon.SinonStub;
+    let showErrorStub: sinon.SinonStub;
+
+    const baseTask = { file: testFile, line: 1, content: '' };
+
+    // One task per flag branch. Buckets do not affect flag computation --
+    // resolveTaskFlag reads task_type / timestamp_type / timestamp_repeater /
+    // timestamp_time only -- so they are spread across the day's buckets.
+    const flagDay = {
+        date: '2025-12-09',
+        overdue: [],
+        scheduled_timed: [
+            // repeat: has a repeater (wins over the bare time it also carries)
+            {
+                ...baseTask,
+                heading: 'Repeating',
+                task_type: 'TODO',
+                timestamp_time: '09:00',
+                timestamp_repeater: '+1w'
+            },
+            // deadline: DEADLINE timestamp
+            { ...baseTask, heading: 'Due', task_type: 'TODO', timestamp_type: 'DEADLINE' },
+            // cancelled: wins over everything else
+            {
+                ...baseTask,
+                heading: 'Dropped',
+                task_type: 'CANCELLED',
+                timestamp_type: 'DEADLINE',
+                timestamp_time: '10:00',
+                timestamp_repeater: '+1d'
+            },
+            // scheduled: has a time, no repeater, not a deadline
+            { ...baseTask, heading: 'Timed', task_type: 'TODO', timestamp_time: '11:00' }
+        ],
+        scheduled_no_time: [
+            // none: plain scheduled TODO, neither time nor repeater
+            { ...baseTask, heading: 'Plain', task_type: 'TODO' }
+        ],
+        upcoming: []
+    };
+
+    before(() => {
+        if (!fs.existsSync(testWorkspaceDir)) {
+            fs.mkdirSync(testWorkspaceDir, { recursive: true });
+        }
+        fs.writeFileSync(testFile, '## TODO Task\n');
+    });
+
+    beforeEach(async () => {
+        const config = vscode.workspace.getConfiguration('markdown-org');
+        await config.update('workspaceDir', testWorkspaceDir, vscode.ConfigurationTarget.Workspace);
+        await config.update('currentTag', 'ALL', vscode.ConfigurationTarget.Workspace);
+        await config.update('agendaStyle', 'ledger', vscode.ConfigurationTarget.Global);
+
+        resolveExtractorStub = sinon.stub(extractor, 'resolveExtractorPath').resolves('markdown-org-extract');
+
+        execFileStub = sinon.stub(exec, 'execFile');
+        execFileStub.callsFake(makeExtractorFake({ day: [flagDay], week: [], month: [], tasks: [] }));
+
+        showErrorStub = sinon.stub(vscode.window, 'showErrorMessage');
+    });
+
+    afterEach(async () => {
+        execFileStub.restore();
+        resolveExtractorStub.restore();
+        showErrorStub.restore();
+        await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+        await vscode.workspace
+            .getConfiguration('markdown-org')
+            .update('agendaStyle', 'hybrid', vscode.ConfigurationTarget.Global);
+    });
+
+    after(() => {
+        if (fs.existsSync(testFile)) {
+            fs.unlinkSync(testFile);
+        }
+    });
+
+    test('ledger style renders a data-flag per task matching resolveTaskFlag precedence', async function () {
+        this.timeout(10000);
+        await vscode.commands.executeCommand('markdown-org.showAgendaDay', '2025-12-09');
+        await sleep(300);
+
+        const info = await AgendaPanel.queryRenderedInfoForTesting();
+        assert.ok(info, 'expected AgendaPanel to be open after showAgendaDay');
+
+        // Task-to-flag matching by array position is fragile (bucket order and
+        // in-bucket order are rendering details), so compare the multiset of
+        // rendered flags against the expected multiset.
+        const sortedForCompare = (xs: string[]) => [...xs].sort();
+        assert.deepStrictEqual(
+            sortedForCompare(info.flags),
+            sortedForCompare(['repeat', 'deadline', 'cancelled', 'scheduled', '']),
+            `unexpected rendered data-flag values: ${JSON.stringify(info.flags)}`
+        );
+    });
+});

@@ -426,18 +426,18 @@ export class AgendaPanel {
      */
     public static queryRenderedInfoForTesting(
         timeoutMs: number = 2000
-    ): Promise<{ dayHeaders: string[]; mode: string } | null> {
+    ): Promise<{ dayHeaders: string[]; mode: string; flags: string[] } | null> {
         const panel = AgendaPanel.currentPanel;
         if (!panel) {
             return Promise.resolve(null);
         }
         return new Promise((resolve, reject) => {
             const sub = panel.webview.onDidReceiveMessage(
-                (m: { command: string; dayHeaders?: string[]; mode?: string }) => {
+                (m: { command: string; dayHeaders?: string[]; mode?: string; flags?: string[] }) => {
                     if (m.command === 'renderedInfo') {
                         clearTimeout(timer);
                         sub.dispose();
-                        resolve({ dayHeaders: m.dayHeaders ?? [], mode: m.mode ?? '' });
+                        resolve({ dayHeaders: m.dayHeaders ?? [], mode: m.mode ?? '', flags: m.flags ?? [] });
                     }
                 }
             );
@@ -658,7 +658,8 @@ export class AgendaPanel {
                 const headers = Array.from(document.querySelectorAll('.day-header'))
                     .map(el => el.getAttribute('data-date'))
                     .filter(d => d !== null);
-                vscode.postMessage({ command: 'renderedInfo', dayHeaders: headers, mode: initialMode });
+                const flags = Array.from(document.querySelectorAll('.flag')).map(el => el.getAttribute('data-flag'));
+                vscode.postMessage({ command: 'renderedInfo', dayHeaders: headers, mode: initialMode, flags });
             }
         });
         
