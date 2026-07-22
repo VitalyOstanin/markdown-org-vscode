@@ -117,4 +117,46 @@ suite('Agenda Style Integration Tests', () => {
         const updated = vscode.workspace.getConfiguration('markdown-org');
         assert.strictEqual(updated.get('agendaStyle'), 'native');
     });
+
+    test('markdown-org.agendaStyle setting drives the ledger preset', async function () {
+        this.timeout(10000);
+        await vscode.workspace
+            .getConfiguration('markdown-org')
+            .update('agendaStyle', 'ledger', vscode.ConfigurationTarget.Global);
+
+        await vscode.commands.executeCommand('markdown-org.showAgendaWeek', '2025-12-09');
+        await sleep(300);
+
+        const panel = (AgendaPanel as unknown as { currentPanel?: { webview: vscode.Webview } }).currentPanel;
+        assert.ok(panel, 'expected AgendaPanel to be open after showAgendaWeek');
+        const html = panel.webview.html;
+        assert.ok(
+            html.includes('data-agenda-style="ledger"'),
+            'expected the webview body to carry data-agenda-style="ledger"'
+        );
+    });
+
+    test('markdown-org.cycleAgendaStyle cycles through all four styles back to start', async function () {
+        this.timeout(10000);
+        const config = vscode.workspace.getConfiguration('markdown-org');
+        await config.update('agendaStyle', 'monospace', vscode.ConfigurationTarget.Global);
+
+        // monospace -> native -> hybrid -> ledger
+        await vscode.commands.executeCommand('markdown-org.cycleAgendaStyle');
+        await vscode.commands.executeCommand('markdown-org.cycleAgendaStyle');
+        await vscode.commands.executeCommand('markdown-org.cycleAgendaStyle');
+        assert.strictEqual(
+            vscode.workspace.getConfiguration('markdown-org').get('agendaStyle'),
+            'ledger',
+            'expected three cycles from monospace to reach ledger'
+        );
+
+        // ledger -> monospace (wraps around)
+        await vscode.commands.executeCommand('markdown-org.cycleAgendaStyle');
+        assert.strictEqual(
+            vscode.workspace.getConfiguration('markdown-org').get('agendaStyle'),
+            'monospace',
+            'expected a fourth cycle to wrap back to monospace'
+        );
+    });
 });

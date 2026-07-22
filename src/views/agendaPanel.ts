@@ -976,7 +976,8 @@ export class AgendaPanel {
             const items = [
                 { id: 'monospace', label: 'Monospace' },
                 { id: 'native', label: 'Native' },
-                { id: 'hybrid', label: 'Hybrid' }
+                { id: 'hybrid', label: 'Hybrid' },
+                { id: 'ledger', label: 'Ledger' }
             ];
             return '<div class="style-menu" id="styleMenu">' +
                 '<button class="style-menu-btn" id="styleMenuBtn" title="Agenda style">Aa &#9662;</button>' +

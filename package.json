@@ -344,12 +344,14 @@
           "enum": [
             "monospace",
             "native",
-            "hybrid"
+            "hybrid",
+            "ledger"
           ],
           "enumDescriptions": [
             "Monospaced 'terminal' look (Courier New, fixed grid columns).",
             "Native VS Code look: proportional UI font, status/priority badges.",
-            "Hybrid: proportional text, but monospaced tabular time/offset columns."
+            "Hybrid: proportional text, but monospaced tabular time/offset columns.",
+            "Ledger: strict grid with a status dot, big time, and a type-flag column (deadline/scheduled/repeat/cancelled)."
           ],
           "default": "hybrid",
           "description": "Visual style of the agenda webview. Applies to all agenda modes (day/week/month/tasks)."
