@@ -13,6 +13,7 @@ import { formatDayHeaderParts } from '../utils/agendaDayHeader';
 import { isCancelled } from '../utils/normalizeTaskType';
 import { shiftMonthAnchor } from '../utils/monthNav';
 import { normalizeAgendaStyle } from '../utils/agendaStyle';
+import { wireDayHeaderNavigation } from '../utils/agendaDayHeaderNav';
 import { AGENDA_STYLES } from './agendaStyles';
 import { formatError, notifyError } from '../utils/notify';
 
@@ -527,6 +528,9 @@ export class AgendaPanel {
         // Month-anchor shift that avoids the short-month rollover (Jan 31 +1 ->
         // February, not March); unit-tested in monthNav.test.ts.
         const shiftMonthAnchorSource = shiftMonthAnchor.toString();
+        // Week-view day-header drill-down: clicking a weekday opens that day's
+        // Day view. Unit-tested in agendaDayHeaderNav.test.ts (jsdom).
+        const wireDayHeaderNavigationSource = wireDayHeaderNavigation.toString();
         const styleConfig = vscode.workspace.getConfiguration('markdown-org');
         const agendaStyle = normalizeAgendaStyle(styleConfig.get<string>('agendaStyle'));
         const agendaFontRaw = (styleConfig.get<string>('agendaFontFamily') || '').trim();
@@ -583,6 +587,7 @@ export class AgendaPanel {
         ${resolveTaskFlagSource}
         ${resolveAttentionLevelSource}
         ${shiftMonthAnchorSource}
+        ${wireDayHeaderNavigationSource}
         const vscode = acquireVsCodeApi();
         // Handshake for the ServiceWorker-race retry path on the extension
         // side: tells AgendaPanel.armReadyTimeout the webview script is alive
@@ -624,6 +629,7 @@ export class AgendaPanel {
                 } else if (initialMode === 'day' || initialMode === 'week') {
                     document.getElementById('content').innerHTML = renderAgenda(initialData);
                     attachTaskListeners();
+                    wireDayHeaderNavigation(document, initialMode, navigateToDay);
                 } else if (initialMode === 'tasks') {
                     document.getElementById('content').innerHTML = renderTasks(initialData);
                     attachTaskListeners();
@@ -654,6 +660,7 @@ export class AgendaPanel {
                 } else if (initialMode === 'day' || initialMode === 'week') {
                     document.getElementById('content').innerHTML = renderAgenda(initialData);
                     attachTaskListeners();
+                    wireDayHeaderNavigation(document, initialMode, navigateToDay);
                 } else if (initialMode === 'tasks') {
                     document.getElementById('content').innerHTML = renderTasks(initialData);
                     attachTaskListeners();
