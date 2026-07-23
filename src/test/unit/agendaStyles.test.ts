@@ -64,9 +64,9 @@ suite('AGENDA_STYLES theming invariant', () => {
         assert.strictEqual(AGENDA_STYLES.includes('Courier New'), false);
     });
 
-    test('ledger all-mono override targets data-ledger-mono', () => {
+    test('table all-mono override targets data-table-mono', () => {
         assert.ok(
-            /\[data-agenda-style="ledger"\]\[data-ledger-mono="true"\]\s*\{[^}]*var\(--markdown-org-agenda-mono-font\)/.test(
+            /\[data-agenda-style="table"\]\[data-table-mono="true"\]\s*\{[^}]*var\(--markdown-org-agenda-mono-font\)/.test(
                 AGENDA_STYLES
             )
         );
@@ -77,7 +77,7 @@ suite('AGENDA_STYLES theming invariant', () => {
     // presets hide .todo-label, so their .task-line grid MUST declare exactly
     // five columns -- a mismatch (e.g. four) makes `1fr` land on the wrong
     // cell and pushes the heading/offset columns off to the side.
-    const EXPECTED_COLUMNS: Record<string, number> = { native: 5, hybrid: 5, ledger: 6 };
+    const EXPECTED_COLUMNS: Record<string, number> = { native: 5, hybrid: 5, table: 6 };
     for (const [preset, cols] of Object.entries(EXPECTED_COLUMNS)) {
         test(`${preset} .task-line grid declares ${cols} columns`, () => {
             const m = AGENDA_STYLES.match(
@@ -95,13 +95,13 @@ suite('AGENDA_STYLES theming invariant', () => {
         });
     }
 
-    test('defines the ledger preset', () => {
-        assert.ok(AGENDA_STYLES.includes('[data-agenda-style="ledger"]'));
+    test('defines the table preset', () => {
+        assert.ok(AGENDA_STYLES.includes('[data-agenda-style="table"]'));
     });
 
-    test('ledger preset declares all four flag glyphs', () => {
+    test('table preset declares all four flag glyphs', () => {
         for (const glyph of ['⚑', '◷', '↻', '⊘']) {
-            assert.ok(AGENDA_STYLES.includes(`content: "${glyph}"`), `expected flag glyph ${glyph} in ledger CSS`);
+            assert.ok(AGENDA_STYLES.includes(`content: "${glyph}"`), `expected flag glyph ${glyph} in table CSS`);
         }
     });
 });

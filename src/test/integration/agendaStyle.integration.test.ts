@@ -118,11 +118,11 @@ suite('Agenda Style Integration Tests', () => {
         assert.strictEqual(updated.get('agendaStyle'), 'native');
     });
 
-    test('markdown-org.agendaStyle setting drives the ledger preset', async function () {
+    test('markdown-org.agendaStyle setting drives the table preset', async function () {
         this.timeout(10000);
         await vscode.workspace
             .getConfiguration('markdown-org')
-            .update('agendaStyle', 'ledger', vscode.ConfigurationTarget.Global);
+            .update('agendaStyle', 'table', vscode.ConfigurationTarget.Global);
 
         await vscode.commands.executeCommand('markdown-org.showAgendaWeek', '2025-12-09');
         await sleep(300);
@@ -131,8 +131,8 @@ suite('Agenda Style Integration Tests', () => {
         assert.ok(panel, 'expected AgendaPanel to be open after showAgendaWeek');
         const html = panel.webview.html;
         assert.ok(
-            html.includes('data-agenda-style="ledger"'),
-            'expected the webview body to carry data-agenda-style="ledger"'
+            html.includes('data-agenda-style="table"'),
+            'expected the webview body to carry data-agenda-style="table"'
         );
     });
 
@@ -141,17 +141,17 @@ suite('Agenda Style Integration Tests', () => {
         const config = vscode.workspace.getConfiguration('markdown-org');
         await config.update('agendaStyle', 'monospace', vscode.ConfigurationTarget.Global);
 
-        // monospace -> native -> hybrid -> ledger
+        // monospace -> native -> hybrid -> table
         await vscode.commands.executeCommand('markdown-org.cycleAgendaStyle');
         await vscode.commands.executeCommand('markdown-org.cycleAgendaStyle');
         await vscode.commands.executeCommand('markdown-org.cycleAgendaStyle');
         assert.strictEqual(
             vscode.workspace.getConfiguration('markdown-org').get('agendaStyle'),
-            'ledger',
-            'expected three cycles from monospace to reach ledger'
+            'table',
+            'expected three cycles from monospace to reach table'
         );
 
-        // ledger -> monospace (wraps around)
+        // table -> monospace (wraps around)
         await vscode.commands.executeCommand('markdown-org.cycleAgendaStyle');
         assert.strictEqual(
             vscode.workspace.getConfiguration('markdown-org').get('agendaStyle'),
@@ -161,15 +161,15 @@ suite('Agenda Style Integration Tests', () => {
     });
 });
 
-// The ledger style adds a per-task type-flag column. `renderTask` emits a
+// The table style adds a per-task type-flag column. `renderTask` emits a
 // `<span class="flag" data-flag="...">` for every task, where the value is
 // computed by `resolveTaskFlag` (precedence: cancelled > deadline > repeat >
 // scheduled-with-time > none). These tests drive a day payload whose tasks
 // exercise each branch and read the rendered `data-flag` values back out of
 // the webview DOM via `queryRenderedInfoForTesting().flags`.
-suite('Agenda Ledger Flags Integration Tests', () => {
+suite('Agenda Table Flags Integration Tests', () => {
     const testWorkspaceDir = path.join(__dirname, '../../test-workspace');
-    const testFile = path.join(testWorkspaceDir, 'agenda-ledger-flags.md');
+    const testFile = path.join(testWorkspaceDir, 'agenda-table-flags.md');
 
     let execFileStub: sinon.SinonStub;
     let resolveExtractorStub: sinon.SinonStub;
@@ -224,7 +224,7 @@ suite('Agenda Ledger Flags Integration Tests', () => {
         const config = vscode.workspace.getConfiguration('markdown-org');
         await config.update('workspaceDir', testWorkspaceDir, vscode.ConfigurationTarget.Workspace);
         await config.update('currentTag', 'ALL', vscode.ConfigurationTarget.Workspace);
-        await config.update('agendaStyle', 'ledger', vscode.ConfigurationTarget.Global);
+        await config.update('agendaStyle', 'table', vscode.ConfigurationTarget.Global);
 
         resolveExtractorStub = sinon.stub(extractor, 'resolveExtractorPath').resolves('markdown-org-extract');
 
@@ -250,7 +250,7 @@ suite('Agenda Ledger Flags Integration Tests', () => {
         }
     });
 
-    test('ledger style renders a data-flag per task matching resolveTaskFlag precedence', async function () {
+    test('table style renders a data-flag per task matching resolveTaskFlag precedence', async function () {
         this.timeout(10000);
         await vscode.commands.executeCommand('markdown-org.showAgendaDay', '2025-12-09');
         await sleep(300);

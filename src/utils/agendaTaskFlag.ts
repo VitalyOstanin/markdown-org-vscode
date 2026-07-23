@@ -3,7 +3,7 @@ import { Task } from '../types';
 export type TaskFlag = 'cancelled' | 'deadline' | 'repeat' | 'scheduled' | '';
 
 /**
- * Ledger-style type flag for a task, first match wins:
+ * Table-style type flag for a task, first match wins:
  *   cancelled (⊘) > deadline (⚑) > repeat (↻) > scheduled-with-time (◷) > none.
  *
  * This function is inlined into the agenda webview via `.toString()`, so its

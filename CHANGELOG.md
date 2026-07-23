@@ -13,7 +13,7 @@ All notable changes to the "Markdown Org" extension will be documented in this f
 - `markdown-org.agendaFontFamily` to override the proportional font used by the
   `native` and `hybrid` styles. Empty (default) uses the system UI stack; the
   `monospace` style ignores it.
-- `ledger` agenda style: a compact list where each task carries a status dot, a
+- `table` agenda style: a compact list where each task carries a status dot, a
   large time, and a per-task type-flag column (deadline / scheduled / repeat /
   cancelled). Available from the style menu, the `Cycle Agenda Style` command,
   and the `markdown-org.agendaStyle` setting.

@@ -6,6 +6,7 @@ import { rememberScroll, recallScroll } from '../utils/agendaScroll';
 import { resolveHeadingClass } from '../utils/agendaHeadingTint';
 import { buildTimeInfo } from '../utils/agendaTimeInfo';
 import { resolveTaskFlag } from '../utils/agendaTaskFlag';
+import { resolveAttentionLevel } from '../utils/agendaAttention';
 import { resolveAgendaWatchBase } from '../utils/agendaWatchPattern';
 import { toIsoDate } from '../utils/isoDate';
 import { formatDayHeaderParts } from '../utils/agendaDayHeader';
@@ -522,35 +523,49 @@ export class AgendaPanel {
         // drift if a spelling is ever added.
         const isCancelledSource = isCancelled.toString();
         const resolveTaskFlagSource = resolveTaskFlag.toString();
+        const resolveAttentionLevelSource = resolveAttentionLevel.toString();
         // Month-anchor shift that avoids the short-month rollover (Jan 31 +1 ->
         // February, not March); unit-tested in monthNav.test.ts.
         const shiftMonthAnchorSource = shiftMonthAnchor.toString();
         const styleConfig = vscode.workspace.getConfiguration('markdown-org');
         const agendaStyle = normalizeAgendaStyle(styleConfig.get<string>('agendaStyle'));
         const agendaFontRaw = (styleConfig.get<string>('agendaFontFamily') || '').trim();
-        // Default to VS Code's own UI font. A bare "-apple-system, 'Segoe UI',
-        // system-ui, sans-serif" stack made Electron pick a face without full
-        // Cyrillic coverage and fall back to a serif for Cyrillic glyphs;
-        // --vscode-font-family already renders the whole VS Code UI (Cyrillic
-        // included) as the expected sans.
-        const uiFontStack = 'var(--vscode-font-family)';
+        // Default matches the design-companion mockup, which renders in Adwaita
+        // Sans: its "-apple-system, 'Segoe UI', system-ui, sans-serif" stack
+        // resolves via fontconfig to Adwaita Sans for Latin *and* Cyrillic.
+        // Naming the face explicitly is what makes it identical to the mockup
+        // and sidesteps the old Electron fallback that picked a serif for
+        // Cyrillic when only generic families were given. Falls back to Noto
+        // Sans / system-ui / sans-serif where Adwaita Sans is absent.
+        const uiFontStack = "'Adwaita Sans', 'Noto Sans', system-ui, sans-serif";
         const agendaFont = agendaFontRaw.length > 0 ? agendaFontRaw : uiFontStack;
         // Monospace family used by the monospace preset and by the tabular
-        // time/offset cells of hybrid/ledger; configurable, with a Courier
+        // time/offset cells of hybrid/table; configurable, with a Courier
         // fallback matching the previous hardcoded stack.
         const monoFontRaw = (styleConfig.get<string>('agendaMonospaceFontFamily') || '').trim();
         const monoStack = "'Courier New', ui-monospace, monospace";
         const agendaMonoFont = monoFontRaw.length > 0 ? monoFontRaw : monoStack;
-        // When true, the ledger style renders every element in the monospace
+        // When true, the table style renders every element in the monospace
         // family (not just the time/offset numerics).
-        const ledgerAllMono = styleConfig.get<boolean>('agendaLedgerAllMono', false) === true;
+        const tableAllMono = styleConfig.get<boolean>('agendaTableAllMono', false) === true;
         return `<!DOCTYPE html>
 <html>
 <head>
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${cspSource} 'nonce-${nonce}'; script-src 'nonce-${nonce}';">
-    <style nonce="${nonce}">${AGENDA_STYLES}</style>
+    <style nonce="${nonce}">
+        /* Font families come in through a nonce'd <style> block, NOT an inline
+           style="" attribute on <body>: the CSP (style-src with a nonce, no
+           'unsafe-inline') blocks inline style attributes, so a custom property
+           set there never applies and font-family: var(...) falls back to the
+           browser default serif. A nonce'd rule is allowed and does apply. */
+        :root {
+            --markdown-org-agenda-font: ${agendaFont};
+            --markdown-org-agenda-mono-font: ${agendaMonoFont};
+        }
+        ${AGENDA_STYLES}
+    </style>
 </head>
-<body data-agenda-style="${agendaStyle}" data-ledger-mono="${ledgerAllMono}" style="--markdown-org-agenda-font: ${agendaFont}; --markdown-org-agenda-mono-font: ${agendaMonoFont};">
+<body data-agenda-style="${agendaStyle}" data-table-mono="${tableAllMono}">
     <div class="nav-bar" id="nav-bar"></div>
     <div class="current-date" id="current-date"></div>
     <div id="content"></div>
@@ -566,6 +581,7 @@ export class AgendaPanel {
         ${formatDayHeaderPartsSource}
         ${isCancelledSource}
         ${resolveTaskFlagSource}
+        ${resolveAttentionLevelSource}
         ${shiftMonthAnchorSource}
         const vscode = acquireVsCodeApi();
         // Handshake for the ServiceWorker-race retry path on the extension
@@ -786,9 +802,9 @@ export class AgendaPanel {
         
         function formatDayHeader(date, isToday) {
             const { weekday, day, month, year } = formatDayHeaderParts(date, locale);
-            const arrowL = isToday ? '❯ ' : '';
-            const arrowR = isToday ? ' ❮' : '';
-            return '<span>' + arrowL + weekday + '</span><span style="text-align: right">' + day + '</span><span>' + month + ' ' + year + arrowR + '</span>';
+            const arrowL = isToday ? '<span class="day-nav">❯ </span>' : '';
+            const arrowR = isToday ? '<span class="day-nav"> ❮</span>' : '';
+            return '<span class="day-weekday">' + arrowL + weekday + '</span><span class="day-num" style="text-align: right">' + day + '</span><span class="day-rest">' + month + ' ' + year + arrowR + '</span>';
         }
         
         function renderTask(task, daysOffset, taskType) {
@@ -818,14 +834,14 @@ export class AgendaPanel {
                 ' data-line="' + sanitizeTaskLine(task.line) + '">' +
                 '<span class="todo-label">todo:</span>' +
                 '<span class="time-info-cell">' + timeInfo + '</span>' +
-                // .time-plain: ledger-only clean HH:MM (or empty). The ledger
+                // .time-plain: table-only clean HH:MM (or empty). The table
                 // style hides .time-info-cell (whose buildTimeInfo output carries
                 // monospace dot-trails, a stacked DEADLINE label, and relative
                 // "Sched.Nx" text) and shows this instead, so the big-time column
                 // stays a single clean line; other styles keep .time-plain hidden.
                 '<span class="time-plain">' + escapeHtml(task.timestamp_time || '') + '</span>' +
-                '<span class="status" data-status="' + statusKind + '">' + escapeHtml(status) + '</span>' +
-                // .flag: ledger-only type glyph (deadline/scheduled/repeat/cancelled);
+                '<span class="status" data-status="' + statusKind + '" data-attention="' + resolveAttentionLevel(task, daysOffset, taskType, isCancelled) + '">' + escapeHtml(status) + '</span>' +
+                // .flag: table-only type glyph (deadline/scheduled/repeat/cancelled);
                 // display:none in other presets, so it occupies no grid cell there.
                 '<span class="flag" data-flag="' + resolveTaskFlag(task, isCancelled) + '"></span>' +
                 '<span class="priority" data-priority="' + escapeHtml(priorityLetter.toLowerCase()) + '">' +
@@ -998,7 +1014,7 @@ export class AgendaPanel {
                 { id: 'monospace', label: 'Monospace' },
                 { id: 'native', label: 'Native' },
                 { id: 'hybrid', label: 'Hybrid' },
-                { id: 'ledger', label: 'Ledger' }
+                { id: 'table', label: 'Table' }
             ];
             return '<div class="style-menu" id="styleMenu">' +
                 '<button class="style-menu-btn" id="styleMenuBtn" title="Agenda style">Aa &#9662;</button>' +
