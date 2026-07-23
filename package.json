@@ -353,7 +353,7 @@
             "Hybrid: proportional text, but monospaced tabular time/offset columns.",
             "Table: strict grid with a status dot, big time, and a type-flag column (deadline/scheduled/repeat/cancelled)."
           ],
-          "default": "hybrid",
+          "default": "table",
           "description": "Visual style of the agenda webview. Applies to all agenda modes (day/week/month/tasks)."
         },
         "markdown-org.agendaFontFamily": {

@@ -506,14 +506,14 @@ Currently selected tag filter. Usually updated by `Cycle Tag Filter`. Stored at 
 ### `markdown-org.agendaStyle`
 
 **Type:** `string` (`monospace` | `native` | `hybrid` | `table`)
-**Default:** `"hybrid"`
+**Default:** `"table"`
 
 Visual style of the agenda webview. Applies to all agenda modes (day/week/month/tasks), including the month calendar. Switch it from the style menu in the agenda panel or with the `Markdown Org: Cycle Agenda Style` command.
 
-- `hybrid` (default): proportional text with monospaced, tabular time/offset columns; status/priority shown as badges.
+- `table` (default): a compact list with a status dot, a large time, and a per-task type-flag column (deadline / scheduled / repeat / cancelled).
+- `hybrid`: proportional text with monospaced, tabular time/offset columns; status/priority shown as badges.
 - `native`: fully proportional VS Code look with status/priority badges.
 - `monospace`: the classic `Courier New` grid look. Set this to keep the previous appearance.
-- `table`: a compact list with a status dot, a large time, and a per-task type-flag column (deadline / scheduled / repeat / cancelled).
 
 All colors are driven by VS Code theme tokens, so every style adapts to the active light / dark / high-contrast theme.
 

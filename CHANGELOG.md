@@ -7,9 +7,10 @@ All notable changes to the "Markdown Org" extension will be documented in this f
 ### Added
 
 - Selectable agenda visual style: the setting `markdown-org.agendaStyle`
-  (`monospace` | `native` | `hybrid`, default `hybrid`) plus an in-panel style
-  menu and the `Markdown Org: Cycle Agenda Style` command. The style applies to
-  all agenda modes (day/week/month/tasks), including the month calendar.
+  (`monospace` | `native` | `hybrid` | `table`, default `table`) plus an
+  in-panel style menu and the `Markdown Org: Cycle Agenda Style` command. The
+  style applies to all agenda modes (day/week/month/tasks), including the month
+  calendar.
 - `markdown-org.agendaFontFamily` to override the proportional font used by the
   `native` and `hybrid` styles. Empty (default) uses the system UI stack; the
   `monospace` style ignores it.
@@ -20,9 +21,10 @@ All notable changes to the "Markdown Org" extension will be documented in this f
 
 ### Changed
 
-- The agenda webview now defaults to the `hybrid` style (proportional text with
-  monospaced, tabular time/offset columns and status/priority badges). To keep
-  the previous monospaced look, set `markdown-org.agendaStyle` to `monospace`.
+- The agenda webview now defaults to the `table` style (a compact list with a
+  status dot, a large time, and a per-task type-flag column). To keep the
+  previous monospaced look, set `markdown-org.agendaStyle` to `monospace`; the
+  `hybrid` and `native` styles remain available too.
 
 ## [0.11.1] - 2026-07-18
 

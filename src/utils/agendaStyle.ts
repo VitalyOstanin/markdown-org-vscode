@@ -8,7 +8,7 @@ export const AGENDA_STYLES_LIST = ['monospace', 'native', 'hybrid', 'table'] as 
 
 export type AgendaStyle = (typeof AGENDA_STYLES_LIST)[number];
 
-export const DEFAULT_AGENDA_STYLE: AgendaStyle = 'hybrid';
+export const DEFAULT_AGENDA_STYLE: AgendaStyle = 'table';
 
 /**
  * Coerce an arbitrary config value into a valid AgendaStyle. Unknown, empty,

@@ -300,7 +300,7 @@ export const AGENDA_STYLES = `
         body[data-agenda-style="native"] .priority:empty {
             visibility: hidden;
         }
-        /* ============ preset: hybrid (default) ============ */
+        /* ============ preset: hybrid ============ */
         body[data-agenda-style="hybrid"] {
             font-family: var(--markdown-org-agenda-font);
         }
@@ -342,7 +342,7 @@ export const AGENDA_STYLES = `
             font-family: var(--markdown-org-agenda-mono-font);
             font-variant-numeric: tabular-nums;
         }
-        /* ============ preset: table (D2+) ============ */
+        /* ============ preset: table (D2+, default) ============ */
         body[data-agenda-style="table"] {
             font-family: var(--markdown-org-agenda-font);
         }

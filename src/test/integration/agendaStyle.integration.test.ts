@@ -80,7 +80,7 @@ suite('Agenda Style Integration Tests', () => {
         // Never leak a non-default agendaStyle into subsequent suites.
         await vscode.workspace
             .getConfiguration('markdown-org')
-            .update('agendaStyle', 'hybrid', vscode.ConfigurationTarget.Global);
+            .update('agendaStyle', 'table', vscode.ConfigurationTarget.Global);
     });
 
     after(() => {
@@ -241,7 +241,7 @@ suite('Agenda Table Flags Integration Tests', () => {
         await vscode.commands.executeCommand('workbench.action.closeAllEditors');
         await vscode.workspace
             .getConfiguration('markdown-org')
-            .update('agendaStyle', 'hybrid', vscode.ConfigurationTarget.Global);
+            .update('agendaStyle', 'table', vscode.ConfigurationTarget.Global);
     });
 
     after(() => {

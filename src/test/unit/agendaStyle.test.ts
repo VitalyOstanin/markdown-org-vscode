@@ -2,8 +2,8 @@ import * as assert from 'assert';
 import { AGENDA_STYLES_LIST, DEFAULT_AGENDA_STYLE, normalizeAgendaStyle } from '../../utils/agendaStyle';
 
 suite('agendaStyle', () => {
-    test('default is hybrid', () => {
-        assert.strictEqual(DEFAULT_AGENDA_STYLE, 'hybrid');
+    test('default is table', () => {
+        assert.strictEqual(DEFAULT_AGENDA_STYLE, 'table');
     });
 
     test('list is exactly the four presets', () => {
@@ -17,10 +17,10 @@ suite('agendaStyle', () => {
     });
 
     test('unknown / empty / undefined fall back to default', () => {
-        assert.strictEqual(normalizeAgendaStyle('garbage'), 'hybrid');
-        assert.strictEqual(normalizeAgendaStyle(''), 'hybrid');
-        assert.strictEqual(normalizeAgendaStyle(undefined), 'hybrid');
-        assert.strictEqual(normalizeAgendaStyle(null as unknown as string), 'hybrid');
+        assert.strictEqual(normalizeAgendaStyle('garbage'), 'table');
+        assert.strictEqual(normalizeAgendaStyle(''), 'table');
+        assert.strictEqual(normalizeAgendaStyle(undefined), 'table');
+        assert.strictEqual(normalizeAgendaStyle(null as unknown as string), 'table');
     });
 
     test('trims and lowercases before matching', () => {
@@ -34,7 +34,7 @@ suite('agendaStyle', () => {
         assert.strictEqual(normalizeAgendaStyle('TABLE'), 'table');
     });
 
-    test('default style is unchanged (hybrid)', () => {
-        assert.strictEqual(DEFAULT_AGENDA_STYLE, 'hybrid');
+    test('default style is table', () => {
+        assert.strictEqual(DEFAULT_AGENDA_STYLE, 'table');
     });
 });
