@@ -570,8 +570,10 @@ export class AgendaPanel {
     </style>
 </head>
 <body data-agenda-style="${agendaStyle}" data-table-mono="${tableAllMono}">
-    <div class="nav-bar" id="nav-bar"></div>
-    <div class="current-date" id="current-date"></div>
+    <div class="agenda-header" id="agenda-header">
+        <div class="nav-bar" id="nav-bar"></div>
+        <div class="current-date" id="current-date"></div>
+    </div>
     <div id="content"></div>
     <script nonce="${nonce}">
         ${selectionGuardSource}
@@ -609,6 +611,16 @@ export class AgendaPanel {
         // round-trip (Next then Prev, or Prev then Next) returns the user
         // to where they were instead of snapping back to today's header.
         const scrollHistory = {};
+        // Publish the sticky nav-bar's live height as --agenda-header-h so the
+        // sticky day-headers pin directly below it (their top / scroll-margin-top
+        // read this var). Re-measured after every render and on resize because
+        // the header wraps differently by width, mode and font.
+        function syncHeaderOffset() {
+            const header = document.getElementById('agenda-header');
+            const h = header ? header.offsetHeight : 0;
+            document.documentElement.style.setProperty('--agenda-header-h', h + 'px');
+        }
+        window.addEventListener('resize', syncHeaderOffset);
 
         window.addEventListener('message', event => {
             const message = event.data;
@@ -623,6 +635,7 @@ export class AgendaPanel {
                     firstDayOfWeek = message.firstDayOfWeek;
                 }
                 renderNavBar();
+                syncHeaderOffset();
                 if (initialMode === 'month') {
                     document.getElementById('content').innerHTML = renderMonthCalendar(initialData);
                     attachCalendarListeners();
@@ -654,6 +667,7 @@ export class AgendaPanel {
                 const scrollPos = window.scrollY;
                 const wasOnCurrentWeek = currentWeekIsVisible();
                 renderNavBar();
+                syncHeaderOffset();
                 if (initialMode === 'month') {
                     document.getElementById('content').innerHTML = renderMonthCalendar(initialData);
                     attachCalendarListeners();
@@ -1069,9 +1083,11 @@ export class AgendaPanel {
                 const unit = initialMode === 'day' ? 'Day' : initialMode === 'week' ? 'Week' : 'Month';
                 navBar.innerHTML =
                     modeSwitchHtml +
-                    '<button class="nav-btn" id="btn-prev">← Prev ' + unit + '</button>' +
-                    '<button class="nav-btn" id="btn-today">Today</button>' +
-                    '<button class="nav-btn" id="btn-next">Next ' + unit + ' →</button>' +
+                    '<span class="date-nav">' +
+                    '<button class="nav-btn" id="btn-prev" title="Previous ' + unit + '">← Prev ' + unit + '</button>' +
+                    '<button class="nav-btn" id="btn-today" title="Jump to today">Today</button>' +
+                    '<button class="nav-btn" id="btn-next" title="Next ' + unit + '">Next ' + unit + ' →</button>' +
+                    '</span>' +
                     tagHtml +
                     styleMenuHtml;
 

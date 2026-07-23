@@ -28,6 +28,10 @@ export const AGENDA_STYLES = `
             --space-3: 12px;
             --space-4: 16px;
             --space-5: 20px;
+            /* Height of the sticky nav-bar header, measured at runtime by
+               syncHeaderOffset. Day-headers stick just below it (top /
+               scroll-margin-top). 0px until the first measurement. */
+            --agenda-header-h: 0px;
         }
         body {
             padding: var(--space-5);
@@ -38,23 +42,45 @@ export const AGENDA_STYLES = `
             line-height: 1.6;
         }
         /* ---- common structure (all presets) ---- */
+        /* Sticky header: the control row and the current-date line stay pinned
+           to the top while the agenda scrolls. The negative margins cancel the
+           body's padding so the header spans edge-to-edge and its background
+           hides content scrolling underneath (including through the body's
+           top/side padding); the padding re-adds the same inset inside. */
+        .agenda-header {
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            background: var(--vscode-editor-background);
+            border-bottom: 1px solid var(--vscode-panel-border);
+            margin: calc(-1 * var(--space-5)) calc(-1 * var(--space-5)) var(--space-4);
+            padding: var(--space-5) var(--space-5) var(--space-2);
+        }
         .nav-bar {
             display: flex;
             gap: var(--space-2);
-            margin-bottom: var(--space-5);
+            margin-bottom: var(--space-2);
             align-items: center;
         }
+        /* Prev/Today/Next: a lightened secondary segment (matches .mode-switch),
+           not the accent-coloured primary buttons they used to be. */
+        .date-nav {
+            display: inline-flex;
+        }
         .nav-btn {
-            background: var(--vscode-button-background);
-            color: var(--vscode-button-foreground);
-            border: none;
-            padding: var(--space-2) var(--space-3);
+            background: var(--vscode-button-secondaryBackground);
+            color: var(--vscode-button-secondaryForeground);
+            border: 1px solid var(--vscode-panel-border);
+            padding: var(--space-1) var(--space-2);
             cursor: pointer;
             font-family: inherit;
-            font-size: 1.05em;
+            font-size: 1em;
+        }
+        .nav-btn + .nav-btn {
+            border-left: none;
         }
         .nav-btn:hover {
-            background: var(--vscode-button-hoverBackground);
+            background: var(--vscode-button-secondaryHoverBackground);
         }
         .mode-switch {
             display: inline-flex;
@@ -85,7 +111,7 @@ export const AGENDA_STYLES = `
             color: var(--vscode-textLink-foreground);
             font-weight: bold;
             font-size: 1.05em;
-            margin: var(--space-1) 0 var(--space-4) 0;
+            margin: 0;
         }
         .tag-indicator {
             color: var(--vscode-charts-yellow);
@@ -139,13 +165,38 @@ export const AGENDA_STYLES = `
         .day-header {
             color: var(--vscode-textLink-foreground);
             font-weight: bold;
-            margin: var(--space-5) 0 var(--space-1) 0;
+            /* Top spacing is padding, not margin, so it belongs to the header
+               box and is filled by the background below -- a sticky header with
+               a transparent top margin would let tasks show through the gap. */
+            margin: 0;
+            padding: var(--space-5) 0 var(--space-1) 0;
             display: grid;
             /* 3-column day header (see formatDayHeader): weekday | day | month+year.
                Content-sized columns keep the parts tight together -- fixed widths
                left large gaps after short weekdays (e.g. "среда"). */
             grid-template-columns: max-content max-content 1fr;
             column-gap: 1ch;
+            /* Sticky section header: each day's heading pins just below the
+               sticky nav-bar (--agenda-header-h, measured by syncHeaderOffset)
+               while that day's tasks scroll under it. The background hides the
+               scrolling tasks; scroll-margin-top keeps scrollToWeekFocus from
+               parking today's header behind the nav-bar. Flat sibling headers
+               cover the previous day's header as the next day scrolls up. */
+            position: sticky;
+            top: var(--agenda-header-h);
+            scroll-margin-top: var(--agenda-header-h);
+            z-index: 5;
+            background: var(--vscode-editor-background);
+        }
+        /* Week-view day-headers double as drill-down links into the Day view
+           (wireDayHeaderNavigation adds .day-header-link). The pointer and the
+           hover underline signal the affordance; colour stays on the existing
+           --vscode-textLink token the header already uses. */
+        .day-header-link {
+            cursor: pointer;
+        }
+        .day-header-link:hover .day-weekday {
+            text-decoration: underline;
         }
         .task-line {
             display: grid;
@@ -358,8 +409,10 @@ export const AGENDA_STYLES = `
             display: flex;
             align-items: baseline;
             gap: var(--space-2);
-            margin: var(--space-5) 0 var(--space-2) 0;
-            padding-bottom: var(--space-1);
+            /* margin -> padding for the same sticky reason as the base rule;
+               position/top/background are inherited from .day-header above. */
+            margin: 0;
+            padding: var(--space-5) 0 var(--space-1) 0;
             border-bottom: 1px solid var(--vscode-panel-border);
             font-weight: normal;
         }
