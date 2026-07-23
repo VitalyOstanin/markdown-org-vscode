@@ -12,8 +12,9 @@ import { toIsoDate } from '../utils/isoDate';
 import { formatDayHeaderParts } from '../utils/agendaDayHeader';
 import { isCancelled } from '../utils/normalizeTaskType';
 import { shiftMonthAnchor } from '../utils/monthNav';
-import { normalizeAgendaStyle } from '../utils/agendaStyle';
 import { wireDayHeaderNavigation } from '../utils/agendaDayHeaderNav';
+import { attentionTooltip, flagTooltip, priorityTooltip } from '../utils/agendaTooltips';
+import { DEFAULT_AGENDA_STYLE, normalizeAgendaStyle } from '../utils/agendaStyle';
 import { AGENDA_STYLES } from './agendaStyles';
 import { formatError, notifyError } from '../utils/notify';
 
@@ -531,6 +532,11 @@ export class AgendaPanel {
         // Week-view day-header drill-down: clicking a weekday opens that day's
         // Day view. Unit-tested in agendaDayHeaderNav.test.ts (jsdom).
         const wireDayHeaderNavigationSource = wireDayHeaderNavigation.toString();
+        // Hover-tooltip text for the terse flag / status-dot / priority glyphs;
+        // unit-tested in agendaTooltips.test.ts.
+        const flagTooltipSource = flagTooltip.toString();
+        const attentionTooltipSource = attentionTooltip.toString();
+        const priorityTooltipSource = priorityTooltip.toString();
         const styleConfig = vscode.workspace.getConfiguration('markdown-org');
         const agendaStyle = normalizeAgendaStyle(styleConfig.get<string>('agendaStyle'));
         const agendaFontRaw = (styleConfig.get<string>('agendaFontFamily') || '').trim();
@@ -590,6 +596,9 @@ export class AgendaPanel {
         ${resolveAttentionLevelSource}
         ${shiftMonthAnchorSource}
         ${wireDayHeaderNavigationSource}
+        ${flagTooltipSource}
+        ${attentionTooltipSource}
+        ${priorityTooltipSource}
         const vscode = acquireVsCodeApi();
         // Handshake for the ServiceWorker-race retry path on the extension
         // side: tells AgendaPanel.armReadyTimeout the webview script is alive
@@ -611,6 +620,25 @@ export class AgendaPanel {
         // round-trip (Next then Prev, or Prev then Next) returns the user
         // to where they were instead of snapping back to today's header.
         const scrollHistory = {};
+        // Style metadata shared by the picker button, the dropdown and the
+        // per-item tooltips. Kept in one place so the button label, the active
+        // checkmark and the hover descriptions cannot drift apart.
+        const agendaStyleMeta = [
+            { id: 'monospace', label: 'Monospace', desc: 'Fixed-width columns; everything in a monospace font.' },
+            { id: 'native', label: 'Native', desc: 'Proportional font with badge-style priorities.' },
+            { id: 'hybrid', label: 'Hybrid', desc: 'Proportional text with monospace time and offset columns.' },
+            { id: 'table', label: 'Table', desc: 'Compact table with a per-task type-flag column (default).' }
+        ];
+        // The default the host resolves to when the setting is unset/invalid,
+        // injected so the picker fallback tracks DEFAULT_AGENDA_STYLE instead
+        // of a hardcoded literal that silently goes stale when the default moves.
+        const defaultAgendaStyle = ${JSON.stringify(DEFAULT_AGENDA_STYLE)};
+        function agendaStyleLabel(id) {
+            for (let i = 0; i < agendaStyleMeta.length; i++) {
+                if (agendaStyleMeta[i].id === id) return agendaStyleMeta[i].label;
+            }
+            return id;
+        }
         // Publish the sticky nav-bar's live height as --agenda-header-h so the
         // sticky day-headers pin directly below it (their top / scroll-margin-top
         // read this var). Re-measured after every render and on resize because
@@ -731,10 +759,17 @@ export class AgendaPanel {
             document.body.dataset.agendaStyle = style;
             // Keep the menu's active marker in sync with the live choice; the
             // menu is rendered once on open, so without this it would keep
-            // highlighting the style that was active at open time.
+            // highlighting the style that was active at open time. The active
+            // checkmark rides on the same .active class via CSS.
             document.querySelectorAll('.style-menu-item').forEach(function (el) {
                 el.classList.toggle('active', el.getAttribute('data-style') === style);
             });
+            // Reflect the new choice on the collapsed button so the current
+            // style is legible without opening the menu.
+            const btn = document.getElementById('styleMenuBtn');
+            if (btn) {
+                btn.textContent = 'Aa ' + agendaStyleLabel(style) + ' ▾';
+            }
             vscode.postMessage({ command: 'setAgendaStyle', style: style });
         }
 
@@ -823,8 +858,8 @@ export class AgendaPanel {
         
         function formatDayHeader(date, isToday) {
             const { weekday, day, month, year } = formatDayHeaderParts(date, locale);
-            const arrowL = isToday ? '<span class="day-nav">❯ </span>' : '';
-            const arrowR = isToday ? '<span class="day-nav"> ❮</span>' : '';
+            const arrowL = isToday ? '<span class="day-nav" title="Today">❯ </span>' : '';
+            const arrowR = isToday ? '<span class="day-nav" title="Today"> ❮</span>' : '';
             return '<span class="day-weekday">' + arrowL + weekday + '</span><span class="day-num" style="text-align: right">' + day + '</span><span class="day-rest">' + month + ' ' + year + arrowR + '</span>';
         }
         
@@ -836,6 +871,8 @@ export class AgendaPanel {
                 : status === 'DONE' ? 'done'
                 : isCancelled(status) ? 'cancelled'
                 : '';
+            const flag = resolveTaskFlag(task, isCancelled);
+            const attention = resolveAttentionLevel(task, daysOffset, taskType, isCancelled);
 
             const dateDisplay = (daysOffset !== undefined && daysOffset !== 0 && task.timestamp_date)
                 ? formatDateForTitle(task.timestamp_date)
@@ -861,11 +898,11 @@ export class AgendaPanel {
                 // "Sched.Nx" text) and shows this instead, so the big-time column
                 // stays a single clean line; other styles keep .time-plain hidden.
                 '<span class="time-plain">' + escapeHtml(task.timestamp_time || '') + '</span>' +
-                '<span class="status" data-status="' + statusKind + '" data-attention="' + resolveAttentionLevel(task, daysOffset, taskType, isCancelled) + '">' + escapeHtml(status) + '</span>' +
+                '<span class="status" data-status="' + statusKind + '" data-attention="' + attention + '" title="' + escapeHtml(attentionTooltip(attention)) + '">' + escapeHtml(status) + '</span>' +
                 // .flag: table-only type glyph (deadline/scheduled/repeat/cancelled);
                 // display:none in other presets, so it occupies no grid cell there.
-                '<span class="flag" data-flag="' + resolveTaskFlag(task, isCancelled) + '"></span>' +
-                '<span class="priority" data-priority="' + escapeHtml(priorityLetter.toLowerCase()) + '">' +
+                '<span class="flag" data-flag="' + flag + '" title="' + escapeHtml(flagTooltip(flag)) + '"></span>' +
+                '<span class="priority" data-priority="' + escapeHtml(priorityLetter.toLowerCase()) + '" title="' + escapeHtml(priorityTooltip(priorityLetter)) + '">' +
                     escapeHtml(priorityLetter) +
                 '</span>' +
                 '<span class="heading">' + escapeHtml(task.heading) + '</span>' +
@@ -1024,27 +1061,25 @@ export class AgendaPanel {
             return '<span class="mode-switch">' +
                 modes.map(m =>
                     '<button class="mode-btn' + (m.id === initialMode ? ' active' : '') +
-                    '" data-mode="' + m.id + '">' + m.label + '</button>'
+                    '" data-mode="' + m.id + '" title="Switch to ' + m.label + ' view">' + m.label + '</button>'
                 ).join('') +
                 '</span>';
         }
 
         function renderStyleMenu() {
-            const cur = document.body.dataset.agendaStyle || 'hybrid';
-            const items = [
-                { id: 'monospace', label: 'Monospace' },
-                { id: 'native', label: 'Native' },
-                { id: 'hybrid', label: 'Hybrid' },
-                { id: 'table', label: 'Table' }
-            ];
+            const cur = document.body.dataset.agendaStyle || defaultAgendaStyle;
+            const btnLabel = 'Aa ' + agendaStyleLabel(cur) + ' ▾';
+            const label = '<div class="style-menu-label">Agenda style</div>';
+            const items = agendaStyleMeta.map(it =>
+                '<div class="style-menu-item' + (it.id === cur ? ' active' : '') +
+                '" data-style="' + it.id + '" title="' + escapeHtml(it.desc) + '">' +
+                '<span class="style-menu-check">✓</span>' +
+                '<span class="style-menu-name">' + escapeHtml(it.label) + '</span>' +
+                '</div>'
+            ).join('');
             return '<div class="style-menu" id="styleMenu">' +
-                '<button class="style-menu-btn" id="styleMenuBtn" title="Agenda style">Aa &#9662;</button>' +
-                '<div class="style-menu-list">' +
-                items.map(it =>
-                    '<div class="style-menu-item' + (it.id === cur ? ' active' : '') +
-                    '" data-style="' + it.id + '">' + it.label + '</div>'
-                ).join('') +
-                '</div></div>';
+                '<button class="style-menu-btn" id="styleMenuBtn" title="Agenda style">' + escapeHtml(btnLabel) + '</button>' +
+                '<div class="style-menu-list">' + label + items + '</div></div>';
         }
 
         function attachStyleMenuListeners() {
@@ -1073,7 +1108,10 @@ export class AgendaPanel {
             const dateEl = document.getElementById('current-date');
             const modeSwitchHtml = renderModeSwitch();
             const styleMenuHtml = renderStyleMenu();
-            const tagHtml = '<span class="tag-indicator" id="tag-indicator">Tag: ' + escapeHtml(currentTag) + '</span>';
+            const tagHtml =
+                '<span class="tag-indicator" id="tag-indicator" title="Click to cycle the file-tag filter">Tag: ' +
+                escapeHtml(currentTag) +
+                '</span>';
 
             if (initialMode === 'tasks') {
                 navBar.innerHTML = modeSwitchHtml + tagHtml + styleMenuHtml;

@@ -150,10 +150,29 @@ export const AGENDA_STYLES = `
         .style-menu.open .style-menu-list {
             display: block;
         }
+        /* Non-selectable caption at the top of the style dropdown. */
+        .style-menu-label {
+            padding: var(--space-1) var(--space-3);
+            color: var(--vscode-descriptionForeground);
+            font-size: 0.9em;
+            cursor: default;
+        }
         .style-menu-item {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
             padding: var(--space-1) var(--space-3);
             cursor: pointer;
             color: var(--vscode-foreground);
+        }
+        /* Leading checkmark column: reserved on every row (visibility, not
+           display) so the labels stay aligned; shown only on the active row. */
+        .style-menu-check {
+            visibility: hidden;
+            color: var(--vscode-textLink-foreground);
+        }
+        .style-menu-item.active .style-menu-check {
+            visibility: visible;
         }
         .style-menu-item:hover {
             background: var(--vscode-list-hoverBackground);
