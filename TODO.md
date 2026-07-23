@@ -23,11 +23,23 @@
       render correctly for several locales (RTL not required), not just the
       current one.
 
-- [ ] Sticky day/date header at the top of the agenda
-    - Keep the current day/date heading pinned to the top of the webview while
-      scrolling through that day's tasks, so the active day stays visible.
+- [x] Sticky day/date header at the top of the agenda
+    - Shipped: each `.day-header` is `position: sticky` and pins just below the
+      sticky nav-bar (offset `--agenda-header-h`, measured by `syncHeaderOffset`)
+      while that day's tasks scroll under it. The header background hides the
+      scrolling tasks; `scroll-margin-top` keeps `scrollToWeekFocus` from parking
+      today's header behind the nav-bar. Top spacing moved margin -> padding so
+      the sticky box has no transparent gap. Applies to both base and table
+      presets.
 
-- [ ] Contextual navigation between agenda modes (day / week / month) with a date anchor
+- [x] Contextual navigation between agenda modes (day / week / month) with a date anchor
+    - Shipped: variant 1 (clickable week day-header -> Day view for that date,
+      via `wireDayHeaderNavigation` + `navigateToDay`, with a pointer/underline
+      affordance and a tooltip) and variant 2 (anchor-preserving mode buttons)
+      are both in place -- variant 2 was already implemented (`switchMode`
+      forwards `AgendaPanel.shiftedToday`, not today). The whole day-header is
+      the click target. Variants 3 (breadcrumb) and 4 (keyboard d/w/m) are
+      deferred as secondary; kept below for reference.
     - Current state: the mode switcher (Day / Week / Month / Tasks buttons,
       `renderModeSwitch`) already exists, but `switchMode` always re-anchors to
       _today_ (`AgendaPanel.shiftedToday`), so switching level from a
@@ -55,38 +67,39 @@
     - Decision pending: which variants to implement; whether the day-number or
       the whole day-header is the click target.
 
-- [ ] Rework the top navigation bar (`#nav-bar`, `renderNavBar`)
-    - The bar holds the mode switch (Day/Week/Month/Tasks), Prev/Today/Next,
-      the tag indicator and the style menu. Two problems:
-    1. Visual redesign: it currently looks crude (bare buttons). Bring it in
-       line with the `table`-style visual language -- consistent spacing,
-       theme-token colours, grouped controls, a lighter affordance for
-       Prev/Today/Next. Distinct from the day/date header restyle above.
-    2. Sticky on scroll: pin the bar to the top of the webview so it stays
-       visible while scrolling the agenda down (currently it scrolls away).
-       Coordinate with the "Sticky day/date header" item so the two sticky
-       elements stack rather than overlap.
+- [x] Rework the top navigation bar (`#nav-bar`, `renderNavBar`)
+    - Shipped both parts:
+    1. Visual redesign: Prev/Today/Next are now a lightened secondary segment
+       (`.date-nav`, matching `.mode-switch`) instead of three accent-coloured
+       primary buttons; consistent token-driven spacing and grouping.
+    2. Sticky on scroll: the control row and the current-date line are wrapped
+       in `.agenda-header`, which is `position: sticky; top: 0` with the editor
+       background and a bottom border. Negative margins cancel the body padding
+       so it spans edge-to-edge. It stacks above the sticky day-headers (they
+       offset by its measured height), so the two never overlap.
 
-- [ ] Redesign the agenda style picker (`renderStyleMenu`)
-    - The style menu (the "Aa v" button + dropdown listing monospace / native /
-      hybrid / table) looks crude and is disconnected from the rest of the bar.
-      Rework it to match the `table`-style visual language: clearer active-item
-      marker, theme-token colours, tidy spacing, and possibly a small preview
-      or icon per style so the choice is legible at a glance. Part of the
-      broader top-nav-bar rework above; kept separate because the picker has its
-      own open/close behaviour and item list.
-    - For detailed consideration later (no decision yet).
+- [x] Redesign the agenda style picker (`renderStyleMenu`)
+    - Shipped: the collapsed button now shows the current style ("Aa Table ▾")
+      so the choice is legible without opening; the dropdown gains a
+      non-selectable "Agenda style" caption, a leading checkmark column on the
+      active row (reserved via `visibility` so labels stay aligned), and a
+      per-style hover tooltip. The stale `|| 'hybrid'` fallback was replaced by
+      an injected `defaultAgendaStyle` (tracks `DEFAULT_AGENDA_STYLE`), and the
+      style metadata (id/label/description) now lives in one `agendaStyleMeta`
+      array shared by the button, the list and the tooltips.
+    - Deferred: a small per-style preview/icon.
 
-- [ ] Hover tooltips on non-obvious UI elements
-    - Any element whose meaning is not self-evident from its look should show a
-      tooltip on hover explaining what it is. Examples: the type-flag glyphs
-      (red flag = deadline, clock = scheduled, repeat, cancelled), the status
-      dot (attention level: deadline / overdue / done / cancelled), the priority
-      chip, the day-nav arrows, and the nav-bar buttons.
-    - Minimum: a `title` attribute; upgrade to a styled custom tooltip only if
-      styling or a hover delay is needed. Keeps the visual language terse
-      (colour/shape carry meaning) without forcing the user to memorise a
-      legend. Currently only the style-menu button has a `title`.
+- [x] Hover tooltips on non-obvious UI elements
+    - Shipped as `title` attributes: the type-flag glyphs, the status dot
+      (attention level) and the priority chip get value-derived tooltips via
+      `flagTooltip` / `attentionTooltip` / `priorityTooltip` (unit-tested,
+      inlined into the webview); the day-nav arrows ("Today"), the Prev/Today/
+      Next buttons, the mode buttons ("Switch to X view"), the tag indicator
+      ("Click to cycle the file-tag filter"), the clickable week day-headers
+      ("Open this day in Day view") and the style picker (button + per-item)
+      all carry titles too.
+    - Deferred: upgrading to a styled custom tooltip (hover delay/positioning)
+      if the native `title` proves insufficient.
     - Design-language principle recorded alongside the other agenda visual
       principles (design log, principle 7).
 
