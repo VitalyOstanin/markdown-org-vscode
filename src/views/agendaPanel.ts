@@ -35,6 +35,12 @@ import {
     tagButtonText,
     tagLabel
 } from '../utils/agendaNavHtml';
+import {
+    buildWeekdayLabels,
+    calendarCellOpenTag,
+    renderMonthCalendar,
+    resolveFirstDayOffset
+} from '../utils/agendaCalendarHtml';
 import { isCancelled } from '../utils/normalizeTaskType';
 import { shiftMonthAnchor } from '../utils/monthNav';
 import { wireDayHeaderNavigation } from '../utils/agendaDayHeaderNav';
@@ -43,7 +49,7 @@ import { buildTagCycle } from '../utils/cycleTag';
 import { resolveHeroModel } from '../utils/agendaHero';
 import { computeDaySummary, buildDaySections } from '../utils/agendaDaySummary';
 import { buildTaskGroups, computeTasksSummary } from '../utils/agendaTaskGroups';
-import { buildMonthDayIndex } from '../utils/agendaMonthCells';
+import { buildMonthDayIndex, buildMonthGrid } from '../utils/agendaMonthCells';
 import type { AgendaHeaderMode } from '../utils/agendaHeaderMode';
 import { nextHeaderMode, normalizeHeaderMode, resolveHeaderLayout } from '../utils/agendaHeaderMode';
 import type { AgendaStrings, UiLanguage } from '../utils/agendaI18n';
@@ -945,7 +951,12 @@ export class AgendaPanel {
         renderHistoryNav,
         renderDateNav,
         renderHeroHtml,
-        renderNavBarHtml
+        renderNavBarHtml,
+        buildMonthGrid,
+        resolveFirstDayOffset,
+        buildWeekdayLabels,
+        calendarCellOpenTag,
+        renderMonthCalendar
     } satisfies AgendaClientDeps;
 
     /**

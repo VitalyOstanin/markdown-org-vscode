@@ -1,6 +1,6 @@
 import * as assert from 'node:assert';
 import { suite, test } from 'mocha';
-import { buildMonthDayIndex } from '../../utils/agendaMonthCells';
+import { buildMonthDayIndex, buildMonthGrid } from '../../utils/agendaMonthCells';
 import type { DayAgenda, TaskWithOffset } from '../../types';
 
 // The month calendar renders these counts as per-day chips. The webview
@@ -65,5 +65,77 @@ suite('buildMonthDayIndex', () => {
     test('an empty or missing payload yields an empty index', () => {
         assert.deepStrictEqual(buildMonthDayIndex([]), {});
         assert.deepStrictEqual(buildMonthDayIndex(undefined as unknown as DayAgenda[]), {});
+    });
+});
+
+// The grid the calendar lays its cells on. December 2025 starts on a Monday
+// and has 31 days, which makes the two week-start variants easy to tell apart:
+// Monday-first needs no leading padding, Sunday-first needs one day.
+suite('buildMonthGrid', () => {
+    test('a Monday-first December 2025 starts on the 1st with no padding', () => {
+        const cells = buildMonthGrid('2025-12-15', 1, '2025-12-15');
+        assert.strictEqual(cells[0]?.date, '2025-12-01');
+        assert.strictEqual(cells[0].otherMonth, false);
+    });
+
+    test('a Sunday-first week pads with the last day of November', () => {
+        const cells = buildMonthGrid('2025-12-15', 0, '2025-12-15');
+        assert.strictEqual(cells[0]?.date, '2025-11-30');
+        assert.strictEqual(cells[0].otherMonth, true);
+        assert.strictEqual(cells[0].dayNumber, 30, 'a padding cell prints its own month day number');
+    });
+
+    test('the cell count is always a whole number of weeks', () => {
+        for (const anchor of ['2026-02-15', '2026-03-15', '2026-05-15', '2027-08-15']) {
+            for (const firstOffset of [0, 1]) {
+                const cells = buildMonthGrid(anchor, firstOffset, '2026-01-01');
+                assert.strictEqual(cells.length % 7, 0, `${anchor} offset ${firstOffset} gave ${cells.length} cells`);
+            }
+        }
+    });
+
+    test('every date of the anchor month appears exactly once, in order', () => {
+        const own = buildMonthGrid('2026-02-10', 1, '2026-01-01').filter((c) => !c.otherMonth);
+        assert.strictEqual(own.length, 28, 'February 2026 has 28 days');
+        assert.strictEqual(own[0]?.date, '2026-02-01');
+        assert.strictEqual(own.at(-1)?.date, '2026-02-28');
+    });
+
+    test('a leap February keeps the 29th', () => {
+        const own = buildMonthGrid('2028-02-01', 1, '2028-01-01').filter((c) => !c.otherMonth);
+        assert.strictEqual(own.length, 29);
+        assert.strictEqual(own.at(-1)?.date, '2028-02-29');
+    });
+
+    test('padding crosses the year boundary in both directions', () => {
+        assert.strictEqual(buildMonthGrid('2026-01-15', 1, '2026-01-01')[0]?.date, '2025-12-29');
+        assert.strictEqual(buildMonthGrid('2026-12-15', 1, '2026-01-01').at(-1)?.date, '2027-01-03');
+    });
+
+    test('weekends are marked by weekday, whichever day the week starts on', () => {
+        for (const firstOffset of [0, 1]) {
+            const cells = buildMonthGrid('2025-12-15', firstOffset, '2025-12-15');
+            const weekend = new Set(cells.filter((c) => c.weekend).map((c) => c.date));
+            assert.ok(weekend.has('2025-12-06'), 'Saturday 6 Dec is a weekend');
+            assert.ok(weekend.has('2025-12-07'), 'Sunday 7 Dec is a weekend');
+            assert.ok(!weekend.has('2025-12-08'), 'Monday 8 Dec is not');
+        }
+    });
+
+    test('exactly one cell is today, and only when today is on the grid', () => {
+        const withToday = buildMonthGrid('2025-12-15', 1, '2025-12-09').filter((c) => c.today);
+        assert.deepStrictEqual(
+            withToday.map((c) => c.date),
+            ['2025-12-09']
+        );
+        assert.strictEqual(buildMonthGrid('2025-12-15', 1, '2026-06-01').filter((c) => c.today).length, 0);
+    });
+
+    test('today is marked on a padding cell too -- it is still that date', () => {
+        const marked = buildMonthGrid('2026-01-15', 1, '2025-12-31').filter((c) => c.today);
+        assert.deepStrictEqual(
+            marked.map((c) => [c.date, c.otherMonth]),
+            [['2025-12-31', true]]
+        );
     });
 });

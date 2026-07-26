@@ -570,9 +570,11 @@ suite('Agenda Show Integration Tests', () => {
         );
         // Every calendar cell goes through one opening-tag helper, which is
         // also where the drill-down tooltip is attached.
-        const cellTag = /function calendarCellOpenTag\([\s\S]*?\n {4}\}/.exec(script);
+        // The helper is inlined at the top level of the script, so its body ends
+        // at the first unindented closing brace.
+        const cellTag = /function calendarCellOpenTag\([\s\S]*?\n\}/.exec(script);
         assert.ok(cellTag, 'expected calendarCellOpenTag in the injected script');
-        assert.ok(cellTag[0].includes('\'<button type="button" class="\''), 'calendar cells must be buttons');
+        assert.ok(cellTag[0].includes('<button type="button" class="'), 'calendar cells must be buttons');
         assert.ok(cellTag[0].includes('openDayView'), 'calendar cells must carry the drill-down tooltip');
     });
 

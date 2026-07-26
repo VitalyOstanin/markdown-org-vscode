@@ -155,6 +155,15 @@ export interface MonthCellCounts {
 
 export type MonthDayIndex = Record<string, MonthCellCounts>;
 
+/** One laid-out cell of the month grid, as `buildMonthGrid` returns them. */
+export interface MonthCellLike {
+    date: string;
+    dayNumber: number;
+    otherMonth: boolean;
+    weekend: boolean;
+    today: boolean;
+}
+
 /** Day-header element subset the week-view drill-down wiring touches. */
 export interface DayHeaderElementLike {
     getAttribute(name: string): string | null;
@@ -350,6 +359,42 @@ export interface AgendaClientDeps {
         ctx: { escapeHtml: (text: string | number | boolean | undefined | null) => string }
     ) => string;
     renderNavBarHtml: (parts: { modeSwitch: string; history: string; dateNav: string; chips: string }) => string;
+    buildMonthGrid: (anchorIso: string, firstOffset: number, todayIso: string) => MonthCellLike[];
+    resolveFirstDayOffset: (firstDayOfWeek: string, locale: string) => number;
+    buildWeekdayLabels: (firstOffset: number, locale: string) => string[];
+    /** Called by `renderMonthCalendar`; not invoked directly by the client. */
+    calendarCellOpenTag: (
+        classes: string,
+        dateStr: string,
+        ctx: { openDayView: string; escapeHtml: (text: string | number | boolean | undefined | null) => string }
+    ) => string;
+    renderMonthCalendar: (
+        cells: readonly MonthCellLike[],
+        weekdayLabels: readonly string[],
+        ctx: {
+            locale: string;
+            uiLang: string;
+            openDayView: string;
+            taskChipForms: string[];
+            overdueChipTemplate: string;
+            index: MonthDayIndex;
+            isHoliday: (date: string) => boolean;
+            escapeHtml: (text: string | number | boolean | undefined | null) => string;
+            formatString: (template: string, ...values: string[]) => string;
+            formatNumber: (value: number, locale: string) => string;
+            pluralIndex: (n: number, lang: string) => number;
+            countLabel: (
+                n: number,
+                forms: string[],
+                ctx: {
+                    locale: string;
+                    uiLang: string;
+                    formatNumber: (value: number, locale: string) => string;
+                    pluralIndex: (n: number, lang: string) => number;
+                }
+            ) => string;
+        }
+    ) => string;
 }
 
 /**
@@ -387,11 +432,6 @@ type HostMessage =
     | ({ command: 'update'; userInitiated?: boolean; navigation?: boolean } & AgendaStatePayload)
     | { command: 'headerMode'; headerMode?: string }
     | { command: 'getRenderedInfo' };
-
-/** `Intl.Locale.weekInfo` is not in the ES2022 lib yet, but browsers ship it. */
-interface LocaleWithWeekInfo {
-    weekInfo?: { firstDay?: number };
-}
 
 /**
  * Run the agenda client in the page. Called once, from the injected `<script>`.
@@ -442,7 +482,11 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         renderHistoryNav,
         renderDateNav,
         renderHeroHtml,
-        renderNavBarHtml
+        renderNavBarHtml,
+        buildMonthGrid,
+        resolveFirstDayOffset,
+        buildWeekdayLabels,
+        renderMonthCalendar
     } = deps;
 
     /**
@@ -453,20 +497,11 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
     const HISTORY_BACK_CHORD = 'Alt+Shift+-';
     const HISTORY_FORWARD_CHORD = 'Alt+Shift+=';
 
-    /** Columns in the month calendar grid -- a week. */
-    const CALENDAR_COLS = 7;
-
     // Active UI dictionary and language. Replaced by every init/update message,
     // so changing markdown-org.uiLanguage re-renders in the new language on the
     // next Show Agenda.
     let UI: AgendaStrings = boot.strings;
     let uiLang: string = boot.language;
-
-    // "3 tasks" / "3 задачи". The body is in utils/agendaSummaryHtml.ts; these
-    // wrappers only bind the page's live state to it.
-    function countLabel(n: number, forms: string[]): string {
-        return countLabelHtml(n, forms, { locale, uiLang, formatNumber, pluralIndex });
-    }
 
     const vscode = acquireVsCodeApi();
     // Handshake for the ServiceWorker-race retry path on the extension side:
@@ -765,7 +800,7 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             return;
         }
         if (initialMode === 'month') {
-            content.innerHTML = renderMonthCalendar(initialData as DayAgenda[]);
+            content.innerHTML = renderMonth(initialData as DayAgenda[]);
             attachCalendarListeners();
             return;
         }
@@ -1109,157 +1144,30 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         return formatted;
     }
 
-    function resolveFirstDayOffset(): number {
-        // 0 = Sunday-first, 1 = Monday-first (only these two supported in UI).
-        if (firstDayOfWeek === 'sunday') {
-            return 0;
-        }
-        if (firstDayOfWeek === 'monday') {
-            return 1;
-        }
-        try {
-            const info = (new Intl.Locale(locale) as unknown as LocaleWithWeekInfo).weekInfo;
-            if (info?.firstDay === 7) {
-                return 0;
-            }
-            if (info?.firstDay !== undefined && info.firstDay >= 1 && info.firstDay <= 6) {
-                return 1;
-            }
-        } catch {
-            // Unsupported locale or API -- fall through to the Monday default.
-        }
-        return 1;
-    }
-
-    function buildWeekdayLabels(firstOffset: number): string[] {
-        // Reference week starting Sun 2024-01-07 lets us pick weekday names by locale.
-        const labels: string[] = [];
-        for (let i = 0; i < CALENDAR_COLS; i++) {
-            const ref = new Date(2024, 0, 7 + ((i + firstOffset) % CALENDAR_COLS));
-            labels.push(ref.toLocaleDateString(locale, { weekday: 'short' }));
-        }
-        return labels;
-    }
-
-    // Opening tag of a calendar cell. Every cell -- including the padding days
-    // of the neighbouring months -- drills down into the Day view, the same
-    // operation the week day-header offers, so all of them are buttons and all
-    // carry that header's tooltip.
-    function calendarCellOpenTag(classes: string, dateStr: string): string {
-        return (
-            '<button type="button" class="' +
-            classes +
-            '" data-date="' +
-            dateStr +
-            '" title="' +
-            escapeHtml(UI.openDayView) +
-            '">'
-        );
-    }
-
-    function renderMonthCalendar(days: DayAgenda[]): string {
-        // date -> { total, overdue }; a missing date means an empty day.
-        // buildMonthDayIndex is the inlined, unit-tested source of truth.
-        const daysMap = buildMonthDayIndex(days);
-
-        const target = shiftedToday ? parseLocalDate(shiftedToday) : new Date();
-        const year = target.getFullYear();
-        const month = target.getMonth();
-        const firstDayOfMonth = new Date(year, month, 1);
-        const lastDayOfMonth = new Date(year, month + 1, 0);
-
-        const firstOffset = resolveFirstDayOffset();
-        // JS getDay(): 0=Sun..6=Sat. Convert to leading-empty-cells count.
-        const startDay = (firstDayOfMonth.getDay() - firstOffset + CALENDAR_COLS) % CALENDAR_COLS;
-
-        const today = new Date();
-        const todayStr = toIsoDate(today);
-
-        let html = '<div class="calendar">';
-        buildWeekdayLabels(firstOffset).forEach((label) => {
-            html += '<div class="calendar-header">' + escapeHtml(label) + '</div>';
+    /**
+     * The month grid. Layout (buildMonthGrid) and markup (renderMonthCalendar)
+     * are both inlined and unit-tested; this binds the page's live state to
+     * them -- the anchor month, the holiday list and the task counts.
+     */
+    function renderMonth(days: DayAgenda[]): string {
+        const todayIso = toIsoDate(new Date());
+        const firstOffset = resolveFirstDayOffset(firstDayOfWeek, locale);
+        const cells = buildMonthGrid(shiftedToday || todayIso, firstOffset, todayIso);
+        return renderMonthCalendar(cells, buildWeekdayLabels(firstOffset, locale), {
+            locale,
+            uiLang,
+            openDayView: UI.openDayView,
+            taskChipForms: UI.countChip.tasks,
+            overdueChipTemplate: UI.countChip.overdue,
+            // date -> { total, overdue }; a missing date means an empty day.
+            index: buildMonthDayIndex(days),
+            isHoliday,
+            escapeHtml,
+            formatString,
+            formatNumber,
+            pluralIndex,
+            countLabel: countLabelHtml
         });
-
-        const prevMonthLast = new Date(year, month, 0);
-        const prevMonthDays = prevMonthLast.getDate();
-        for (let i = startDay - 1; i >= 0; i--) {
-            const day = prevMonthDays - i;
-            const d = new Date(year, month - 1, day);
-            const dateStr = toIsoDate(d);
-            html +=
-                calendarCellOpenTag('calendar-day other-month', dateStr) +
-                '<div class="day-number">' +
-                escapeHtml(formatNumber(day, locale)) +
-                '</div></button>';
-        }
-
-        for (let day = 1; day <= lastDayOfMonth.getDate(); day++) {
-            const d = new Date(year, month, day);
-            const dateStr = toIsoDate(d);
-            const dayOfWeek = d.getDay();
-            const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-            const isHol = isHoliday(dateStr);
-            const counts = daysMap[dateStr];
-            const isToday = dateStr === todayStr;
-
-            let classes = 'calendar-day';
-            if (isWeekend) {
-                classes += ' weekend';
-            }
-            if (isHol) {
-                classes += ' holiday';
-            }
-            if (counts) {
-                classes += ' has-tasks';
-            }
-            if (isToday) {
-                classes += ' today';
-            }
-
-            // Task load is a count chip, not a binary dot: the number says how
-            // full the day is at a glance, and the chip turns red when any of
-            // that day's work is overdue.
-            const chipTitle = counts
-                ? countLabel(counts.total, UI.countChip.tasks) +
-                  (counts.overdue > 0
-                      ? ', ' + formatString(UI.countChip.overdue, formatNumber(counts.overdue, locale))
-                      : '')
-                : '';
-            const chip = counts
-                ? '<div class="task-count' +
-                  (counts.overdue > 0 ? ' task-count-overdue' : '') +
-                  '"' +
-                  ' title="' +
-                  escapeHtml(chipTitle) +
-                  '">' +
-                  escapeHtml(formatNumber(counts.total, locale)) +
-                  '</div>'
-                : '';
-
-            html +=
-                calendarCellOpenTag(classes, dateStr) +
-                '<div class="day-number">' +
-                escapeHtml(formatNumber(day, locale)) +
-                '</div>' +
-                chip +
-                '</button>';
-        }
-
-        // Pad trailing cells up to the next full week boundary -- gives 4/5/6 rows naturally.
-        const used = startDay + lastDayOfMonth.getDate();
-        const trailingCells = (CALENDAR_COLS - (used % CALENDAR_COLS)) % CALENDAR_COLS;
-        for (let i = 1; i <= trailingCells; i++) {
-            const d = new Date(year, month + 1, i);
-            const dateStr = toIsoDate(d);
-            html +=
-                calendarCellOpenTag('calendar-day other-month', dateStr) +
-                '<div class="day-number">' +
-                escapeHtml(formatNumber(i, locale)) +
-                '</div></button>';
-        }
-
-        html += '</div>';
-        return html;
     }
 
     function navigate(offset: number): void {

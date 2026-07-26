@@ -316,12 +316,19 @@
       `renderSectionPanel` and the day-header markup moved to
       `src/utils/agendaSummaryHtml.ts` with 15 unit tests. What stays in the
       client are one-line wrappers that bind the live state to them.
-    - Remaining, in descending size: `renderNavBar` (135 lines),
-      `renderMonthCalendar` (105), `renderTask` (58), `renderDayCard` (56),
-      `renderTagMenu` (37), `renderTasks` (34), `renderModeSwitch`,
-      `renderHeaderModeButton`, `calendarCellOpenTag`, `tagLabel`,
-      `tagButtonText`. `handleHostMessage` (153) is dispatch, not markup, and is
-      better left where it is.
+    - Step 2 done: the whole header -- mode segment, view history, date
+      navigation, header-layout button, tag dropdown and hero title -- moved to
+      `src/utils/agendaNavHtml.ts` with 25 jsdom unit tests. `renderNavBar` is
+      down to DOM writes and listener wiring.
+    - Step 3 done: the month calendar split in two -- `buildMonthGrid` (which
+      dates the grid shows) in `src/utils/agendaMonthCells.ts` and the markup in
+      `src/utils/agendaCalendarHtml.ts`, together with the two locale decisions
+      behind it (`resolveFirstDayOffset`, `buildWeekdayLabels`). 23 unit tests;
+      the client keeps a five-line binding.
+    - Remaining, in descending size: `renderTask` (58 lines), `renderDayCard`
+      (56), `renderTasks` (34), `formatDayHeader`, `formatDateForTitle`.
+      `handleHostMessage` (153) is dispatch, not markup, and is better left
+      where it is.
 
 - [x] Turn on the remaining strict TypeScript option: `noUncheckedIndexedAccess`
     - On in both projects as of 2026-07-26, which completes the strict set:
