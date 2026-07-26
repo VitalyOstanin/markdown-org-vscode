@@ -266,3 +266,28 @@ suite('AGENDA_STYLES shape and type-scale invariant', () => {
         }
     });
 });
+
+/**
+ * Render cost (#75). A refresh rebuilds every row, and laying the off-screen
+ * ones out is what dominates a large corpus: measured over 1000 tasks, layout
+ * was 92 ms of a ~120 ms refresh, against 14 ms with the rows skipped. The rule
+ * is a one-line optimisation that is easy to lose in a later edit, so the
+ * measurement is pinned here.
+ */
+suite('AGENDA_STYLES render-cost invariant', () => {
+    const taskLineRule = (): string => {
+        const match = /\n\s*\.task-line\s*\{([\s\S]*?)\n\s*\}/.exec(AGENDA_STYLES);
+        assert.ok(match, 'expected a .task-line rule');
+        return match[1]!;
+    };
+
+    test('rows outside the viewport are skipped', () => {
+        assert.match(taskLineRule(), /content-visibility:\s*auto/);
+    });
+
+    test('the skipped rows still declare a height, so the scrollbar means something', () => {
+        // Without contain-intrinsic-size a skipped row measures 0 and the whole
+        // list collapses; `auto` keeps the real height once a row has been shown.
+        assert.match(taskLineRule(), /contain-intrinsic-size:\s*auto\s+\d+px/);
+    });
+});

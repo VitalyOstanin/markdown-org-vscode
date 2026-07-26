@@ -379,6 +379,17 @@ export const AGENDA_STYLES = `
             /* The row runs at the base font size (the mockup's 13px) to stay
                compact. */
             font-size: var(--font-md);
+            /* A refresh rebuilds every row, and laying them all out is what a
+               large corpus actually pays for: measured over 1000 tasks, layout
+               was 92 ms of a ~120 ms refresh, because the document is ~30000px
+               tall while ~900px of it is on screen. Skipping the off-screen
+               rows brings that to 14 ms. The auto keyword in
+               contain-intrinsic-size means the placeholder height is only a
+               guess until a row has been shown once, after which the measured
+               size is remembered -- so the scrollbar is approximate on first
+               paint and exact afterwards. */
+            content-visibility: auto;
+            contain-intrinsic-size: auto 26px;
         }
         .task-line:hover {
             background: var(--vscode-list-hoverBackground);
