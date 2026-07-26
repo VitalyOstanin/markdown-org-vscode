@@ -205,11 +205,12 @@
     - Implementation sketch: create tags with `git tag -s` (GPG or SSH signing
       key) and add a signature check next to the annotated-tag check in the
       `validate-tag` job of `.github/workflows/release.yml`.
-- [ ] Restore the release body of v0.11.1
+- [x] Restore the release body of v0.11.1
     - It was tagged before its CHANGELOG section existed, so the published
-      release carries the placeholder "See CHANGELOG.md for details." The
-      section was added later and can be pushed with
-      `gh release edit v0.11.1 --notes-file <section>`.
+      release carried the placeholder "See CHANGELOG.md for details." The
+      section was added later and was pushed with
+      `gh release edit v0.11.1 --notes-file <section>`; the body now matches the
+      CHANGELOG section, in the same shape as every other release.
     - The gap itself is closed: `validate-tag` now fails when the CHANGELOG has
       no section for the tagged version.
 - [ ] Generate an SBOM (CycloneDX or SPDX) and attach it to GitHub Releases
@@ -248,11 +249,20 @@
       nowhere in the published README -- and the GIFs are not in the VSIX at
       all -- so a dark-theme reader would get a broken image rather than the
       light fallback.
-    - Render targets: GitHub honours the media query. Open VSX, the VS Code
-      Marketplace page and the in-editor Extensions preview are still
-      unverified -- their markdown renderers sanitise HTML and may ignore it,
-      in which case they show the light fallback. Check each after the next
-      publish and note the outcome here.
+    - Render targets, checked against the published 0.12.0:
+        - GitHub honours the media query.
+        - Open VSX honours it too. Its renderer keeps `<picture>` and `<source>`
+          intact: all 13 assets resolve to the `-dark` variant once the browser
+          reports `prefers-color-scheme: dark`, and to `-light` otherwise.
+        - The in-editor Extensions preview drops `<picture>`: VS Code's markdown
+          sanitiser (1.105.1) has `source` on its tag allowlist but not
+          `picture`, so the element is removed, the `<source>` children are left
+          orphaned next to the `<img>`, and the light fallback is what renders --
+          even though the webview itself reports `prefers-color-scheme: dark`
+          under a dark theme. This is the designed fallback, not a defect; the
+          alternative would be shipping dark-only assets.
+        - The VS Code Marketplace page does not apply: the extension is not
+          published there (see [ADR-0004](docs/adr/0004-open-vsx-distribution.md)).
     - The GitHub-only `#gh-dark-mode-only` / `#gh-light-mode-only` anchor hack
       was deliberately not used: it does not generalise beyond GitHub.
     - The GIFs were dropped from the VSIX (`media/*.gif` in `.vscodeignore`):
