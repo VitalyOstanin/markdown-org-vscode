@@ -114,8 +114,7 @@ suite('Timestamp cursor boundaries (issue #41)', () => {
             label: 'SCHEDULED day boundary preserves +1d',
             line: SCHEDULED_LINE,
             cursor: 23,
-            expectContains: '2026-05-26',
-            expectMissing: undefined
+            expectContains: '2026-05-26'
         },
         { label: 'SCHEDULED day boundary preserves repeater', line: SCHEDULED_LINE, cursor: 23, expectContains: '+1d' },
         // weekday boundary -- offset 26

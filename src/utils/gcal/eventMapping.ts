@@ -94,7 +94,9 @@ export function mapTaskToEvent(task: Task, orgId: string, opts: MapOptions): Gca
     }
 
     return {
-        id: undefined, // assigned by the caller from eventId(orgId)
+        // `id` is left out, not set to undefined: the caller fills it in from
+        // eventId(orgId), and an explicit undefined is a different thing from
+        // an absent key under `exactOptionalPropertyTypes`.
         // Explicit 'confirmed' revives a previously soft-deleted (cancelled)
         // event when the task goes DONE -> TODO again: the deterministic id is
         // still held by the cancelled event, so insert 409s and we patch; the

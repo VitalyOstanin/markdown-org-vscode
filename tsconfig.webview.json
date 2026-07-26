@@ -26,6 +26,9 @@
     "types": [],
     "sourceMap": true,
     "strict": true,
+    // Same as the host project: an optional property is absent or holds a
+    // value, never an explicit undefined.
+    "exactOptionalPropertyTypes": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
     "composite": true,

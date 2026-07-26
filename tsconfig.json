@@ -8,10 +8,14 @@
     "sourceMap": true,
     "rootDir": "src",
     "strict": true,
-    // Free today (zero errors) and keeps an override honest once class
-    // hierarchies grow. exactOptionalPropertyTypes and noUncheckedIndexedAccess
-    // are tracked in TODO.md -- they need code changes.
+    // Free (zero errors) and keeps an override honest once class hierarchies
+    // grow. noUncheckedIndexedAccess is the one strict option still off; it is
+    // tracked in TODO.md and needs code changes.
     "noImplicitOverride": true,
+    // An optional property is either absent or holds a value: `{ x: undefined }`
+    // no longer passes for `{ x?: T }`. Fields that legitimately accept an
+    // explicit undefined say so as `x?: T | undefined`.
+    "exactOptionalPropertyTypes": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
     "types": ["node", "mocha"],

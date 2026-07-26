@@ -129,6 +129,13 @@ because `--fix` will rewrite the imports otherwise:
   imports and self-imports; `no-unresolved` stays off, since `npm run typecheck`
   already resolves every specifier.
 
+One more rule comes from the compiler rather than the linter:
+`exactOptionalPropertyTypes` is on, so `{ x: undefined }` no longer satisfies
+`{ x?: T }`. Declare `x?: T | undefined` when the field really does accept an
+explicit undefined (a slot cleared with `= undefined`, an option passed straight
+through); otherwise leave the key out, which is also what the extractor's JSON
+does for a field it did not emit.
+
 ## Debug
 
 1. Open project in VS Code

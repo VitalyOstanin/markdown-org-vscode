@@ -52,10 +52,10 @@ export type SyncAction = 'created' | 'updated' | 'deleted' | 'deferred' | 'faile
 export interface SyncChange {
     action: SyncAction;
     /** The task's date (`YYYY-MM-DD`) if it has one, else undefined. */
-    date?: string;
+    date?: string | undefined;
     heading: string;
     /** Failure reason (only set for `action: 'failed'`), for the details channel. */
-    error?: string;
+    error?: string | undefined;
 }
 
 export interface SyncSummary {

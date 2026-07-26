@@ -5,7 +5,7 @@ export type FetchFn = typeof fetch;
 
 export interface TokenResponse {
     accessToken: string;
-    refreshToken?: string;
+    refreshToken?: string | undefined;
     expiresAt: number; // epoch ms
 }
 

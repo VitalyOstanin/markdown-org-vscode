@@ -13,7 +13,7 @@ export interface RunHandle {
 export class SingleFlight {
     private running = false;
     private pending = false;
-    private current?: RunHandle;
+    private current?: RunHandle | undefined;
 
     constructor(private readonly policy: ConcurrencyPolicy) {}
 

@@ -4,9 +4,9 @@ export interface HeadingParts {
     /** Leading `#` run that fixes the heading level. */
     hashes: string;
     /** Final TODO/DONE/CANCELLED/CANCELED keyword; omitted from the output when falsy. */
-    status?: TaskStatus;
+    status?: TaskStatus | undefined;
     /** Bare priority value (e.g. `A`, `5`); wrapped as `[#...]`, omitted when falsy. */
-    priority?: string;
+    priority?: string | undefined;
     /** Heading text after the keyword/priority tokens. */
     title: string;
 }

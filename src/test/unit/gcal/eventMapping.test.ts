@@ -15,14 +15,24 @@ const base: Task = {
 
 const opts = { timeZone: 'Europe/Belgrade', defaultEventMinutes: 60, relPath: 'notes.md' };
 
+/**
+ * `base` without one optional field. The extractor emits JSON, which carries no
+ * explicit `undefined`, so a missing field is a missing key -- and that is what
+ * `exactOptionalPropertyTypes` insists the fixture spell out.
+ */
+function without<K extends keyof Task>(task: Task, key: K): Task {
+    const { [key]: _dropped, ...rest } = task;
+    return rest as Task;
+}
+
 suite('gcal/eventMapping', () => {
     test('isSyncable: active SCHEDULED/DEADLINE only', () => {
         assert.ok(isSyncable(base));
         assert.ok(isSyncable({ ...base, timestamp_type: 'DEADLINE' }));
         assert.ok(!isSyncable({ ...base, timestamp_active: false }));
         assert.ok(!isSyncable({ ...base, timestamp_type: 'CREATED' }));
-        assert.ok(!isSyncable({ ...base, timestamp_active: undefined }));
-        assert.ok(!isSyncable({ ...base, timestamp_date: undefined }));
+        assert.ok(!isSyncable(without(base, 'timestamp_active')));
+        assert.ok(!isSyncable(without(base, 'timestamp_date')));
     });
 
     test('all-day event: end.date is exclusive (next day)', () => {

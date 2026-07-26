@@ -308,12 +308,21 @@
       with jsdom unit tests (the established route), or collect V8 coverage from
       the webview process and merge it into the report.
 
-- [ ] Turn on the remaining strict TypeScript options
-    - `noImplicitOverride` is on (it cost nothing). Two are left, both needing
-      code changes: `exactOptionalPropertyTypes` (~40 errors, mostly optional
-      fields passed through as `T | undefined`) and `noUncheckedIndexedAccess`
-      (~216, a large share of them indexed access in tests).
-    - Take them one at a time, starting with `exactOptionalPropertyTypes`.
+- [ ] Turn on the remaining strict TypeScript option: `noUncheckedIndexedAccess`
+    - `noImplicitOverride` was free; `exactOptionalPropertyTypes` is on as of
+      2026-07-26 (both projects). What is left is `noUncheckedIndexedAccess`
+      (~216 errors, a large share of them indexed access in tests).
+    - How `exactOptionalPropertyTypes` was closed, since the same shapes recur:
+      43 errors in the host project, none in the webview one. Roughly half were
+      class fields cleared with `= undefined` (`agendaPanel`, `mutex`), fixed by
+      declaring them `?: T | undefined`. Most of the rest were declarations that
+      always meant "absent or a value" -- `HeadingParts.status`,
+      `OrgTimestampOptions.weekday`, `SyncChange.date`, `CallOptions.signal`,
+      `TokenResponse.refreshToken` -- widened the same way. Three were genuine:
+      a `body: ... : undefined` in a `fetch` init and an `id: undefined`
+      placeholder became conditional spreads / an omitted key, and the fixtures
+      that spelled a missing extractor field as `undefined` now drop the key,
+      which is what the JSON they stand in for actually does.
 
 - [x] Adopt `eslint-plugin-import-x`
     - Added with `eslint-import-resolver-typescript` (without a resolver

@@ -46,7 +46,7 @@ suite('normalizeAgendaTaskTypes', () => {
         const input = [
             task({ task_type: 'TODO' }),
             task({ task_type: 'CANCELLED' }),
-            task({ task_type: 'MAYBE' as unknown as Task['task_type'] })
+            task({ task_type: 'MAYBE' as unknown as NonNullable<Task['task_type']> })
         ];
         const out = normalizeAgendaTaskTypes(input) as Task[];
         assert.strictEqual(out[0].task_type, 'TODO');
@@ -55,7 +55,7 @@ suite('normalizeAgendaTaskTypes', () => {
     });
 
     test('does not mutate the input tasks', () => {
-        const t = task({ task_type: 'MAYBE' as unknown as Task['task_type'] });
+        const t = task({ task_type: 'MAYBE' as unknown as NonNullable<Task['task_type']> });
         normalizeAgendaTaskTypes([t]);
         assert.strictEqual(t.task_type, 'MAYBE');
     });
@@ -63,7 +63,7 @@ suite('normalizeAgendaTaskTypes', () => {
     test('normalizes nested DayAgenda[] buckets', () => {
         const day: DayAgenda = {
             date: '2026-05-29',
-            overdue: [task({ task_type: 'WAITING' as unknown as Task['task_type'] })],
+            overdue: [task({ task_type: 'WAITING' as unknown as NonNullable<Task['task_type']> })],
             scheduled_timed: [task({ task_type: 'CANCELLED' })],
             scheduled_no_time: [],
             upcoming: [task({ task_type: 'DONE' })]

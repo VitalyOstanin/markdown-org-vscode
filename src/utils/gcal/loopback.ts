@@ -25,7 +25,7 @@ const SUCCESS_HTML =
 
 /** Start a loopback HTTP server on 127.0.0.1:<random>, callback path /callback. */
 export async function startLoopbackServer(): Promise<LoopbackServer> {
-    let pending: { code?: string; state?: string; error?: string } | undefined;
+    let pending: { code?: string | undefined; state?: string | undefined; error?: string | undefined } | undefined;
     let onPending: (() => void) | undefined;
 
     const server = http.createServer((req, res) => {

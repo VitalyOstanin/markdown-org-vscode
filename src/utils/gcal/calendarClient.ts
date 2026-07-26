@@ -68,7 +68,7 @@ export function computeRetryDelayMs(
 
 /** Cooperative cancellation flag, the same shape the sync engine passes around. */
 export interface CallOptions {
-    signal?: { aborted: boolean };
+    signal?: { aborted: boolean } | undefined;
 }
 
 const defaultSleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
@@ -120,7 +120,10 @@ async function call(
                 Authorization: `Bearer ${token}`,
                 ...(body !== undefined ? { 'Content-Type': 'application/json' } : {})
             },
-            body: body !== undefined ? JSON.stringify(body) : undefined
+            // Spread rather than `body: ... : undefined`: `RequestInit.body` is
+            // optional, and an explicit `undefined` is not the same as an
+            // absent key once `exactOptionalPropertyTypes` is on.
+            ...(body !== undefined ? { body: JSON.stringify(body) } : {})
         });
         const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
         const retryAfter = res.headers.get('retry-after');
@@ -199,7 +202,7 @@ export async function listWritableCalendars(
 export async function ensureCalendar(
     fetchFn: FetchFn,
     getToken: AccessTokenProvider,
-    opts: { name: string; pinnedId?: string }
+    opts: { name: string; pinnedId?: string | undefined }
 ): Promise<string> {
     if (opts.pinnedId) {
         const { status, json } = await call(

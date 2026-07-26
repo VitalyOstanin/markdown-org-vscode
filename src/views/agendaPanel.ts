@@ -114,15 +114,15 @@ export interface AgendaRenderRequest {
 }
 
 export class AgendaPanel {
-    private static currentPanel?: vscode.WebviewPanel;
-    private static watcher?: vscode.FileSystemWatcher;
-    private static debounceTimer?: NodeJS.Timeout;
-    private static refreshCallback?: (shiftedToday?: string, userInitiated?: boolean) => Promise<void>;
+    private static currentPanel?: vscode.WebviewPanel | undefined;
+    private static watcher?: vscode.FileSystemWatcher | undefined;
+    private static debounceTimer?: NodeJS.Timeout | undefined;
+    private static refreshCallback?: ((shiftedToday?: string, userInitiated?: boolean) => Promise<void>) | undefined;
     // The "anchor" date the panel is currently built around: today + any
     // Prev/Next offset the user has applied. Equals today on first open and
     // after the Today button; offset elsewhere. Drives the extractor query,
     // the navbar label, and which date the navigation buttons step from.
-    private static shiftedToday?: string;
+    private static shiftedToday?: string | undefined;
     // Browser-style navigation history of {mode, date} view states. record()
     // is called on every render; goBack/goForward replay a past state. Cleared
     // on dispose so a reopened panel starts fresh.
@@ -138,30 +138,30 @@ export class AgendaPanel {
     // then recorded, and recording drops the forward tail -- Forward silently
     // stopped working.
     private static historyReplayDepth = 0;
-    private static dayCheckTimer?: NodeJS.Timeout;
+    private static dayCheckTimer?: NodeJS.Timeout | undefined;
     // Watches the settings that are baked into the webview HTML (as opposed to
     // those delivered by an update message). Lives as long as the panel.
-    private static configListener?: vscode.Disposable;
+    private static configListener?: vscode.Disposable | undefined;
     // Tracks the ServiceWorker readiness handshake from the webview. The
     // webview sends `{command: 'ready'}` once acquireVsCodeApi() succeeds; if
     // it never arrives within WEBVIEW_READY_TIMEOUT_MS, we assume the host
     // failed to register its ServiceWorker and retry by recreating the panel.
-    private static readyTimeout?: NodeJS.Timeout;
+    private static readyTimeout?: NodeJS.Timeout | undefined;
     private static panelReady = false;
     private static createRetries = 0;
     private static internalRetryInProgress = false;
-    private static lastCreateArgs?: AgendaRenderArgs;
+    private static lastCreateArgs?: AgendaRenderArgs | undefined;
     // What the panel currently shows. Unlike `lastCreateArgs` -- which is a
     // snapshot for the ServiceWorker-race retry and is dropped as soon as the
     // webview reports ready -- this one lives as long as the panel and tracks
     // every update, so the shell can be rebuilt and repopulated at any time.
-    private static lastRenderArgs?: AgendaRenderArgs;
+    private static lastRenderArgs?: AgendaRenderArgs | undefined;
     // A header mode the page did not receive (postMessage resolved false),
     // re-sent once the page reports ready again.
-    private static pendingHeaderMode?: AgendaHeaderMode;
+    private static pendingHeaderMode?: AgendaHeaderMode | undefined;
     // Last `dateLocale` value that was rejected, so the warning about it is
     // shown once rather than on every refresh.
-    private static warnedLocale?: string;
+    private static warnedLocale?: string | undefined;
     // Whether a render failure inside the webview has already been reported for
     // the open panel. A broken payload fails on every refresh, and the
     // file-watcher refreshes on each save, so the report is once per panel.
@@ -171,7 +171,7 @@ export class AgendaPanel {
     // runs in milliseconds instead of seconds; `_testSuppressReadies` counts
     // the next N `ready` messages that handleReady should silently drop, so
     // the timeout actually fires. Production code keeps the constants intact.
-    private static _testReadyTimeoutMs?: number;
+    private static _testReadyTimeoutMs?: number | undefined;
     private static _testSuppressReadies = 0;
     // Public read-only counter test code asserts against to verify whether
     // the retry path fired (each createNewPanel call bumps it by one).

@@ -6,7 +6,7 @@ import type { FetchFn } from '../../../utils/gcal/oauth';
 interface Call {
     url: string;
     method: string;
-    body?: Record<string, unknown>;
+    body?: Record<string, unknown> | undefined;
 }
 
 function recorder(responder: (c: Call) => { status: number; body: unknown }): { fn: FetchFn; calls: Call[] } {

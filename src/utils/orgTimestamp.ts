@@ -4,11 +4,11 @@ export interface OrgTimestampOptions {
     /** `angle` emits `<...>` (active), `square` emits `[...]` (inactive). */
     bracket: 'angle' | 'square';
     /** Pre-formatted weekday token; omitted from the output when falsy. */
-    weekday?: string;
+    weekday?: string | undefined;
     /** Append ` HH:MM` (default `true`); set `false` for date-only timestamps. */
     includeTime?: boolean;
     /** Org repeater (e.g. `+1d`); appended after the time when non-empty. */
-    repeater?: string;
+    repeater?: string | undefined;
 }
 
 /**
