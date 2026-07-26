@@ -10,7 +10,9 @@
 
 ## Status
 
-Accepted.
+Superseded by [ADR-0015](0015-pin-today-with-current-date.md). The
+editor-side decisions below still hold; the contract with the extractor
+does not -- `--date` is the window anchor, not `current_date_override`.
 
 ## Context
 

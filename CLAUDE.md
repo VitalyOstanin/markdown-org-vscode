@@ -1,5 +1,14 @@
 # Markdown Org -- правила проекта
 
+## Table of Contents
+
+- [Покрытие изменений тестами](#покрытие-изменений-тестами)
+- [Документация фич в README](#документация-фич-в-readme)
+- [Demo-медиа для UX-фич](#demo-медиа-для-ux-фич)
+- [Extractor и навигация по задачам](#extractor-и-навигация-по-задачам)
+- [Безопасность webview: CSP + escapeHtml](#безопасность-webview-csp--escapehtml)
+- [Сериализация JSON: safe-stable-stringify](#сериализация-json-safe-stable-stringify)
+
 ## Покрытие изменений тестами
 
 Любое изменение поведения кода ОБЯЗАТЕЛЬНО должно быть покрыто тестами
@@ -69,7 +78,20 @@ README отражает текущее состояние, CHANGELOG -- исто
 - Демонстрации живут в `src/test/demo/*.demo.test.ts`; видео пишется
   через `scripts/record-demo.js` (xvfb + ffmpeg), скриншоты -- через
   `scripts/screenshot-demo.js`. Артефакты складываются в `media/`
-  (`demo-*.gif`, `demo-*.mp4`, `*.png`).
+  (`demo-*-<тема>.gif`, `demo-*-<тема>.mp4`, `*-<тема>.png`).
+- Оба скрипта снимают ОБЕ темы, если тема не названа аргументом:
+  `record-demo.js all` пишет каждый сценарий в dark и light,
+  `screenshot-demo.js` снимает оба набора PNG. Одну тему -- вторым
+  аргументом (`screenshot-demo.js light`, `record-demo.js agenda dark`).
+  Тема уезжает в тест через `MARKDOWN_ORG_DEMO_THEME` (dark = Monokai,
+  light = Solarized Light, обе встроены в VS Code) и задаёт суффикс имени.
+- Оба скрипта обязаны держать окно VS Code на Xvfb, а не на реальном экране:
+  на Wayland-сессии Electron сам выбирает Wayland-бэкенд и открывает живое
+  окно, пока Xvfb пишет пустой рабочий стол. Решающий рычаг --
+  `launchArgs: ['--ozone-platform=x11']` в `.vscode-test.demo.mjs`; в
+  окружении дочернего процесса дополнительно снимается `WAYLAND_DISPLAY` и
+  задаются `XDG_SESSION_TYPE=x11`, `GDK_BACKEND=x11`,
+  `ELECTRON_OZONE_PLATFORM_HINT=x11` (функция `x11ChildEnv` в обоих скриптах).
 - Если фича расширяет уже показанный сценарий (например, новый статус
   задачи в дополнение к TODO/DONE) -- дополнить СУЩЕСТВУЮЩИЙ demo-тест и
   перезаписать его медиа, а не заводить новый файл.

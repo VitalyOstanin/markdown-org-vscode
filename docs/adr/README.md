@@ -26,19 +26,23 @@ was decided, and the trade-offs that came with it.
 
 ## Index
 
-| #    | Title                                                                                                      | Status   |
-| ---- | ---------------------------------------------------------------------------------------------------------- | -------- |
-| 0001 | [External Rust extractor for markdown scanning](0001-external-rust-extractor.md)                           | Accepted |
-| 0002 | [Webview-based agenda UI](0002-webview-agenda.md)                                                          | Accepted |
-| 0003 | [Org-mode wire format for timestamps and CLOCK](0003-org-mode-wire-format.md)                              | Accepted |
-| 0004 | [Distribute via Open VSX and GitHub Releases, not Microsoft Marketplace](0004-open-vsx-distribution.md)    | Accepted |
-| 0005 | [Active and inactive timestamps (editor side)](0005-active-and-inactive-timestamps.md)                     | Accepted |
-| 0006 | [Bracket-toggle keybindings and scope](0006-bracket-toggle-keybindings.md)                                 | Accepted |
-| 0007 | [Local wall-clock dates; timezone awareness lives in the extractor](0007-local-time-and-timezones.md)      | Accepted |
-| 0008 | [No community meta-docs until a community exists](0008-no-community-meta-docs.md)                          | Accepted |
-| 0009 | [On-disk task properties via an org-properties fenced block](0009-task-properties-org-properties-block.md) | Accepted |
-| 0010 | [Google Calendar sync (push MVP)](0010-google-calendar-sync.md)                                            | Accepted |
-| 0011 | [Google Calendar sync: GOA token provider (Linux)](0011-google-calendar-sync-goa-provider.md)              | Accepted |
+| #    | Title                                                                                                      | Status                                                    |
+| ---- | ---------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| 0001 | [External Rust extractor for markdown scanning](0001-external-rust-extractor.md)                           | Accepted                                                  |
+| 0002 | [Webview-based agenda UI](0002-webview-agenda.md)                                                          | Accepted                                                  |
+| 0003 | [Org-mode wire format for timestamps and CLOCK](0003-org-mode-wire-format.md)                              | Accepted                                                  |
+| 0004 | [Distribute via Open VSX and GitHub Releases, not Microsoft Marketplace](0004-open-vsx-distribution.md)    | Accepted                                                  |
+| 0005 | [Active and inactive timestamps (editor side)](0005-active-and-inactive-timestamps.md)                     | Accepted                                                  |
+| 0006 | [Bracket-toggle keybindings and scope](0006-bracket-toggle-keybindings.md)                                 | Accepted                                                  |
+| 0007 | [Local wall-clock dates; timezone awareness lives in the extractor](0007-local-time-and-timezones.md)      | Superseded by [0015](0015-pin-today-with-current-date.md) |
+| 0008 | [No community meta-docs until a community exists](0008-no-community-meta-docs.md)                          | Accepted                                                  |
+| 0009 | [On-disk task properties via an org-properties fenced block](0009-task-properties-org-properties-block.md) | Accepted                                                  |
+| 0010 | [Google Calendar sync (push MVP)](0010-google-calendar-sync.md)                                            | Accepted                                                  |
+| 0011 | [Google Calendar sync: GOA token provider (Linux)](0011-google-calendar-sync-goa-provider.md)              | Accepted                                                  |
+| 0012 | [Webview client as a typed project](0012-webview-client-as-a-typed-project.md)                             | Accepted                                                  |
+| 0013 | [Agenda UI language: own setting and dictionary](0013-agenda-ui-language-own-dictionary.md)                | Accepted                                                  |
+| 0014 | [One agenda style, no style switcher](0014-single-agenda-style.md)                                         | Accepted                                                  |
+| 0015 | [Pin "today" with `--current-date`, not `--date`](0015-pin-today-with-current-date.md)                     | Accepted                                                  |
 
 ## Adding a new ADR
 

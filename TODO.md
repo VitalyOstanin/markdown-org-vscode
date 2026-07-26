@@ -1,5 +1,13 @@
 # TODO
 
+## Table of Contents
+
+- [Design](#design)
+- [Configuration](#configuration)
+- [Publishing](#publishing)
+- [Documentation](#documentation)
+- [Testing](#testing)
+
 ## Design
 
 - [x] Redesign the visual language of the agenda/webview UI
@@ -13,15 +21,69 @@
       HEX). A separate light/dark "force" setting was intentionally dropped:
       the tokens already follow the active editor theme, so a webview-only
       override would fight the theme rather than help.
-    - `markdown-org.agendaFontFamily` overrides the proportional font for the
-      native/hybrid styles.
-    - Follow-ups (deferred): capture README screenshots of the three styles;
+    - `markdown-org.agendaFontFamily` overrides the proportional agenda font.
+      (The agenda was later collapsed to the single `table` style -- see below.)
+    - Follow-ups (deferred): capture a README screenshot of the table style;
       consider codicon-based status/priority icons.
 
-- [ ] Verify agenda localization across languages
-    - Check weekday/month names, date formats, and any user-facing strings
-      render correctly for several locales (RTL not required), not just the
-      current one.
+- [x] Collapse to `table` as the single agenda style
+    - Done: dropped `monospace` / `native` / `hybrid`. Removed the other presets
+      from `agendaStyles.ts`, the `markdown-org.agendaStyle` enum from
+      `package.json`, the style picker (`renderStyleMenu`) and the
+      `Cycle Agenda Style` command, and hardcoded `body[data-agenda-style="table"]`.
+      `markdown-org.agendaFontFamily` is kept (table honours it).
+    - Also removed the now-orphaned `markdown-org.agendaMonospaceFontFamily` and
+      `markdown-org.agendaTableAllMono`: after the collapse the mono font var had
+      a single, partly-broken consumer (the table's numeric columns use the
+      proportional font with `tabular-nums`, not the mono font).
+
+- [x] Bring the Tasks and Month views into the card visual language
+    - Tasks: the flat priority list became a card -- a sticky summary bar
+      (`N tasks / K priority A / M done`) plus one section panel per priority
+      group (A, B, C, then the unprioritised backlog), each with a count chip
+      tinted like its priority. It reuses the Day card's chrome
+      (`renderSummaryBar` / `renderSectionPanel`); the grouping and counts are
+      pure and unit-tested in `agendaTaskGroups.ts`. The empty-time em-dash
+      placeholder is suppressed in this card, where most rows have no clock.
+    - Month: rounded cells on a hairline border with a transparent surface,
+      uppercase weekday captions, muted day numbers that lift for days holding
+      work, and an inset accent ring for today (instead of a heavier border
+      that shifted the grid). The binary "has tasks" dot became a count chip
+      showing how many tasks the day holds, turning red when any are overdue;
+      the counts come from `agendaMonthCells.ts` (unit-tested).
+
+- [x] Compact mode for the agenda header (`.agenda-header`)
+    - Shipped as `markdown-org.agendaHeaderMode` (`auto` | `full` | `compact`),
+      which answers the open question with "both": `auto` follows the panel
+      height, the other two pin the layout.
+    - The compact layout turns `.agenda-header` into a flex row, so the hero
+      date shares a line with the controls, drops it to `--font-lg`/`--font-xs`
+      and tightens the padding. No control is hidden -- otherwise `auto` would
+      remove one by resizing. (An earlier attempt used `order: -1` on a child of
+      a block parent, which does nothing; the header only looked compact.)
+    - The decision lives in `src/utils/agendaHeaderMode.ts` and is inlined into
+      the page, which toggles a single `compact-header` class on `<body>`; the
+      header's ResizeObserver then re-measures `--agenda-header-h`, so the
+      sticky day-headers keep their offset. Changing the setting reflows an open
+      panel through a `headerMode` message (no shell rebuild, no re-render).
+    - Note for future inlined helpers: only the function's own source travels,
+      so its body may not reference module-level names -- an exported const used
+      as a default parameter arrives as a read off the module object and the
+      page fails to load. Guarded by a check in the agenda integration suite.
+
+- [x] Verify agenda localization across languages
+    - Covered by `src/test/unit/agendaLocales.test.ts`, which walks eleven
+      locales (Latin, Cyrillic, CJK, RTL, and a region whose digits are not
+      ASCII) and asserts the shape rather than the wording, since the wording
+      comes from the running Node build's ICU data: every day-header part is
+      filled in, the weekday actually varies by locale, offset dates stay on
+      one line, and a malformed tag degrades instead of throwing.
+    - The interface language is checked on its own axis: every counted noun
+      resolves for counts 0-120 in both shipped languages, so none can render
+      as "5 undefined".
+    - Not covered, deliberately: RTL layout. The stylesheet uses physical
+      properties, so an RTL interface language would need a separate pass; the
+      shipped languages are both LTR.
 
 - [x] Sticky day/date header at the top of the agenda
     - Shipped: each `.day-header` is `position: sticky` and pins just below the
@@ -102,6 +164,18 @@
       if the native `title` proves insufficient.
     - Design-language principle recorded alongside the other agenda visual
       principles (design log, principle 7).
+- [ ] Agenda rendering at scale
+    - Measure the render cost of the Tasks and Month views on a large corpus
+      (1k+ tasks) before choosing a fix; the pre-release review of 2026-07-25
+      flagged the unbounded render but did not measure it.
+    - Today every row is rebuilt on every refresh: `--tasks` is fetched without
+      a limit, the whole payload crosses in one message, and `#content` is
+      replaced wholesale (one save of a watched file = one full rebuild).
+    - Options once measured: a per-section row cap with a "show more" control
+      (sections already exist -- `renderSectionPanel`), windowing the visible
+      range, or skipping the rebuild when the rendered markup is unchanged.
+      The first two change what the user sees, so they need their own design
+      pass rather than being slipped into a release.
 
 ## Configuration
 
@@ -123,6 +197,21 @@
     - Added `"publisher": "vitalyostanin"` (reused as the Open VSX namespace).
 - [x] Pick a distribution channel
     - Open VSX (`vitalyostanin.markdown-org-vscode`) + GitHub Releases (per-target VSIX). Microsoft Marketplace is out of scope -- see [ADR-0004](docs/adr/0004-open-vsx-distribution.md).
+- [ ] Sign release tags
+    - All release tags are annotated (CI rejects lightweight ones) but unsigned:
+      `git tag -v v0.11.1` reports "no signature found".
+    - For an extension shipped as a VSIX with a bundled executable inside, a
+      signed tag is extra provenance for the artifact.
+    - Implementation sketch: create tags with `git tag -s` (GPG or SSH signing
+      key) and add a signature check next to the annotated-tag check in the
+      `validate-tag` job of `.github/workflows/release.yml`.
+- [ ] Restore the release body of v0.11.1
+    - It was tagged before its CHANGELOG section existed, so the published
+      release carries the placeholder "See CHANGELOG.md for details." The
+      section was added later and can be pushed with
+      `gh release edit v0.11.1 --notes-file <section>`.
+    - The gap itself is closed: `validate-tag` now fails when the CHANGELOG has
+      no section for the tagged version.
 - [ ] Generate an SBOM (CycloneDX or SPDX) and attach it to GitHub Releases
     - Currently low-value: the VSIX bundles minimal production deps and the user base is individual.
     - Becomes worth doing once production-deps surface grows or corporate adoption picks up (CRA/EO 14028 readiness, Dependency-Track / Trivy ingestion).
@@ -137,26 +226,46 @@
     - Documented all commands with hotkeys in tables
     - Added detailed Settings section with examples
     - Documented markdown-org-extract dependency and installation
-- [ ] Refresh README screenshots and demo video after all UI changes
-    - Recapture the agenda screenshots and the demo video/GIF once the visual
-      changes land (table style, nav-bar rework, style-picker, tooltips), so the
-      README reflects the current UI, not the old one.
-    - Capture each in BOTH light and dark editor themes.
-    - Auto-switch light/dark asset to the viewer's active theme, on every render
-      target where it is supported (not just GitHub): GitHub, Open VSX, the VS
-      Code Marketplace page, and the in-editor Extensions README preview.
-    - Mechanism: the `<picture>` + `prefers-color-scheme` pattern --
-      `<picture><source media="(prefers-color-scheme: dark)" srcset="agenda-dark.png"><img src="agenda-light.png" alt="..."></picture>`.
-      GitHub honours this (general knowledge). Support on Open VSX / VS Code
-      Marketplace / the in-editor preview is unverified -- their markdown
-      renderers sanitise HTML and may ignore the media query; verify each and
-      note which fall back.
-    - Fallback for renderers that ignore the media query: the `<img>` default
-      must read acceptably in both themes -- either a theme-neutral capture or a
-      single side-by-side light|dark composite. Avoid a pure-dark default that
-      looks broken on a light page.
-    - The older GitHub-only `#gh-dark-mode-only` / `#gh-light-mode-only` anchor
-      hack is GitHub-specific and does not generalise; prefer `<picture>`.
+- [x] Refresh README screenshots and demo video after all UI changes
+    - Every screenshot and every demo recording was recaptured against the
+      current interface, in BOTH themes: Monokai for dark, Solarized Light for
+      light (both built into VS Code, so no extension has to be installed).
+      Files carry a `-dark` / `-light` suffix.
+    - Both drivers take the theme as an argument and record both by default:
+      `node scripts/screenshot-demo.js [dark|light]` and
+      `node scripts/record-demo.js <scenario>|all [dark|light]`. The theme
+      reaches the test as `MARKDOWN_ORG_DEMO_THEME`, which also picks the file
+      suffix, so a single run cannot mix the two sets.
+    - README embeds each asset through `<picture>` + `prefers-color-scheme`,
+      with the light variant as the `<img>` fallback -- readable on a light page
+      and acceptable on a dark one, unlike a pure-dark default.
+    - The `<source srcset>` URLs are absolute
+      (`https://github.com/VitalyOstanin/markdown-org-vscode/raw/HEAD/media/...`)
+      while `<img src>` stays relative. Reason: when packaging, `@vscode/vsce`
+      rewrites relative paths to absolute GitHub URLs only for markdown images
+      and for `<img>` / `<video>` `src` (its regex in `out/package.js`); a
+      `<source srcset>` is left as written. A relative one would then point
+      nowhere in the published README -- and the GIFs are not in the VSIX at
+      all -- so a dark-theme reader would get a broken image rather than the
+      light fallback.
+    - Render targets: GitHub honours the media query. Open VSX, the VS Code
+      Marketplace page and the in-editor Extensions preview are still
+      unverified -- their markdown renderers sanitise HTML and may ignore it,
+      in which case they show the light fallback. Check each after the next
+      publish and note the outcome here.
+    - The GitHub-only `#gh-dark-mode-only` / `#gh-light-mode-only` anchor hack
+      was deliberately not used: it does not generalise beyond GitHub.
+    - The GIFs were dropped from the VSIX (`media/*.gif` in `.vscodeignore`):
+      two themes come to ~20 MB and would ship once per platform package to
+      save a fetch in the in-editor preview alone. Package size went 21.89 MB
+      -> 2.77 MB. The screenshots (712 KB) still ship, but the README preview
+      does not use those copies: vsce rewrites their `<img src>` to a GitHub
+      URL, so every embed is fetched over the network regardless.
+    - Recording had to be pinned to X11 (`--ozone-platform=x11` in
+      `.vscode-test.demo.mjs`, plus scrubbing the Wayland variables out of the
+      child environment). Without it Electron picks the Wayland backend on a
+      Wayland session: the demo window opens on the real screen and Xvfb
+      records an empty desktop.
 - [x] Add Open VSX version badge to README
     - Shipped in 0.6.0 alongside the auto-publish workflow ([ADR-0004](docs/adr/0004-open-vsx-distribution.md)).
 - [x] Create CHANGELOG.md
@@ -176,3 +285,78 @@
     - Test timestamp commands (insertCreated, insertScheduled, insertDeadline)
     - Test timestamp navigation (timestampUp, timestampDown)
     - Test command execution in real VS Code environment
+- [ ] Measure coverage of the code that runs inside the agenda page
+    - `src/webview/agendaClient.ts` is type-checked and linted like the rest of
+      the source (ADR-0012), but no coverage number covers it: c8 measures the
+      extension host, and the client runs in the webview, which neither runner
+      instruments. It is excluded from the unit profile so it does not sit in
+      the denominator as a permanent zero.
+    - What holds it today: the helpers it is handed are unit-tested modules, and
+      its observable output is asserted through `queryRenderedInfoForTesting` in
+      the integration suite.
+    - Options to explore: keep extracting page logic into `src/utils/` modules
+      with jsdom unit tests (the established route), or collect V8 coverage from
+      the webview process and merge it into the report.
+
+- [ ] Turn on the remaining strict TypeScript options
+    - `noImplicitOverride` is on (it cost nothing). Two are left, both needing
+      code changes: `exactOptionalPropertyTypes` (~40 errors, mostly optional
+      fields passed through as `T | undefined`) and `noUncheckedIndexedAccess`
+      (~216, a large share of them indexed access in tests).
+    - Take them one at a time, starting with `exactOptionalPropertyTypes`.
+
+- [ ] Consider `eslint-plugin-import-x`
+    - Import cycles, import order and duplicate imports are unchecked. The
+      project has a specific reason to care: the modules inlined into the
+      webview via `.toString()` must stay import-free, and today that rule
+      lives only in comments at the top of each of them.
+    - Deferred because it adds a dev dependency and a rule set to tune; module
+      resolution itself is already checked by `npm run typecheck`.
+
+- [ ] Move `src/` onto the `node:` import prefix
+    - Built-in modules are imported both ways today: ~126 bare specifiers
+      (`from 'fs'`, `'path'`, `'crypto'`, `'assert'`) against ~64 prefixed ones.
+      The split follows the age of the code -- the `gcal` subsystem, the demo
+      helpers and the newer tests already use `node:`; `scripts/*.js` is fully
+      on it. The prefix rules out a `node_modules` package shadowing a built-in
+      and resolves without the package lookup.
+    - Deliberately not done before the release: the change touches most files
+      and would drown the release diff in noise.
+    - Afterwards: one sweep over `src/`, then pin it with a lint rule
+      (`n/prefer-node-protocol` from
+      [eslint-plugin-n](https://github.com/eslint-community/eslint-plugin-n) or
+      `unicorn/prefer-node-protocol` from
+      [eslint-plugin-unicorn](https://github.com/sindresorhus/eslint-plugin-unicorn)).
+      Fold in `import * as fs from 'fs'` + `fs.promises.*` (`moveHeading.ts`)
+      into a direct `import { readFile } from 'node:fs/promises'`, as
+      `utils/gcal/lock.ts` already does.
+
+- [ ] TypeScript 6 -> 7
+    - Deferred deliberately: the urgent part of the upgrade is already done --
+      `moduleResolution: node10`, which TypeScript 7 removes, was replaced by
+      `node16` in both projects and `ignoreDeprecations` is gone, so the build
+      no longer sits on a deprecation.
+    - What remains is a compiler major (the native port) right before a
+      release. Do it in its own change: bump `typescript`, re-run
+      `npm run typecheck`, both test suites and a VSIX build, and check
+      typescript-eslint's supported-version range at the same time.
+
+- [x] Ship third-party notices for the bundled extractor
+    - The VSIX distributes `markdown-org-extract` as a statically linked
+      binary; 81 crates are linked into it. All of them are permissive (no
+      copyleft anywhere in the tree), but several carry an attribution clause
+      that binary redistribution does not waive: BSD-2-Clause (comrak),
+      BSD-3-Clause/WHATWG (encoding_rs, an `AND` component, so it stands
+      regardless of the `MIT OR Apache-2.0` choice), the Unicode licences, and
+      plain MIT.
+    - Done in `markdown-org-extract` 0.11.1: it generates
+      `THIRD-PARTY-LICENSES.txt` from its own dependency graph, ships it in
+      every release archive, and gates the licence set with `cargo deny check
+licenses` (its ADR-0024). Generation lives there rather than here
+      because only that repository knows what is linked into the binary.
+    - Here: `scripts/download-extractor.sh` unpacks it next to the binary as
+      `bin/THIRD-PARTY-LICENSES.markdown-org-extract.txt` — beside
+      `bin/LICENSE.markdown-org-extract`, since both describe the bundled
+      binary and neither is authored in this repository — and the VSIX smoke
+      test requires the path. No copy is kept in-tree: it would go stale the
+      moment `x-markdown-org.extractorVersion` moves.

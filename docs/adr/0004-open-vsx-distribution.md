@@ -53,4 +53,4 @@ Harder:
 - Open VSX namespace: [open-vsx.org/namespace/vitalyostanin](https://open-vsx.org/namespace/vitalyostanin)
 - Open VSX namespace ownership grant: [EclipseFdn/open-vsx.org#10493](https://github.com/EclipseFdn/open-vsx.org/issues/10493)
 - Open VSX publisher CLI: [ovsx](https://github.com/eclipse/openvsx/tree/master/cli)
-- README install paths: [README.md > Installation](../../README.md#installation)
+- README install paths: [README.md > Quick Start](../../README.md#quick-start)

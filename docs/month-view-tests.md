@@ -75,8 +75,8 @@
 # Все тесты
 npm test
 
-# Только unit тесты
-npm run compile && node ./out/test/suite/index.js
+# Только unit тесты (то же, что npm test)
+npm run compile && npx mocha --config .mocharc.unit.json
 
 # Интеграционные тесты
 npm run test:integration

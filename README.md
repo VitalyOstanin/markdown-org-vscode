@@ -10,7 +10,10 @@ CLOCK time tracking, and **one-way [Google Calendar sync](#google-calendar-sync)
 of scheduled tasks. Everything lives in plain `.md` files, so your tasks
 travel with the repository.
 
-![Day / Week / Month agenda demo](media/demo-agenda.gif)
+<picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/VitalyOstanin/markdown-org-vscode/raw/HEAD/media/demo-agenda-dark.gif">
+    <img src="media/demo-agenda-light.gif" alt="Day / Week / Month agenda demo">
+</picture>
 
 ## Table of Contents
 
@@ -30,6 +33,7 @@ travel with the repository.
     - [Timestamp Commands](#timestamp-commands)
     - [CLOCK Commands](#clock-commands)
     - [Agenda Commands](#agenda-commands)
+    - [Shadowed VS Code chords](#shadowed-vs-code-chords)
     - [Heading Management Commands](#heading-management-commands)
         - [Migrating into a maintain file with **Promote to Maintain**](#migrating-into-a-maintain-file-with-promote-to-maintain)
     - [Google Calendar Commands](#google-calendar-commands)
@@ -38,11 +42,12 @@ travel with the repository.
     - [`markdown-org.workspaceDir`](#markdown-orgworkspacedir)
     - [`markdown-org.maintainFilePath`](#markdown-orgmaintainfilepath)
     - [`markdown-org.dateLocale`](#markdown-orgdatelocale)
+    - [`markdown-org.uiLanguage`](#markdown-orguilanguage)
     - [`markdown-org.firstDayOfWeek`](#markdown-orgfirstdayofweek)
     - [`markdown-org.fileTags`](#markdown-orgfiletags)
     - [`markdown-org.currentTag`](#markdown-orgcurrenttag)
-    - [`markdown-org.agendaStyle`](#markdown-orgagendastyle)
     - [`markdown-org.agendaFontFamily`](#markdown-orgagendafontfamily)
+    - [`markdown-org.agendaHeaderMode`](#markdown-orgagendaheadermode)
     - [`markdown-org.clockRoundMinutes`](#markdown-orgclockroundminutes)
     - [`markdown-org.weekdayLocale`](#markdown-orgweekdaylocale)
     - [`markdown-org.gcalSync.clientId`](#markdown-orggcalsyncclientid)
@@ -70,7 +75,10 @@ orphan. Property write-back (`ID` / `GCAL_EVENT_ID`) is conflict-safe.
 See the full [Google Calendar Sync](#google-calendar-sync) section with
 connect / select / sync demos and [ADR-0010](docs/adr/0010-google-calendar-sync.md).
 
-![Sync Now: spinner, summary, and the per-event details channel](media/demo-gcal-sync.gif)
+<picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/VitalyOstanin/markdown-org-vscode/raw/HEAD/media/demo-gcal-sync-dark.gif">
+    <img src="media/demo-gcal-sync-light.gif" alt="Sync Now: spinner, summary, and the per-event details channel">
+</picture>
 
 ### Core
 
@@ -78,7 +86,8 @@ connect / select / sync demos and [ADR-0010](docs/adr/0010-google-calendar-sync.
 - **Timestamps** -- `CREATED`, `SCHEDULED`, `DEADLINE`, `CLOSED` with full date / time, in both active `<...>` and inactive `[...]` forms per [ADR-0005](docs/adr/0005-active-and-inactive-timestamps.md).
 - **Repeating tasks** -- Org-mode repeaters `+1d`, `+1w`, `+1m`, `.+1m`, `++1w`, and `+1wd` for workdays (skips weekends and Russian holidays).
 - **CLOCK entries** -- Time tracking with start / finish events and an aggregated CLOCK table per file.
-- **Agenda views** -- Day, Week, and Month, with automatic grouping of overdue, scheduled, and upcoming tasks.
+- **Agenda views** -- Day, Week, Month and Tasks. Day and Tasks are cards (a sticky summary bar plus sections by time of day or by priority), the week groups overdue, scheduled and upcoming tasks under sticky day headers, and the month calendar shows a per-day task count that turns red when a day holds something overdue. Views keep a browser-style history you can step through with Back / Forward.
+- **Interface language** -- The agenda panel speaks English or Russian, following [`markdown-org.uiLanguage`](#markdown-orguilanguage); by default it follows the date locale, then the VS Code display language.
 - **Tag filtering** -- Filter agenda by file-name patterns (e.g. `WORK` / `PRIVATE`), toggled from the agenda or by hotkey.
 - **Live updates** -- Agenda refreshes automatically when underlying markdown files change.
 - **Heading management** -- Archive completed tasks to `*.archive.md` or promote them to a maintenance file.
@@ -124,11 +133,17 @@ running with a custom `markdown-org-extract` build, see
 The extension reads tasks directly from your Markdown -- headings
 become tasks, inline code spans hold timestamps:
 
-![Editor view of a planning file](media/editor-markdown.png)
+<picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/VitalyOstanin/markdown-org-vscode/raw/HEAD/media/editor-markdown-dark.png">
+    <img src="media/editor-markdown-light.png" alt="Editor view of a planning file">
+</picture>
 
 ### Task Statuses
 
-![TODO / priority / DONE / CANCELLED workflow](media/demo-task-status.gif)
+<picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/VitalyOstanin/markdown-org-vscode/raw/HEAD/media/demo-task-status-dark.gif">
+    <img src="media/demo-task-status-light.gif" alt="TODO / priority / DONE / CANCELLED workflow">
+</picture>
 
 ```markdown
 ## TODO Task without priority
@@ -150,7 +165,10 @@ shown struck-through in the agenda and is never pushed to Google Calendar
 
 ### Timestamps
 
-![All four timestamp types and three repeater flavours](media/demo-timestamps.gif)
+<picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/VitalyOstanin/markdown-org-vscode/raw/HEAD/media/demo-timestamps-dark.gif">
+    <img src="media/demo-timestamps-light.gif" alt="All four timestamp types and three repeater flavours">
+</picture>
 
 **With tasks:**
 
@@ -212,7 +230,10 @@ for the UX rationale and the deliberate asymmetry with Emacs
 CLOCK entries track time spent on tasks. They can be open (running)
 or closed (with duration).
 
-![CLOCK history, new entry, and clocktable](media/demo-clock.gif)
+<picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/VitalyOstanin/markdown-org-vscode/raw/HEAD/media/demo-clock-dark.gif">
+    <img src="media/demo-clock-light.gif" alt="CLOCK history, new entry, and clocktable">
+</picture>
 
 **Open CLOCK (running):**
 
@@ -234,7 +255,10 @@ or closed (with duration).
 Use **Insert CLOCK Table** to produce an aggregated table of CLOCK
 durations for the current file:
 
-![Aggregated CLOCK table](media/clocktable.png)
+<picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/VitalyOstanin/markdown-org-vscode/raw/HEAD/media/clocktable-dark.png">
+    <img src="media/clocktable-light.png" alt="Aggregated CLOCK table">
+</picture>
 
 ### Priority Levels
 
@@ -265,12 +289,18 @@ weekday and repeater always live **inside** the angle brackets.
 
 | Repeater | Meaning                                             |
 | -------- | --------------------------------------------------- |
-| `+Nh`    | Every N hours                                       |
+| `+Nh`    | Every N hours (see the note below)                  |
 | `+Nd`    | Every N days                                        |
 | `+Nw`    | Every N weeks                                       |
 | `+Nm`    | Every N months                                      |
 | `+Ny`    | Every N years                                       |
 | `+Nwd`   | Every N **workdays** (skips weekends + RU holidays) |
+
+**Hourly repeaters in the agenda.** The agenda is a day grid, so
+`markdown-org-extract` projects an hour repeater onto it: every day counts as
+one occurrence and **N is ignored** -- `+5h` behaves like `+1h`. Google Calendar
+sync is not bound by that grid and maps the same repeater to
+`FREQ=HOURLY;INTERVAL=N`.
 
 **Repeater modifiers:**
 
@@ -295,9 +325,11 @@ weekday and repeater always live **inside** the angle brackets.
 
 ## Commands
 
-Hotkeys below match the bindings declared in `package.json`. All
-keybindings except `Cycle Tag Filter` are only active when an active
-Markdown editor has focus.
+Hotkeys below match the bindings declared in `package.json`. They are
+active while a Markdown editor has focus, with three exceptions: the
+four `Show Agenda …` / `Show Tasks` commands also work while the agenda
+panel has focus, the agenda history commands work only there, and
+`Cycle Tag Filter` works everywhere.
 
 On macOS every `Ctrl+K …` chord uses `Cmd` instead, e.g. `Cmd+K Cmd+T`
 for `Set TODO` (the `Shift+Up`/`Shift+Down` bindings are unchanged).
@@ -332,25 +364,69 @@ for `Set TODO` (the `Shift+Up`/`Shift+Down` bindings are unchanged).
 
 ### Agenda Commands
 
-| Command                             | Hotkey                 | Description                                              |
-| ----------------------------------- | ---------------------- | -------------------------------------------------------- |
-| `Markdown Org: Show Agenda (Day)`   | -                      | Show today's tasks                                       |
-| `Markdown Org: Show Agenda (Week)`  | `Ctrl+K Ctrl+W`        | Show this week's tasks                                   |
-| `Markdown Org: Show Agenda (Month)` | `Ctrl+K Ctrl+M`        | Show this month's tasks                                  |
-| `Markdown Org: Show Tasks`          | -                      | Show all TODO tasks grouped by priority                  |
-| `Markdown Org: Cycle Tag Filter`    | `Ctrl+K Ctrl+K Ctrl+T` | Cycle the active file tag filter (e.g. ALL/WORK/PRIVATE) |
+| Command                              | Hotkey                 | Description                                              |
+| ------------------------------------ | ---------------------- | -------------------------------------------------------- |
+| `Markdown Org: Show Agenda (Day)`    | `Ctrl+K Ctrl+K Ctrl+Y` | Show today's tasks                                       |
+| `Markdown Org: Show Agenda (Week)`   | `Ctrl+K Ctrl+W`        | Show this week's tasks                                   |
+| `Markdown Org: Show Agenda (Month)`  | `Ctrl+K Ctrl+M`        | Show this month's tasks                                  |
+| `Markdown Org: Show Tasks`           | `Ctrl+K Ctrl+K Ctrl+L` | Show all TODO tasks grouped by priority                  |
+| `Markdown Org: Go Back in Agenda`    | `Alt+Shift+-`          | Return to the previously shown agenda view               |
+| `Markdown Org: Go Forward in Agenda` | `Alt+Shift+=`          | Step forward again after going back                      |
+| `Markdown Org: Cycle Tag Filter`     | `Ctrl+K Ctrl+K Ctrl+T` | Cycle the active file tag filter (e.g. ALL/WORK/PRIVATE) |
+
+All four view commands work both in a Markdown editor and while the agenda panel has focus, so you can switch views from the panel with the keyboard as well as with the mode buttons.
+
+The agenda keeps a browser-style history of the views you opened (mode plus anchor date). Back and Forward replay it; their hotkeys apply while the agenda panel has focus and can be rebound like any other keybinding.
 
 **Day view:**
 
-![Agenda day view](media/agenda-day.png)
+<picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/VitalyOstanin/markdown-org-vscode/raw/HEAD/media/agenda-day-dark.png">
+    <img src="media/agenda-day-light.png" alt="Agenda day view">
+</picture>
 
 **Week view:**
 
-![Agenda week view](media/agenda-week.png)
+<picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/VitalyOstanin/markdown-org-vscode/raw/HEAD/media/agenda-week-dark.png">
+    <img src="media/agenda-week-light.png" alt="Agenda week view">
+</picture>
 
 **Month view:**
 
-![Agenda month view](media/agenda-month.png)
+<picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/VitalyOstanin/markdown-org-vscode/raw/HEAD/media/agenda-month-dark.png">
+    <img src="media/agenda-month-light.png" alt="Agenda month view">
+</picture>
+
+### Shadowed VS Code chords
+
+The extension's `Ctrl+K …` chords deliberately take precedence over the VS Code defaults listed
+below. The override applies where the `when` clause of each binding does -- in Markdown files, and
+for the four view commands also in the agenda panel -- and, with the one exception noted under the
+table, nowhere else: in any other editor the default command keeps working. Rebind either side in
+**Keyboard Shortcuts** if you prefer the default.
+
+| Chord                  | Extension command                | VS Code default it shadows             |
+| ---------------------- | -------------------------------- | -------------------------------------- |
+| `Ctrl+K Ctrl+T`        | Set TODO                         | Select Color Theme                     |
+| `Ctrl+K Ctrl+D`        | Set DONE                         | Move Last Selection To Next Find Match |
+| `Ctrl+K Ctrl+X`        | Set CANCELLED                    | Trim Trailing Whitespace               |
+| `Ctrl+K Ctrl+P`        | Toggle Priority                  | Show All Editors By Appearance         |
+| `Ctrl+K Ctrl+C Ctrl+…` | Insert CLOCK Start/Finish/Table  | Add Line Comment (`Ctrl+K Ctrl+C`)     |
+| `Ctrl+K Ctrl+W`        | Show Agenda (Week)               | Close All Editors                      |
+| `Ctrl+K Ctrl+M`        | Show Agenda (Month)              | Toggle Maximize Editor Group           |
+| `Ctrl+K Ctrl+K Ctrl+…` | Timestamps, views, headings, tag | Select from Anchor to Cursor           |
+
+Two of these are easy to misread. `Copy Path of Active File` is `Ctrl+K P` (no second `Ctrl`) and
+`Change Language Mode` is `Ctrl+K M`, so neither is affected.
+
+The CLOCK and `Ctrl+K Ctrl+K` entries differ from the rest: both are prefixes here, so in a
+Markdown file the editor waits for the next chord instead of running the default command.
+
+One binding under that prefix is global: `Cycle Tag Filter` (`Ctrl+K Ctrl+K Ctrl+T`) carries no
+`when` clause, so it takes the prefix in every editor, not only in Markdown files. That is
+deliberate -- the tag filter applies to the agenda, which is not tied to the file you are in.
 
 ### Heading Management Commands
 
@@ -470,6 +546,25 @@ Locale for date formatting in agenda views.
 }
 ```
 
+### `markdown-org.uiLanguage`
+
+**Type:** `"auto" | "en" | "ru"`
+**Default:** `"auto"`
+
+Language of the agenda interface: mode buttons, navigation, section and group titles, summary counts, and tooltips. Dates themselves follow [`markdown-org.dateLocale`](#markdown-orgdatelocale).
+
+`"auto"` resolves the language from `markdown-org.dateLocale` first (only when you set that setting yourself), then from the VS Code display language, then falls back to English -- so setting the date locale to `ru-RU` also switches the interface to Russian, and a Russian VS Code gives a Russian agenda even with the date locale untouched. Set the value explicitly to keep the two apart (for example Russian dates with an English interface).
+
+The setting covers what the agenda panel itself renders. Three things stay in English regardless of it: notifications the extension raises through VS Code (error toasts, warnings, status-bar messages), the command names in the Command Palette, and the setting titles and descriptions on this page and in the Settings UI. All three come from the extension manifest or from VS Code's own message API, neither of which reads this setting.
+
+```json
+{
+    "markdown-org.uiLanguage": "ru"
+}
+```
+
+The setting is read on every agenda render, so an open panel follows a change on the next refresh. Command names are supplied by the extension manifest, which ships English strings only (see [ADR-0013](docs/adr/0013-agenda-ui-language-own-dictionary.md)).
+
 ### `markdown-org.firstDayOfWeek`
 
 **Type:** `"monday" | "sunday" | "auto"`
@@ -503,26 +598,25 @@ See [TAG_FILTERING.md](TAG_FILTERING.md) for examples. Cycle the active tag with
 
 Currently selected tag filter. Usually updated by `Cycle Tag Filter`. Stored at workspace scope when a workspace is open, otherwise globally.
 
-### `markdown-org.agendaStyle`
-
-**Type:** `string` (`monospace` | `native` | `hybrid` | `table`)
-**Default:** `"table"`
-
-Visual style of the agenda webview. Applies to all agenda modes (day/week/month/tasks), including the month calendar. Switch it from the style menu in the agenda panel or with the `Markdown Org: Cycle Agenda Style` command.
-
-- `table` (default): a compact list with a status dot, a large time, and a per-task type-flag column (deadline / scheduled / repeat / cancelled).
-- `hybrid`: proportional text with monospaced, tabular time/offset columns; status/priority shown as badges.
-- `native`: fully proportional VS Code look with status/priority badges.
-- `monospace`: the classic `Courier New` grid look. Set this to keep the previous appearance.
-
-All colors are driven by VS Code theme tokens, so every style adapts to the active light / dark / high-contrast theme.
-
 ### `markdown-org.agendaFontFamily`
 
 **Type:** `string`
 **Default:** `""` (system UI font stack)
 
-Proportional font family for the `native` and `hybrid` styles. Empty uses the system UI stack (`-apple-system, 'Segoe UI', system-ui, sans-serif`). Ignored by the `monospace` style.
+Proportional font family of the agenda webview, given as a CSS font stack (e.g. `"Fira Sans", system-ui, sans-serif`). Empty uses `'Adwaita Sans', 'Noto Sans', system-ui, sans-serif`. Numeric columns (time, offsets) render in the same face with `tabular-nums`, so they still line up.
+
+The value goes into a stylesheet, so it is checked first: only letters, digits, spaces, quotes, commas, dots, hyphens and underscores are accepted. Anything else — CSS functions such as `url(...)`, comments, braces, semicolons — is ignored and the default stack is used instead. Changing the setting re-renders an open agenda; no reopen needed.
+
+All agenda colors are driven by VS Code theme tokens, so the panel follows the active light / dark / high-contrast theme.
+
+### `markdown-org.agendaHeaderMode`
+
+**Type:** `"auto" | "full" | "compact"`
+**Default:** `"auto"`
+
+Layout of the agenda header. The full header takes about a fifth of a short panel: a control row plus a hero line carrying a large weekday or month title. The compact layout puts that title on the control row and tightens the type and spacing; every control stays where it was, nothing is hidden.
+
+`auto` picks compact when the panel is 520 px tall or less -- the case where the header crowds out the tasks it introduces -- and follows the panel as it is resized. `full` and `compact` pin the layout regardless of size. Changing the setting reflows an open agenda; no reopen needed.
 
 ### `markdown-org.clockRoundMinutes`
 
@@ -583,7 +677,10 @@ you can bring your own OAuth Desktop client. See
 runs, and reports what changed; **Show details** opens the full per-event
 log:
 
-![Sync Now: spinner, summary, and the per-event details channel](media/demo-gcal-sync.gif)
+<picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/VitalyOstanin/markdown-org-vscode/raw/HEAD/media/demo-gcal-sync-dark.gif">
+    <img src="media/demo-gcal-sync-light.gif" alt="Sync Now: spinner, summary, and the per-event details channel">
+</picture>
 
 Three commands cover the whole flow: connect once, choose a calendar, then
 sync on demand (or on save).
@@ -618,7 +715,10 @@ Calendar** removes the stored token and client secret.
 Connect prompts for the `client_secret`, then completes the browser
 authorization and stores the token:
 
-![Connect Google Calendar: client-secret prompt, connecting, connected](media/demo-gcal-connect.gif)
+<picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/VitalyOstanin/markdown-org-vscode/raw/HEAD/media/demo-gcal-connect-dark.gif">
+    <img src="media/demo-gcal-connect-light.gif" alt="Connect Google Calendar: client-secret prompt, connecting, connected">
+</picture>
 
 ### Linux: GNOME Online Accounts (no OAuth client)
 
@@ -649,7 +749,10 @@ receives the events; it pins the choice in
 `markdown-org.gcalSync.calendarId`. With no pinned id, the sync finds
 (or creates) a calendar named after `markdown-org.gcalSync.calendarName`.
 
-![Select Google Calendar: pick from your writable calendars](media/demo-gcal-select.gif)
+<picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/VitalyOstanin/markdown-org-vscode/raw/HEAD/media/demo-gcal-select-dark.gif">
+    <img src="media/demo-gcal-select-light.gif" alt="Select Google Calendar: pick from your writable calendars">
+</picture>
 
 ### Running a sync
 
@@ -712,9 +815,14 @@ next run.
 - **No orphan cleanup.** Events left behind by tasks that were deleted
   outright (heading removed, not marked DONE) are not purged
   automatically.
-- **Repeaters collapse to one event.** A repeating task syncs as a single
-  event on its base date; the recurrence is not expanded into a Google
-  recurring event.
+- **Not every repeater becomes a recurring event.** Most do: `+Nd` / `+Nw` /
+  `+Nm` / `+Ny` / `+Nh` map to `FREQ=DAILY|WEEKLY|MONTHLY|YEARLY|HOURLY` with
+  `INTERVAL=N`, and `+1wd` to `FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR` (needs the
+  bundled extractor 0.10.0 or newer, which is where `timestamp_repeater` comes
+  from). What has no single-rule form stays a one-shot event on its base date:
+  `+Nwd` with `N > 1` ("every N-th workday"). The `+` / `++` / `.+` prefixes
+  differ only in how org shifts the date on completion, which a calendar grid
+  has no notion of, so they do not change the rule.
 - **Second-window edits are invisible.** If the same file is open in a
   second VS Code window with unsaved edits, this extension cannot see
   that other window's in-memory state. A sync writing back to disk there
@@ -766,3 +874,16 @@ the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 Released under the [MIT License](LICENSE) -- see the LICENSE file for the
 full text. The `license` field in `package.json` carries the SPDX
 identifier `MIT`.
+
+The package also bundles the prebuilt `markdown-org-extract` binary, which
+is a separate MIT-licensed work and is statically linked. Both notices ship
+inside the VSIX next to the binary:
+
+| №   | Path                                                | Covers                                      |
+| --- | --------------------------------------------------- | ------------------------------------------- |
+| 1   | `bin/LICENSE.markdown-org-extract`                  | the extractor's own code                    |
+| 2   | `bin/THIRD-PARTY-LICENSES.markdown-org-extract.txt` | the crates linked into the extractor binary |
+
+Both files are unpacked from the extractor's release archive at package
+time rather than kept in this repository, so they always describe the
+version actually shipped.
