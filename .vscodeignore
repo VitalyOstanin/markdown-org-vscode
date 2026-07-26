@@ -14,6 +14,7 @@ CLAUDE.md
 # Sources and build artifacts
 src/**
 out/test/**
+out/.tsbuildinfo-*
 **/*.map
 node_modules/**
 
@@ -37,6 +38,7 @@ scripts/**
 .vscodeignore
 eslint.config.mjs
 tsconfig.json
+tsconfig.webview.json
 
 # npm lockfile — included via the published `package.json` already; shipping
 # the lockfile inflates the VSIX without changing what the user installs.
@@ -62,13 +64,21 @@ TAG_FILTERING.md
 # catches the directory; this file lives at the repo root).
 .claude-dir-settings.yaml
 
-# Media: only the GIFs and PNGs referenced from README.md ship in
-# the VSIX. The MP4 source files that the demo recording produces
-# alongside each GIF aren't linked from anywhere user-visible.
-# The SVG source of the icon is kept in-tree for future re-renders
-# but only the resulting PNG is shipped.
+# Media: only the PNG screenshots referenced from README.md ship in the
+# VSIX. The MP4 sources that the demo recording produces alongside each
+# GIF aren't linked from anywhere user-visible, and the SVG source of the
+# icon is kept in-tree for future re-renders while only the rendered PNG
+# ships.
+#
+# The GIFs stay out as well: recorded in two themes they come to ~20 MB,
+# which would be shipped four times over (one VSIX per platform) to save
+# a network fetch in one place -- the in-editor Extensions preview.
+# Everywhere else the images already come from GitHub: Open VSX rewrites
+# relative links to GitHub URLs, and the repository page reads them from
+# the tree directly.
 media/*.mp4
 media/*.svg
+media/*.gif
 
 # Build outputs
 *.vsix
