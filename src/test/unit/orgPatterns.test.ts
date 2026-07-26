@@ -35,27 +35,31 @@ suite('orgPatterns named groups', () => {
         test('numeric priority [#0] is captured', () => {
             const match = '## TODO [#0] Hottest item'.match(HEADING_REGEX);
             assert.ok(match);
-            assert.strictEqual(match.groups?.priority, '0');
-            assert.strictEqual(match.groups?.title, 'Hottest item');
+            assert.ok(match.groups);
+            assert.strictEqual(match.groups.priority, '0');
+            assert.strictEqual(match.groups.title, 'Hottest item');
         });
 
         test('numeric priority [#5] is captured', () => {
             const match = '## TODO [#5] Mid item'.match(HEADING_REGEX);
             assert.ok(match);
-            assert.strictEqual(match.groups?.priority, '5');
+            assert.ok(match.groups);
+            assert.strictEqual(match.groups.priority, '5');
         });
 
         test('numeric priority [#42] is captured (two-digit value)', () => {
             const match = '## TODO [#42] Forty-two'.match(HEADING_REGEX);
             assert.ok(match);
-            assert.strictEqual(match.groups?.priority, '42');
-            assert.strictEqual(match.groups?.title, 'Forty-two');
+            assert.ok(match.groups);
+            assert.strictEqual(match.groups.priority, '42');
+            assert.strictEqual(match.groups.title, 'Forty-two');
         });
 
         test('numeric priority [#64] is captured (upper bound)', () => {
             const match = '## TODO [#64] Lowest numeric'.match(HEADING_REGEX);
             assert.ok(match);
-            assert.strictEqual(match.groups?.priority, '64');
+            assert.ok(match.groups);
+            assert.strictEqual(match.groups.priority, '64');
         });
 
         test('numeric priority [#65] is rejected (out of range -- consumed as part of title)', () => {
@@ -63,15 +67,17 @@ suite('orgPatterns named groups', () => {
             // bracket cookie remains in the title.
             const match = '## TODO [#65] Out of range'.match(HEADING_REGEX);
             assert.ok(match);
-            assert.strictEqual(match.groups?.priority, undefined);
-            assert.strictEqual(match.groups?.title, '[#65] Out of range');
+            assert.ok(match.groups);
+            assert.strictEqual(match.groups.priority, undefined);
+            assert.strictEqual(match.groups.title, '[#65] Out of range');
         });
 
         test('numeric priority [#01] is rejected (leading zero)', () => {
             const match = '## TODO [#01] Leading zero'.match(HEADING_REGEX);
             assert.ok(match);
-            assert.strictEqual(match.groups?.priority, undefined);
-            assert.strictEqual(match.groups?.title, '[#01] Leading zero');
+            assert.ok(match.groups);
+            assert.strictEqual(match.groups.priority, undefined);
+            assert.strictEqual(match.groups.title, '[#01] Leading zero');
         });
     });
 
@@ -125,26 +131,30 @@ suite('orgPatterns named groups', () => {
         test('SCHEDULED with active bracket matches', () => {
             const match = '  `SCHEDULED: <2025-12-06 Fri 10:00>`'.match(TIMESTAMP_LINE_REGEX);
             assert.ok(match);
-            assert.strictEqual(match.groups?.indent, '  ');
-            assert.strictEqual(match.groups?.schedTs, '<2025-12-06 Fri 10:00>');
+            assert.ok(match.groups);
+            assert.strictEqual(match.groups.indent, '  ');
+            assert.strictEqual(match.groups.schedTs, '<2025-12-06 Fri 10:00>');
         });
 
         test('DEADLINE with active bracket matches', () => {
             const match = '`DEADLINE: <2025-12-06 Fri>`'.match(TIMESTAMP_LINE_REGEX);
             assert.ok(match);
-            assert.strictEqual(match.groups?.deadTs, '<2025-12-06 Fri>');
+            assert.ok(match.groups);
+            assert.strictEqual(match.groups.deadTs, '<2025-12-06 Fri>');
         });
 
         test('CLOSED with inactive bracket matches', () => {
             const match = '`CLOSED: [2025-12-06 Fri]`'.match(TIMESTAMP_LINE_REGEX);
             assert.ok(match);
-            assert.strictEqual(match.groups?.closedTs, '[2025-12-06 Fri]');
+            assert.ok(match.groups);
+            assert.strictEqual(match.groups.closedTs, '[2025-12-06 Fri]');
         });
 
         test('CREATED with inactive bracket matches', () => {
             const match = '`CREATED: [2025-12-06 Fri]`'.match(TIMESTAMP_LINE_REGEX);
             assert.ok(match);
-            assert.strictEqual(match.groups?.createdTs, '[2025-12-06 Fri]');
+            assert.ok(match.groups);
+            assert.strictEqual(match.groups.createdTs, '[2025-12-06 Fri]');
         });
 
         test('SCHEDULED with inactive bracket is rejected', () => {

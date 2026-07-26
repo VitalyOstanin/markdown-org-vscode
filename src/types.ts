@@ -65,10 +65,14 @@ export interface TaskWithOffset extends Task {
 // buckets, so callers default each one to `[]` (see `src/utils/tagFilter.ts`).
 export interface DayAgenda {
     date: string;
-    overdue: TaskWithOffset[];
-    scheduled_timed: TaskWithOffset[];
-    scheduled_no_time: TaskWithOffset[];
-    upcoming: TaskWithOffset[];
+    // Optional on the wire: markdown-org-extract omits a bucket that is empty
+    // in week and month mode. Declaring them required was how v0.3.0 shipped
+    // "Cannot read properties of undefined (reading 'filter')" -- the type said
+    // the key was there and every reader believed it.
+    overdue?: TaskWithOffset[];
+    scheduled_timed?: TaskWithOffset[];
+    scheduled_no_time?: TaskWithOffset[];
+    upcoming?: TaskWithOffset[];
 }
 
 export type AgendaData = DayAgenda[] | Task[];

@@ -33,13 +33,17 @@ suite('orgCommandWrap.withErrorReporting', () => {
 
     test('catches synchronous throws and reports a formatted message', async () => {
         const collected: string[] = [];
-        const wrapped = withErrorReporting<[], void>(
+        const wrapped = withErrorReporting<[], undefined>(
             'markdown-org.x',
             (m) => collected.push(m),
             () => {
                 throw new Error('boom');
             }
         );
+        // The point of the assertion: a handler that threw must resolve to
+        // undefined rather than propagate. The wrapper's return type is void
+        // here, which is exactly what is being pinned down.
+        // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression
         const result = await wrapped();
         assert.strictEqual(result, undefined);
         assert.deepStrictEqual(collected, ['x failed: boom']);
@@ -47,13 +51,17 @@ suite('orgCommandWrap.withErrorReporting', () => {
 
     test('catches rejected Promises and reports a formatted message', async () => {
         const collected: string[] = [];
-        const wrapped = withErrorReporting<[], void>(
+        const wrapped = withErrorReporting<[], undefined>(
             'markdown-org.x',
             (m) => collected.push(m),
             async () => {
                 throw new Error('async boom');
             }
         );
+        // The point of the assertion: a handler that threw must resolve to
+        // undefined rather than propagate. The wrapper's return type is void
+        // here, which is exactly what is being pinned down.
+        // eslint-disable-next-line @typescript-eslint/no-confusing-void-expression
         const result = await wrapped();
         assert.strictEqual(result, undefined);
         assert.deepStrictEqual(collected, ['x failed: async boom']);
@@ -61,7 +69,7 @@ suite('orgCommandWrap.withErrorReporting', () => {
 
     test('passes all arguments through to the handler unchanged', async () => {
         const received: unknown[][] = [];
-        const wrapped = withErrorReporting<[string, number], void>(
+        const wrapped = withErrorReporting(
             'markdown-org.x',
             () => {
                 /* the wrapped command body is irrelevant here */

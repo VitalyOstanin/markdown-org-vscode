@@ -160,7 +160,9 @@ suite('gcal/calendarClient', () => {
                 return Promise.resolve();
             });
         });
-        teardown(() => setRetrySleepForTests());
+        teardown(() => {
+            setRetrySleepForTests();
+        });
 
         test('retries on 500 then succeeds', async () => {
             let n = 0;

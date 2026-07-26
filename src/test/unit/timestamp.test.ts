@@ -13,12 +13,13 @@ suite('Timestamp Tests', () => {
         const match = TIMESTAMP_REGEX.exec(timestamp);
 
         assert.ok(match);
-        assert.strictEqual(match.groups?.year, '2025');
-        assert.strictEqual(match.groups?.month, '12');
-        assert.strictEqual(match.groups?.day, '06');
-        assert.strictEqual(match.groups?.weekday, 'Fri');
-        assert.strictEqual(match.groups?.hour, undefined);
-        assert.strictEqual(match.groups?.minute, undefined);
+        assert.ok(match.groups);
+        assert.strictEqual(match.groups.year, '2025');
+        assert.strictEqual(match.groups.month, '12');
+        assert.strictEqual(match.groups.day, '06');
+        assert.strictEqual(match.groups.weekday, 'Fri');
+        assert.strictEqual(match.groups.hour, undefined);
+        assert.strictEqual(match.groups.minute, undefined);
     });
 
     test('Parse timestamp with date and time', () => {
@@ -26,12 +27,13 @@ suite('Timestamp Tests', () => {
         const match = TIMESTAMP_REGEX.exec(timestamp);
 
         assert.ok(match);
-        assert.strictEqual(match.groups?.year, '2025');
-        assert.strictEqual(match.groups?.month, '12');
-        assert.strictEqual(match.groups?.day, '06');
-        assert.strictEqual(match.groups?.weekday, 'Fri');
-        assert.strictEqual(match.groups?.hour, '14');
-        assert.strictEqual(match.groups?.minute, '30');
+        assert.ok(match.groups);
+        assert.strictEqual(match.groups.year, '2025');
+        assert.strictEqual(match.groups.month, '12');
+        assert.strictEqual(match.groups.day, '06');
+        assert.strictEqual(match.groups.weekday, 'Fri');
+        assert.strictEqual(match.groups.hour, '14');
+        assert.strictEqual(match.groups.minute, '30');
     });
 
     test('Parse timestamp with repeater', () => {
@@ -39,7 +41,8 @@ suite('Timestamp Tests', () => {
         const match = TIMESTAMP_REGEX.exec(timestamp);
 
         assert.ok(match);
-        assert.strictEqual(match.groups?.repeater, '+1d');
+        assert.ok(match.groups);
+        assert.strictEqual(match.groups.repeater, '+1d');
     });
 
     test('Parse timestamp with workday repeater', () => {
@@ -47,7 +50,8 @@ suite('Timestamp Tests', () => {
         const match = TIMESTAMP_REGEX.exec(timestamp);
 
         assert.ok(match);
-        assert.strictEqual(match.groups?.repeater, '+2wd');
+        assert.ok(match.groups);
+        assert.strictEqual(match.groups.repeater, '+2wd');
     });
 
     test('Parse timestamp with full English weekday name (long form)', () => {
@@ -58,7 +62,8 @@ suite('Timestamp Tests', () => {
         const match = TIMESTAMP_REGEX.exec(timestamp);
 
         assert.ok(match);
-        assert.strictEqual(match.groups?.weekday, 'Friday');
+        assert.ok(match.groups);
+        assert.strictEqual(match.groups.weekday, 'Friday');
     });
 
     test('Parse timestamp with full Russian weekday name (long form)', () => {
@@ -66,7 +71,8 @@ suite('Timestamp Tests', () => {
         const match = TIMESTAMP_REGEX.exec(timestamp);
 
         assert.ok(match);
-        assert.strictEqual(match.groups?.weekday, 'Пятница');
+        assert.ok(match.groups);
+        assert.strictEqual(match.groups.weekday, 'Пятница');
     });
 
     test('Parse SCHEDULED timestamp line (active)', () => {

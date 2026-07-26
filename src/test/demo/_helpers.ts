@@ -120,9 +120,9 @@ export async function maximizeVscodeWindow(): Promise<void> {
             stdio: ['ignore', 'pipe', 'ignore']
         });
         proc.stdout.on('data', (b) => chunks.push(b));
-        proc.on('exit', (code) =>
-            resolve({ status: code ?? 1, stdout: Buffer.concat(chunks).toString('utf-8').trim() })
-        );
+        proc.on('exit', (code) => {
+            resolve({ status: code ?? 1, stdout: Buffer.concat(chunks).toString('utf-8').trim() });
+        });
         proc.on('error', reject);
     });
     if (search.status !== 0 || !search.stdout) {
@@ -136,7 +136,9 @@ export async function maximizeVscodeWindow(): Promise<void> {
                 env: { ...process.env, DISPLAY: display },
                 stdio: ['ignore', 'inherit', 'inherit']
             });
-            proc.on('exit', (code) => resolve(code ?? 1));
+            proc.on('exit', (code) => {
+                resolve(code ?? 1);
+            });
             proc.on('error', reject);
         });
     // `--sync` makes xdotool block until the X server reports the operation
@@ -290,9 +292,9 @@ async function runXdotool(args: string[]): Promise<{ status: number; stdout: str
             stdio: ['ignore', 'pipe', 'ignore']
         });
         proc.stdout.on('data', (b) => chunks.push(b));
-        proc.on('exit', (code) =>
-            resolve({ status: code ?? 1, stdout: Buffer.concat(chunks).toString('utf-8').trim() })
-        );
+        proc.on('exit', (code) => {
+            resolve({ status: code ?? 1, stdout: Buffer.concat(chunks).toString('utf-8').trim() });
+        });
         proc.on('error', reject);
     });
 }

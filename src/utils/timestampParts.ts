@@ -112,7 +112,7 @@ export function getTimestampPartAt(lineText: string, character: number): Timesta
 }
 
 function buildTimestampSpans(lineText: string, match: RegExpExecArray, tsStart: number): Span[] {
-    const { weekday, hour, minute } = match.groups!;
+    const { weekday, hour, minute } = match.groups ?? {};
     const spans: Span[] = [
         { part: 'year', start: tsStart + 1, end: tsStart + 5 },
         { part: 'month', start: tsStart + 6, end: tsStart + 8 },

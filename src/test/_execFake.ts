@@ -27,7 +27,7 @@ export interface ExtractorPayloads {
 export function makeExtractorFake(payloads: ExtractorPayloads) {
     return (..._args: unknown[]) => {
         const callback = _args.at(-1) as ExecFileCallback;
-        const cliArgs = (_args[1] as string[]) || [];
+        const cliArgs = _args[1] as string[];
         let response: unknown = [];
         if (cliArgs.includes('--holidays')) {
             response = payloads.holidays ?? [];
@@ -40,7 +40,9 @@ export function makeExtractorFake(payloads: ExtractorPayloads) {
             else if (mode === 'month') response = payloads.month;
         }
         const stdout = JSON.stringify(response);
-        queueMicrotask(() => callback(null, stdout, ''));
+        queueMicrotask(() => {
+            callback(null, stdout, '');
+        });
         return {} as unknown as cp.ChildProcess;
     };
 }

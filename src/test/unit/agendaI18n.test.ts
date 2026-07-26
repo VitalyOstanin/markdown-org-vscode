@@ -114,7 +114,9 @@ suite('AGENDA_STRINGS', () => {
                 return;
             }
             if (Array.isArray(value)) {
-                value.forEach((item, i) => walk(item, `${path}[${i}]`));
+                value.forEach((item, i) => {
+                    walk(item, `${path}[${i}]`);
+                });
                 return;
             }
             for (const [key, child] of Object.entries(value as Record<string, unknown>)) {

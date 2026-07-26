@@ -67,7 +67,9 @@ suite('Agenda webview ServiceWorker-race retry', () => {
             const callback = _args.at(-1) as ExecFileCallback;
             // Empty payload is fine -- this suite cares about webview retry,
             // not rendered tasks.
-            queueMicrotask(() => callback(null, JSON.stringify([]), ''));
+            queueMicrotask(() => {
+                callback(null, JSON.stringify([]), '');
+            });
             return {} as unknown as cp.ChildProcess;
         });
 

@@ -85,7 +85,10 @@ export default tseslint.config(
     // they are the modern spelling of things the codebase already does by hand
     // -- `??` over an undefined-test ternary, `?.` over an `&&` chain,
     // `RegExp#exec` over `String#match` for a single lookup.
-    ...[...tseslint.configs.recommendedTypeChecked, ...tseslint.configs.stylisticTypeChecked].map((config) => ({
+    // `strict` is the same idea one step further: it reports what is defensible
+    // but usually a mistake -- a condition the types say can never be false, a
+    // template literal interpolating something that is not a string.
+    ...[...tseslint.configs.strictTypeChecked, ...tseslint.configs.stylisticTypeChecked].map((config) => ({
         ...config,
         files: ['**/*.ts']
     })),
@@ -117,7 +120,12 @@ export default tseslint.config(
             // own line, which is why the fix keeps type and value imports in
             // separate declarations rather than inlining `type` markers into a
             // mixed one.
-            '@typescript-eslint/consistent-type-imports': 'error'
+            '@typescript-eslint/consistent-type-imports': 'error',
+            // `strict` forbids interpolating a number, on the grounds that its
+            // string form is locale-dependent. Every number this codebase puts
+            // in a template is a count or an id in a log line or an error
+            // message, where the default form is the intended one.
+            '@typescript-eslint/restrict-template-expressions': ['error', { allowNumber: true }]
         }
     },
     // Import hygiene. `no-unresolved` stays off: `npm run typecheck` already
@@ -189,7 +197,12 @@ export default tseslint.config(
             '@typescript-eslint/no-unsafe-return': 'off',
             '@typescript-eslint/no-unsafe-call': 'off',
             '@typescript-eslint/unbound-method': 'off',
-            '@typescript-eslint/restrict-template-expressions': 'off'
+            '@typescript-eslint/restrict-template-expressions': 'off',
+            // A test reads a value the fixture put there. `!` says that in one
+            // character, and if the fixture ever stops putting it there the
+            // test fails on the spot -- which is the outcome a check would
+            // produce anyway, spelled longer.
+            '@typescript-eslint/no-non-null-assertion': 'off'
         }
     },
     {

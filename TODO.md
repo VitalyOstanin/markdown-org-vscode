@@ -334,6 +334,28 @@
       `regexGroups_1 is not defined`. The integration suite now trips on that
       alias pattern the same way it already trips on `exports.`.
 
+- [x] Adopt `strict-type-checked`
+    - On for `**/*.ts`, with `no-non-null-assertion` off in `src/test/**` (145
+      of its 152 reports were there, all of them the fixture-reads-what-the-
+      fixture-wrote pattern) and `restrict-template-expressions` set to
+      `allowNumber: true` (every interpolated number here is a count or an id
+      in a log line).
+    - The find that paid for the pass: `no-unnecessary-condition` pointed at 20
+      `?? []` guards on the agenda buckets, which are guards precisely because
+      the extractor omits an empty bucket in week and month mode. The type said
+      otherwise, so `DayAgenda` now declares them optional -- the same mismatch
+      that shipped "Cannot read properties of undefined (reading 'filter')" in
+      v0.3.0.
+    - Other real ones: `escapeHtml` and `sanitizeFontFamily` had a `String()`
+      conversion their `string` parameter type made dead; `mapTaskToEvent`
+      asserted two fields with `!` that its `isSyncable` contract guarantees and
+      now checks; `AgendaPanel.updateExistingPanel` re-asserted a panel the
+      caller had already narrowed; a `<A extends unknown[]>` parameter bound
+      nothing.
+    - Four disable comments remain, each with its reason: a flag set from
+      outside the loop body, `document.fonts` (absent in older webview
+      runtimes), a dictionary `delete`, and `AgendaPanel`'s all-static shape.
+
 - [x] Adopt the modern-TypeScript rule sets
     - `stylistic-type-checked` from typescript-eslint, plus 30 hand-picked
       modern-API rules from `eslint-plugin-unicorn`. Measured before choosing:

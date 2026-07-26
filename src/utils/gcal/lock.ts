@@ -168,7 +168,7 @@ export async function acquireLock(opts: AcquireOptions): Promise<Lock | null> {
                 }
             );
         }, hbMs);
-        timer.unref?.();
+        timer.unref();
     }
 
     return {

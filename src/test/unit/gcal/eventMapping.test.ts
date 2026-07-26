@@ -20,7 +20,7 @@ const opts = { timeZone: 'Europe/Belgrade', defaultEventMinutes: 60, relPath: 'n
  * explicit `undefined`, so a missing field is a missing key -- and that is what
  * `exactOptionalPropertyTypes` insists the fixture spell out.
  */
-function without<K extends keyof Task>(task: Task, key: K): Task {
+function without(task: Task, key: keyof Task): Task {
     const { [key]: _dropped, ...rest } = task;
     return rest as Task;
 }
@@ -42,8 +42,10 @@ suite('gcal/eventMapping', () => {
         assert.equal(ev.summary, 'Ship release');
         assert.match(ev.description ?? '', /Body\./);
         assert.match(ev.description ?? '', /Source: notes\.md:10/);
-        assert.equal(ev.extendedProperties?.private?.mdOrgId, 'oid');
-        assert.equal(ev.extendedProperties?.private?.mdOrgTsType, 'SCHEDULED');
+        const ext = ev.extendedProperties?.private;
+        assert.ok(ext);
+        assert.equal(ext.mdOrgId, 'oid');
+        assert.equal(ext.mdOrgTsType, 'SCHEDULED');
     });
 
     test("event carries status 'confirmed' so re-publish revives a cancelled event", () => {

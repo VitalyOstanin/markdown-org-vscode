@@ -114,7 +114,7 @@ npm run format          # Prettier
 npm run format:check
 ```
 
-The rule sets are `recommended-type-checked` and `stylistic-type-checked` from
+The rule sets are `strict-type-checked` and `stylistic-type-checked` from
 typescript-eslint, plus a hand-picked list of modern-API rules from
 [eslint-plugin-unicorn](https://github.com/sindresorhus/eslint-plugin-unicorn).
 Unicorn's own `recommended` preset is deliberately not used: it reports 1500+
@@ -136,6 +136,14 @@ because `--fix` will rewrite the imports otherwise:
   (`import-x/order`). `import-x` also fails the build on cycles, duplicate
   imports and self-imports; `no-unresolved` stays off, since `npm run typecheck`
   already resolves every specifier.
+
+`strict-type-checked` is the reason a few patterns are spelled the way they
+are. `no-unnecessary-condition` reports a guard the types say can never fire, so
+a guard that is really there for data the types describe wrongly means the type
+is wrong -- that is how the agenda buckets became optional. `!` is off in `src`
+and on in `src/test`. Where a report is a false negative of the analysis rather
+than a defect (a flag another method sets, a DOM API missing in older webview
+runtimes), the disable comment carries the reason.
 
 Two more rules come from the compiler rather than the linter.
 

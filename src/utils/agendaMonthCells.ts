@@ -36,7 +36,7 @@ export function buildMonthDayIndex(days: DayAgenda[]): MonthDayIndex {
     const index: MonthDayIndex = {};
     const list = Array.isArray(days) ? days : [];
     for (const day of list) {
-        if (!day?.date) {
+        if (!day.date) {
             continue;
         }
         // Inlined (not a module-scope helper) so the whole function survives

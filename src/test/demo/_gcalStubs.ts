@@ -73,7 +73,9 @@ export function installFakeGcal(opts: {
     execFileStub.callsFake((..._args: unknown[]) => {
         const callback = _args.at(-1) as ExecFileCallback;
         const stdout = JSON.stringify(tasks);
-        queueMicrotask(() => callback(null, stdout, ''));
+        queueMicrotask(() => {
+            callback(null, stdout, '');
+        });
         return {} as unknown as cp.ChildProcess;
     });
 

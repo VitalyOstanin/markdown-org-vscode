@@ -17,7 +17,7 @@ import { group } from './regexGroups';
 
 /** `markdown-org-extract 0.11.0` -> `0.11.0`. Undefined when unrecognised. */
 export function parseExtractorVersion(stdout: string): string | undefined {
-    const m = /(\d+)\.(\d+)\.(\d+)/.exec(stdout ?? '');
+    const m = /(\d+)\.(\d+)\.(\d+)/.exec(stdout);
     return m ? `${group(m, 1)}.${group(m, 2)}.${group(m, 3)}` : undefined;
 }
 

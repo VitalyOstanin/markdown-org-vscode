@@ -339,7 +339,7 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
     function countLabel(n: number, forms: string[]): string {
         // The plural form follows the UI language; the digits follow the date
         // locale, like every other number on the panel.
-        return formatNumber(n, locale) + ' ' + forms[pluralIndex(n, uiLang)];
+        return `${formatNumber(n, locale)} ${forms[pluralIndex(n, uiLang)] ?? ''}`;
     }
 
     const vscode = acquireVsCodeApi();
@@ -408,7 +408,7 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
     function syncHeaderOffset(): void {
         const header = document.getElementById('agenda-header');
         const h = header ? header.offsetHeight : 0;
-        document.documentElement.style.setProperty('--agenda-header-h', h + 'px');
+        document.documentElement.style.setProperty('--agenda-header-h', `${h}px`);
     }
 
     // Keep --agenda-header-h locked to the header's ACTUAL height through every
@@ -425,6 +425,7 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
     } else {
         window.addEventListener('resize', syncHeaderOffset);
     }
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- the FontFaceSet API is absent in older webview runtimes
     if (document.fonts) {
         // The offset is re-measured on every later resize anyway, so a failed
         // font load costs nothing here. It still gets its own catch: without
@@ -584,6 +585,7 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             headerMode = message.headerMode ?? 'auto';
             applyHeaderLayout();
             refreshHeaderModeButton();
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- spelled out rather than a bare `else`, so the branch says which command it serves
         } else if (message.command === 'getRenderedInfo') {
             // Integration-test query: snapshot the rendered DOM so the host can
             // verify that renderAgenda produced the expected day-headers for the
@@ -612,9 +614,7 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             // non-Latin digits must reach the page as such, and nothing but the
             // rendered text proves it.
             const heroSub = document.querySelector('.hero-sub span')?.textContent ?? '';
-            const dayNumbers = [...document.querySelectorAll('.calendar-day .day-number')].map(
-                (el) => el.textContent ?? ''
-            );
+            const dayNumbers = [...document.querySelectorAll('.calendar-day .day-number')].map((el) => el.textContent);
             vscode.postMessage({
                 command: 'renderedInfo',
                 dayHeaders: headers,
@@ -706,7 +706,9 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         document.querySelectorAll('.calendar-day').forEach((el) => {
             const date = el.getAttribute('data-date');
             if (date) {
-                el.addEventListener('click', () => navigateToDay(date));
+                el.addEventListener('click', () => {
+                    navigateToDay(date);
+                });
             }
         });
     }
@@ -754,10 +756,10 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
                     formatDayHeader(day.date) +
                     '</div>'
             );
-            (day.overdue || []).forEach((task) => parts.push(renderTask(task, task.days_offset, 'overdue')));
-            (day.scheduled_timed || []).forEach((task) => parts.push(renderTask(task, task.days_offset)));
-            (day.scheduled_no_time || []).forEach((task) => parts.push(renderTask(task, task.days_offset)));
-            (day.upcoming || []).forEach((task) => parts.push(renderTask(task, task.days_offset, 'upcoming')));
+            (day.overdue ?? []).forEach((task) => parts.push(renderTask(task, task.days_offset, 'overdue')));
+            (day.scheduled_timed ?? []).forEach((task) => parts.push(renderTask(task, task.days_offset)));
+            (day.scheduled_no_time ?? []).forEach((task) => parts.push(renderTask(task, task.days_offset)));
+            (day.upcoming ?? []).forEach((task) => parts.push(renderTask(task, task.days_offset, 'upcoming')));
         });
         return parts.join('');
     }
@@ -769,7 +771,7 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
     // order. Task rows still go through renderTask, so click handling carries
     // over.
     function renderDayCard(days: DayAgenda[]): string {
-        const day: DayAgenda = days?.[0] ?? {
+        const day: DayAgenda = days[0] ?? {
             date: '',
             overdue: [],
             scheduled_timed: [],
@@ -826,15 +828,7 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
     // (["task","tasks"] in English, three forms in Russian).
     function summaryStat(n: number, word: string | string[], cls: string): string {
         const label = Array.isArray(word) ? word[pluralIndex(n, uiLang)] : word;
-        return (
-            '<span class="day-summary-stat' +
-            (cls ? ' ' + cls : '') +
-            '"><b>' +
-            n +
-            '</b> ' +
-            escapeHtml(label) +
-            '</span>'
-        );
+        return `<span class="day-summary-stat${cls ? ` ${cls}` : ''}"><b>${n}</b> ${escapeHtml(label)}</span>`;
     }
 
     // The bar reuses the sticky .day-header shell. dateIso is the view's anchor
@@ -853,25 +847,16 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
 
     /** One section panel: title, count chip and the already-rendered rows. */
     function renderSectionPanel(key: string, title: string, count: number, rowsHtml: string): string {
+        // The count chip is the same component as the month cell's task-load
+        // chip, so it explains its number the same way.
+        const chipTitle = escapeHtml(formatString(UI.countChip.inSection, countLabel(count, UI.countChip.tasks)));
         return (
-            '<section class="day-section day-section-' +
-            key +
-            '">' +
+            `<section class="day-section day-section-${key}">` +
             '<div class="day-section-head">' +
-            '<span class="day-section-name">' +
-            escapeHtml(title) +
-            '</span>' +
-            // Same component as the month cell's task-load chip, so it explains
-            // its number the same way.
-            '<span class="day-section-count" title="' +
-            escapeHtml(formatString(UI.countChip.inSection, countLabel(count, UI.countChip.tasks))) +
-            '">' +
-            count +
-            '</span>' +
+            `<span class="day-section-name">${escapeHtml(title)}</span>` +
+            `<span class="day-section-count" title="${chipTitle}">${count}</span>` +
             '</div>' +
-            '<div class="day-section-body">' +
-            rowsHtml +
-            '</div>' +
+            `<div class="day-section-body">${rowsHtml}</div>` +
             '</section>'
         );
     }
@@ -979,57 +964,22 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         const typeAttr = resolveHeadingClass(task).includes('deadline') ? 'deadline' : 'scheduled';
 
         return (
-            '<div class="task-line"' +
-            ' data-status="' +
-            statusKind +
-            '"' +
-            ' data-priority="' +
-            priorityAttr +
-            '"' +
-            ' data-type="' +
-            typeAttr +
-            '"' +
-            ' data-file="' +
-            escapeHtml(task.file) +
-            '"' +
-            ' data-line="' +
-            sanitizeTaskLine(task.line) +
-            '">' +
+            `<div class="task-line" data-status="${statusKind}" data-priority="${priorityAttr}"` +
+            ` data-type="${typeAttr}" data-file="${escapeHtml(task.file)}"` +
+            ` data-line="${sanitizeTaskLine(task.line)}">` +
             // The big-time column: a clean HH:MM, or empty for an all-day task
             // (the stylesheet then fills in an em-dash placeholder).
-            '<span class="time-plain">' +
-            escapeHtml(task.timestamp_time ?? '') +
-            '</span>' +
-            '<span class="status" data-status="' +
-            statusKind +
-            '" data-attention="' +
-            attention +
-            '" title="' +
-            escapeHtml(attentionTooltip(attention, UI.tooltips)) +
-            '">' +
-            escapeHtml(status) +
-            '</span>' +
+            `<span class="time-plain">${escapeHtml(task.timestamp_time ?? '')}</span>` +
+            `<span class="status" data-status="${statusKind}" data-attention="${attention}"` +
+            ` title="${escapeHtml(attentionTooltip(attention, UI.tooltips))}">${escapeHtml(status)}</span>` +
             // .flag: the type glyph (deadline/scheduled/repeat/cancelled).
-            '<span class="flag" data-flag="' +
-            flag +
-            '" title="' +
-            escapeHtml(flagTooltip(flag, UI.tooltips, formatString, formatDateForTitle, task)) +
-            '"></span>' +
-            '<span class="priority" data-priority="' +
-            priorityAttr +
-            '" title="' +
-            escapeHtml(priorityTooltip(priorityLetter, UI.tooltips, formatString)) +
-            '">' +
-            escapeHtml(priorityLetter) +
-            '</span>' +
-            '<span class="heading">' +
-            escapeHtml(task.heading) +
-            '</span>' +
-            '<span class="offset" data-dir="' +
-            dateDir +
-            '">' +
-            dateDisplay +
-            '</span>' +
+            `<span class="flag" data-flag="${flag}"` +
+            ` title="${escapeHtml(flagTooltip(flag, UI.tooltips, formatString, formatDateForTitle, task))}"></span>` +
+            `<span class="priority" data-priority="${priorityAttr}"` +
+            ` title="${escapeHtml(priorityTooltip(priorityLetter, UI.tooltips, formatString))}">` +
+            `${escapeHtml(priorityLetter)}</span>` +
+            `<span class="heading">${escapeHtml(task.heading)}</span>` +
+            `<span class="offset" data-dir="${dateDir}">${dateDisplay}</span>` +
             '</div>'
         );
     }
@@ -1233,6 +1183,7 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         // that anchor so the update handler falls back to scrollToWeekFocus()
         // instead of restoring an old position.
         if (offset === 0) {
+            // eslint-disable-next-line @typescript-eslint/no-dynamic-delete -- scrollHistory is a dictionary keyed by anchor date; dropping an entry is what it is for
             delete scrollHistory[newDate];
         }
         vscode.postMessage({ command: 'navigate', date: newDate });
@@ -1334,7 +1285,9 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
     function attachTagMenuListeners(): void {
         const btn = document.getElementById('tagMenuBtn');
         if (btn) {
-            btn.addEventListener('click', (ev) => toggleMenu(ev, 'tagMenu'));
+            btn.addEventListener('click', (ev) => {
+                toggleMenu(ev, 'tagMenu');
+            });
         }
         document.querySelectorAll('#tagMenu .tag-menu-item').forEach((el) => {
             el.addEventListener('click', () => {
@@ -1514,9 +1467,15 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             '</div>';
 
         if (hero.kind !== 'tasks') {
-            document.getElementById('btn-prev')?.addEventListener('click', () => navigate(-1));
-            document.getElementById('btn-today')?.addEventListener('click', () => navigate(0));
-            document.getElementById('btn-next')?.addEventListener('click', () => navigate(1));
+            document.getElementById('btn-prev')?.addEventListener('click', () => {
+                navigate(-1);
+            });
+            document.getElementById('btn-today')?.addEventListener('click', () => {
+                navigate(0);
+            });
+            document.getElementById('btn-next')?.addEventListener('click', () => {
+                navigate(1);
+            });
         }
         document.getElementById('btn-history-back')?.addEventListener('click', () => {
             vscode.postMessage({ command: 'historyBack' });

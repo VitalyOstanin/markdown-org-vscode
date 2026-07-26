@@ -44,7 +44,9 @@ suite('wireDayHeaderNavigation (jsdom)', () => {
         const linked = document.querySelectorAll('.day-header.day-header-link');
         assert.strictEqual(linked.length, 3, 'each wired header gets the day-header-link class');
         // Wired headers carry a hover tooltip explaining the drill-down.
-        linked.forEach((el) => assert.strictEqual(el.getAttribute('title'), OPEN_DAY_TITLE));
+        linked.forEach((el) => {
+            assert.strictEqual(el.getAttribute('title'), OPEN_DAY_TITLE);
+        });
         // The header without data-date must stay inert.
         const inert = [...document.querySelectorAll('.day-header')].filter(
             (el) => !el.classList.contains('day-header-link')

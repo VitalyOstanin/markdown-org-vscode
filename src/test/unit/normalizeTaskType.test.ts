@@ -69,9 +69,9 @@ suite('normalizeAgendaTaskTypes', () => {
             upcoming: [task({ task_type: 'DONE' })]
         };
         const out = normalizeAgendaTaskTypes([day]) as DayAgenda[];
-        assert.strictEqual(out[0]!.overdue[0]!.task_type, undefined);
-        assert.strictEqual(out[0]!.scheduled_timed[0]!.task_type, 'CANCELLED');
-        assert.strictEqual(out[0]!.upcoming[0]!.task_type, 'DONE');
+        assert.strictEqual(out[0]!.overdue![0]!.task_type, undefined);
+        assert.strictEqual(out[0]!.scheduled_timed![0]!.task_type, 'CANCELLED');
+        assert.strictEqual(out[0]!.upcoming![0]!.task_type, 'DONE');
     });
 
     test('tolerates DayAgenda buckets omitted by the extractor', () => {

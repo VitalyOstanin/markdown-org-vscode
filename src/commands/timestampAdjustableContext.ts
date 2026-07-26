@@ -41,7 +41,11 @@ export function registerTimestampAdjustableContext(context: vscode.ExtensionCont
     // is gated correctly, then keep it in sync with cursor and editor changes.
     update();
     context.subscriptions.push(
-        vscode.window.onDidChangeActiveTextEditor(() => update()),
-        vscode.window.onDidChangeTextEditorSelection(() => update())
+        vscode.window.onDidChangeActiveTextEditor(() => {
+            update();
+        }),
+        vscode.window.onDidChangeTextEditorSelection(() => {
+            update();
+        })
     );
 }

@@ -31,9 +31,7 @@ suite('CLOCK Integration Tests', () => {
     });
 
     teardown(async () => {
-        if (testDocument) {
-            await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
-        }
+        await vscode.commands.executeCommand('workbench.action.closeActiveEditor');
 
         if (fs.existsSync(testFilePath)) {
             fs.unlinkSync(testFilePath);

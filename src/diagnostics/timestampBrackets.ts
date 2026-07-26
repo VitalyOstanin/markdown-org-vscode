@@ -120,7 +120,9 @@ export function registerBracketDiagnostics(context: vscode.ExtensionContext): vs
 
     context.subscriptions.push(
         vscode.workspace.onDidOpenTextDocument(refresh),
-        vscode.workspace.onDidChangeTextDocument((e) => scheduleRefresh(e.document)),
+        vscode.workspace.onDidChangeTextDocument((e) => {
+            scheduleRefresh(e.document);
+        }),
         vscode.workspace.onDidCloseTextDocument((doc) => {
             const key = doc.uri.toString();
             debouncedByUri.get(key)?.cancel();

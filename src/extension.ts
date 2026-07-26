@@ -19,12 +19,12 @@ import { withErrorReporting } from './utils/orgCommandWrap';
 import { registerBracketDiagnostics } from './diagnostics/timestampBrackets';
 import { registerTimestampAdjustableContext } from './commands/timestampAdjustableContext';
 
-function registerOrgCommand<A extends unknown[]>(
+function registerOrgCommand(
     context: vscode.ExtensionContext,
     name: string,
     // `unknown` already covers a returned promise; spelling both out is
     // redundant (and flagged as such by no-redundant-type-constituents).
-    handler: (...args: A) => unknown
+    handler: (...args: never[]) => unknown
 ): void {
     const wrapped = withErrorReporting(name, (msg) => notifyError(msg), handler);
     context.subscriptions.push(vscode.commands.registerCommand(name, wrapped));

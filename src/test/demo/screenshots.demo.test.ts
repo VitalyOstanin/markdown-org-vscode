@@ -65,7 +65,7 @@ suite('Demo: Screenshots', () => {
             const date = d.toISOString().slice(0, 10);
             const weekday = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][d.getDay()];
             const pieces = [`${date} ${weekday}`];
-            if (opts?.hour !== undefined && opts?.minute !== undefined) {
+            if (opts?.hour !== undefined && opts.minute !== undefined) {
                 const hh = String(opts.hour).padStart(2, '0');
                 const mm = String(opts.minute).padStart(2, '0');
                 pieces.push(`${hh}:${mm}`);

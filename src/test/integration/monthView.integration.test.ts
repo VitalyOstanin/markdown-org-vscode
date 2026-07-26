@@ -29,10 +29,7 @@ suite('Month View Integration Tests', () => {
 
         const daysWithTasks = mockAgendaData.filter((day) => {
             const taskCount =
-                (day.overdue || []).length +
-                (day.scheduled_timed || []).length +
-                (day.scheduled_no_time || []).length +
-                (day.upcoming || []).length;
+                day.overdue.length + day.scheduled_timed.length + day.scheduled_no_time.length + day.upcoming.length;
             return taskCount > 0;
         });
 

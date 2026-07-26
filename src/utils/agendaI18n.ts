@@ -242,7 +242,7 @@ export function pluralIndex(n: number, lang: string): number {
  * Inlined into the webview via `.toString()`, so it must stay self-contained.
  */
 export function formatString(template: string, ...values: string[]): string {
-    return String(template ?? '').replaceAll(/\{(\d+)\}/g, (match, digits) => {
+    return template.replaceAll(/\{(\d+)\}/g, (match, digits) => {
         const value = values[Number(digits)];
         return value ?? match;
     });

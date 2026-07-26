@@ -53,9 +53,11 @@ suite('Extractor execFile options', () => {
         execFileStub = sinon.stub(exec, 'execFile');
         execFileStub.callsFake((..._args: unknown[]) => {
             const callback = _args.at(-1) as ExecFileCallback;
-            const cliArgs = (_args[1] as string[]) || [];
+            const cliArgs = _args[1] as string[];
             const response = cliArgs.includes('--holidays') ? [] : dayPayload;
-            queueMicrotask(() => callback(null, JSON.stringify(response), ''));
+            queueMicrotask(() => {
+                callback(null, JSON.stringify(response), '');
+            });
             return {};
         });
     });

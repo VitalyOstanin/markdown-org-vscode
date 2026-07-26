@@ -24,7 +24,7 @@ const FONT_STACK_PATTERN = /^[\p{L}\p{N} '",._-]+$/u;
  * built-in default in both cases.
  */
 export function sanitizeFontFamily(value: string | undefined | null): string {
-    const trimmed = String(value ?? '').trim();
+    const trimmed = (value ?? '').trim();
     if (!trimmed || trimmed.length > MAX_FONT_STACK_LENGTH) {
         return '';
     }

@@ -26,7 +26,7 @@ export const defaultDbusRun: DbusRun = (file, args) =>
         exec.execFile(file, args, { encoding: 'utf-8', maxBuffer: MAX_BUFFER_BYTES }, (error, stdout, stderr) => {
             const e = error as (NodeJS.ErrnoException & { code?: number | string }) | null;
             const code: number | string = e ? (e.code ?? 1) : 0;
-            resolve({ stdout: stdout ?? '', stderr: stderr ?? '', code });
+            resolve({ stdout, stderr, code });
         });
     });
 
@@ -54,7 +54,7 @@ export async function busctlCall(run: DbusRun, spec: DbusCallSpec): Promise<unkn
     } catch {
         throw new Error(`busctl ${spec.method}: unexpected output`);
     }
-    if (!parsed || !Array.isArray(parsed.data)) {
+    if (!Array.isArray(parsed.data)) {
         throw new Error(`busctl ${spec.method}: unexpected output`);
     }
     return parsed.data as unknown[];

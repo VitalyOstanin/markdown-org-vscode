@@ -43,6 +43,6 @@ suite('escapeHtml', () => {
         // this on values that an older extractor may omit entirely.
         assert.strictEqual(escapeHtml(undefined), '');
         assert.strictEqual(escapeHtml(null), '');
-        assert.strictEqual(escapeHtml(42 as unknown as string), '42');
+        assert.strictEqual(escapeHtml(42), '42');
     });
 });

@@ -20,7 +20,7 @@
  * Inlined into the webview via `.toString()`, so the body must stay
  * self-contained: no imports, no module-level helpers.
  */
-export function escapeHtml(text: string | undefined | null): string {
+export function escapeHtml(text: string | number | boolean | undefined | null): string {
     return String(text ?? '')
         .replaceAll('&', '&amp;')
         .replaceAll('<', '&lt;')

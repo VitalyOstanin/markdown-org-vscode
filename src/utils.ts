@@ -117,7 +117,7 @@ export async function requireHeadingAtCursor(editor: vscode.TextEditor): Promise
  * Falls back to a manual upward scan if no document symbols are available.
  */
 export async function findNearestHeading(editor: vscode.TextEditor): Promise<number | null> {
-    const symbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
+    const symbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[] | undefined>(
         'vscode.executeDocumentSymbolProvider',
         editor.document.uri
     );
@@ -133,7 +133,7 @@ export async function findNearestHeading(editor: vscode.TextEditor): Promise<num
                     const symLine = sym.range.start.line;
                     bestMatch = symLine;
 
-                    if (sym.children && sym.children.length > 0) {
+                    if (sym.children.length > 0) {
                         const childMatch = findHeading(sym.children, symLine);
                         if (childMatch !== null) {
                             bestMatch = childMatch;

@@ -51,11 +51,18 @@ function buildDescription(content: string | undefined, relPath: string, line: nu
 
 /** Map a syncable task to a Google Calendar event resource. */
 export function mapTaskToEvent(task: Task, orgId: string, opts: MapOptions): GcalEventResource {
-    const date = task.timestamp_date!;
+    // `isSyncable` is the gate for this function and checks both fields; the
+    // guard restates that contract for the type system, and for a caller that
+    // ever forgets it.
+    const date = task.timestamp_date;
+    const tsType = task.timestamp_type;
+    if (date === undefined || tsType === undefined) {
+        throw new Error(`task ${orgId} is not syncable: it has no timestamp`);
+    }
     const ext = {
         private: {
             mdOrgId: orgId,
-            mdOrgTsType: task.timestamp_type!
+            mdOrgTsType: tsType
         }
     };
 

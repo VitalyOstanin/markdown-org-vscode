@@ -113,6 +113,7 @@ export interface AgendaRenderRequest {
     navigation?: boolean;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-extraneous-class -- one panel exists at a time, so its state is static by design; a namespace cannot hold the private statics this keeps
 export class AgendaPanel {
     private static currentPanel?: vscode.WebviewPanel | undefined;
     private static watcher?: vscode.FileSystemWatcher | undefined;
@@ -199,7 +200,7 @@ export class AgendaPanel {
      * rejection here would surface nowhere at all.
      */
     private static requestRefresh(shiftedToday?: string, userInitiated?: boolean): void {
-        AgendaPanel.refreshCallback?.(shiftedToday, userInitiated)?.catch((err) =>
+        AgendaPanel.refreshCallback?.(shiftedToday, userInitiated).catch((err: unknown) =>
             notifyError(`agenda refresh failed: ${formatError(err)}`)
         );
     }
@@ -250,7 +251,11 @@ export class AgendaPanel {
         };
 
         if (AgendaPanel.currentPanel) {
-            AgendaPanel.updateExistingPanel(args, { shiftedToday, userInitiated, navigation });
+            AgendaPanel.updateExistingPanel(AgendaPanel.currentPanel, args, {
+                shiftedToday,
+                userInitiated,
+                navigation
+            });
         } else {
             AgendaPanel.createNewPanel(args);
         }
@@ -313,15 +318,15 @@ export class AgendaPanel {
 
     /** Localized tab title, e.g. `Agenda: Week` / `Агенда: Неделя`. */
     private static panelTitleFor(mode: string, strings: AgendaStrings): string {
-        const label = strings.modes[mode as keyof AgendaStrings['modes']] ?? mode;
+        const label = mode in strings.modes ? strings.modes[mode as keyof AgendaStrings['modes']] : mode;
         return formatString(strings.tabTitle, label);
     }
 
     private static updateExistingPanel(
+        panel: vscode.WebviewPanel,
         args: AgendaRenderArgs,
         view: { shiftedToday: string | undefined; userInitiated: boolean; navigation: boolean }
     ) {
-        const panel = AgendaPanel.currentPanel!;
         if (view.userInitiated) {
             panel.reveal(vscode.ViewColumn.One);
         }
@@ -397,7 +402,9 @@ export class AgendaPanel {
             AgendaPanel.setAgendaFocusedContext(e.webviewPanel.active);
         });
 
-        AgendaPanel.currentPanel.onDidDispose(() => AgendaPanel.handleDispose());
+        AgendaPanel.currentPanel.onDidDispose(() => {
+            AgendaPanel.handleDispose();
+        });
         // The handler is async, so its promise is caught here rather than left
         // to become an unhandled rejection: the commands it dispatches carry
         // their own error reporting today, but that is an invariant of theirs,
@@ -406,7 +413,7 @@ export class AgendaPanel {
         // shape the handler declares, and every field it reads is validated
         // there before use.
         AgendaPanel.currentPanel.webview.onDidReceiveMessage((message: unknown) =>
-            AgendaPanel.handleWebviewMessage(message as AgendaWebviewMessage).catch((err) =>
+            AgendaPanel.handleWebviewMessage(message as AgendaWebviewMessage).catch((err: unknown) =>
                 notifyError(`agenda action failed: ${formatError(err)}`)
             )
         );

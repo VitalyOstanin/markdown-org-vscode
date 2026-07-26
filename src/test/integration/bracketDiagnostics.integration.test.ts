@@ -112,7 +112,7 @@ suite('Bracket-policy diagnostics + Quick Fix', () => {
         const editor = await vscode.window.showTextDocument(doc);
         const [diagnostic] = await waitForBracketDiagnostics(doc.uri, 1);
 
-        const actions = await vscode.commands.executeCommand<vscode.CodeAction[]>(
+        const actions = await vscode.commands.executeCommand<vscode.CodeAction[] | undefined>(
             'vscode.executeCodeActionProvider',
             doc.uri,
             diagnostic!.range,
@@ -139,7 +139,7 @@ suite('Bracket-policy diagnostics + Quick Fix', () => {
         const editor = await vscode.window.showTextDocument(doc);
         const [diagnostic] = await waitForBracketDiagnostics(doc.uri, 1);
 
-        const actions = await vscode.commands.executeCommand<vscode.CodeAction[]>(
+        const actions = await vscode.commands.executeCommand<vscode.CodeAction[] | undefined>(
             'vscode.executeCodeActionProvider',
             doc.uri,
             diagnostic!.range,

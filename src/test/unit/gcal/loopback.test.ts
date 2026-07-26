@@ -6,7 +6,9 @@ function hit(url: string): Promise<void> {
     return new Promise((resolve, reject) => {
         http.get(url, (res) => {
             res.resume();
-            res.on('end', () => resolve());
+            res.on('end', () => {
+                resolve();
+            });
         }).on('error', reject);
     });
 }

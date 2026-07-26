@@ -13,8 +13,8 @@ import { collectSiblingKeywords } from '../utils/headingScan';
 import { namedGroups } from '../utils/regexGroups';
 import { notifyWarn, notifyStatus } from '../utils/notify';
 
-const PRIORITY_A_CODE = 'A'.codePointAt(0)!;
-const PRIORITY_Z_CODE = 'Z'.codePointAt(0)!;
+const PRIORITY_A_CODE = 'A'.codePointAt(0) ?? 0;
+const PRIORITY_Z_CODE = 'Z'.codePointAt(0) ?? 0;
 // Numeric priorities mirror org-mode's `[#0]..[#64]` range -- same bounds
 // markdown-org-extract enforces in `Priority::parse`.
 const PRIORITY_NUMERIC_MIN = 0;
@@ -116,7 +116,7 @@ function adjustHeadingPart(match: RegExpMatchArray, part: HeadingPart, delta: nu
             const newIndex = (currentIndex + delta + statuses.length) % statuses.length;
             newStatus = statuses[newIndex] ?? status;
         }
-    } else if (part === 'priority') {
+    } else {
         if (/^\d+$/.test(priority)) {
             const newValue = parseInt(priority, 10) + delta;
             if (newValue >= PRIORITY_NUMERIC_MIN && newValue <= PRIORITY_NUMERIC_MAX) {

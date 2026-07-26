@@ -85,7 +85,9 @@ suite('Google Calendar sync: DONE -> delete', () => {
         execFileStub.callsFake((..._args: unknown[]) => {
             const callback = _args.at(-1) as ExecFileCallback;
             const stdout = JSON.stringify(donePayload);
-            queueMicrotask(() => callback(null, stdout, ''));
+            queueMicrotask(() => {
+                callback(null, stdout, '');
+            });
             return {};
         });
 
@@ -432,7 +434,9 @@ suite('Google Calendar sync: makePropertiesWriter', () => {
         // dirty. The writer opens the same document instance and must bail.
         const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(file));
         const editor = await vscode.window.showTextDocument(doc);
-        await editor.edit((eb) => eb.insert(new vscode.Position(doc.lineCount - 1, 0), 'scratch\n'));
+        await editor.edit((eb) => {
+            eb.insert(new vscode.Position(doc.lineCount - 1, 0), 'scratch\n');
+        });
         assert.ok(doc.isDirty, 'precondition: document should be dirty after the edit');
 
         const outcome = await makePropertiesWriter().write(file, 1, 'My heading', { ID: 'abc' });

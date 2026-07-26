@@ -37,7 +37,7 @@ export async function listGoaGoogleAccounts(run: DbusRun): Promise<GoaAccount[]>
     }
     const out: GoaAccount[] = [];
     for (const [path, ifaces] of Object.entries(managed as Record<string, Record<string, Record<string, unknown>>>)) {
-        const acc = ifaces?.[ACCOUNT_IFACE];
+        const acc = ifaces[ACCOUNT_IFACE];
         if (!acc) {
             continue;
         }

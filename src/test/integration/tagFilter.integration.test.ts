@@ -36,7 +36,11 @@ suite('Tag Filter Integration Tests', () => {
     });
 
     after(async () => {
-        [testFile1, testFile2].forEach((f) => fs.existsSync(f) && fs.unlinkSync(f));
+        for (const f of [testFile1, testFile2]) {
+            if (fs.existsSync(f)) {
+                fs.unlinkSync(f);
+            }
+        }
         const config = vscode.workspace.getConfiguration('markdown-org');
         await config.update('currentTag', undefined, vscode.ConfigurationTarget.Workspace);
         await config.update('currentTag', undefined, vscode.ConfigurationTarget.Global);

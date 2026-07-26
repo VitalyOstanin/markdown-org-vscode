@@ -32,6 +32,7 @@ export class SingleFlight {
                 const handle: RunHandle = { aborted: false };
                 this.current = handle;
                 await task(handle);
+                // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- `run` sets this flag from outside the loop body
             } while (this.pending);
         } finally {
             this.running = false;
