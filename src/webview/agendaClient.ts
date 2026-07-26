@@ -287,6 +287,69 @@ export interface AgendaClientDeps {
         }
     ) => string;
     renderDayHeaderHtml: (parts: DayHeaderParts) => string;
+    renderModeSwitch: (
+        activeMode: string,
+        ctx: {
+            modes: AgendaStrings['modes'];
+            switchToView: string;
+            escapeHtml: (text: string | number | boolean | undefined | null) => string;
+            formatString: (template: string, ...values: string[]) => string;
+        }
+    ) => string;
+    /** Called by `renderTagMenu`; not invoked directly by the client. */
+    tagLabel: (name: string, allLabel: string) => string;
+    /** Also called on its own, to re-label the collapsed button after a pick. */
+    tagButtonText: (
+        tag: string,
+        ctx: { tagAll: string; tagButton: string; formatString: (template: string, ...values: string[]) => string }
+    ) => string;
+    renderTagMenu: (
+        tags: readonly string[],
+        currentTag: string,
+        ctx: {
+            tagAll: string;
+            tagAllTitle: string;
+            tagButton: string;
+            tagCaption: string;
+            tagFilterTitle: string;
+            escapeHtml: (text: string | number | boolean | undefined | null) => string;
+            formatString: (template: string, ...values: string[]) => string;
+        }
+    ) => string;
+    renderHeaderModeButton: (
+        mode: string | undefined,
+        ctx: {
+            headerModeButton: string;
+            headerModeTitle: string;
+            headerModes: AgendaStrings['headerModes'];
+            escapeHtml: (text: string | number | boolean | undefined | null) => string;
+            formatString: (template: string, ...values: string[]) => string;
+            nextHeaderMode: (value: string | undefined) => 'auto' | 'full' | 'compact';
+        }
+    ) => string;
+    renderHistoryNav: (ctx: {
+        historyBack: string;
+        historyForward: string;
+        backChord: string;
+        forwardChord: string;
+        escapeHtml: (text: string | number | boolean | undefined | null) => string;
+        formatString: (template: string, ...values: string[]) => string;
+    }) => string;
+    renderDateNav: (
+        unit: 'day' | 'week' | 'month',
+        ctx: {
+            navPrev: AgendaStrings['navPrev'];
+            navNext: AgendaStrings['navNext'];
+            navToday: string;
+            navTodayTitle: string;
+            escapeHtml: (text: string | number | boolean | undefined | null) => string;
+        }
+    ) => string;
+    renderHeroHtml: (
+        parts: { title: string; sub?: string; badge?: string },
+        ctx: { escapeHtml: (text: string | number | boolean | undefined | null) => string }
+    ) => string;
+    renderNavBarHtml: (parts: { modeSwitch: string; history: string; dateNav: string; chips: string }) => string;
 }
 
 /**
@@ -370,8 +433,25 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         summaryStat: summaryStatHtml,
         renderSummaryBar: renderSummaryBarHtml,
         renderSectionPanel: renderSectionPanelHtml,
-        renderDayHeaderHtml
+        renderDayHeaderHtml,
+        renderModeSwitch,
+        tagButtonText,
+        renderTagMenu,
+        // Aliased: the client keeps a wrapper of this one, called from two places.
+        renderHeaderModeButton: renderHeaderModeButtonHtml,
+        renderHistoryNav,
+        renderDateNav,
+        renderHeroHtml,
+        renderNavBarHtml
     } = deps;
+
+    /**
+     * Chords the view-history tooltips name. They mirror the `keybindings`
+     * contribution in package.json; nothing reads the user's remapping back, so
+     * a rebound chord shows its default here.
+     */
+    const HISTORY_BACK_CHORD = 'Alt+Shift+-';
+    const HISTORY_FORWARD_CHORD = 'Alt+Shift+=';
 
     /** Columns in the month calendar grid -- a week. */
     const CALENDAR_COLS = 7;
@@ -1205,84 +1285,6 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         vscode.postMessage({ command: 'navigate', date: newDate });
     }
 
-    function renderModeSwitch(): string {
-        const modes = [
-            { id: 'day', label: UI.modes.day },
-            { id: 'week', label: UI.modes.week },
-            { id: 'month', label: UI.modes.month },
-            { id: 'tasks', label: UI.modes.tasks }
-        ];
-        return (
-            '<span class="mode-seg">' +
-            modes
-                .map(
-                    (m) =>
-                        '<button class="seg-item' +
-                        (m.id === initialMode ? ' active' : '') +
-                        '" data-mode="' +
-                        m.id +
-                        '" title="' +
-                        escapeHtml(formatString(UI.switchToView, m.label)) +
-                        '">' +
-                        escapeHtml(m.label) +
-                        '</button>'
-                )
-                .join('') +
-            '</span>'
-        );
-    }
-
-    // The implicit "no filter" tag is stored as ALL but shown translated;
-    // user-defined tag names are shown as configured.
-    function tagLabel(name: string): string {
-        return name === 'ALL' ? UI.tagAll : name;
-    }
-
-    function tagButtonText(tag: string): string {
-        return formatString(UI.tagButton, tagLabel(tag)) + ' ▾';
-    }
-
-    // The file-tag dropdown: a collapsed button plus a list of tags. The ids and
-    // the data-tag attribute are hardcoded because the click handlers
-    // (toggleMenu, attachTagMenuListeners) address them directly -- a second
-    // dropdown would need its own handlers anyway.
-    function renderTagMenu(): string {
-        const rows = availableTags
-            .map((name) => {
-                const title = name === 'ALL' ? UI.tagAllTitle : formatString(UI.tagFilterTitle, name);
-                return (
-                    // A dropdown row behaves like a button, so it is one: that
-                    // is what gives it Tab focus and Enter/Space activation,
-                    // matching the mode segment next to it.
-                    '<button type="button" class="tag-menu-item' +
-                    (name === currentTag ? ' active' : '') +
-                    '" data-tag="' +
-                    escapeHtml(name) +
-                    '" title="' +
-                    escapeHtml(title) +
-                    '">' +
-                    '<span class="tag-menu-check">✓</span>' +
-                    escapeHtml(tagLabel(name)) +
-                    '</button>'
-                );
-            })
-            .join('');
-        return (
-            '<div class="tag-menu" id="tagMenu">' +
-            '<button class="tag-menu-btn" id="tagMenuBtn" title="' +
-            escapeHtml(UI.tagCaption) +
-            '">' +
-            escapeHtml(tagButtonText(currentTag)) +
-            '</button>' +
-            '<div class="tag-menu-list">' +
-            '<div class="tag-menu-label">' +
-            escapeHtml(UI.tagCaption) +
-            '</div>' +
-            rows +
-            '</div></div>'
-        );
-    }
-
     function setTag(tag: string): void {
         currentTag = tag;
         // Mirror the live choice onto the collapsed button and the active marker
@@ -1293,7 +1295,7 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         });
         const btn = document.getElementById('tagMenuBtn');
         if (btn) {
-            btn.textContent = tagButtonText(tag);
+            btn.textContent = tagButtonText(tag, { tagAll: UI.tagAll, tagButton: UI.tagButton, formatString });
         }
         vscode.postMessage({ command: 'setTag', tag: tag });
     }
@@ -1315,28 +1317,15 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         });
     }
 
-    /**
-     * The header-layout button: it names the current mode and cycles it
-     * (auto -> full -> compact) on click. The setting exists for a panel too
-     * short for the full header, which is exactly when reaching for the
-     * settings editor is most awkward; the tooltip names what one click gives,
-     * so the cycle is legible without trying it.
-     */
     function renderHeaderModeButton(): string {
-        const mode: 'auto' | 'full' | 'compact' =
-            headerMode === 'full' || headerMode === 'compact' ? headerMode : 'auto';
-        const next = nextHeaderMode(mode);
-        const label = formatString(UI.headerModeButton, UI.headerModes[mode]);
-        const title = formatString(UI.headerModeTitle, UI.headerModes[mode], UI.headerModes[next]);
-        return (
-            '<button class="chip-btn" id="headerModeBtn" title="' +
-            escapeHtml(title) +
-            '" aria-label="' +
-            escapeHtml(title) +
-            '">' +
-            escapeHtml(label) +
-            '</button>'
-        );
+        return renderHeaderModeButtonHtml(headerMode, {
+            headerModeButton: UI.headerModeButton,
+            headerModeTitle: UI.headerModeTitle,
+            headerModes: UI.headerModes,
+            escapeHtml,
+            formatString,
+            nextHeaderMode
+        });
     }
 
     /**
@@ -1378,109 +1367,77 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         if (!navBar || !heroEl) {
             return;
         }
-        const modeSwitchHtml = renderModeSwitch();
-        const tagHtml = renderTagMenu();
         // The header-layout button and the Tag picker sit at the right edge of
         // the control row.
-        const chipsHtml = '<span class="nav-spacer"></span>' + renderHeaderModeButton() + tagHtml;
-
-        // View history (Back/Forward over {mode, date} states). It has keyboard
-        // shortcuts, but every other navigation in the panel is a visible
-        // button, and the commands only appear in the Command Palette while the
-        // agenda has focus -- so without these two the feature is unreachable
-        // unless you already know it exists. The tooltips name the default
-        // chords, which is where the user learns them.
-        const historyHtml =
-            '<span class="date-nav history-nav">' +
-            '<button class="nav-btn nav-btn-arrow" id="btn-history-back" title="' +
-            escapeHtml(formatString(UI.historyBack, 'Alt+Shift+-')) +
-            '" aria-label="' +
-            escapeHtml(formatString(UI.historyBack, 'Alt+Shift+-')) +
-            '">⟨</button>' +
-            '<button class="nav-btn nav-btn-arrow" id="btn-history-forward" title="' +
-            escapeHtml(formatString(UI.historyForward, 'Alt+Shift+=')) +
-            '" aria-label="' +
-            escapeHtml(formatString(UI.historyForward, 'Alt+Shift+=')) +
-            '">⟩</button>' +
-            '</span>';
+        const chipsHtml =
+            renderHeaderModeButton() +
+            renderTagMenu(availableTags, currentTag, {
+                tagAll: UI.tagAll,
+                tagAllTitle: UI.tagAllTitle,
+                tagButton: UI.tagButton,
+                tagCaption: UI.tagCaption,
+                tagFilterTitle: UI.tagFilterTitle,
+                escapeHtml,
+                formatString
+            });
+        const historyHtml = renderHistoryNav({
+            historyBack: UI.historyBack,
+            historyForward: UI.historyForward,
+            backChord: HISTORY_BACK_CHORD,
+            forwardChord: HISTORY_FORWARD_CHORD,
+            escapeHtml,
+            formatString
+        });
 
         // resolveHeroModel (inlined, unit-tested) decides the title shape and
         // whether the TODAY badge shows; Intl formatting of the actual text stays
         // here where the locale lives.
         const hero = resolveHeroModel(initialMode, shiftedToday, toIsoDate(new Date()));
-        const badge = hero.showToday ? '<span class="hero-badge">' + escapeHtml(UI.todayBadge) + '</span>' : '';
+        const badge = hero.showToday ? UI.todayBadge : '';
 
         // Date navigation (Prev/Today/Next) exists for every mode except Tasks.
-        // In the full header the mode segment and this control row live on two
-        // separate rows (per the approved Nav "A" mockup), so the underline
-        // segment does not share a baseline with the boxed nav buttons; the
-        // compact header folds them onto one row through CSS alone -- the markup
-        // built here is the same in both layouts.
         let dateNavHtml = '';
         if (hero.kind === 'tasks') {
-            heroEl.innerHTML = '<div class="hero-title">' + escapeHtml(UI.modes.tasks) + '</div>';
+            heroEl.innerHTML = renderHeroHtml({ title: UI.modes.tasks }, { escapeHtml });
         } else {
             const d = parseLocalDate(shiftedToday);
-            if (hero.kind === 'month') {
-                const monthName = d.toLocaleDateString(locale, { month: 'long' });
-                heroEl.innerHTML =
-                    '<div class="hero-title">' +
-                    escapeHtml(monthName) +
-                    '</div>' +
-                    '<div class="hero-sub"><span>' +
-                    escapeHtml(formatNumber(d.getFullYear(), locale)) +
-                    '</span>' +
-                    badge +
-                    '</div>';
-            } else {
-                const weekday = d.toLocaleDateString(locale, { weekday: 'long' });
-                const dayMonth = d.toLocaleDateString(locale, { day: 'numeric', month: 'long' });
-                heroEl.innerHTML =
-                    '<div class="hero-title">' +
-                    escapeHtml(weekday) +
-                    '</div>' +
-                    '<div class="hero-sub"><span>' +
-                    escapeHtml(dayMonth + ' ' + formatNumber(d.getFullYear(), locale)) +
-                    '</span>' +
-                    badge +
-                    '</div>';
-            }
+            const year = formatNumber(d.getFullYear(), locale);
+            heroEl.innerHTML =
+                hero.kind === 'month'
+                    ? renderHeroHtml(
+                          { title: d.toLocaleDateString(locale, { month: 'long' }), sub: year, badge },
+                          { escapeHtml }
+                      )
+                    : renderHeroHtml(
+                          {
+                              title: d.toLocaleDateString(locale, { weekday: 'long' }),
+                              sub: `${d.toLocaleDateString(locale, { day: 'numeric', month: 'long' })} ${year}`,
+                              badge
+                          },
+                          { escapeHtml }
+                      );
 
-            // Prev/Next wording is per unit, not a "Previous {unit}" template: in
-            // some languages the adjective agrees with the noun's gender (ru:
-            // "Предыдущий день" / "Предыдущая неделя").
             const unit = initialMode === 'day' ? 'day' : initialMode === 'week' ? 'week' : 'month';
-            const prevTitle = escapeHtml(UI.navPrev[unit]);
-            const nextTitle = escapeHtml(UI.navNext[unit]);
-            dateNavHtml =
-                '<span class="date-nav">' +
-                '<button class="nav-btn nav-btn-arrow" id="btn-prev" title="' +
-                prevTitle +
-                '" aria-label="' +
-                prevTitle +
-                '">‹</button>' +
-                '<button class="nav-btn nav-btn-today" id="btn-today" title="' +
-                escapeHtml(UI.navTodayTitle) +
-                '">' +
-                escapeHtml(UI.navToday) +
-                '</button>' +
-                '<button class="nav-btn nav-btn-arrow" id="btn-next" title="' +
-                nextTitle +
-                '" aria-label="' +
-                nextTitle +
-                '">›</button>' +
-                '</span>';
+            dateNavHtml = renderDateNav(unit, {
+                navPrev: UI.navPrev,
+                navNext: UI.navNext,
+                navToday: UI.navToday,
+                navTodayTitle: UI.navTodayTitle,
+                escapeHtml
+            });
         }
 
-        navBar.innerHTML =
-            '<div class="seg-row">' +
-            modeSwitchHtml +
-            '</div>' +
-            '<div class="control-row">' +
-            historyHtml +
-            dateNavHtml +
-            chipsHtml +
-            '</div>';
+        navBar.innerHTML = renderNavBarHtml({
+            modeSwitch: renderModeSwitch(initialMode, {
+                modes: UI.modes,
+                switchToView: UI.switchToView,
+                escapeHtml,
+                formatString
+            }),
+            history: historyHtml,
+            dateNav: dateNavHtml,
+            chips: chipsHtml
+        });
 
         if (hero.kind !== 'tasks') {
             document.getElementById('btn-prev')?.addEventListener('click', () => {

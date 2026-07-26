@@ -24,6 +24,17 @@ import {
     renderSummaryBar,
     summaryStat
 } from '../utils/agendaSummaryHtml';
+import {
+    renderDateNav,
+    renderHeaderModeButton,
+    renderHeroHtml,
+    renderHistoryNav,
+    renderModeSwitch,
+    renderNavBarHtml,
+    renderTagMenu,
+    tagButtonText,
+    tagLabel
+} from '../utils/agendaNavHtml';
 import { isCancelled } from '../utils/normalizeTaskType';
 import { shiftMonthAnchor } from '../utils/monthNav';
 import { wireDayHeaderNavigation } from '../utils/agendaDayHeaderNav';
@@ -925,7 +936,16 @@ export class AgendaPanel {
         summaryStat,
         renderSummaryBar,
         renderSectionPanel,
-        renderDayHeaderHtml
+        renderDayHeaderHtml,
+        renderModeSwitch,
+        tagLabel,
+        tagButtonText,
+        renderTagMenu,
+        renderHeaderModeButton,
+        renderHistoryNav,
+        renderDateNav,
+        renderHeroHtml,
+        renderNavBarHtml
     } satisfies AgendaClientDeps;
 
     /**

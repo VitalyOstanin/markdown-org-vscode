@@ -487,7 +487,11 @@ suite('Agenda Show Integration Tests', () => {
         assert.ok(panel, 'expected AgendaPanel to be open after showAgendaDay');
         const html = panel.webview.html;
 
-        const depsCall = /\},\s*\{ ([A-Za-z0-9_, ]+) \}\);/.exec(html);
+        // The call that starts the client: `})({"strings":...}, { a, b, ... });`
+        // -- the whole of it on the script's last line. Anchored to the `)(`
+        // that applies the stringified client, because a helper body may well
+        // contain `}, { name })` of its own (a ctx argument, say).
+        const depsCall = /\)\(\{.*\}, \{ ([A-Za-z0-9_, ]+) \}\);/.exec(html);
         assert.ok(depsCall, 'expected the script to call the client with a shorthand helper object');
         const names = depsCall[1]!.split(',').map((n) => n.trim());
         assert.ok(names.length >= 20, `expected the full helper set, got ${names.length}: ${names.join(', ')}`);
