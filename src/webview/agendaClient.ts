@@ -368,6 +368,47 @@ export interface AgendaClientDeps {
         dateStr: string,
         ctx: { openDayView: string; escapeHtml: (text: string | number | boolean | undefined | null) => string }
     ) => string;
+    renderTaskRow: (
+        task: TaskWithOffset,
+        daysOffset: number | undefined,
+        taskType: string | undefined,
+        ctx: {
+            tooltips: TooltipStrings;
+            escapeHtml: (text: string | number | boolean | undefined | null) => string;
+            formatString: (template: string, ...values: string[]) => string;
+            formatDate: (iso: string) => string;
+            sanitizeTaskLine: (value: unknown) => number;
+            isCancelled: (status: string | undefined) => boolean;
+            resolveTaskFlag: (task: Task, isCancelled: (status: string | undefined) => boolean) => string;
+            resolveAttentionLevel: (
+                task: Task,
+                daysOffset: number | undefined,
+                taskType: string | undefined,
+                isCancelled: (status: string | undefined) => boolean
+            ) => string;
+            resolveHeadingClass: (task: HeadingTintInput) => string;
+            attentionTooltip: (level: string, strings: TooltipStrings) => string;
+            flagTooltip: (
+                flag: string,
+                strings: TooltipStrings,
+                fill: (template: string, ...values: string[]) => string,
+                fmtDate: (iso: string) => string,
+                task?: FlagTooltipTask
+            ) => string;
+            priorityTooltip: (
+                letter: string,
+                strings: TooltipStrings,
+                fill: (template: string, ...values: string[]) => string
+            ) => string;
+        }
+    ) => string;
+    renderCard: (
+        kind: 'day' | 'tasks',
+        summaryHtml: string,
+        sectionsHtml: string,
+        emptyText: string,
+        ctx: { escapeHtml: (text: string | number | boolean | undefined | null) => string }
+    ) => string;
     renderMonthCalendar: (
         cells: readonly MonthCellLike[],
         weekdayLabels: readonly string[],
@@ -486,7 +527,9 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         buildMonthGrid,
         resolveFirstDayOffset,
         buildWeekdayLabels,
-        renderMonthCalendar
+        renderMonthCalendar,
+        renderTaskRow,
+        renderCard
     } = deps;
 
     /**
@@ -952,18 +995,6 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         // The summary bar carries data-date: it is the day view's single
         // anchor-date element (getRenderedInfo contract). Its content is the
         // count summary, not the date -- the nav hero already shows the date.
-        const summaryHtml = renderSummaryBar(day.date, pieces);
-
-        if (sections.length === 0) {
-            return (
-                '<div class="day-card" data-card="day">' +
-                summaryHtml +
-                '<div class="day-empty">' +
-                escapeHtml(UI.empty.day) +
-                '</div></div>'
-            );
-        }
-
         const sectionsHtml = sections
             .map((sec) => {
                 const rows = sec.items
@@ -976,7 +1007,7 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
                 return renderSectionPanel(sec.key, sec.title, sec.items.length, rows);
             })
             .join('');
-        return '<div class="day-card" data-card="day">' + summaryHtml + sectionsHtml + '</div>';
+        return renderCard('day', renderSummaryBar(day.date, pieces), sectionsHtml, UI.empty.day, { escapeHtml });
     }
 
     // ---- shared card chrome (Day and Tasks views) ----
@@ -1045,74 +1076,38 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         if (summary.done > 0) {
             pieces.push(summaryStat(summary.done, UI.summary.done, 'day-summary-done'));
         }
-        const summaryHtml = renderSummaryBar('', pieces);
-
-        if (groups.length === 0) {
-            return (
-                '<div class="day-card" data-card="tasks">' +
-                summaryHtml +
-                '<div class="day-empty">' +
-                escapeHtml(UI.empty.tasks) +
-                '</div></div>'
-            );
-        }
-
         // Group key -> section key: "pa"/"pb"/"pc"/"pnone", which the style sheet
         // tints to match the priority chip colours.
         const groupsHtml = groups
             .map((group) => {
                 const rows = group.items.map((task) => renderTask(task)).join('');
-                return renderSectionPanel('p' + group.key, group.title, group.items.length, rows);
+                return renderSectionPanel(`p${group.key}`, group.title, group.items.length, rows);
             })
             .join('');
-        return '<div class="day-card" data-card="tasks">' + summaryHtml + groupsHtml + '</div>';
+        return renderCard('tasks', renderSummaryBar('', pieces), groupsHtml, UI.empty.tasks, { escapeHtml });
     }
 
     function formatDayHeader(date: string): string {
         return renderDayHeaderHtml(formatDayHeaderParts(date, locale));
     }
 
+    // The row markup is in utils/agendaCardHtml.ts; this binds the page's
+    // dictionary and the memoised date formatter to it. Called from both cards.
     function renderTask(task: TaskWithOffset, daysOffset?: number, taskType?: string): string {
-        const status = task.task_type ?? '';
-        const priorityLetter = task.priority ?? '';
-        const statusKind =
-            status === 'TODO' ? 'todo' : status === 'DONE' ? 'done' : isCancelled(status) ? 'cancelled' : '';
-        // Escaped once and used in both the row and the chip: this is the
-        // hottest string in the renderer (a month view emits it per task).
-        const priorityAttr = escapeHtml(priorityLetter.toLowerCase());
-        const flag = resolveTaskFlag(task, isCancelled);
-        const attention = resolveAttentionLevel(task, daysOffset, taskType, isCancelled);
-
-        const dateDisplay =
-            daysOffset !== undefined && daysOffset !== 0 && task.timestamp_date
-                ? formatDateForTitle(task.timestamp_date)
-                : '';
-        const dateDir = taskType === 'upcoming' ? 'upcoming' : 'overdue';
-        // Source of truth: src/utils/agendaHeadingTint.ts -- unit tested.
-        // typeAttr feeds the [data-type="deadline"] selector that paints the
-        // heading red for a DEADLINE task; resolveHeadingClass still owns the
-        // DEADLINE > priority > default precedence rule.
-        const typeAttr = resolveHeadingClass(task).includes('deadline') ? 'deadline' : 'scheduled';
-
-        return (
-            `<div class="task-line" data-status="${statusKind}" data-priority="${priorityAttr}"` +
-            ` data-type="${typeAttr}" data-file="${escapeHtml(task.file)}"` +
-            ` data-line="${sanitizeTaskLine(task.line)}">` +
-            // The big-time column: a clean HH:MM, or empty for an all-day task
-            // (the stylesheet then fills in an em-dash placeholder).
-            `<span class="time-plain">${escapeHtml(task.timestamp_time ?? '')}</span>` +
-            `<span class="status" data-status="${statusKind}" data-attention="${attention}"` +
-            ` title="${escapeHtml(attentionTooltip(attention, UI.tooltips))}">${escapeHtml(status)}</span>` +
-            // .flag: the type glyph (deadline/scheduled/repeat/cancelled).
-            `<span class="flag" data-flag="${flag}"` +
-            ` title="${escapeHtml(flagTooltip(flag, UI.tooltips, formatString, formatDateForTitle, task))}"></span>` +
-            `<span class="priority" data-priority="${priorityAttr}"` +
-            ` title="${escapeHtml(priorityTooltip(priorityLetter, UI.tooltips, formatString))}">` +
-            `${escapeHtml(priorityLetter)}</span>` +
-            `<span class="heading">${escapeHtml(task.heading)}</span>` +
-            `<span class="offset" data-dir="${dateDir}">${dateDisplay}</span>` +
-            '</div>'
-        );
+        return renderTaskRow(task, daysOffset, taskType, {
+            tooltips: UI.tooltips,
+            escapeHtml,
+            formatString,
+            formatDate: formatDateForTitle,
+            sanitizeTaskLine,
+            isCancelled,
+            resolveTaskFlag,
+            resolveAttentionLevel,
+            resolveHeadingClass,
+            attentionTooltip,
+            flagTooltip,
+            priorityTooltip
+        });
     }
 
     /**

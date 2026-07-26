@@ -325,10 +325,13 @@
       `src/utils/agendaCalendarHtml.ts`, together with the two locale decisions
       behind it (`resolveFirstDayOffset`, `buildWeekdayLabels`). 23 unit tests;
       the client keeps a five-line binding.
-    - Remaining, in descending size: `renderTask` (58 lines), `renderDayCard`
-      (56), `renderTasks` (34), `formatDayHeader`, `formatDateForTitle`.
-      `handleHostMessage` (153) is dispatch, not markup, and is better left
-      where it is.
+    - Step 4 done: the task row and the card shell moved to
+      `src/utils/agendaCardHtml.ts` with 20 jsdom unit tests. `renderDayCard`
+      and `renderTasks` are down to picking the summary pieces and mapping
+      sections to rows; the row itself and the empty state are covered.
+    - Remaining in the client: `handleHostMessage` (dispatch, not markup, better
+      left where it is), the scroll/header-layout effects (they touch the live
+      DOM by definition) and the two memoised date formatters.
 
 - [x] Turn on the remaining strict TypeScript option: `noUncheckedIndexedAccess`
     - On in both projects as of 2026-07-26, which completes the strict set:

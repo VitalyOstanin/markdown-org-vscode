@@ -41,6 +41,7 @@ import {
     renderMonthCalendar,
     resolveFirstDayOffset
 } from '../utils/agendaCalendarHtml';
+import { renderCard, renderTaskRow } from '../utils/agendaCardHtml';
 import { isCancelled } from '../utils/normalizeTaskType';
 import { shiftMonthAnchor } from '../utils/monthNav';
 import { wireDayHeaderNavigation } from '../utils/agendaDayHeaderNav';
@@ -956,7 +957,9 @@ export class AgendaPanel {
         resolveFirstDayOffset,
         buildWeekdayLabels,
         calendarCellOpenTag,
-        renderMonthCalendar
+        renderMonthCalendar,
+        renderTaskRow,
+        renderCard
     } satisfies AgendaClientDeps;
 
     /**
