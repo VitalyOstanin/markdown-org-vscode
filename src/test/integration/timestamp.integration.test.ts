@@ -204,7 +204,7 @@ suite('Timestamp Integration Tests', () => {
             const englishDays = new Set(['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']);
             const match = inserted.match(/<\d{4}-\d{2}-\d{2}\s+(\S+)\s/);
             assert.ok(match, `cannot extract weekday from: ${inserted}`);
-            assert.ok(englishDays.has(match![1]), `weekday "${match![1]}" is not an English short name`);
+            assert.ok(englishDays.has(match[1]), `weekday "${match[1]}" is not an English short name`);
         } finally {
             await cfg.update('weekdayLocale', undefined, vscode.ConfigurationTarget.Workspace);
         }
@@ -224,7 +224,7 @@ suite('Timestamp Integration Tests', () => {
         const russianDays = new Set(['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб']);
         const match = inserted.match(/<\d{4}-\d{2}-\d{2}\s+(\S+)\s/);
         assert.ok(match, `cannot extract weekday from: ${inserted}`);
-        assert.ok(russianDays.has(match![1]), `weekday "${match![1]}" should default to Russian`);
+        assert.ok(russianDays.has(match[1]), `weekday "${match[1]}" should default to Russian`);
     });
 
     // Repeater preservation across day-shift commands: all three prefixes
@@ -598,7 +598,7 @@ suite('Timestamp Integration Tests', () => {
 
             assert.strictEqual(document.lineAt(1).text, '`CREATED: [2025-12-31 Wed]`');
             assert.strictEqual(statusStub.callCount, 1);
-            assert.match(statusStub.firstCall.args[0] as string, /Skipped DEADLINE, CLOSED \(already on heading\)/);
+            assert.match(statusStub.firstCall.args[0], /Skipped DEADLINE, CLOSED \(already on heading\)/);
         } finally {
             statusStub.restore();
         }
@@ -630,7 +630,7 @@ suite('Timestamp Integration Tests', () => {
             // Escalates to a warning toast (not the quiet status bar).
             assert.strictEqual(warnStub.callCount, 1, 'no-op must escalate to a warning toast');
             assert.match(
-                warnStub.firstCall.args[0] as string,
+                warnStub.firstCall.args[0],
                 /Cannot cycle CLOSED: CREATED, DEADLINE, SCHEDULED are already on this heading\./
             );
             assert.strictEqual(statusStub.callCount, 0, 'no status-bar message on a pure no-op');

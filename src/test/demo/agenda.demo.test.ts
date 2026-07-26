@@ -8,7 +8,7 @@ import {
     hideSidePanels,
     enableScreencast,
     forceEnglishWeekdays,
-    applyMonokaiTheme,
+    applyDemoTheme,
     maximizeVscodeWindow,
     pressKey,
     runCommandViaPalette
@@ -76,7 +76,7 @@ suite('Demo: Agenda', () => {
         const document = await vscode.workspace.openTextDocument(planningFile);
         await vscode.window.showTextDocument(document);
 
-        await applyMonokaiTheme();
+        await applyDemoTheme();
         await hideSidePanels();
         await forceEnglishWeekdays();
         await sleep(800);

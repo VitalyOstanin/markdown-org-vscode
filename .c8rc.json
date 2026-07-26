@@ -1,12 +1,28 @@
 {
   "all": true,
   "include": ["out/**/*.js"],
-  "exclude": ["out/test/**", "out/**/*.d.ts", "**/*.test.js", "**/*.integration.test.js"],
+  "exclude": [
+    "out/test/**",
+    "out/**/*.d.ts",
+    "**/*.test.js",
+    "**/*.integration.test.js",
+    "out/extension.js",
+    "out/commands/**",
+    "out/views/agendaPanel.js",
+    "out/diagnostics/**",
+    "out/webview/**",
+    "out/utils.js",
+    "out/utils/extractor.js",
+    "out/utils/notify.js",
+    "out/utils/configTarget.js",
+    "out/utils/logChannel.js",
+    "out/**/types.js"
+  ],
   "reporter": ["text", "lcov", "html"],
   "reports-dir": "coverage",
-  "lines": 48,
-  "branches": 89,
-  "functions": 87,
-  "statements": 48,
+  "lines": 95,
+  "branches": 92,
+  "functions": 96,
+  "statements": 95,
   "check-coverage": true
 }

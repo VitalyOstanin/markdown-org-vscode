@@ -9,7 +9,7 @@ import {
     hideSidePanels,
     enableScreencast,
     forceEnglishWeekdays,
-    applyMonokaiTheme,
+    applyDemoTheme,
     maximizeVscodeWindow,
     pressKey
 } from './_helpers';
@@ -49,7 +49,7 @@ suite('Demo: Task Status', () => {
         // event), then collapse side panels and adjust workspace settings.
         // maximizeVscodeWindow comes last so neither the theme repaint nor
         // closing a sidebar can reset the X11 window size mid-setup.
-        await applyMonokaiTheme();
+        await applyDemoTheme();
         await hideSidePanels();
         await forceEnglishWeekdays();
         await sleep(800);

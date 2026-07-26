@@ -37,7 +37,7 @@ suite('execError.buildExecError', () => {
         const original = makeExecException('child exited with code 1', 1);
         const err = buildExecError(original, 'stderr text', 'fallback');
         assert.strictEqual(err.cause, original);
-        assert.strictEqual((err.cause as FakeExecException).code, 1);
+        assert.strictEqual(err.cause.code, 1);
     });
 
     test('omits cause when no original error is provided (e.g. timeout path)', () => {

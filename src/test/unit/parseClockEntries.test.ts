@@ -110,4 +110,48 @@ suite('parseClockEntries', () => {
             { title: 'Child', totalMinutes: 45 }
         ]);
     });
+    // The extractor drops these when it computes `total_clock_time`; the table
+    // built here has to drop them too, or the same file gets two different
+    // totals depending on which project you ask.
+    test('a negative duration is dropped, not subtracted', () => {
+        const text =
+            '## TODO Typo\n' +
+            '`CLOCK: [2025-12-09 Tue 10:00]--[2025-12-09 Tue 11:00] => 1:00`\n' +
+            '`CLOCK: [2025-12-09 Tue 12:00]--[2025-12-09 Tue 10:00] => -2:00`\n';
+        const rows = parseClockEntries(text);
+        assert.deepStrictEqual(rows, [{ title: 'Typo', totalMinutes: 60 }]);
+    });
+
+    test('a duration past the 10000-hour bound is dropped', () => {
+        const text =
+            '## TODO Absurd\n' +
+            '`CLOCK: [2025-12-09 Tue 10:00]--[2025-12-09 Tue 11:00] => 1:00`\n' +
+            '`CLOCK: [2025-12-09 Tue 10:00]--[2099-12-09 Tue 11:00] => 10001:00`\n';
+        const rows = parseClockEntries(text);
+        assert.deepStrictEqual(rows, [{ title: 'Absurd', totalMinutes: 60 }]);
+    });
+
+    test('a minutes field of 60 or more is dropped', () => {
+        const text =
+            '## TODO Malformed\n' +
+            '`CLOCK: [2025-12-09 Tue 10:00]--[2025-12-09 Tue 11:00] => 1:00`\n' +
+            '`CLOCK: [2025-12-09 Tue 12:00]--[2025-12-09 Tue 13:15] => 1:75`\n';
+        const rows = parseClockEntries(text);
+        assert.deepStrictEqual(rows, [{ title: 'Malformed', totalMinutes: 60 }]);
+    });
+
+    // Whitespace variants the extractor accepts (`CLOCK:\s*` and `\s*=>\s*` in
+    // its clock.rs regex). Org-mode's own output pads the duration to a fixed
+    // column, and a hand-edited file can carry either form; counting them here
+    // but not there -- or the reverse -- is the very disagreement the shared
+    // acceptance rules exist to prevent.
+    test('the spacing variants the extractor accepts are counted here too', () => {
+        const text =
+            '## TODO Spacing\n' +
+            '`CLOCK: [2025-12-09 Tue 10:00]--[2025-12-09 Tue 11:00] =>  1:00`\n' +
+            '`CLOCK: [2025-12-09 Tue 12:00]--[2025-12-09 Tue 12:30]=>0:30`\n' +
+            '`CLOCK:  [2025-12-09 Tue 14:00]--[2025-12-09 Tue 14:15] => 0:15`\n';
+        const rows = parseClockEntries(text);
+        assert.deepStrictEqual(rows, [{ title: 'Spacing', totalMinutes: 105 }]);
+    });
 });

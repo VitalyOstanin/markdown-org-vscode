@@ -7,7 +7,7 @@ import {
     sleep,
     hideSidePanels,
     forceEnglishWeekdays,
-    applyMonokaiTheme,
+    applyDemoTheme,
     captureScreenshot,
     maximizeVscodeWindow,
     runCommandViaPalette
@@ -19,9 +19,12 @@ import {
  * Open VSX listing should advertise and snaps a single PNG of the
  * current X11 display.
  *
- * The screenshots scenario uses the Monokai theme so the PNGs read as
- * "Markdown Org has a personality", not as "another extension on a stock
- * Dark+ background".
+ * The scenario runs once per theme (Monokai and Solarized Light, both
+ * built in), so the PNGs read as "Markdown Org has a personality" rather
+ * than "another extension on a stock Dark+ background", and README can
+ * serve each reader the set matching their own colour scheme. The theme
+ * and the `-dark` / `-light` file-name suffix come from the driver via
+ * MARKDOWN_ORG_DEMO_THEME.
  */
 function clockEntry(start: Date, end: Date): string {
     const startStr = formatOrgTimestamp(start, 'square', 'en');
@@ -149,9 +152,9 @@ suite('Demo: Screenshots', () => {
         await config.update('workspaceDir', wsDir, vscode.ConfigurationTarget.Workspace);
 
         await forceEnglishWeekdays();
-        // applyMonokaiTheme now waits for VS Code's active-theme event, so
+        // applyDemoTheme now waits for VS Code's active-theme event, so
         // by the time control returns the editor has already recoloured.
-        await applyMonokaiTheme();
+        await applyDemoTheme();
 
         // 1. Editor view: planning.md is the most representative source file.
         const planningDoc = await vscode.workspace.openTextDocument(planningFile);

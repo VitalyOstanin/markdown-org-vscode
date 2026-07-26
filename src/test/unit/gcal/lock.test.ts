@@ -1,7 +1,7 @@
 import * as assert from 'node:assert/strict';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { mkdtemp, readFile, readdir } from 'node:fs/promises';
+import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { acquireLock, __atomicWriteForTests as atomicWrite } from '../../../utils/gcal/lock';
 
@@ -18,11 +18,11 @@ suite('gcal/lock', () => {
         assert.ok(existsSync(p));
         const second = await acquireLock({ path: p, heartbeatMs: 0 });
         assert.equal(second, null, 'second acquire is blocked');
-        await lock!.release();
+        await lock.release();
         assert.ok(!existsSync(p), 'lock file removed on release');
         const third = await acquireLock({ path: p, heartbeatMs: 0 });
         assert.ok(third, 'acquire after release succeeds');
-        await third!.release();
+        await third.release();
     });
 
     test('steals a stale lock (heartbeat older than TTL)', async () => {
@@ -37,7 +37,7 @@ suite('gcal/lock', () => {
         // the new lock owns the file (different nonce)
         const data = JSON.parse(await readFile(p, 'utf8'));
         assert.ok(typeof data.nonce === 'string');
-        await fresh!.release();
+        await fresh.release();
     });
 
     test('atomicWrite replaces contents in place, leaving no temp files and valid JSON', async () => {
@@ -63,6 +63,77 @@ suite('gcal/lock', () => {
         const data = JSON.parse(await readFile(p, 'utf8'));
         assert.ok(typeof data.heartbeatAt === 'number');
         assert.ok(typeof data.nonce === 'string');
-        await lock!.release();
+        await lock.release();
+    });
+    // A failing heartbeat used to be swallowed: the lease silently stopped
+    // being renewed, and after the TTL another window took the lock while this
+    // run was still writing.
+    test('a failed heartbeat is reported and counted', async () => {
+        const p = await tmpLockPath();
+        const errors: number[] = [];
+        let t = 1_000_000;
+        const lock = await acquireLock({
+            path: p,
+            heartbeatMs: 5,
+            now: () => (t += 1000),
+            onHeartbeatError: (_err, consecutive) => errors.push(consecutive)
+        });
+        assert.ok(lock);
+        // Make the atomic write fail: the lock directory disappears, so the
+        // temp file cannot be created.
+        await rm(path.dirname(p), { recursive: true, force: true });
+        await new Promise((r) => setTimeout(r, 40));
+        assert.ok(errors.length > 0, 'expected at least one heartbeat failure to be reported');
+        assert.deepEqual(
+            errors,
+            errors.map((_, i) => i + 1),
+            'failures are counted consecutively'
+        );
+        assert.ok(lock.failedHeartbeats() > 0, 'the lock reports its lease as not renewed');
+        await lock.release();
+    });
+
+    // The callback is part of the public contract, so the lock cannot assume it
+    // behaves: a throw from it used to escape into an unhandled rejection,
+    // which this extension has nowhere to report.
+    test('a throwing onHeartbeatError callback does not escape the lock', async () => {
+        const p = await tmpLockPath();
+        let calls = 0;
+        let t = 1_000_000;
+        const unhandled: unknown[] = [];
+        const onUnhandled = (reason: unknown) => unhandled.push(reason);
+        process.on('unhandledRejection', onUnhandled);
+        try {
+            const lock = await acquireLock({
+                path: p,
+                heartbeatMs: 5,
+                now: () => (t += 1000),
+                onHeartbeatError: () => {
+                    calls++;
+                    throw new Error('callback blew up');
+                }
+            });
+            assert.ok(lock);
+            await rm(path.dirname(p), { recursive: true, force: true });
+            await new Promise((r) => setTimeout(r, 40));
+            assert.ok(calls > 0, 'the callback was called');
+            // Counting continues even though the callback threw.
+            assert.ok(lock.failedHeartbeats() > 0);
+            await lock.release();
+            // Give any stray rejection a turn to surface before asserting.
+            await new Promise((r) => setImmediate(r));
+            assert.deepEqual(unhandled, [], 'no unhandled rejection escaped');
+        } finally {
+            process.off('unhandledRejection', onUnhandled);
+        }
+    });
+
+    // A read that fails for any reason other than "no such file" says nothing
+    // about whether the holder is alive, so the lock is left alone.
+    test('an unreadable lock file is not treated as free', async () => {
+        const p = await tmpLockPath();
+        await writeFile(p, 'not json at all');
+        const lock = await acquireLock({ path: p, heartbeatMs: 0 });
+        assert.strictEqual(lock, null, 'a corrupt lock file must not be stolen');
     });
 });

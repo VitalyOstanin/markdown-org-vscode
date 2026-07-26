@@ -16,7 +16,14 @@ function recorder(responder: (c: Call) => { status: number; body: unknown }): { 
         const call = { url, method: init?.method ?? 'GET', body: parsed };
         calls.push(call);
         const r = responder(call);
-        return { ok: r.status >= 200 && r.status < 300, status: r.status, json: async () => r.body };
+        return {
+            ok: r.status >= 200 && r.status < 300,
+            status: r.status,
+            json: async () => r.body,
+            // The client reads `retry-after` off every response, so the double
+            // has to answer like a Response: no header set here, no retry.
+            headers: { get: () => null }
+        };
     }) as unknown as FetchFn;
     return { fn, calls };
 }
@@ -261,6 +268,67 @@ suite('gcal/syncEngine', () => {
         assert.equal(summary.deferred, 0, 'no task is deferred by a sibling write-back shifting its line');
     });
 
+    test('a run that keeps failing stops instead of hammering the API for every task', async () => {
+        // A failure that repeats for every task is not about the tasks: revoked
+        // access, a deleted calendar, a rate limit. Each task costs up to four
+        // requests with backoff now, so walking all of them would stretch a
+        // hopeless run into minutes of traffic the API already refused.
+        const r = recorder(() => ({ status: 403, body: { error: { message: 'insufficient permissions' } } }));
+        const w = recordingWriter();
+        const tasks = Array.from({ length: 20 }, (_, i) =>
+            task({ line: 5 + i, properties: { ID: `1111111${i % 10}-1111-1111-1111-111111111111` } })
+        );
+
+        const summary = await runSync(baseDeps(tasks, r.fn, w.writer));
+
+        assert.ok(summary.failed < tasks.length, `the run should have stopped early, got ${summary.failed} failures`);
+        assert.ok(summary.stoppedEarly, 'the summary must say the run was cut short');
+        assert.match(summary.stoppedEarly ?? '', /insufficient permissions/);
+    });
+
+    test('failures scattered among successes do not stop the run', async () => {
+        // Only one task in three fails, and never in a long enough row: that is
+        // per-task breakage, and the rest of the run must still go through.
+        let n = 0;
+        const r = recorder((c) => {
+            if (c.method !== 'POST') return { status: 200, body: {} };
+            return ++n % 3 === 0
+                ? { status: 403, body: { error: { message: 'nope' } } }
+                : { status: 200, body: { id: 'x' } };
+        });
+        const w = recordingWriter();
+        const tasks = Array.from({ length: 9 }, (_, i) =>
+            task({ line: 5 + i, properties: { ID: `2222222${i % 10}-2222-2222-2222-222222222222` } })
+        );
+
+        const summary = await runSync(baseDeps(tasks, r.fn, w.writer));
+
+        assert.equal(summary.failed, 3);
+        assert.equal(summary.created, 6, 'every other task still synced');
+        assert.equal(summary.stoppedEarly, undefined, 'the run was not cut short');
+    });
+
+    test('a run stops at its time budget and says so', async () => {
+        // Each call can spend up to ~24s in retries, and the tasks are walked
+        // one by one, so a rate-limited run has no upper bound on how long it
+        // holds the lock. The budget is that bound.
+        const r = recorder(() => ({ status: 200, body: { id: 'x' } }));
+        const w = recordingWriter();
+        const tasks = Array.from({ length: 5 }, (_, i) =>
+            task({ line: 5 + i, properties: { ID: `3333333${i % 10}-3333-3333-3333-333333333333` } })
+        );
+        const deps = baseDeps(tasks, r.fn, w.writer);
+        // A clock that is already past the deadline by the second task.
+        let calls = 0;
+        deps.now = () => (++calls > 1 ? 10_000 : 0);
+        deps.deadlineAt = 1_000;
+
+        const summary = await runSync(deps);
+
+        assert.equal(summary.created, 1, 'only the first task made it');
+        assert.match(summary.stoppedEarly ?? '', /time budget/i);
+    });
+
     test('failed task records the error reason in changes (not discarded)', async () => {
         // A non-transient insert error (403) throws immediately (no backoff retry),
         // so the per-task catch must capture the reason on the change entry.
@@ -271,6 +339,6 @@ suite('gcal/syncEngine', () => {
         assert.equal(summary.failed, 1);
         const failed = summary.changes.find((c) => c.action === 'failed');
         assert.ok(failed, 'a failed change is recorded');
-        assert.match(failed!.error ?? '', /forbidden calendar/, 'failure reason is preserved');
+        assert.match(failed.error ?? '', /forbidden calendar/, 'failure reason is preserved');
     });
 });

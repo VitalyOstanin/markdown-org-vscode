@@ -10,7 +10,7 @@ import {
     hideSidePanels,
     enableScreencast,
     forceEnglishWeekdays,
-    applyMonokaiTheme,
+    applyDemoTheme,
     maximizeVscodeWindow,
     pressKey
 } from './_helpers';
@@ -90,7 +90,7 @@ suite('Demo: CLOCK', () => {
         const document = await vscode.workspace.openTextDocument(demoFile);
         const editor = await vscode.window.showTextDocument(document);
 
-        await applyMonokaiTheme();
+        await applyDemoTheme();
         await hideSidePanels();
         await forceEnglishWeekdays();
         await sleep(800);

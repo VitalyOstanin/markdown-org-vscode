@@ -9,14 +9,20 @@ import { suite, beforeEach, afterEach, test } from 'mocha';
 import { exec } from '../../utils/exec';
 import { extractor } from '../../utils/extractor';
 import { syncNow, makePropertiesWriter } from '../../commands/gcalSync';
-
-type ExecFileCallback = (error: Error | null, stdout: string, stderr: string) => void;
+import type { ExecFileCallback } from '../_execFake';
 
 // A Response-like stub good enough for the two consumers in play:
 //   * oauth.postToken reads `res.ok` / `res.status` and `res.json()`;
 //   * calendarClient.call reads `res.status` and `res.json()`.
 function jsonResponse(status: number, body: unknown): unknown {
-    return { ok: status >= 200 && status < 300, status, json: async () => body };
+    return {
+        ok: status >= 200 && status < 300,
+        status,
+        json: async () => body,
+        // The client reads `retry-after` off every response, so the double has
+        // to answer like a Response; no header here means no retry.
+        headers: { get: () => null }
+    };
 }
 
 async function waitUntil(pred: () => boolean, timeoutMs: number): Promise<boolean> {
@@ -80,12 +86,12 @@ suite('Google Calendar sync: DONE -> delete', () => {
             const callback = _args[_args.length - 1] as ExecFileCallback;
             const stdout = JSON.stringify(donePayload);
             queueMicrotask(() => callback(null, stdout, ''));
-            return {} as unknown as cp.ChildProcess;
+            return {};
         });
 
         fetchCalls = [];
         fetchStub = sinon.stub(globalThis, 'fetch');
-        fetchStub.callsFake((async (input: unknown, init?: { method?: string }) => {
+        fetchStub.callsFake(async (input: unknown, init?: { method?: string }) => {
             const url = String(input);
             const method = (init?.method ?? 'GET').toUpperCase();
             fetchCalls.push({ url, method });
@@ -99,7 +105,7 @@ suite('Google Calendar sync: DONE -> delete', () => {
                 return jsonResponse(200, {});
             }
             return jsonResponse(404, { error: { message: `unexpected ${method} ${url}` } });
-        }) as unknown as typeof fetch);
+        });
 
         warnStub = sinon.stub(vscode.window, 'showWarningMessage');
         infoStub = sinon.stub(vscode.window, 'showInformationMessage');
@@ -119,10 +125,13 @@ suite('Google Calendar sync: DONE -> delete', () => {
                 ) => Thenable<unknown>
             ) =>
                 Promise.resolve(
-                    task({ report: () => {} }, {
-                        isCancellationRequested: false,
-                        onCancellationRequested: () => ({ dispose: () => {} })
-                    } as vscode.CancellationToken)
+                    task(
+                        { report: () => {} },
+                        {
+                            isCancellationRequested: false,
+                            onCancellationRequested: () => ({ dispose: () => {} })
+                        }
+                    )
                 ).then((r) => {
                     progressSettled = true;
                     return r;
@@ -285,7 +294,7 @@ suite('Google Calendar sync: DONE -> delete', () => {
 
         // Force the DELETE branch to return 500 so the engine catches and
         // increments summary.failed. The on-save trigger must surface that.
-        fetchStub.callsFake((async (input: unknown, init?: { method?: string }) => {
+        fetchStub.callsFake(async (input: unknown, init?: { method?: string }) => {
             const url = String(input);
             const method = (init?.method ?? 'GET').toUpperCase();
             fetchCalls.push({ url, method });
@@ -299,7 +308,7 @@ suite('Google Calendar sync: DONE -> delete', () => {
                 return jsonResponse(500, { error: { message: 'boom' } });
             }
             return jsonResponse(404, { error: { message: `unexpected ${method} ${url}` } });
-        }) as unknown as typeof fetch);
+        });
 
         await syncNow(makeContext(), { trigger: 'onSave' });
 

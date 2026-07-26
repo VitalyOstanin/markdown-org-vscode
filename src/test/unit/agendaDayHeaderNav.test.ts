@@ -2,6 +2,11 @@ import * as assert from 'assert';
 import { suite, test } from 'mocha';
 import { JSDOM } from 'jsdom';
 import { wireDayHeaderNavigation } from '../../utils/agendaDayHeaderNav';
+import { AGENDA_STRINGS } from '../../utils/agendaI18n';
+
+// The drill-down tooltip is handed in rather than baked into the helper, so it
+// speaks the configured UI language (see agendaI18n.ts).
+const OPEN_DAY_TITLE = AGENDA_STRINGS.en.openDayView;
 
 // jsdom mirrors the agenda webview DOM so the day-header drill-down wiring
 // is exercised without a full VS Code instance. The webview embeds the
@@ -33,13 +38,13 @@ suite('wireDayHeaderNavigation (jsdom)', () => {
         const document = setupDom('week');
         const seen: string[] = [];
 
-        const count = wireDayHeaderNavigation(document, 'week', (date) => seen.push(date));
+        const count = wireDayHeaderNavigation(document, 'week', (date) => seen.push(date), OPEN_DAY_TITLE);
 
         assert.strictEqual(count, 3, 'three data-date headers should be wired');
         const linked = document.querySelectorAll('.day-header.day-header-link');
         assert.strictEqual(linked.length, 3, 'each wired header gets the day-header-link class');
         // Wired headers carry a hover tooltip explaining the drill-down.
-        linked.forEach((el) => assert.strictEqual(el.getAttribute('title'), 'Open this day in Day view'));
+        linked.forEach((el) => assert.strictEqual(el.getAttribute('title'), OPEN_DAY_TITLE));
         // The header without data-date must stay inert.
         const inert = Array.from(document.querySelectorAll('.day-header')).filter(
             (el) => !el.classList.contains('day-header-link')
@@ -51,7 +56,7 @@ suite('wireDayHeaderNavigation (jsdom)', () => {
         const document = setupDom('week');
         const seen: string[] = [];
 
-        wireDayHeaderNavigation(document, 'week', (date) => seen.push(date));
+        wireDayHeaderNavigation(document, 'week', (date) => seen.push(date), OPEN_DAY_TITLE);
 
         (document.querySelector('.day-header[data-date="2025-12-09"]') as HTMLElement).click();
         (document.querySelector('.day-header[data-date="2025-12-08"]') as HTMLElement).click();
@@ -66,7 +71,7 @@ suite('wireDayHeaderNavigation (jsdom)', () => {
             const document = setupDom(mode);
             const seen: string[] = [];
 
-            const count = wireDayHeaderNavigation(document, mode, (date) => seen.push(date));
+            const count = wireDayHeaderNavigation(document, mode, (date) => seen.push(date), OPEN_DAY_TITLE);
 
             assert.strictEqual(count, 0, `${mode} mode must not wire day-headers`);
             assert.strictEqual(
@@ -89,7 +94,7 @@ suite('wireDayHeaderNavigation (jsdom)', () => {
         const document = dom.window.document;
         const seen: string[] = [];
 
-        const count = wireDayHeaderNavigation(document, 'week', (date) => seen.push(date));
+        const count = wireDayHeaderNavigation(document, 'week', (date) => seen.push(date), OPEN_DAY_TITLE);
 
         assert.strictEqual(count, 0, 'empty data-date is not a navigable header');
         (document.querySelector('.day-header') as HTMLElement).click();

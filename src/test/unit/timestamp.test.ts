@@ -72,31 +72,31 @@ suite('Timestamp Tests', () => {
     test('Parse SCHEDULED timestamp line (active)', () => {
         const hit = matchTimestampLine('`SCHEDULED: <2025-12-06 Fri 10:00>`');
         assert.ok(hit);
-        assert.strictEqual(hit!.indent, '');
-        assert.strictEqual(hit!.type, 'SCHEDULED');
-        assert.strictEqual(hit!.timestamp, '<2025-12-06 Fri 10:00>');
-        assert.strictEqual(hit!.active, true);
+        assert.strictEqual(hit.indent, '');
+        assert.strictEqual(hit.type, 'SCHEDULED');
+        assert.strictEqual(hit.timestamp, '<2025-12-06 Fri 10:00>');
+        assert.strictEqual(hit.active, true);
     });
 
     test('Parse DEADLINE timestamp line (active)', () => {
         const hit = matchTimestampLine('`DEADLINE: <2025-12-06 Fri>`');
         assert.ok(hit);
-        assert.strictEqual(hit!.type, 'DEADLINE');
-        assert.strictEqual(hit!.active, true);
+        assert.strictEqual(hit.type, 'DEADLINE');
+        assert.strictEqual(hit.active, true);
     });
 
     test('Parse CREATED timestamp line (inactive per ADR-0014)', () => {
         const hit = matchTimestampLine('`CREATED: [2025-12-01 Sun 09:15]`');
         assert.ok(hit);
-        assert.strictEqual(hit!.type, 'CREATED');
-        assert.strictEqual(hit!.active, false);
+        assert.strictEqual(hit.type, 'CREATED');
+        assert.strictEqual(hit.active, false);
     });
 
     test('Parse CLOSED timestamp line (inactive per ADR-0014)', () => {
         const hit = matchTimestampLine('`CLOSED: [2025-12-03 Tue 14:30]`');
         assert.ok(hit);
-        assert.strictEqual(hit!.type, 'CLOSED');
-        assert.strictEqual(hit!.active, false);
+        assert.strictEqual(hit.type, 'CLOSED');
+        assert.strictEqual(hit.active, false);
     });
 
     test('Reject SCHEDULED with inactive bracket (ADR-0014 violation)', () => {
@@ -114,8 +114,8 @@ suite('Timestamp Tests', () => {
     test('Parse timestamp line with indent', () => {
         const hit = matchTimestampLine('  `SCHEDULED: <2025-12-06 Fri>`');
         assert.ok(hit);
-        assert.strictEqual(hit!.indent, '  ');
-        assert.strictEqual(hit!.type, 'SCHEDULED');
+        assert.strictEqual(hit.indent, '  ');
+        assert.strictEqual(hit.type, 'SCHEDULED');
     });
 
     test('Toggle timestamp type SCHEDULED to DEADLINE', () => {

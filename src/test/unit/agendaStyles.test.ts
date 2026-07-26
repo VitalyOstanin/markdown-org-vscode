@@ -10,7 +10,7 @@ import { AGENDA_STYLES } from '../../views/agendaStyles';
  */
 suite('AGENDA_STYLES theming invariant', () => {
     test('contains no hardcoded HEX colours', () => {
-        // Exclude `content: "[#"` -- the monospace-preset marker text, not a colour.
+        // Exclude `content: "…"` -- glyph/placeholder marker text, not a colour.
         const withoutContent = AGENDA_STYLES.replace(/content:\s*"[^"]*"/g, '');
         const hexes = withoutContent.match(/#[0-9a-fA-F]{3,8}\b/g);
         assert.strictEqual(hexes, null, `agenda CSS must not hardcode colours; found: ${hexes?.join(', ')}`);
@@ -41,68 +41,61 @@ suite('AGENDA_STYLES theming invariant', () => {
         assert.ok(mixes.length >= 3, `expected >=3 color-mix() tints, found ${mixes.length}`);
     });
 
-    test('defines all three presets', () => {
-        assert.ok(AGENDA_STYLES.includes('[data-agenda-style="monospace"]'));
-        assert.ok(AGENDA_STYLES.includes('[data-agenda-style="native"]'));
-        assert.ok(AGENDA_STYLES.includes('[data-agenda-style="hybrid"]'));
-    });
-
     test('no hardcoded hex colours anywhere', () => {
         const withoutContent = AGENDA_STYLES.replace(/content:\s*"[^"]*"/g, '');
         assert.strictEqual(/#[0-9a-fA-F]{3,8}\b/.test(withoutContent), false);
     });
 
-    test('hybrid time/offset use tabular-nums', () => {
+    test('the time and offset columns use tabular-nums', () => {
         assert.ok(/font-variant-numeric:\s*tabular-nums/.test(AGENDA_STYLES));
     });
 
-    test('fonts are driven by config vars, not a hardcoded family', () => {
-        // Proportional and monospace families both come from configurable CSS
-        // vars so the settings can override them; no literal 'Courier New'.
+    test('the agenda font is driven by a config var, not a hardcoded family', () => {
+        // The proportional family comes from a configurable CSS var so the
+        // setting can override it; no literal 'Courier New'.
         assert.ok(AGENDA_STYLES.includes('var(--markdown-org-agenda-font)'));
-        assert.ok(AGENDA_STYLES.includes('var(--markdown-org-agenda-mono-font)'));
         assert.strictEqual(AGENDA_STYLES.includes('Courier New'), false);
     });
 
-    test('table all-mono override targets data-table-mono', () => {
-        assert.ok(
-            /\[data-agenda-style="table"\]\[data-table-mono="true"\]\s*\{[^}]*var\(--markdown-org-agenda-mono-font\)/.test(
-                AGENDA_STYLES
-            )
+    // A .task-line lays out six cells: status dot | big time | flag | priority
+    // | heading | offset. Its grid MUST declare exactly six columns -- a
+    // mismatch makes `1fr` land on the wrong cell and pushes the heading and
+    // offset columns off to the side.
+    test('.task-line grid declares one column per rendered cell', () => {
+        const m = AGENDA_STYLES.match(/\.task-line\s*\{[^}]*grid-template-columns:\s*([^;]+);/);
+        assert.ok(m, 'expected a grid-template-columns rule for .task-line');
+        const tracks = m[1].trim().split(/\s+/);
+        assert.strictEqual(
+            tracks.length,
+            6,
+            `.task-line must have 6 columns (one per rendered cell), found ${tracks.length}: ${m[1].trim()}`
         );
     });
 
-    // renderTask emits five visible cells once .todo-label is hidden
-    // (time-info-cell, status, priority, heading, offset). The native/hybrid
-    // presets hide .todo-label, so their .task-line grid MUST declare exactly
-    // five columns -- a mismatch (e.g. four) makes `1fr` land on the wrong
-    // cell and pushes the heading/offset columns off to the side.
-    const EXPECTED_COLUMNS: Record<string, number> = { native: 5, hybrid: 5, table: 6 };
-    for (const [preset, cols] of Object.entries(EXPECTED_COLUMNS)) {
-        test(`${preset} .task-line grid declares ${cols} columns`, () => {
-            const m = AGENDA_STYLES.match(
-                new RegExp(
-                    `\\[data-agenda-style="${preset}"\\]\\s*\\.task-line\\s*\\{[^}]*grid-template-columns:\\s*([^;]+);`
-                )
-            );
-            assert.ok(m, `expected a grid-template-columns rule for the ${preset} .task-line`);
-            const tracks = m[1].trim().split(/\s+/);
-            assert.strictEqual(
-                tracks.length,
-                cols,
-                `${preset} .task-line must have ${cols} columns (one per visible cell), found ${tracks.length}: ${m[1].trim()}`
-            );
-        });
-    }
-
-    test('defines the table preset', () => {
-        assert.ok(AGENDA_STYLES.includes('[data-agenda-style="table"]'));
+    test('declares all four flag glyphs', () => {
+        for (const glyph of ['⚑', '◷', '↻', '⊘']) {
+            assert.ok(AGENDA_STYLES.includes(`content: "${glyph}"`), `expected flag glyph ${glyph} in the agenda CSS`);
+        }
     });
 
-    test('table preset declares all four flag glyphs', () => {
-        for (const glyph of ['⚑', '◷', '↻', '⊘']) {
-            assert.ok(AGENDA_STYLES.includes(`content: "${glyph}"`), `expected flag glyph ${glyph} in table CSS`);
+    // The renderer no longer emits a todo label or the stacked time-info cell,
+    // and the day-header no longer carries the today arrows, so no rule may
+    // reference them: such a rule can only ever be dead weight.
+    test('carries no rules for markup the renderer stopped emitting', () => {
+        for (const gone of ['.todo-label', '.time-info-cell', '.day-nav']) {
+            assert.strictEqual(
+                AGENDA_STYLES.includes(gone),
+                false,
+                `${gone} is no longer rendered, so the agenda CSS must not style it`
+            );
         }
+    });
+
+    // The agenda has a single look; the body attribute that used to select
+    // between presets is gone, and with it every selector that scoped a rule to
+    // one preset.
+    test('no selector is scoped to an agenda-style preset', () => {
+        assert.strictEqual(AGENDA_STYLES.includes('data-agenda-style'), false);
     });
 });
 
@@ -154,6 +147,122 @@ suite('AGENDA_STYLES spacing-scale invariant', () => {
                 !/\d+px/.test(fs),
                 `font-size must be em or var(--vscode-font-size)-derived, found px: ${fs.trim()}`
             );
+        }
+    });
+});
+
+/**
+ * Shape and type-scale invariants (#38), the same rule the spacing scale
+ * already follows: corner radii and font sizes are declared once in `:root` and
+ * referenced everywhere else, so two elements meant to be the same component
+ * cannot end up a step apart (the month cell's task-load chip and the card
+ * section count did: 20px/0.78em against 22px/0.8em).
+ */
+suite('AGENDA_STYLES shape and type-scale invariant', () => {
+    const RADII: ReadonlyArray<readonly [string, string]> = [
+        ['--radius-sm', '3px'],
+        ['--radius-md', '6px'],
+        ['--radius-pill', '999px']
+    ];
+
+    const FONTS: ReadonlyArray<readonly [string, string]> = [
+        ['--font-xs', '0.78em'],
+        ['--font-sm', '0.85em'],
+        ['--font-md', '1em'],
+        ['--font-lg', '1.1em'],
+        ['--font-xl', '1.5em']
+    ];
+
+    test('declares the radius and type scales once in :root', () => {
+        for (const [name, value] of [...RADII, ...FONTS]) {
+            assert.ok(
+                new RegExp(`${name}:\\s*${value};`).test(AGENDA_STYLES),
+                `expected scale token ${name}: ${value}; in :root`
+            );
+        }
+    });
+
+    test('every border-radius comes from a --radius token (50% dots aside)', () => {
+        const decls = AGENDA_STYLES.match(/border-radius:\s*[^;]+;/g) ?? [];
+        assert.ok(decls.length > 0, 'expected border-radius declarations to scan');
+        for (const decl of decls) {
+            const value = decl.slice(decl.indexOf(':') + 1).trim();
+            assert.ok(
+                /var\(--radius-(sm|md|pill)\)/.test(value) || value === '50%;',
+                `border-radius must use var(--radius-*) or the 50% dot shape, found: ${decl.trim()}`
+            );
+        }
+    });
+
+    test('every font-size comes from a --font token (or the :root base)', () => {
+        // Declarations inside :root are the scale itself; skip that block.
+        const body = AGENDA_STYLES.slice(AGENDA_STYLES.indexOf('}') + 1);
+        const decls = body.match(/font-size:\s*[^;]+;/g) ?? [];
+        assert.ok(decls.length > 0, 'expected font-size declarations to scan');
+        for (const decl of decls) {
+            const value = decl.slice(decl.indexOf(':') + 1).trim();
+            assert.ok(
+                /var\(--font-(xs|sm|md|lg|xl)\)/.test(value) ||
+                    value === 'var(--vscode-font-size);' ||
+                    value === 'inherit;' ||
+                    // .status renders as a dot: its text is sized away.
+                    value === '0;',
+                `font-size must use var(--font-*), found: ${decl.trim()}`
+            );
+        }
+    });
+
+    test('the count chip is declared once for both places that use it', () => {
+        const shared = AGENDA_STYLES.match(/\.task-count,\s*\.day-section-count\s*\{([^}]*)\}/);
+        assert.ok(shared, 'expected one rule declaring .task-count and .day-section-count together');
+        for (const prop of ['min-width', 'border-radius', 'font-size', 'padding']) {
+            assert.ok(shared[1].includes(prop + ':'), `expected ${prop} on the shared count-chip rule`);
+        }
+        // Neither of the two may re-declare the shape in its own rule -- the
+        // one whose selector is exactly that class, not the shared pair.
+        const rules = [...AGENDA_STYLES.matchAll(/([^{}]+)\{([^}]*)\}/g)].map((m) => ({
+            selector: m[1].replace(/\/\*[\s\S]*?\*\//g, '').trim(),
+            body: m[2]
+        }));
+        for (const cls of ['.task-count', '.day-section-count']) {
+            const own = rules.find((r) => r.selector === cls);
+            assert.ok(own, `expected a placement rule for ${cls}`);
+            for (const prop of ['min-width', 'border-radius', 'font-size']) {
+                assert.strictEqual(
+                    own.body.includes(prop + ':'),
+                    false,
+                    `${cls} must inherit ${prop} from the shared chip rule`
+                );
+            }
+        }
+    });
+
+    test('the compact header only resizes the header, it hides nothing', () => {
+        const rules = [...AGENDA_STYLES.matchAll(/([^{}]+)\{([^}]*)\}/g)]
+            .map((m) => ({ selector: m[1].replace(/\/\*[\s\S]*?\*\//g, '').trim(), body: m[2] }))
+            .filter((r) => r.selector.startsWith('body.compact-header'));
+        assert.ok(rules.length > 0, 'expected the compact-header block');
+        for (const rule of rules) {
+            // The layout is a size change, not a different header: dropping a
+            // control in compact mode would make it reachable only by resizing
+            // the panel, and `auto` resizes it without asking.
+            assert.ok(
+                !/(display:\s*none|visibility:\s*hidden)/.test(rule.body),
+                `${rule.selector} must not hide anything in compact mode`
+            );
+        }
+        // The header itself has to shrink, otherwise the class buys nothing.
+        assert.ok(
+            rules.some((r) => r.selector === 'body.compact-header .agenda-header' && r.body.includes('padding:')),
+            'expected the compact header to tighten its own padding'
+        );
+    });
+
+    test('every interactive surface of the panel shares one focus ring', () => {
+        const rule = AGENDA_STYLES.match(/((?:\.[a-z-]+:focus-visible,\s*)+\.[a-z-]+:focus-visible)\s*\{/);
+        assert.ok(rule, 'expected a single :focus-visible rule listing the interactive classes');
+        for (const cls of ['.nav-btn', '.seg-item', '.tag-menu-btn', '.tag-menu-item', '.calendar-day']) {
+            assert.ok(rule[1].includes(`${cls}:focus-visible`), `${cls} must be covered by the shared focus ring`);
         }
     });
 });

@@ -153,20 +153,37 @@ export async function maximizeVscodeWindow(): Promise<void> {
     }
 }
 
+/** Colour theme a demo run records in, and the file-name suffix that goes with it. */
+export const DEMO_THEMES = {
+    dark: { colorTheme: 'Monokai', suffix: '-dark' },
+    light: { colorTheme: 'Solarized Light', suffix: '-light' }
+} as const;
+
 /**
- * Switch the running VS Code window to the built-in Monokai theme. Used by
- * the screenshots scenario so the PNGs that land on the Open VSX listing
- * have a recognisable, high-contrast colour palette that does not look like
- * a stock VS Code screenshot. Written at Global scope; the demo runner gets
- * its own disposable user-data-dir, so the developer's own theme choice is
- * not touched.
+ * Which of the two themes this run records. The driver passes it as
+ * MARKDOWN_ORG_DEMO_THEME (`dark` | `light`); anything else, including an
+ * unset variable, means dark -- the theme every asset was shot in before the
+ * light set existed.
  */
-export async function applyMonokaiTheme(): Promise<void> {
+export function demoTheme(): (typeof DEMO_THEMES)[keyof typeof DEMO_THEMES] {
+    return process.env.MARKDOWN_ORG_DEMO_THEME === 'light' ? DEMO_THEMES.light : DEMO_THEMES.dark;
+}
+
+/**
+ * Switch the running VS Code window to this run's theme -- built-in Monokai
+ * for the dark set, built-in Solarized Light for the light one. Both are
+ * shipped with VS Code, so no extension has to be installed, and both give the
+ * assets a recognisable palette rather than a stock Dark+/Light+ background.
+ * Written at Workspace scope; the demo runner gets its own disposable
+ * user-data-dir, so the developer's own theme choice is not touched.
+ */
+export async function applyDemoTheme(): Promise<void> {
+    const { colorTheme } = demoTheme();
     const workbench = vscode.workspace.getConfiguration('workbench');
-    // If the previous run already wrote Monokai to settings, `update` is a
+    // If the previous run already wrote this theme to settings, `update` is a
     // no-op and onDidChangeActiveColorTheme would never fire. Detect that
     // case up front so the caller is not blocked on a timeout.
-    if (workbench.get<string>('colorTheme') === 'Monokai') {
+    if (workbench.get<string>('colorTheme') === colorTheme) {
         await sleep(500);
         return;
     }
@@ -189,7 +206,7 @@ export async function applyMonokaiTheme(): Promise<void> {
     // Workspace target applies immediately without a window reload; Global
     // also works but is only picked up after VS Code re-reads the settings
     // file, which is unreliable under the test runner.
-    await workbench.update('colorTheme', 'Monokai', vscode.ConfigurationTarget.Workspace);
+    await workbench.update('colorTheme', colorTheme, vscode.ConfigurationTarget.Workspace);
     await themeApplied;
     // Even after the active-theme event, the editor needs a moment to
     // recompute tokenisation colours and the minimap palette.
@@ -202,10 +219,12 @@ export async function applyMonokaiTheme(): Promise<void> {
  * a no-op outside the pipeline so the same test suite can be debugged via
  * `npm run test:integration` without a screen capture stack attached.
  *
- * The frame is saved as `${MARKDOWN_ORG_SCREENSHOT_DIR}/${name}.png`. Display
- * geometry defaults to 1280x720 to match the Xvfb the recording driver starts;
- * it is read from MARKDOWN_ORG_SCREENSHOT_GEOMETRY when present so the test
- * stays portable if the driver ever changes resolution.
+ * The frame is saved as `${MARKDOWN_ORG_SCREENSHOT_DIR}/${name}${suffix}.png`,
+ * where the suffix names the theme of the run (`-dark` / `-light`) so the two
+ * sets sit side by side and README can pick between them. Display geometry
+ * defaults to 1280x720 to match the Xvfb the recording driver starts; it is
+ * read from MARKDOWN_ORG_SCREENSHOT_GEOMETRY when present so the test stays
+ * portable if the driver ever changes resolution.
  */
 export async function captureScreenshot(name: string): Promise<void> {
     const dir = process.env.MARKDOWN_ORG_SCREENSHOT_DIR;
@@ -213,7 +232,7 @@ export async function captureScreenshot(name: string): Promise<void> {
     await fs.mkdir(dir, { recursive: true });
     const display = process.env.DISPLAY ?? ':99';
     const geometry = process.env.MARKDOWN_ORG_SCREENSHOT_GEOMETRY ?? '1280x720';
-    const target = path.join(dir, `${name}.png`);
+    const target = path.join(dir, `${name}${demoTheme().suffix}.png`);
     await new Promise<void>((resolve, reject) => {
         const proc = spawn(
             'ffmpeg',
@@ -353,15 +372,42 @@ export async function runCommandViaPalette(name: string, pauseBeforeEnterMs = 45
  * to fill the client-secret prompt the same way a user would. Goes through
  * `xdotool type` so the keystrokes reach VS Code's focused input.
  */
-export async function typeText(text: string, submit = false): Promise<void> {
+export async function typeText(text: string, submit = false, options: { masked?: boolean } = {}): Promise<void> {
     // No window re-activation: the target is an already-open input box / QuickInput
     // that holds focus; activating the window would hand focus back to the editor
     // (see pressKeyInPicker). The window is already focused from the demo setup.
-    await runXdotool(['type', '--delay', '30', text]);
-    if (submit) {
-        await sleep(200);
-        await runXdotool(['key', 'Return']);
+    //
+    // `masked` is for values the input box itself hides (`password: true`). The
+    // screencast overlay does not know about that and paints every keystroke on
+    // top of the window, so the recording would show in plain text what the
+    // field is masking. The demos only ever type placeholders, but the pipeline
+    // must not depend on that: someone debugging the scenario with a real
+    // credential would publish it in the GIF.
+    if (options.masked) {
+        await setScreencastKeys(false);
     }
+    try {
+        await runXdotool(['type', '--delay', '30', text]);
+        if (submit) {
+            await sleep(200);
+            await runXdotool(['key', 'Return']);
+        }
+    } finally {
+        if (options.masked) {
+            await setScreencastKeys(true);
+        }
+    }
+}
+
+/** Turn the screencast overlay's keystroke echo on or off, leaving the rest of its settings alone. */
+export async function setScreencastKeys(showKeys: boolean): Promise<void> {
+    const cfg = vscode.workspace.getConfiguration('screencastMode');
+    const current = cfg.get<Record<string, unknown>>('keyboardOptions') ?? {};
+    await cfg.update('keyboardOptions', { ...current, showKeys }, vscode.ConfigurationTarget.Global);
+    // The overlay reads the setting on the next keystroke, but the update itself
+    // is asynchronous; a short settle keeps the first character from slipping
+    // through under the old value.
+    await sleep(150);
 }
 
 /**

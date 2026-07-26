@@ -9,8 +9,7 @@ import { suite, before, beforeEach, after, afterEach, test } from 'mocha';
 import { exec } from '../../utils/exec';
 import { EXTRACTOR_MAX_BUFFER_BYTES } from '../../utils/extractor';
 import { extractor } from '../../utils/extractor';
-
-type ExecFileCallback = (error: Error | null, stdout: string, stderr: string) => void;
+import type { ExecFileCallback } from '../_execFake';
 
 /**
  * Verify that the agenda / clocktable code paths pass an explicit
@@ -58,7 +57,7 @@ suite('Extractor execFile options', () => {
             const cliArgs = (_args[1] as string[]) || [];
             const response = cliArgs.includes('--holidays') ? [] : dayPayload;
             queueMicrotask(() => callback(null, JSON.stringify(response), ''));
-            return {} as unknown as cp.ChildProcess;
+            return {};
         });
     });
 
@@ -88,13 +87,13 @@ suite('Extractor execFile options', () => {
 
         // The agenda code path uses the 4-arg execFile overload:
         // execFile(command, args, options, callback)
-        const optionsArg = agendaCall!.args[2] as { maxBuffer?: number; encoding?: string } | undefined;
+        const optionsArg = agendaCall.args[2] as { maxBuffer?: number; encoding?: string } | undefined;
         assert.ok(optionsArg, 'agenda execFile call must include options (3rd arg)');
         assert.strictEqual(
-            optionsArg!.maxBuffer,
+            optionsArg.maxBuffer,
             EXTRACTOR_MAX_BUFFER_BYTES,
             `maxBuffer must be the shared EXTRACTOR_MAX_BUFFER_BYTES (${EXTRACTOR_MAX_BUFFER_BYTES})`
         );
-        assert.strictEqual(optionsArg!.encoding, 'utf-8');
+        assert.strictEqual(optionsArg.encoding, 'utf-8');
     });
 });

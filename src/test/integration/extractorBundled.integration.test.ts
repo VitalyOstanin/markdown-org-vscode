@@ -12,8 +12,10 @@ const execFileAsync = promisify(execFile);
 
 /**
  * Smoke-test the bundled markdown-org-extract shipped in the VSIX. Skips
- * itself when `bin/<binary>` is absent so a fresh developer checkout that
- * did not run `npm run prepare-bin` still has a green test run.
+ * itself when `bin/<binary>` is absent, so a fresh checkout that has not
+ * fetched the binary still has a green run; populate it with
+ * `bash scripts/download-extractor.sh <target>` (CI does exactly that before
+ * the integration tests, so these cases do run there).
  */
 suite('Extractor: bundled binary smoke', () => {
     // Repo root: integration tests run from out/test/integration/, so two
@@ -36,8 +38,8 @@ suite('Extractor: bundled binary smoke', () => {
     beforeEach(function () {
         const candidate = path.join(repoRoot, 'bin', bundledBinaryName(process.platform));
         if (!fs.existsSync(candidate)) {
-            // No bundled binary in dev checkout -- the per-target download
-            // step lives in CI's release.yml, not in the local build. Skip
+            // No bundled binary in this checkout: it is fetched on demand
+            // (`scripts/download-extractor.sh`), not built locally. Skip
             // cleanly instead of failing.
             this.skip();
         }

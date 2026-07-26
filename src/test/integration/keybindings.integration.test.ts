@@ -27,6 +27,32 @@ function findKeybinding(pkg: PackageJson, command: string): Keybinding | undefin
     return pkg.contributes?.keybindings?.find((kb) => kb.command === command);
 }
 
+// A command declared in the manifest but never registered in `activate()` is
+// invisible until someone picks it from the Command Palette and gets "command
+// not found". The manifest side is checked statically by the unit contract
+// test; this is the other half -- what the running extension actually offers.
+suite('Commands: manifest matches the runtime registry', () => {
+    const pkg = loadPackageJson();
+
+    test('every contributed command is registered at runtime', async function () {
+        this.timeout(20000);
+        const ext = vscode.extensions.getExtension('vitalyostanin.markdown-org-vscode');
+        assert.ok(ext, 'extension not found');
+        await ext.activate();
+
+        const declared = (pkg.contributes?.commands ?? []).map((c) => c.command);
+        assert.ok(declared.length > 0, 'expected contributes.commands to list commands');
+
+        const registered = new Set(await vscode.commands.getCommands(true));
+        const missing = declared.filter((command) => !registered.has(command));
+        assert.deepStrictEqual(
+            missing,
+            [],
+            `commands declared in package.json but not registered: ${missing.join(', ')}`
+        );
+    });
+});
+
 suite('Keybindings: package.json contract', () => {
     const pkg = loadPackageJson();
 
@@ -39,10 +65,10 @@ suite('Keybindings: package.json contract', () => {
         assert.ok(scheduled, 'insertScheduled keybinding must exist');
         assert.ok(deadline, 'insertDeadline keybinding must exist');
 
-        assert.strictEqual(created!.key, 'ctrl+k ctrl+k ctrl+c');
-        assert.strictEqual(scheduled!.key, 'ctrl+k ctrl+k ctrl+s');
+        assert.strictEqual(created.key, 'ctrl+k ctrl+k ctrl+c');
+        assert.strictEqual(scheduled.key, 'ctrl+k ctrl+k ctrl+s');
         assert.strictEqual(
-            deadline!.key,
+            deadline.key,
             'ctrl+k ctrl+k ctrl+d',
             'insertDeadline must follow the Ctrl+K Ctrl+K Ctrl+<letter> shape used by insertCreated/insertScheduled'
         );
@@ -65,7 +91,7 @@ suite('Keybindings: package.json contract', () => {
         // remains live for setDone when only one Ctrl+K prefix was typed.
         const setDone = findKeybinding(pkg, 'markdown-org.setDone');
         assert.ok(setDone);
-        assert.strictEqual(setDone!.key, 'ctrl+k ctrl+d');
+        assert.strictEqual(setDone.key, 'ctrl+k ctrl+d');
     });
 
     test('insertDeadline is registered as an executable command', async () => {
@@ -101,15 +127,15 @@ suite('Keybindings: package.json contract', () => {
         const table = findKeybinding(pkg, 'markdown-org.insertClockTable');
 
         assert.ok(start && finish && table, 'all three CLOCK keybindings must exist');
-        assert.strictEqual(start!.key, 'ctrl+k ctrl+c ctrl+s');
-        assert.strictEqual(finish!.key, 'ctrl+k ctrl+c ctrl+f');
-        assert.strictEqual(table!.key, 'ctrl+k ctrl+c ctrl+v');
+        assert.strictEqual(start.key, 'ctrl+k ctrl+c ctrl+s');
+        assert.strictEqual(finish.key, 'ctrl+k ctrl+c ctrl+f');
+        assert.strictEqual(table.key, 'ctrl+k ctrl+c ctrl+v');
     });
 
     test('insertCreated stays on Ctrl+K Ctrl+K Ctrl+C (no longer a CLOCK prefix) (#9)', () => {
         const created = findKeybinding(pkg, 'markdown-org.insertCreated');
         assert.ok(created);
-        assert.strictEqual(created!.key, 'ctrl+k ctrl+k ctrl+c');
+        assert.strictEqual(created.key, 'ctrl+k ctrl+k ctrl+c');
     });
 
     test('Shift+Up/Down are gated by the markdown-org.timestampAdjustable context (#10)', () => {
@@ -117,17 +143,17 @@ suite('Keybindings: package.json contract', () => {
         const down = findKeybinding(pkg, 'markdown-org.timestampDown');
 
         assert.ok(up && down, 'timestampUp/Down keybindings must exist');
-        assert.strictEqual(up!.key, 'shift+up');
-        assert.strictEqual(down!.key, 'shift+down');
+        assert.strictEqual(up.key, 'shift+up');
+        assert.strictEqual(down.key, 'shift+down');
         // Without this gate the bindings shadow cursorUpSelect/cursorDownSelect
         // in every markdown file and break multi-line selection.
         assert.ok(
-            up!.when?.includes('markdown-org.timestampAdjustable'),
-            `timestampUp when must require the adjustable context: ${up!.when}`
+            up.when?.includes('markdown-org.timestampAdjustable'),
+            `timestampUp when must require the adjustable context: ${up.when}`
         );
         assert.ok(
-            down!.when?.includes('markdown-org.timestampAdjustable'),
-            `timestampDown when must require the adjustable context: ${down!.when}`
+            down.when?.includes('markdown-org.timestampAdjustable'),
+            `timestampDown when must require the adjustable context: ${down.when}`
         );
     });
 
@@ -163,8 +189,8 @@ suite('Keybindings: package.json contract', () => {
         const up = findKeybinding(pkg, 'markdown-org.timestampUp');
         const down = findKeybinding(pkg, 'markdown-org.timestampDown');
         assert.ok(up && down);
-        assert.strictEqual(up!.mac, undefined, 'shift+up must not carry a mac override');
-        assert.strictEqual(down!.mac, undefined, 'shift+down must not carry a mac override');
+        assert.strictEqual(up.mac, undefined, 'shift+up must not carry a mac override');
+        assert.strictEqual(down.mac, undefined, 'shift+down must not carry a mac override');
     });
 
     test('no markdown-org keybinding is a strict chord-prefix of another (guards #9 shadowing)', () => {

@@ -124,6 +124,31 @@ suite('gcal/calendarClient', () => {
         assert.deepEqual(forced, [false, true], 'second attempt forced a refresh');
     });
 
+    // The 401 branch is allowed once; a later transient retry must not keep
+    // re-forcing the refresh. With one flag doing both jobs it did, adding up
+    // to three needless token-endpoint round trips per API call.
+    test('a transient retry after a 401 does not force another token refresh', async () => {
+        let n = 0;
+        const r = recorder(() => {
+            n++;
+            if (n === 1) return { status: 401, body: { error: { message: 'expired' } } };
+            if (n === 2) return { status: 503, body: {} };
+            return { status: 200, body: { items: [] } };
+        });
+        const forced: boolean[] = [];
+        const tok = async (opts?: { forceRefresh?: boolean }) => {
+            forced.push(!!opts?.forceRefresh);
+            return 'AT';
+        };
+        setRetrySleepForTests(async () => {});
+        try {
+            await listWritableCalendars(r.fn, tok);
+        } finally {
+            setRetrySleepForTests();
+        }
+        assert.deepEqual(forced, [false, true, false], 'only the 401 retry forces a refresh');
+    });
+
     suite('transient-error retry (429/5xx)', () => {
         const sleeps: number[] = [];
         setup(() => {
@@ -155,7 +180,9 @@ suite('gcal/calendarClient', () => {
             );
             await listWritableCalendars(r.fn, token);
             assert.equal(r.calls.length, 2);
-            assert.equal(sleeps[0], 2000, 'honoured Retry-After: 2s');
+            // Not less than what the server asked for, and no more than the
+            // jitter (up to one base interval) can add on top.
+            assert.ok(sleeps[0] >= 2000 && sleeps[0] <= 2500, `honoured Retry-After: 2s (+jitter), got ${sleeps[0]}`);
         });
 
         test('gives up after MAX_RETRIES and surfaces the error', async () => {
@@ -170,6 +197,64 @@ suite('gcal/calendarClient', () => {
             const r = recorder(() => ({ status: 403, body: { error: { message: 'forbidden' } } }));
             await assert.rejects(() => listWritableCalendars(r.fn, token), /list calendars/);
             assert.equal(r.calls.length, 1, 'no retry on 403');
+        });
+
+        test('retries a network failure, which never produces a status at all', async () => {
+            // The most common transient failure has no response: a dropped
+            // connection, a DNS hiccup, a TLS error. Before, it escaped the
+            // retry loop entirely while the rarer 5xx was retried.
+            let n = 0;
+            const inner = recorder(() => ({ status: 200, body: { items: [] } }));
+            const fn = (async (url: string, init?: unknown) => {
+                if (++n === 1) {
+                    throw Object.assign(new Error('fetch failed'), { code: 'ECONNRESET' });
+                }
+                return (inner.fn as unknown as (u: string, i?: unknown) => Promise<unknown>)(url, init);
+            }) as unknown as FetchFn;
+
+            const cals = await listWritableCalendars(fn, token);
+            assert.deepEqual(cals, []);
+            assert.equal(n, 2, 'one retry after the network error');
+            assert.equal(sleeps.length, 1, 'the retry went through the backoff');
+        });
+
+        test('gives up on a network failure after MAX_RETRIES and rethrows it', async () => {
+            let n = 0;
+            const fn = (async () => {
+                n++;
+                throw new Error('getaddrinfo ENOTFOUND www.googleapis.com');
+            }) as unknown as FetchFn;
+
+            await assert.rejects(() => listWritableCalendars(fn, token), /ENOTFOUND/);
+            assert.equal(n, 4, '1 initial + 3 retries');
+        });
+
+        test('an abort signal stops the retry chain instead of sleeping it out', async () => {
+            // The heartbeat watchdog sets `aborted` when the lock lease is
+            // gone: another window is about to take over, so this run must stop
+            // touching the calendar rather than finish its backoff first.
+            const signal = { aborted: false };
+            const r = recorder(() => ({ status: 503, body: { error: { message: 'down' } } }));
+            setRetrySleepForTests(() => {
+                signal.aborted = true;
+                return Promise.resolve();
+            });
+
+            await assert.rejects(() => listWritableCalendars(r.fn, token, { signal }), /aborted/i);
+            assert.equal(r.calls.length, 1, 'no request goes out after the abort');
+        });
+
+        test('a token failure is retried the same way', async () => {
+            let n = 0;
+            const r = recorder(() => ({ status: 200, body: { items: [] } }));
+            const flakyToken = async () => {
+                if (++n === 1) {
+                    throw new Error('token endpoint unreachable');
+                }
+                return 'AT';
+            };
+            await listWritableCalendars(r.fn, flakyToken);
+            assert.equal(n, 2, 'the token provider was tried again');
         });
     });
 
@@ -193,12 +278,54 @@ suite('gcal/calendarClient', () => {
         });
 
         test('computeRetryDelayMs uses exponential backoff and caps', () => {
-            assert.equal(computeRetryDelayMs(1, undefined, 500, 8000), 500);
-            assert.equal(computeRetryDelayMs(2, undefined, 500, 8000), 1000);
-            assert.equal(computeRetryDelayMs(3, undefined, 500, 8000), 2000);
-            assert.equal(computeRetryDelayMs(10, undefined, 500, 8000), 8000, 'capped');
-            assert.equal(computeRetryDelayMs(1, 3000, 500, 8000), 3000, 'retry-after wins');
-            assert.equal(computeRetryDelayMs(1, 99999, 500, 8000), 8000, 'retry-after capped');
+            // The exponential value is the upper bound of the jittered window,
+            // so it is asserted with random() pinned to 1.
+            const full = () => 1;
+            assert.equal(computeRetryDelayMs(1, undefined, 500, 8000, full), 500);
+            assert.equal(computeRetryDelayMs(2, undefined, 500, 8000, full), 1000);
+            assert.equal(computeRetryDelayMs(3, undefined, 500, 8000, full), 2000);
+            assert.equal(computeRetryDelayMs(10, undefined, 500, 8000, full), 8000, 'capped');
+            const none = () => 0;
+            assert.equal(computeRetryDelayMs(1, 3000, 500, 8000, none), 3000, 'retry-after wins');
+            assert.equal(computeRetryDelayMs(1, 99999, 500, 8000, none), 8000, 'retry-after capped');
+        });
+
+        test('computeRetryDelayMs spreads the delay when a random source is supplied', () => {
+            // Several VS Code windows hitting the same 429 would otherwise wake
+            // up at the same millisecond and retry in lockstep. The jitter keeps
+            // the delay between half the exponential value and the full one.
+            assert.equal(
+                computeRetryDelayMs(2, undefined, 500, 8000, () => 0),
+                500,
+                'half at random()=0'
+            );
+            assert.equal(
+                computeRetryDelayMs(2, undefined, 500, 8000, () => 1),
+                1000,
+                'full at random()=1'
+            );
+            assert.equal(
+                computeRetryDelayMs(2, undefined, 500, 8000, () => 0.5),
+                750
+            );
+        });
+
+        test('a Retry-After delay is only ever extended by jitter, never shortened', () => {
+            // The server named the earliest acceptable time; waiting less would
+            // ignore it. The spread goes on top, and the cap still holds.
+            assert.equal(
+                computeRetryDelayMs(1, 3000, 500, 8000, () => 0),
+                3000
+            );
+            assert.equal(
+                computeRetryDelayMs(1, 3000, 500, 8000, () => 1),
+                3500
+            );
+            assert.equal(
+                computeRetryDelayMs(1, 8000, 500, 8000, () => 1),
+                8000,
+                'still capped'
+            );
         });
     });
 

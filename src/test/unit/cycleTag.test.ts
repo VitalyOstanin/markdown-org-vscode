@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import { TAG_ALL, computeNextTag, buildTagCycle } from '../../utils/cycleTag';
+import { TAG_ALL, computeNextTag, buildTagCycle, resolveRequestedTag } from '../../utils/cycleTag';
 
 suite('computeNextTag', () => {
     test('ALL advances to the first configured tag', () => {
@@ -67,5 +67,28 @@ suite('buildTagCycle', () => {
     test('all-ALL configuration collapses to a single-element cycle (degenerate)', () => {
         // length <= 1 is the signal the caller uses to report "nothing to cycle".
         assert.deepStrictEqual(buildTagCycle([TAG_ALL, TAG_ALL]), [TAG_ALL]);
+    });
+});
+
+suite('resolveRequestedTag', () => {
+    test('a configured tag is applied as requested', () => {
+        assert.strictEqual(resolveRequestedTag('work', ['work', 'home']), 'work');
+    });
+
+    test('ALL is always resolvable (the implicit cycle entry)', () => {
+        assert.strictEqual(resolveRequestedTag(TAG_ALL, ['work', 'home']), TAG_ALL);
+        assert.strictEqual(resolveRequestedTag(TAG_ALL, []), TAG_ALL);
+    });
+
+    test('a stale tag no longer in fileTags falls back to ALL', () => {
+        // The dropdown was rendered with "archived", then the user removed it
+        // from fileTags before clicking. Apply ALL, not a filter the extractor
+        // no longer knows.
+        assert.strictEqual(resolveRequestedTag('archived', ['work', 'home']), TAG_ALL);
+    });
+
+    test('an explicit ALL entry in fileTags still resolves ALL (dedup-safe)', () => {
+        assert.strictEqual(resolveRequestedTag('WORK', [TAG_ALL, 'WORK', 'PERSONAL']), 'WORK');
+        assert.strictEqual(resolveRequestedTag(TAG_ALL, [TAG_ALL, 'WORK', 'PERSONAL']), TAG_ALL);
     });
 });

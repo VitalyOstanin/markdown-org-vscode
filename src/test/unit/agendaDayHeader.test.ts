@@ -47,4 +47,16 @@ suite('agendaDayHeader.formatDayHeaderParts', () => {
         assert.strictEqual(parts.month, 'December');
         assert.strictEqual(parts.year, '2025');
     });
+
+    test('a malformed locale tag degrades to the default instead of throwing', () => {
+        // `ru_RU` (underscore) makes Intl throw a RangeError. This function is
+        // inlined into the webview and runs for every header, so an unusable
+        // tag must not take the render down -- the host warns about the setting
+        // separately (utils/dateLocale.ts).
+        const parts = formatDayHeaderParts('2025-12-31', 'ru_RU');
+        assert.strictEqual(parts.day, '31');
+        assert.ok(parts.month.length > 0, 'expected a month name from the default locale');
+        assert.ok(parts.weekday.length > 0, 'expected a weekday name from the default locale');
+        assert.strictEqual(parts.year, '2025');
+    });
 });

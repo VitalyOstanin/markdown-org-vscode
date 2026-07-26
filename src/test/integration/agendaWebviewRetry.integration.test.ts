@@ -9,8 +9,7 @@ import { suite, before, beforeEach, afterEach, after, test } from 'mocha';
 import { exec } from '../../utils/exec';
 import { extractor } from '../../utils/extractor';
 import { AgendaPanel } from '../../views/agendaPanel';
-
-type ExecFileCallback = (error: Error | null, stdout: string, stderr: string) => void;
+import type { ExecFileCallback } from '../_execFake';
 
 /**
  * Cover the ServiceWorker-race retry path documented in agendaPanel.ts:

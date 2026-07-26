@@ -125,7 +125,7 @@ suite('Bracket-policy diagnostics + Quick Fix', () => {
 
         const edit = ours[0].edit;
         assert.ok(edit, 'quick fix must carry a WorkspaceEdit');
-        await vscode.workspace.applyEdit(edit!);
+        await vscode.workspace.applyEdit(edit);
 
         assert.strictEqual(editor.document.lineAt(0).text, '`CLOSED: [2026-05-25 Пн 19:02]`');
         await waitForBracketDiagnostics(doc.uri, 0);
@@ -147,7 +147,7 @@ suite('Bracket-policy diagnostics + Quick Fix', () => {
         );
         const ours = (actions ?? []).filter((a) => /Convert to/.test(a.title));
         assert.ok(ours[0].edit);
-        await vscode.workspace.applyEdit(ours[0].edit!);
+        await vscode.workspace.applyEdit(ours[0].edit);
         assert.strictEqual(editor.document.lineAt(0).text, '`SCHEDULED: <2026-05-25 Пн>`');
     });
 });

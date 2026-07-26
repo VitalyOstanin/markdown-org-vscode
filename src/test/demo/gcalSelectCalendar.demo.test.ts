@@ -9,7 +9,7 @@ import {
     hideSidePanels,
     enableScreencast,
     forceEnglishWeekdays,
-    applyMonokaiTheme,
+    applyDemoTheme,
     maximizeVscodeWindow,
     focusVscodeWindow,
     pressKeyInPicker,
@@ -47,7 +47,7 @@ suite('Demo: Select Google Calendar', () => {
         const document = await vscode.workspace.openTextDocument(backdrop);
         await vscode.window.showTextDocument(document);
 
-        await applyMonokaiTheme();
+        await applyDemoTheme();
         await hideSidePanels();
         await forceEnglishWeekdays();
         await sleep(800);

@@ -11,7 +11,7 @@ import {
     hideSidePanels,
     enableScreencast,
     forceEnglishWeekdays,
-    applyMonokaiTheme,
+    applyDemoTheme,
     maximizeVscodeWindow,
     typeText
 } from './_helpers';
@@ -63,7 +63,7 @@ suite('Demo: Connect Google Calendar', () => {
         const document = await vscode.workspace.openTextDocument(backdrop);
         await vscode.window.showTextDocument(document);
 
-        await applyMonokaiTheme();
+        await applyDemoTheme();
         await hideSidePanels();
         await forceEnglishWeekdays();
         await sleep(800);
@@ -87,9 +87,11 @@ suite('Demo: Connect Google Calendar', () => {
             const running = connectGcal(fake.context);
             running.catch(() => {});
 
-            // Fill the client-secret password prompt the way a user would.
+            // Fill the client-secret password prompt the way a user would. The
+            // prompt masks the value; `masked` makes the screencast overlay do
+            // the same, so the recording cannot show what the field hides.
             await sleep(1600);
-            await typeText('demo-client-secret', true);
+            await typeText('demo-client-secret', true, { masked: true });
 
             // Once runConnect opens the browser, simulate Google redirecting back
             // to the loopback server with an authorization code + matching state.

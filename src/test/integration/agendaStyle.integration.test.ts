@@ -1,43 +1,14 @@
 import * as assert from 'assert';
 import * as path from 'path';
 import * as fs from 'fs';
-import { setTimeout as sleep } from 'node:timers/promises';
 import * as vscode from 'vscode';
 import * as sinon from 'sinon';
-import type * as cp from 'child_process';
 import { suite, before, beforeEach, afterEach, after, test } from 'mocha';
 import { exec } from '../../utils/exec';
 import { extractor } from '../../utils/extractor';
 import { AgendaPanel } from '../../views/agendaPanel';
-
-type ExecFileCallback = (error: Error | null, stdout: string, stderr: string) => void;
-
-/**
- * Same day-payload fake used by agenda.integration.test.ts, kept minimal
- * here since these tests only need `showAgendaWeek` to succeed -- the
- * assertions are about the `markdown-org.agendaStyle` setting, not about
- * task rendering content.
- */
-function makeExtractorFake(payloads: { day: unknown; week: unknown; month: unknown; tasks: unknown }) {
-    return (..._args: unknown[]) => {
-        const callback = _args[_args.length - 1] as ExecFileCallback;
-        const cliArgs = (_args[1] as string[]) || [];
-        let response: unknown = [];
-        if (cliArgs.includes('--holidays')) {
-            response = [];
-        } else if (cliArgs.includes('--tasks')) {
-            response = payloads.tasks;
-        } else if (cliArgs.includes('--agenda')) {
-            const mode = cliArgs[cliArgs.indexOf('--agenda') + 1];
-            if (mode === 'day') response = payloads.day;
-            else if (mode === 'week') response = payloads.week;
-            else if (mode === 'month') response = payloads.month;
-        }
-        const stdout = JSON.stringify(response);
-        queueMicrotask(() => callback(null, stdout, ''));
-        return {} as unknown as cp.ChildProcess;
-    };
-}
+import { waitForAgendaRender, waitUntil } from './_helpers';
+import { makeExtractorFake } from '../_execFake';
 
 suite('Agenda Style Integration Tests', () => {
     const testWorkspaceDir = path.join(__dirname, '../../test-workspace');
@@ -77,10 +48,6 @@ suite('Agenda Style Integration Tests', () => {
         resolveExtractorStub.restore();
         showErrorStub.restore();
         await vscode.commands.executeCommand('workbench.action.closeAllEditors');
-        // Never leak a non-default agendaStyle into subsequent suites.
-        await vscode.workspace
-            .getConfiguration('markdown-org')
-            .update('agendaStyle', 'table', vscode.ConfigurationTarget.Global);
     });
 
     after(() => {
@@ -89,75 +56,82 @@ suite('Agenda Style Integration Tests', () => {
         }
     });
 
-    test('markdown-org.agendaStyle setting drives the body data-agenda-style preset', async function () {
+    // The agenda has a single visual style, so the body carries no style
+    // selector at all -- the old per-style setting, its cycle command and the
+    // `data-agenda-style` hook were all removed.
+    test('the webview body carries no agenda-style selector', async function () {
         this.timeout(10000);
-        await vscode.workspace
-            .getConfiguration('markdown-org')
-            .update('agendaStyle', 'monospace', vscode.ConfigurationTarget.Global);
-
         await vscode.commands.executeCommand('markdown-org.showAgendaWeek', '2025-12-09');
-        await sleep(300);
+        await waitForAgendaRender('week');
 
         const panel = (AgendaPanel as unknown as { currentPanel?: { webview: vscode.Webview } }).currentPanel;
         assert.ok(panel, 'expected AgendaPanel to be open after showAgendaWeek');
-        const html = panel.webview.html;
         assert.ok(
-            html.includes('data-agenda-style="monospace"'),
-            'expected the webview body to carry data-agenda-style="monospace"'
+            !panel.webview.html.includes('data-agenda-style'),
+            'the single-style agenda must not emit a data-agenda-style hook'
         );
+        // The task grid is still styled -- the rules simply are not scoped now.
+        assert.ok(panel.webview.html.includes('.task-line {'), 'expected the task-line rules in the webview');
     });
 
-    test('markdown-org.cycleAgendaStyle advances the setting monospace -> native', async function () {
+    // markdown-org.agendaFontFamily lands inside the nonce'd <style> block, so
+    // the panel validates it (sanitizeFontFamily, unit-tested) instead of
+    // interpolating whatever the settings file holds.
+    test('a font-family value carrying CSS syntax never reaches the stylesheet', async function () {
         this.timeout(10000);
         const config = vscode.workspace.getConfiguration('markdown-org');
-        await config.update('agendaStyle', 'monospace', vscode.ConfigurationTarget.Global);
+        await config.update(
+            'agendaFontFamily',
+            'sans-serif; } body { display: none; } .x {',
+            vscode.ConfigurationTarget.Workspace
+        );
+        try {
+            await vscode.commands.executeCommand('markdown-org.showAgendaWeek', '2025-12-09');
+            await waitForAgendaRender('week');
 
-        await vscode.commands.executeCommand('markdown-org.cycleAgendaStyle');
-
-        const updated = vscode.workspace.getConfiguration('markdown-org');
-        assert.strictEqual(updated.get('agendaStyle'), 'native');
+            const panel = (AgendaPanel as unknown as { currentPanel?: { webview: vscode.Webview } }).currentPanel;
+            assert.ok(panel, 'expected AgendaPanel to be open after showAgendaWeek');
+            assert.ok(
+                !panel.webview.html.includes('body { display: none; }'),
+                'the injected rule must not appear in the webview stylesheet'
+            );
+            assert.ok(
+                panel.webview.html.includes("--markdown-org-agenda-font: 'Adwaita Sans'"),
+                'a rejected value must fall back to the default font stack'
+            );
+        } finally {
+            await config.update('agendaFontFamily', undefined, vscode.ConfigurationTarget.Workspace);
+        }
     });
 
-    test('markdown-org.agendaStyle setting drives the table preset', async function () {
+    test('changing the font family re-renders the open panel without reopening it', async function () {
         this.timeout(10000);
-        await vscode.workspace
-            .getConfiguration('markdown-org')
-            .update('agendaStyle', 'table', vscode.ConfigurationTarget.Global);
-
+        const config = vscode.workspace.getConfiguration('markdown-org');
         await vscode.commands.executeCommand('markdown-org.showAgendaWeek', '2025-12-09');
-        await sleep(300);
+        await waitForAgendaRender('week');
 
         const panel = (AgendaPanel as unknown as { currentPanel?: { webview: vscode.Webview } }).currentPanel;
         assert.ok(panel, 'expected AgendaPanel to be open after showAgendaWeek');
-        const html = panel.webview.html;
-        assert.ok(
-            html.includes('data-agenda-style="table"'),
-            'expected the webview body to carry data-agenda-style="table"'
-        );
-    });
+        assert.ok(panel.webview.html.includes("--markdown-org-agenda-font: 'Adwaita Sans'"));
 
-    test('markdown-org.cycleAgendaStyle cycles through all four styles back to start', async function () {
-        this.timeout(10000);
-        const config = vscode.workspace.getConfiguration('markdown-org');
-        await config.update('agendaStyle', 'monospace', vscode.ConfigurationTarget.Global);
-
-        // monospace -> native -> hybrid -> table
-        await vscode.commands.executeCommand('markdown-org.cycleAgendaStyle');
-        await vscode.commands.executeCommand('markdown-org.cycleAgendaStyle');
-        await vscode.commands.executeCommand('markdown-org.cycleAgendaStyle');
-        assert.strictEqual(
-            vscode.workspace.getConfiguration('markdown-org').get('agendaStyle'),
-            'table',
-            'expected three cycles from monospace to reach table'
-        );
-
-        // table -> monospace (wraps around)
-        await vscode.commands.executeCommand('markdown-org.cycleAgendaStyle');
-        assert.strictEqual(
-            vscode.workspace.getConfiguration('markdown-org').get('agendaStyle'),
-            'monospace',
-            'expected a fourth cycle to wrap back to monospace'
-        );
+        try {
+            await config.update('agendaFontFamily', 'Fira Sans, sans-serif', vscode.ConfigurationTarget.Workspace);
+            // Wait on the condition rather than on a fixed pause: the rebuild
+            // runs from the configuration-change event, not from this await.
+            await waitUntil(
+                () => panel.webview.html.includes('font: Fira Sans, sans-serif'),
+                'the rebuilt shell to carry the new font stack',
+                3000
+            );
+            assert.ok(
+                panel.webview.html.includes('--markdown-org-agenda-font: Fira Sans, sans-serif'),
+                `expected the new font stack in the rebuilt shell, got: ${
+                    /--markdown-org-agenda-font:[^;]*/.exec(panel.webview.html)?.[0]
+                }`
+            );
+        } finally {
+            await config.update('agendaFontFamily', undefined, vscode.ConfigurationTarget.Workspace);
+        }
     });
 });
 
@@ -224,7 +198,6 @@ suite('Agenda Table Flags Integration Tests', () => {
         const config = vscode.workspace.getConfiguration('markdown-org');
         await config.update('workspaceDir', testWorkspaceDir, vscode.ConfigurationTarget.Workspace);
         await config.update('currentTag', 'ALL', vscode.ConfigurationTarget.Workspace);
-        await config.update('agendaStyle', 'table', vscode.ConfigurationTarget.Global);
 
         resolveExtractorStub = sinon.stub(extractor, 'resolveExtractorPath').resolves('markdown-org-extract');
 
@@ -239,9 +212,6 @@ suite('Agenda Table Flags Integration Tests', () => {
         resolveExtractorStub.restore();
         showErrorStub.restore();
         await vscode.commands.executeCommand('workbench.action.closeAllEditors');
-        await vscode.workspace
-            .getConfiguration('markdown-org')
-            .update('agendaStyle', 'table', vscode.ConfigurationTarget.Global);
     });
 
     after(() => {
@@ -253,7 +223,7 @@ suite('Agenda Table Flags Integration Tests', () => {
     test('table style renders a data-flag per task matching resolveTaskFlag precedence', async function () {
         this.timeout(10000);
         await vscode.commands.executeCommand('markdown-org.showAgendaDay', '2025-12-09');
-        await sleep(300);
+        await waitForAgendaRender('day');
 
         const info = await AgendaPanel.queryRenderedInfoForTesting();
         assert.ok(info, 'expected AgendaPanel to be open after showAgendaDay');

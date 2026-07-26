@@ -17,8 +17,7 @@ import { setTimeout as sleep } from 'node:timers/promises';
 import { exec } from '../../utils/exec';
 import { extractor } from '../../utils/extractor';
 import type * as cp from 'child_process';
-
-type ExecFileCallback = (error: Error | null, stdout: string, stderr: string) => void;
+import type { ExecFileCallback } from '../_execFake';
 
 /** A Response-like object matching what oauth.postToken and calendarClient read. */
 function jsonResponse(status: number, body: unknown): unknown {

@@ -10,7 +10,7 @@ import {
     hideSidePanels,
     enableScreencast,
     forceEnglishWeekdays,
-    applyMonokaiTheme,
+    applyDemoTheme,
     maximizeVscodeWindow,
     runCommandViaPalette
 } from './_helpers';
@@ -132,7 +132,7 @@ suite('Demo: Google Calendar Sync Now', () => {
         const document = await vscode.workspace.openTextDocument(planningFile);
         await vscode.window.showTextDocument(document);
 
-        await applyMonokaiTheme();
+        await applyDemoTheme();
         await hideSidePanels();
         await forceEnglishWeekdays();
         await sleep(800);

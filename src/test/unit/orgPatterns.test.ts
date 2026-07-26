@@ -79,21 +79,21 @@ suite('orgPatterns named groups', () => {
         test('matches "### CANCELLED Foo"', () => {
             const m = HEADING_REGEX.exec('### CANCELLED Foo');
             assert.ok(m);
-            assert.strictEqual(m!.groups!.status, 'CANCELLED');
-            assert.strictEqual(m!.groups!.title, 'Foo');
+            assert.strictEqual(m.groups!.status, 'CANCELLED');
+            assert.strictEqual(m.groups!.title, 'Foo');
         });
         test('matches "### CANCELLED [#A] Foo"', () => {
             const m = HEADING_REGEX.exec('### CANCELLED [#A] Foo');
             assert.ok(m);
-            assert.strictEqual(m!.groups!.status, 'CANCELLED');
-            assert.strictEqual(m!.groups!.priority, 'A');
-            assert.strictEqual(m!.groups!.title, 'Foo');
+            assert.strictEqual(m.groups!.status, 'CANCELLED');
+            assert.strictEqual(m.groups!.priority, 'A');
+            assert.strictEqual(m.groups!.title, 'Foo');
         });
         test('does not match lowercase "cancelled"', () => {
             const m = HEADING_REGEX.exec('### cancelled Foo');
             assert.ok(m);
-            assert.strictEqual(m!.groups!.status, undefined);
-            assert.strictEqual(m!.groups!.title, 'cancelled Foo');
+            assert.strictEqual(m.groups!.status, undefined);
+            assert.strictEqual(m.groups!.title, 'cancelled Foo');
         });
     });
 
@@ -101,23 +101,23 @@ suite('orgPatterns named groups', () => {
         test('matches "### CANCELED Foo"', () => {
             const m = HEADING_REGEX.exec('### CANCELED Foo');
             assert.ok(m);
-            assert.strictEqual(m!.groups!.status, 'CANCELED');
-            assert.strictEqual(m!.groups!.title, 'Foo');
+            assert.strictEqual(m.groups!.status, 'CANCELED');
+            assert.strictEqual(m.groups!.title, 'Foo');
         });
         test('matches "### CANCELED [#A] Foo"', () => {
             const m = HEADING_REGEX.exec('### CANCELED [#A] Foo');
             assert.ok(m);
-            assert.strictEqual(m!.groups!.status, 'CANCELED');
-            assert.strictEqual(m!.groups!.priority, 'A');
-            assert.strictEqual(m!.groups!.title, 'Foo');
+            assert.strictEqual(m.groups!.status, 'CANCELED');
+            assert.strictEqual(m.groups!.priority, 'A');
+            assert.strictEqual(m.groups!.title, 'Foo');
         });
         // Guards the alternation ordering (CANCELLED before CANCELED): the
         // two-L form must still capture as CANCELLED, not partially as CANCELED.
         test('"### CANCELLED Foo" still yields status CANCELLED, not CANCELED', () => {
             const m = HEADING_REGEX.exec('### CANCELLED Foo');
             assert.ok(m);
-            assert.strictEqual(m!.groups!.status, 'CANCELLED');
-            assert.strictEqual(m!.groups!.title, 'Foo');
+            assert.strictEqual(m.groups!.status, 'CANCELLED');
+            assert.strictEqual(m.groups!.title, 'Foo');
         });
     });
 

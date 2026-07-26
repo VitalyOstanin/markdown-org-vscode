@@ -1,4 +1,6 @@
 import * as assert from 'assert';
+import { buildMonthDayIndex } from '../../utils/agendaMonthCells';
+import { DayAgenda } from '../../types';
 
 suite('Month View Calendar', () => {
     suite('isHoliday', () => {
@@ -78,26 +80,22 @@ suite('Month View Calendar', () => {
     });
 
     suite('Task Indicators', () => {
+        // The calendar's per-day load comes from buildMonthDayIndex (the
+        // function the webview inlines); see agendaMonthCells.test.ts for its
+        // full contract. This case keeps the month-view scenario itself
+        // covered: which days end up marked as carrying work.
         test('should correctly map days with tasks', () => {
             const mockDays = [
                 { date: '2025-12-01', scheduled_timed: [{}], scheduled_no_time: [], upcoming: [], overdue: [] },
                 { date: '2025-12-02', scheduled_timed: [], scheduled_no_time: [], upcoming: [], overdue: [] },
                 { date: '2025-12-06', scheduled_timed: [{}], scheduled_no_time: [{}], upcoming: [], overdue: [] }
-            ];
+            ] as unknown as DayAgenda[];
 
-            const daysMap: Record<string, boolean> = {};
-            mockDays.forEach((day) => {
-                const taskCount =
-                    (day.overdue || []).length +
-                    (day.scheduled_timed || []).length +
-                    (day.scheduled_no_time || []).length +
-                    (day.upcoming || []).length;
-                daysMap[day.date] = taskCount > 0;
-            });
+            const daysMap = buildMonthDayIndex(mockDays);
 
-            assert.strictEqual(daysMap['2025-12-01'], true);
-            assert.strictEqual(daysMap['2025-12-02'], false);
-            assert.strictEqual(daysMap['2025-12-06'], true);
+            assert.deepStrictEqual(daysMap['2025-12-01'], { total: 1, overdue: 0 });
+            assert.strictEqual(daysMap['2025-12-02'], undefined);
+            assert.deepStrictEqual(daysMap['2025-12-06'], { total: 2, overdue: 0 });
         });
     });
 

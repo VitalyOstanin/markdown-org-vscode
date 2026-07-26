@@ -33,3 +33,32 @@ suite('package.json scripts', () => {
         );
     });
 });
+
+/**
+ * The manifest promises that path-like settings are ignored in an untrusted
+ * workspace. Until these are listed, that promise rests only on `isTrusted`
+ * checks at the command entry points: any future command that forgets one runs
+ * an executable whose path came from a cloned repository's `.vscode/settings.json`.
+ */
+suite('package.json workspace trust', () => {
+    interface TrustCapabilities {
+        capabilities?: {
+            untrustedWorkspaces?: { supported?: string; restrictedConfigurations?: string[] };
+        };
+    }
+
+    const manifest = JSON.parse(
+        fs.readFileSync(path.join(__dirname, '..', '..', '..', 'package.json'), 'utf8')
+    ) as TrustCapabilities;
+
+    test('the path-like settings are restricted by the platform, not just by our own checks', () => {
+        const restricted = manifest.capabilities?.untrustedWorkspaces?.restrictedConfigurations ?? [];
+        for (const setting of [
+            'markdown-org.extractorPath',
+            'markdown-org.maintainFilePath',
+            'markdown-org.workspaceDir'
+        ]) {
+            assert.ok(restricted.includes(setting), `${setting} must be in restrictedConfigurations`);
+        }
+    });
+});

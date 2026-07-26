@@ -2,49 +2,15 @@ import * as assert from 'assert';
 import * as path from 'path';
 import * as fs from 'fs';
 import * as os from 'os';
-import { setTimeout as sleep } from 'node:timers/promises';
 import * as vscode from 'vscode';
 import * as sinon from 'sinon';
-import type * as cp from 'child_process';
 import { suite, before, beforeEach, after, afterEach, test } from 'mocha';
 import { exec } from '../../utils/exec';
+import { formatDayHeaderParts } from '../../utils/agendaDayHeader';
 import { extractor } from '../../utils/extractor';
 import { AgendaPanel } from '../../views/agendaPanel';
-
-type ExecFileCallback = (error: Error | null, stdout: string, stderr: string) => void;
-
-/**
- * Build an execFile fake that hands back a different stdout depending on the
- * arguments the agenda code passes to `markdown-org-extract`. The wrapper
- * supports the various Node `execFile` overloads (with/without options) by
- * always taking the callback from the last argument.
- */
-function makeExtractorFake(payloads: {
-    day: unknown;
-    week: unknown;
-    month: unknown;
-    tasks: unknown;
-    holidays?: unknown;
-}) {
-    return (..._args: unknown[]) => {
-        const callback = _args[_args.length - 1] as ExecFileCallback;
-        const cliArgs = (_args[1] as string[]) || [];
-        let response: unknown = [];
-        if (cliArgs.includes('--holidays')) {
-            response = payloads.holidays ?? [];
-        } else if (cliArgs.includes('--tasks')) {
-            response = payloads.tasks;
-        } else if (cliArgs.includes('--agenda')) {
-            const mode = cliArgs[cliArgs.indexOf('--agenda') + 1];
-            if (mode === 'day') response = payloads.day;
-            else if (mode === 'week') response = payloads.week;
-            else if (mode === 'month') response = payloads.month;
-        }
-        const stdout = JSON.stringify(response);
-        queueMicrotask(() => callback(null, stdout, ''));
-        return {} as unknown as cp.ChildProcess;
-    };
-}
+import { makeExtractorFake } from '../_execFake';
+import { waitForAgendaRender, waitForHeaderLayout, waitForValue, waitUntil } from './_helpers';
 
 suite('Agenda Show Integration Tests', () => {
     const testWorkspaceDir = path.join(__dirname, '../../test-workspace');
@@ -76,7 +42,14 @@ suite('Agenda Show Integration Tests', () => {
         { date: '2025-12-15', scheduled_no_time: [fullDay.scheduled_timed[0]] }
     ];
 
-    const tasksPayload = [{ file: testFile, line: 1, heading: 'Task', content: '', task_type: 'TODO', priority: 'A' }];
+    // Mixed priorities (and one task without a cookie) so the Tasks card has
+    // several groups to order; `B` is deliberately absent to prove empty groups
+    // are dropped rather than rendered as a "(0)" panel.
+    const tasksPayload = [
+        { file: testFile, line: 1, heading: 'Task', content: '', task_type: 'TODO', priority: 'A' },
+        { file: testFile, line: 3, heading: 'Third', content: '', task_type: 'TODO', priority: 'C' },
+        { file: testFile, line: 5, heading: 'Plain', content: '', task_type: 'TODO' }
+    ];
 
     before(() => {
         if (!fs.existsSync(testWorkspaceDir)) {
@@ -89,6 +62,9 @@ suite('Agenda Show Integration Tests', () => {
         const config = vscode.workspace.getConfiguration('markdown-org');
         await config.update('workspaceDir', testWorkspaceDir, vscode.ConfigurationTarget.Workspace);
         await config.update('currentTag', 'ALL', vscode.ConfigurationTarget.Workspace);
+        // The UI language would otherwise leak between tests: every assertion
+        // on rendered labels below expects the English dictionary.
+        await config.update('uiLanguage', 'auto', vscode.ConfigurationTarget.Workspace);
 
         resolveExtractorStub = sinon.stub(extractor, 'resolveExtractorPath').resolves('markdown-org-extract');
 
@@ -127,7 +103,7 @@ suite('Agenda Show Integration Tests', () => {
     test('Show Agenda (Day) loads without error', async function () {
         this.timeout(10000);
         await vscode.commands.executeCommand('markdown-org.showAgendaDay');
-        await sleep(300);
+        await waitForAgendaRender('day');
         assertNoError();
         // Lock in the contract with markdown-org-extract: paths must come
         // back absolute so the openTask handler can pass them straight to
@@ -140,24 +116,85 @@ suite('Agenda Show Integration Tests', () => {
         );
     });
 
+    // The extractor derives "today" (overdue/upcoming buckets, timestamp_next)
+    // from --current-date, and falls back to its own --tz default of
+    // Europe/Moscow when the flag is absent. --date is the window anchor and
+    // moves with Prev/Next, so it cannot stand in for "today": without this
+    // flag a user east or west of Moscow gets the neighbouring day's agenda.
+    test('the agenda invocation pins "today" with --current-date, independently of the window anchor', async function () {
+        this.timeout(10000);
+        await vscode.commands.executeCommand('markdown-org.showAgendaDay', '2025-12-09');
+        await waitForAgendaRender('day');
+        assertNoError();
+        const agendaCall = execFileStub.getCalls().find((c) => (c.args[1] as string[]).includes('--agenda'));
+        assert.ok(agendaCall, 'expected an --agenda invocation');
+        const args = agendaCall.args[1] as string[];
+        const currentDateIndex = args.indexOf('--current-date');
+        assert.notStrictEqual(currentDateIndex, -1, `extractor args missing --current-date: ${args.join(' ')}`);
+        assert.match(args[currentDateIndex + 1], /^\d{4}-\d{2}-\d{2}$/);
+        // The anchor stays the requested date, so the two flags carry different
+        // values here -- which is exactly why both are needed.
+        const dateIndex = args.indexOf('--date');
+        assert.strictEqual(args[dateIndex + 1], '2025-12-09');
+        assert.notStrictEqual(args[currentDateIndex + 1], '2025-12-09');
+    });
+
     test('Show Agenda (Week) loads sparse payload without error', async function () {
         this.timeout(10000);
         await vscode.commands.executeCommand('markdown-org.showAgendaWeek');
-        await sleep(300);
+        await waitForAgendaRender('week');
         assertNoError();
+    });
+
+    // A render that throws used to leave the panel blank and the user with
+    // nothing to go on: the exception reaches only the webview console, and the
+    // ready handshake (sent when the script starts, before any render) had
+    // already told the retry watchdog the panel was fine. The webview now
+    // reports the failure to the host, which surfaces it.
+    test('a payload the renderer cannot handle is reported, not left as a blank panel', async function () {
+        this.timeout(15000);
+        await vscode.commands.executeCommand('markdown-org.showAgendaWeek');
+        await waitForAgendaRender('week');
+        assertNoError();
+
+        const panel = (AgendaPanel as unknown as { currentPanel?: { webview: vscode.Webview } }).currentPanel;
+        assert.ok(panel, 'expected AgendaPanel to be open');
+        // An empty dictionary is the shape of a real failure mode (a host and a
+        // page that disagree about the strings contract): the nav bar reads
+        // UI.modes.day and throws on it.
+        await panel.webview.postMessage({
+            command: 'init',
+            data: [],
+            mode: 'week',
+            locale: 'en-US',
+            shiftedToday: '2025-12-09',
+            currentTag: 'ALL',
+            availableTags: ['ALL'],
+            holidays: [],
+            firstDayOfWeek: 'monday',
+            language: 'en',
+            strings: {}
+        });
+
+        await waitUntil(() => showErrorStub.called, 'a render failure to be reported', 4000);
+        const messages = showErrorStub.getCalls().map((c) => String(c.args[0]));
+        assert.ok(
+            messages.some((m) => m.includes('agenda failed to render')),
+            `expected a render failure to be reported, got: ${messages.join('; ') || '(no message)'}`
+        );
     });
 
     test('Show Agenda (Month) loads sparse payload without error', async function () {
         this.timeout(10000);
         await vscode.commands.executeCommand('markdown-org.showAgendaMonth');
-        await sleep(300);
+        await waitForAgendaRender('month');
         assertNoError();
     });
 
     test('Show Tasks loads without error', async function () {
         this.timeout(10000);
         await vscode.commands.executeCommand('markdown-org.showTasks');
-        await sleep(300);
+        await waitForAgendaRender('tasks');
         assertNoError();
     });
 
@@ -170,7 +207,9 @@ suite('Agenda Show Integration Tests', () => {
             'markdown-org.showTasks'
         ]) {
             await vscode.commands.executeCommand(cmd);
-            await sleep(200);
+            await waitForAgendaRender(
+                cmd === 'markdown-org.showTasks' ? 'tasks' : cmd.replace('markdown-org.showAgenda', '').toLowerCase()
+            );
         }
         assertNoError();
     });
@@ -183,7 +222,7 @@ suite('Agenda Show Integration Tests', () => {
     test('Day mode renders a single day-header with the requested anchor date', async function () {
         this.timeout(10000);
         await vscode.commands.executeCommand('markdown-org.showAgendaDay', '2025-12-09');
-        await sleep(300);
+        await waitForAgendaRender('day');
         const info = await AgendaPanel.queryRenderedInfoForTesting();
         assert.ok(info, 'expected AgendaPanel to be open after showAgendaDay');
         assert.strictEqual(info.mode, 'day');
@@ -193,7 +232,7 @@ suite('Agenda Show Integration Tests', () => {
     test('Week mode renders day-headers for every date in the payload, even sparse entries', async function () {
         this.timeout(10000);
         await vscode.commands.executeCommand('markdown-org.showAgendaWeek', '2025-12-09');
-        await sleep(300);
+        await waitForAgendaRender('week');
         const info = await AgendaPanel.queryRenderedInfoForTesting();
         assert.ok(info, 'expected AgendaPanel to be open after showAgendaWeek');
         assert.strictEqual(info.mode, 'week');
@@ -203,33 +242,173 @@ suite('Agenda Show Integration Tests', () => {
         assert.deepStrictEqual(info.dayHeaders, ['2025-12-08', '2025-12-09']);
     });
 
+    // Day and Tasks both render as a card: a summary bar plus section panels.
+    // The panel titles come from buildDaySections / buildTaskGroups (unit
+    // tested); these two tests prove the cards actually reach the DOM and keep
+    // their order, which a webview-side ReferenceError would silently break.
+    test('Day mode renders section panels for the buckets it received', async function () {
+        this.timeout(10000);
+        await vscode.commands.executeCommand('markdown-org.showAgendaDay', '2025-12-09');
+        await waitForAgendaRender('day');
+        const info = await AgendaPanel.queryRenderedInfoForTesting();
+        assert.ok(info, 'expected AgendaPanel to be open after showAgendaDay');
+        // fullDay carries a single scheduled-with-time task; the empty
+        // all-day/overdue buckets must not produce panels.
+        assert.deepStrictEqual(info.sections, ['Scheduled today']);
+    });
+
+    test('Tasks mode groups by priority, highest first and backlog last', async function () {
+        this.timeout(10000);
+        await vscode.commands.executeCommand('markdown-org.showTasks');
+        await waitForAgendaRender('tasks');
+        const info = await AgendaPanel.queryRenderedInfoForTesting();
+        assert.ok(info, 'expected AgendaPanel to be open after showTasks');
+        assert.strictEqual(info.mode, 'tasks');
+        assert.deepStrictEqual(info.sections, ['Priority A', 'Priority C', 'No priority']);
+        // The date-less Tasks card has no anchor date, so its summary bar
+        // carries no data-date (unlike the Day card's).
+        assert.deepStrictEqual(info.dayHeaders, []);
+    });
+
+    // Numbers on the panel follow the date locale's numbering system, like the
+    // dates they sit next to. The year used to be printed as a raw JS number,
+    // so under ar-EG the hero read "٥ يناير 2026" while the day header below it
+    // was fully Arabic-Indic; the month grid had the same split between its
+    // Intl weekday row and its ASCII cell numbers.
+    test('dateLocale=ar-EG renders the year and the calendar numbers in the locale digits', async function () {
+        this.timeout(15000);
+        const config = vscode.workspace.getConfiguration('markdown-org');
+        await config.update('dateLocale', 'ar-EG', vscode.ConfigurationTarget.Workspace);
+        try {
+            await vscode.commands.executeCommand('markdown-org.showAgendaDay', '2026-01-05');
+            await waitForAgendaRender('day');
+            const day = await AgendaPanel.queryRenderedInfoForTesting();
+            assert.ok(day, 'expected AgendaPanel to be open after showAgendaDay');
+            const expectedYear = formatDayHeaderParts('2026-01-05', 'ar-EG').year;
+            assert.ok(
+                day.heroSub.includes(expectedYear),
+                `hero subtitle "${day.heroSub}" should carry the localized year "${expectedYear}"`
+            );
+            assert.ok(!/[0-9]/.test(day.heroSub), `hero subtitle "${day.heroSub}" still contains ASCII digits`);
+
+            await vscode.commands.executeCommand('markdown-org.showAgendaMonth', '2026-01-05');
+            await waitForAgendaRender('month');
+            const month = await AgendaPanel.queryRenderedInfoForTesting();
+            assert.ok(month, 'expected AgendaPanel to be open after showAgendaMonth');
+            assert.ok(month.dayNumbers.length > 0, 'expected the month grid to render day numbers');
+            const ascii = month.dayNumbers.filter((n) => /[0-9]/.test(n));
+            assert.deepStrictEqual(ascii, [], 'calendar day numbers still contain ASCII digits');
+        } finally {
+            await config.update('dateLocale', undefined, vscode.ConfigurationTarget.Workspace);
+        }
+    });
+
+    // markdown-org.uiLanguage drives the labels the webview renders. This
+    // proves the dictionary actually reaches the DOM (the strings are injected
+    // into the webview and reassigned on every init/update), not just that the
+    // resolver returns the right language.
+    test('uiLanguage=ru renders the card labels in Russian', async function () {
+        this.timeout(10000);
+        const config = vscode.workspace.getConfiguration('markdown-org');
+        await config.update('uiLanguage', 'ru', vscode.ConfigurationTarget.Workspace);
+
+        await vscode.commands.executeCommand('markdown-org.showTasks');
+        await waitForAgendaRender('tasks');
+        const info = await AgendaPanel.queryRenderedInfoForTesting();
+        assert.ok(info, 'expected AgendaPanel to be open after showTasks');
+        assert.deepStrictEqual(info.sections, ['Приоритет A', 'Приоритет C', 'Без приоритета']);
+    });
+
+    test('uiLanguage=en keeps the card labels in English regardless of the date locale', async function () {
+        this.timeout(10000);
+        const config = vscode.workspace.getConfiguration('markdown-org');
+        await config.update('uiLanguage', 'en', vscode.ConfigurationTarget.Workspace);
+        await config.update('dateLocale', 'ru-RU', vscode.ConfigurationTarget.Workspace);
+
+        try {
+            await vscode.commands.executeCommand('markdown-org.showAgendaDay', '2025-12-09');
+            await waitForAgendaRender('day');
+            const info = await AgendaPanel.queryRenderedInfoForTesting();
+            assert.ok(info, 'expected AgendaPanel to be open after showAgendaDay');
+            assert.deepStrictEqual(info.sections, ['Scheduled today']);
+        } finally {
+            await config.update('dateLocale', undefined, vscode.ConfigurationTarget.Workspace);
+        }
+    });
+
+    // markdown-org.agendaHeaderMode. `compact` and `full` pin the layout; the
+    // default `auto` decides from the panel height, which a headless test cannot
+    // set, so the two pinned values are what is asserted here. The class lands
+    // on <body>, and the page reports which one it settled on.
+    test('agendaHeaderMode=compact renders the compact header, full renders the tall one', async function () {
+        this.timeout(15000);
+        const config = vscode.workspace.getConfiguration('markdown-org');
+        try {
+            await config.update('agendaHeaderMode', 'compact', vscode.ConfigurationTarget.Workspace);
+            await vscode.commands.executeCommand('markdown-org.showAgendaDay', '2025-12-09');
+            await waitForAgendaRender('day');
+            const compact = await AgendaPanel.queryRenderedInfoForTesting();
+            assert.ok(compact, 'expected AgendaPanel to be open after showAgendaDay');
+            assert.strictEqual(compact.headerLayout, 'compact');
+            // What the setting actually promises (package.json, README): the
+            // title moves onto the control row. The class alone does not prove
+            // that -- an inert `order` on a non-flex parent leaves the hero on
+            // its own line while the class says "compact" -- so the page
+            // measures the two boxes and reports whether they overlap.
+            assert.strictEqual(
+                compact.heroSharesControlRow,
+                true,
+                'compact header must place the hero title on the control row, not merely shrink it'
+            );
+
+            // Changing the setting must reach the open panel: unlike the font
+            // stack this rides on a message instead of a shell rebuild, so a
+            // missing listener would leave the panel on the old layout until it
+            // was reopened.
+            await config.update('agendaHeaderMode', 'full', vscode.ConfigurationTarget.Workspace);
+            await waitForHeaderLayout('full');
+            const full = await AgendaPanel.queryRenderedInfoForTesting();
+            assert.ok(full, 'expected AgendaPanel to stay open after the setting change');
+            assert.strictEqual(
+                full.heroSharesControlRow,
+                false,
+                'full header must keep the hero title on its own line above the controls'
+            );
+        } finally {
+            await config.update('agendaHeaderMode', undefined, vscode.ConfigurationTarget.Workspace);
+        }
+    });
+
     // CANCELLED/CANCELED styling. The per-task status class is computed
     // client-side inside the inlined `renderTask` function, so the generated
     // webview HTML carries the renderTask SOURCE plus the AGENDA_STYLES CSS,
     // not the rendered <span class="status" data-status="cancelled"> markup.
     // The most meaningful seam without a live DOM harness is therefore the
-    // webview `html` string itself: it must contain (a) the
-    // .status[data-status="cancelled"] CSS rule and (b) the two-spelling
-    // branch in the renderTask source, while keeping the CSP/escape
-    // invariants intact (see CLAUDE.md "Безопасность webview").
-    test('webview HTML carries the data-status="cancelled" styling and renderTask branch', async function () {
+    // webview `html` string itself: it must contain (a) the CSS that marks a
+    // cancelled task -- a grey status dot and a struck-through heading -- and
+    // (b) the two-spelling branch in the renderTask source, while keeping the
+    // CSP/escape invariants intact (see CLAUDE.md "Безопасность webview").
+    test('webview HTML carries the cancelled-task styling and renderTask branch', async function () {
         this.timeout(10000);
         await vscode.commands.executeCommand('markdown-org.showAgendaDay', '2025-12-09');
-        await sleep(300);
+        await waitForAgendaRender('day');
         const panel = (AgendaPanel as unknown as { currentPanel?: { webview: vscode.Webview } }).currentPanel;
         assert.ok(panel, 'expected AgendaPanel to be open after showAgendaDay');
         const html = panel.webview.html;
 
-        // (a) The CSS rule that visually distinguishes a cancelled task
-        // (grey + strikethrough) must be present in the injected styles.
+        // (a) The CSS that visually distinguishes a cancelled task must be in
+        // the injected styles: the status is a coloured dot (painted by
+        // attention level, not by the status text) and the heading is greyed
+        // out and struck through.
         assert.ok(
-            html.includes('.status[data-status="cancelled"]'),
-            'expected the .status[data-status="cancelled"] CSS rule to be injected into the webview'
+            html.includes('.status[data-attention="cancelled"]::before'),
+            'expected the cancelled status-dot rule to be injected into the webview'
         );
         assert.ok(
-            html.includes('text-decoration: line-through'),
-            'expected the cancelled status rule to strike through the status text'
+            html.includes('.task-line[data-status="cancelled"] .heading'),
+            'expected the cancelled-heading rule to be injected into the webview'
         );
+        assert.ok(html.includes('text-decoration: line-through'), 'expected the cancelled task to be struck through');
 
         // (b) The cancelled-spelling check is shared with host code: the
         // `isCancelled` helper (which knows both 'CANCELLED' two L and
@@ -254,6 +433,150 @@ suite('Agenda Show Integration Tests', () => {
             html.includes('escapeHtml(status)'),
             'expected the status text to remain escaped via escapeHtml(status)'
         );
+    });
+
+    // The injected script ends with `(agendaClientMain source)(bootstrap, { helper, ... })`,
+    // where the helper names are the KEYS of AgendaPanel.INLINED_HELPERS while the
+    // declarations above them come from each function's own `.toString()`. Those two
+    // agree only as long as every key is spelled like the function it holds -- a
+    // renamed import (`import { escapeHtml as esc }`) would emit `esc` in the
+    // argument list and `function escapeHtml` in the body, and the page would die on
+    // an undefined name at load. The check derives the list from the emitted HTML, so
+    // it stays in step with the contract instead of restating it.
+    test('every helper handed to the webview client is also declared in the script', async function () {
+        this.timeout(10000);
+        await vscode.commands.executeCommand('markdown-org.showAgendaDay', '2025-12-09');
+        await waitForAgendaRender('day');
+        const panel = (AgendaPanel as unknown as { currentPanel?: { webview: vscode.Webview } }).currentPanel;
+        assert.ok(panel, 'expected AgendaPanel to be open after showAgendaDay');
+        const html = panel.webview.html;
+
+        const depsCall = html.match(/\},\s*\{ ([A-Za-z0-9_, ]+) \}\);/);
+        assert.ok(depsCall, 'expected the script to call the client with a shorthand helper object');
+        const names = depsCall[1].split(',').map((n) => n.trim());
+        assert.ok(names.length >= 20, `expected the full helper set, got ${names.length}: ${names.join(', ')}`);
+        for (const name of names) {
+            assert.ok(
+                html.includes(`function ${name}(`),
+                `helper "${name}" is passed to the client but never declared in the injected script`
+            );
+        }
+
+        // The client itself is inlined, not merely referenced: its ready
+        // handshake is what stops the ServiceWorker-race retry from firing.
+        assert.ok(
+            html.includes("postMessage({ command: 'ready' })"),
+            'expected the inlined client body to contain the ready handshake'
+        );
+
+        // Only the function bodies travel, so a body that reads anything from
+        // its module -- an exported const used as a default parameter, say --
+        // arrives as `exports.NAME` and kills the page with "exports is not
+        // defined" on load. The CommonJS emit spells every such reference that
+        // way, which makes the string a reliable tripwire.
+        assert.ok(
+            !/\bexports\./.test(html),
+            'inlined sources must not reference module exports (they are undefined in the page)'
+        );
+    });
+
+    // #content comes from the HTML shell and only ever has its innerHTML
+    // replaced, so it outlives every render. Subscribing to it per render used
+    // to stack a closure each time, and after N refreshes (one per save of a
+    // watched file) one click posted N openTask messages and opened the editor
+    // N times. The wiring must therefore appear exactly once in the script.
+    test('the task-click handler is wired once, not per render', async function () {
+        this.timeout(10000);
+        await vscode.commands.executeCommand('markdown-org.showAgendaWeek', '2025-12-09');
+        await waitForAgendaRender('week');
+        const panel = (AgendaPanel as unknown as { currentPanel?: { webview: vscode.Webview } }).currentPanel;
+        assert.ok(panel, 'expected AgendaPanel to be open after showAgendaWeek');
+        const occurrences = panel.webview.html.split("command: 'openTask'").length - 1;
+        assert.strictEqual(occurrences, 1, `expected a single openTask sender in the script, found ${occurrences}`);
+    });
+
+    // The panel's clickable surfaces are <button>s rather than <div>s with a
+    // click handler: that is what gives them Tab focus and Enter/Space, so the
+    // whole header and the month grid stay usable without a mouse. The markup
+    // is built in the page, so the injected script is what the check reads.
+    test('clickable panel surfaces are rendered as buttons', async function () {
+        this.timeout(10000);
+        await vscode.commands.executeCommand('markdown-org.showAgendaMonth', '2025-12-09');
+        await waitForAgendaRender('month');
+        const panel = (AgendaPanel as unknown as { currentPanel?: { webview: vscode.Webview } }).currentPanel;
+        assert.ok(panel, 'expected AgendaPanel to be open after showAgendaMonth');
+        const script = panel.webview.html;
+
+        for (const cls of ['calendar-day', 'tag-menu-item', 'seg-item']) {
+            assert.strictEqual(
+                script.includes(`<div class="${cls}`),
+                false,
+                `${cls} must be a <button>, not a clickable <div>`
+            );
+        }
+        assert.ok(
+            script.includes('<button type="button" class="tag-menu-item'),
+            'expected the tag dropdown rows to be buttons'
+        );
+        // Every calendar cell goes through one opening-tag helper, which is
+        // also where the drill-down tooltip is attached.
+        const cellTag = script.match(/function calendarCellOpenTag\([\s\S]*?\n {4}\}/);
+        assert.ok(cellTag, 'expected calendarCellOpenTag in the injected script');
+        assert.ok(cellTag[0].includes('\'<button type="button" class="\''), 'calendar cells must be buttons');
+        assert.ok(cellTag[0].includes('openDayView'), 'calendar cells must carry the drill-down tooltip');
+    });
+
+    // Two chips of the same component -- the month cell's task load and the
+    // card section count -- must explain their number the same way. The month
+    // one always did; the section one used to be a bare number.
+    test('both count chips carry a tooltip', async function () {
+        this.timeout(10000);
+        await vscode.commands.executeCommand('markdown-org.showAgendaDay', '2025-12-09');
+        await waitForAgendaRender('day');
+        const panel = (AgendaPanel as unknown as { currentPanel?: { webview: vscode.Webview } }).currentPanel;
+        assert.ok(panel, 'expected AgendaPanel to be open after showAgendaDay');
+        const script = panel.webview.html;
+        assert.ok(
+            script.includes('<span class="day-section-count" title="'),
+            'the section count chip must carry a tooltip'
+        );
+        assert.ok(script.includes('countChip'), 'both chips must read their wording from the shared countChip strings');
+    });
+
+    // History used to be keyboard-only, and the commands only show in the
+    // Command Palette while the agenda has focus -- so nothing in the interface
+    // said the feature existed.
+    test('the control row offers history buttons whose tooltips name the shortcut', async function () {
+        this.timeout(10000);
+        await vscode.commands.executeCommand('markdown-org.showAgendaWeek');
+        await waitForAgendaRender('week');
+        const panel = (AgendaPanel as unknown as { currentPanel?: { webview: vscode.Webview } }).currentPanel;
+        assert.ok(panel, 'expected AgendaPanel to be open after showAgendaWeek');
+        const script = panel.webview.html;
+
+        assert.ok(script.includes('id="btn-history-back"'), 'expected a Back button in the control row');
+        assert.ok(script.includes('id="btn-history-forward"'), 'expected a Forward button in the control row');
+        assert.ok(script.includes('Alt+Shift+-'), 'the Back tooltip must name its chord');
+        assert.ok(script.includes('Alt+Shift+='), 'the Forward tooltip must name its chord');
+        assert.ok(script.includes("command: 'historyBack'"), 'the Back button must ask the host to navigate');
+        assert.ok(script.includes("command: 'historyForward'"), 'the Forward button must ask the host to navigate');
+    });
+
+    test('the panel navigates history when the buttons report a click', async function () {
+        this.timeout(15000);
+        // Two view states, so Back has somewhere to go.
+        await vscode.commands.executeCommand('markdown-org.showAgendaWeek');
+        await waitForAgendaRender('week');
+        await vscode.commands.executeCommand('markdown-org.showAgendaMonth');
+        await waitForAgendaRender('month');
+
+        const handle = (AgendaPanel as unknown as { handleWebviewMessage(m: unknown): Promise<void> })
+            .handleWebviewMessage;
+        await handle.call(AgendaPanel, { command: 'historyBack' });
+        await waitForAgendaRender('week');
+
+        await handle.call(AgendaPanel, { command: 'historyForward' });
+        await waitForAgendaRender('month');
     });
 });
 
@@ -417,48 +740,115 @@ suite('Agenda webview keybindings scope', () => {
         }
     });
 
-    test('package.json: show* keybindings include markdown-org.agendaFocused in when', () => {
+    // The panel presents Day/Week/Month/Tasks as four equal segments, so all
+    // four view commands carry a keybinding with the same scope -- Day and
+    // Tasks used to have none, which left the two most reworked views
+    // mouse-only.
+    test('package.json: all four view commands are bound and reach the agenda panel', () => {
         const ext = vscode.extensions.getExtension('vitalyostanin.markdown-org-vscode');
         assert.ok(ext, 'extension not found');
-        const keybindings: Array<{ command: string; when?: string }> = ext.packageJSON.contributes.keybindings;
-        const week = keybindings.find((k) => k.command === 'markdown-org.showAgendaWeek');
-        const month = keybindings.find((k) => k.command === 'markdown-org.showAgendaMonth');
-        assert.ok(week, 'showAgendaWeek keybinding missing');
-        assert.ok(month, 'showAgendaMonth keybinding missing');
-        assert.ok(
-            week.when && week.when.includes('markdown-org.agendaFocused'),
-            `showAgendaWeek when missing agendaFocused: ${week.when}`
-        );
-        assert.ok(
-            month.when && month.when.includes('markdown-org.agendaFocused'),
-            `showAgendaMonth when missing agendaFocused: ${month.when}`
-        );
+        const keybindings: Array<{ command: string; key?: string; mac?: string; when?: string }> =
+            ext.packageJSON.contributes.keybindings;
+        const views = [
+            'markdown-org.showAgendaDay',
+            'markdown-org.showAgendaWeek',
+            'markdown-org.showAgendaMonth',
+            'markdown-org.showTasks'
+        ];
+        for (const command of views) {
+            const binding = keybindings.find((k) => k.command === command);
+            assert.ok(binding, `${command} keybinding missing`);
+            assert.ok(binding.key, `${command} keybinding has no key`);
+            assert.ok(binding.mac, `${command} keybinding has no mac variant`);
+            assert.ok(
+                binding.when && binding.when.includes('markdown-org.agendaFocused'),
+                `${command} when missing agendaFocused: ${binding.when}`
+            );
+        }
+        // No two of them share a chord.
+        const keys = views.map((c) => keybindings.find((k) => k.command === c)?.key);
+        assert.strictEqual(new Set(keys).size, keys.length, `view commands share a chord: ${keys.join(', ')}`);
     });
 
-    test('package.json: cycleTag keybinding has no editorLangId gate (works everywhere)', () => {
+    // History navigation used to be a keydown listener inside the page that
+    // captured Alt+Shift+- / Alt+Shift+= and stopped propagation. That made the
+    // shortcut invisible in Keyboard Shortcuts, impossible to rebind or
+    // disable, and it swallowed whatever else the user had bound to those
+    // chords while the agenda had focus. They are contributed keybindings now.
+    test('package.json: history navigation is a contributed keybinding, scoped to the agenda', () => {
+        const ext = vscode.extensions.getExtension('vitalyostanin.markdown-org-vscode');
+        assert.ok(ext, 'extension not found');
+        const keybindings: Array<{ command: string; key?: string; when?: string }> =
+            ext.packageJSON.contributes.keybindings;
+        const back = keybindings.find((k) => k.command === 'markdown-org.agendaBack');
+        const forward = keybindings.find((k) => k.command === 'markdown-org.agendaForward');
+        assert.ok(back, 'agendaBack keybinding missing');
+        assert.ok(forward, 'agendaForward keybinding missing');
+        assert.strictEqual(back.key, 'alt+shift+-');
+        assert.strictEqual(forward.key, 'alt+shift+=');
+        for (const binding of [back, forward]) {
+            assert.ok(
+                binding.when && binding.when.includes('markdown-org.agendaFocused'),
+                `${binding.command} must be scoped to the agenda, got: ${binding.when}`
+            );
+        }
+    });
+
+    test('overlapping history replays keep the forward tail', async function () {
+        this.timeout(20000);
+        // Three states, so there is a tail to lose.
+        for (const date of ['2026-05-17', '2026-05-18', '2026-05-19']) {
+            await vscode.commands.executeCommand('markdown-org.showAgendaDay', date);
+            await waitForAgendaRender('day');
+        }
+        // Two Back invocations without awaiting the first: VS Code serialises
+        // neither commands nor webview messages, so this is what a quick double
+        // press looks like. With the old boolean flag the first replay to
+        // finish cleared it mid-flight, the second render was recorded, and
+        // recording drops everything ahead of the cursor.
+        await Promise.all([
+            vscode.commands.executeCommand('markdown-org.agendaBack'),
+            vscode.commands.executeCommand('markdown-org.agendaBack')
+        ]);
+        await waitForAgendaRender('day');
+
+        const history = (AgendaPanel as unknown as { history: { canGoForward(): boolean } }).history;
+        assert.ok(history.canGoForward(), 'forward tail was dropped by overlapping replays');
+    });
+
+    test('package.json: cycleTag is scoped like every other binding -- markdown editor or agenda panel', () => {
+        // It used to be the one binding with no `when` at all, so the chord was
+        // live in every editor. The agenda clause is what keeps it working from
+        // inside the panel, where there is no text editor to focus.
         const ext = vscode.extensions.getExtension('vitalyostanin.markdown-org-vscode');
         const keybindings: Array<{ command: string; when?: string }> = ext!.packageJSON.contributes.keybindings;
         const cycle = keybindings.find((k) => k.command === 'markdown-org.cycleTag');
         assert.ok(cycle, 'cycleTag keybinding missing');
-        // Either no when at all, or one that does not depend on editorLangId.
-        if (cycle.when) {
-            assert.ok(
-                !cycle.when.includes('editorLangId'),
-                `cycleTag when should not gate on editorLangId: ${cycle.when}`
-            );
-        }
+        assert.ok(cycle.when, 'cycleTag should carry the same when-clause as the rest');
+        assert.ok(
+            cycle.when.includes('markdown-org.agendaFocused'),
+            `cycleTag must still work inside the agenda: ${cycle.when}`
+        );
+        assert.ok(
+            cycle.when.includes('editorLangId == markdown'),
+            `cycleTag should be scoped to markdown editors: ${cycle.when}`
+        );
     });
 
     test('shiftedToday is reset when the agenda panel is disposed', async function () {
         this.timeout(10000);
         await vscode.commands.executeCommand('markdown-org.showAgendaWeek');
-        await sleep(300);
+        await waitForAgendaRender('week');
 
         const beforeClose = (AgendaPanel as unknown as { shiftedToday?: string }).shiftedToday;
         assert.ok(beforeClose, 'expected AgendaPanel.shiftedToday to be populated while the panel is open');
 
         await vscode.commands.executeCommand('workbench.action.closeAllEditors');
-        await sleep(300);
+        await waitForValue(
+            () => (AgendaPanel as unknown as { shiftedToday?: string }).shiftedToday,
+            undefined,
+            'shiftedToday to be cleared on dispose'
+        );
 
         const afterClose = (AgendaPanel as unknown as { shiftedToday?: string }).shiftedToday;
         assert.strictEqual(
@@ -473,7 +863,7 @@ suite('Agenda webview keybindings scope', () => {
         const spy = sinon.spy(vscode.commands, 'executeCommand');
         try {
             await vscode.commands.executeCommand('markdown-org.showAgendaWeek');
-            await sleep(300);
+            await waitForAgendaRender('week');
 
             const focusCalls = spy
                 .getCalls()
@@ -484,7 +874,18 @@ suite('Agenda webview keybindings scope', () => {
             );
 
             await vscode.commands.executeCommand('workbench.action.closeAllEditors');
-            await sleep(300);
+            await waitUntil(
+                () =>
+                    spy
+                        .getCalls()
+                        .some(
+                            (c) =>
+                                c.args[0] === 'setContext' &&
+                                c.args[1] === 'markdown-org.agendaFocused' &&
+                                c.args[2] === false
+                        ),
+                'setContext(agendaFocused, false) after the panel closed'
+            );
 
             const afterClose = spy
                 .getCalls()
@@ -504,7 +905,7 @@ suite('Agenda webview keybindings scope', () => {
         await vscode.commands.executeCommand('workbench.action.closeAllEditors');
 
         await vscode.commands.executeCommand('markdown-org.showAgendaWeek');
-        await sleep(300);
+        await waitForAgendaRender('week');
         let tab = vscode.window.tabGroups.activeTabGroup.activeTab;
         assert.ok(
             tab && tab.label.toLowerCase().includes('week'),
@@ -512,7 +913,7 @@ suite('Agenda webview keybindings scope', () => {
         );
 
         await vscode.commands.executeCommand('markdown-org.showAgendaMonth');
-        await sleep(300);
+        await waitForAgendaRender('month');
         tab = vscode.window.tabGroups.activeTabGroup.activeTab;
         assert.ok(
             tab && tab.label.toLowerCase().includes('month'),
@@ -520,7 +921,7 @@ suite('Agenda webview keybindings scope', () => {
         );
 
         await vscode.commands.executeCommand('markdown-org.showAgendaDay');
-        await sleep(300);
+        await waitForAgendaRender('day');
         tab = vscode.window.tabGroups.activeTabGroup.activeTab;
         assert.ok(
             tab && tab.label.toLowerCase().includes('day'),
@@ -528,7 +929,7 @@ suite('Agenda webview keybindings scope', () => {
         );
 
         await vscode.commands.executeCommand('markdown-org.showTasks');
-        await sleep(300);
+        await waitForAgendaRender('tasks');
         tab = vscode.window.tabGroups.activeTabGroup.activeTab;
         assert.ok(
             tab && tab.label.toLowerCase().includes('tasks'),
@@ -544,7 +945,7 @@ suite('Agenda webview keybindings scope', () => {
 
         // Open the panel on the current week first.
         await vscode.commands.executeCommand('markdown-org.showAgendaWeek');
-        await sleep(300);
+        await waitForAgendaRender('week');
 
         const renderSpy = sinon.spy(AgendaPanel, 'render');
         try {
@@ -560,19 +961,13 @@ suite('Agenda webview keybindings scope', () => {
             assert.ok(refreshCb, 'refreshCallback should be set after the panel opens');
 
             await refreshCb('2026-05-24', true);
-            await sleep(300);
+            await waitUntil(() => renderSpy.callCount >= 1, 'render to be called from refreshCallback');
 
             assert.ok(renderSpy.callCount >= 1, 'expected AgendaPanel.render to be called from refreshCallback');
-            const last = renderSpy.lastCall;
-            // Render signature: (_context, data, mode, date, refreshCallback,
-            // userInitiated, currentTag, holidays, navigation). The flag we
-            // care about is the 9th positional argument.
-            const navigationArg = last.args[8];
-            const userInitiatedArg = last.args[5];
-            const dateArg = last.args[3];
-            assert.strictEqual(userInitiatedArg, true, 'Next Week click should be userInitiated=true');
-            assert.strictEqual(navigationArg, true, 'Next Week click should set navigation=true');
-            assert.strictEqual(dateArg, '2026-05-24', 'render should receive the new shiftedToday');
+            const request = renderSpy.lastCall.args[0];
+            assert.strictEqual(request.userInitiated, true, 'Next Week click should be userInitiated=true');
+            assert.strictEqual(request.navigation, true, 'Next Week click should set navigation=true');
+            assert.strictEqual(request.shiftedToday, '2026-05-24', 'render should receive the new shiftedToday');
         } finally {
             renderSpy.restore();
         }
@@ -584,7 +979,7 @@ suite('Agenda webview keybindings scope', () => {
         // Open the panel and then nudge it onto a different anchor so the
         // Today click has somewhere to come back from.
         await vscode.commands.executeCommand('markdown-org.showAgendaWeek');
-        await sleep(300);
+        await waitForAgendaRender('week');
 
         const refreshCb = (
             AgendaPanel as unknown as {
@@ -595,7 +990,7 @@ suite('Agenda webview keybindings scope', () => {
 
         // Step away (imitates Next Week).
         await refreshCb('2026-05-24', true);
-        await sleep(300);
+        await waitForAgendaRender('week');
 
         const renderSpy = sinon.spy(AgendaPanel, 'render');
         try {
@@ -610,20 +1005,17 @@ suite('Agenda webview keybindings scope', () => {
                 String(todayDate.getDate()).padStart(2, '0');
 
             await refreshCb(todayIso, true);
-            await sleep(300);
+            await waitUntil(() => renderSpy.callCount >= 1, 'render to be called from the Today refresh');
 
             assert.ok(renderSpy.callCount >= 1, 'expected AgendaPanel.render to be called from Today refresh');
-            const last = renderSpy.lastCall;
-            const navigationArg = last.args[8];
-            const userInitiatedArg = last.args[5];
-            const dateArg = last.args[3];
-            assert.strictEqual(userInitiatedArg, true, 'Today click should be userInitiated=true');
+            const request = renderSpy.lastCall.args[0];
+            assert.strictEqual(request.userInitiated, true, 'Today click should be userInitiated=true');
             assert.strictEqual(
-                navigationArg,
+                request.navigation,
                 true,
                 'Today click should set navigation=true (so the webview re-anchors)'
             );
-            assert.strictEqual(dateArg, todayIso, 'render should receive today as the new shiftedToday');
+            assert.strictEqual(request.shiftedToday, todayIso, 'render should receive today as the new shiftedToday');
         } finally {
             renderSpy.restore();
         }
@@ -634,17 +1026,17 @@ suite('Agenda webview keybindings scope', () => {
 
         // First open establishes the panel.
         await vscode.commands.executeCommand('markdown-org.showAgendaWeek');
-        await sleep(300);
+        await waitForAgendaRender('week');
 
         const renderSpy = sinon.spy(AgendaPanel, 'render');
         try {
             // Second invocation while the panel is already open.
             await vscode.commands.executeCommand('markdown-org.showAgendaWeek');
-            await sleep(300);
+            await waitForAgendaRender('week');
 
             assert.ok(renderSpy.callCount >= 1, 'expected AgendaPanel.render to be called on repeat');
-            const navigationArg = renderSpy.lastCall.args[8];
-            assert.strictEqual(navigationArg, false, 'repeated Show Agenda (Week) should NOT be marked as navigation');
+            const { navigation } = renderSpy.lastCall.args[0];
+            assert.strictEqual(navigation, false, 'repeated Show Agenda (Week) should NOT be marked as navigation');
         } finally {
             renderSpy.restore();
         }
@@ -665,10 +1057,14 @@ suite('Agenda webview keybindings scope', () => {
 
         await vscode.commands.executeCommand('workbench.action.closeAllEditors');
         await vscode.commands.executeCommand('markdown-org.showAgendaWeek');
-        await sleep(300);
+        await waitForAgendaRender('week');
 
         await vscode.commands.executeCommand('markdown-org.cycleTag');
-        await sleep(300);
+        await waitForValue(
+            () => vscode.workspace.getConfiguration('markdown-org').get<string>('currentTag'),
+            'WORK',
+            'currentTag to cycle to WORK'
+        );
 
         const after = vscode.workspace.getConfiguration('markdown-org').get<string>('currentTag');
         assert.strictEqual(after, 'WORK', `expected currentTag to cycle to WORK, got ${after}`);

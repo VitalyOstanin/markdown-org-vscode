@@ -106,8 +106,8 @@ suite('getTimestampPartAt (plain timestamp)', () => {
     test('returned range covers the whole timestamp', () => {
         const result = getTimestampPartAt(LINE, 2);
         assert.ok(result);
-        assert.strictEqual(result!.start, 0);
-        assert.strictEqual(result!.end, LINE.length);
+        assert.strictEqual(result.start, 0);
+        assert.strictEqual(result.end, LINE.length);
     });
 
     test('date-only timestamp without weekday or time', () => {
@@ -158,13 +158,13 @@ suite('getTimestampPartAt (plain timestamp)', () => {
         test('flags inactive form via active=false', () => {
             const hit = getTimestampPartAt(INACTIVE, 1);
             assert.ok(hit);
-            assert.strictEqual(hit!.active, false);
+            assert.strictEqual(hit.active, false);
         });
 
         test('flags active form via active=true', () => {
             const hit = getTimestampPartAt('<2025-12-06 Fri 14:30>', 1);
             assert.ok(hit);
-            assert.strictEqual(hit!.active, true);
+            assert.strictEqual(hit.active, true);
         });
 
         test('cursor positions resolve to the same parts as the active form', () => {
@@ -205,8 +205,8 @@ suite('getTimestampPartAt (plain timestamp)', () => {
             const inactiveRepeated = '[2025-12-06 Fri 14:30 +1d]';
             const hit = getTimestampPartAt(inactiveRepeated, 1);
             assert.ok(hit);
-            assert.strictEqual(hit!.active, false);
-            assert.strictEqual(hit!.match.groups!.repeater, '+1d');
+            assert.strictEqual(hit.active, false);
+            assert.strictEqual(hit.match.groups!.repeater, '+1d');
         });
     });
 });
