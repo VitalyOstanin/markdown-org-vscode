@@ -347,15 +347,40 @@
       block: a rule configured twice is replaced, not merged, so leaving it out
       there would have let unit tests import `fs` bare again.
 
-- [ ] TypeScript 6 -> 7
-    - Deferred deliberately: the urgent part of the upgrade is already done --
-      `moduleResolution: node10`, which TypeScript 7 removes, was replaced by
-      `node16` in both projects and `ignoreDeprecations` is gone, so the build
-      no longer sits on a deprecation.
-    - What remains is a compiler major (the native port) right before a
-      release. Do it in its own change: bump `typescript`, re-run
-      `npm run typecheck`, both test suites and a VSIX build, and check
-      typescript-eslint's supported-version range at the same time.
+- [ ] TypeScript 6 -> 7 -- blocked on typescript-eslint, revisit at TS 7.1
+    - The urgent part of the upgrade is already done: `moduleResolution:
+node10`, which TypeScript 7 removes, was replaced by `node16` in both
+      projects and `ignoreDeprecations` is gone, so the build no longer sits on
+      a deprecation.
+    - Tried on 7.0.2 (2026-07-26). The compiler is ready for this project:
+      `tsc -b` builds it from a cleaned `out/` with no errors, all 730 unit and
+      295 integration tests pass on that output, and the build takes 0.67 s
+      against 7.29 s on TypeScript 6.
+    - The linter is not. `eslint .` aborts before it reads a file with
+      `Error: typescript-eslint does not support TS 7.0`, and the peer range of
+      `typescript-eslint` 8.65.0 -- canary included -- is
+      `typescript >=4.8.4 <6.1.0`.
+    - The cause is not a missing version bump. TypeScript 7 no longer publishes
+      the compiler as a JS library: the package has no `main`, its root export
+      is `lib/version.cjs` (three lines returning the version string), the
+      compiler ships as a native per-platform binary behind `bin/tsc`, and the
+      programmatic surface sits behind `typescript/unstable/*`, where `Program`
+      and `Checker` are clients of a separate compiler process rather than
+      in-process objects. typescript-eslint needs the old in-process API, so
+      support is
+      [blocked by external API](https://github.com/typescript-eslint/typescript-eslint/issues/10940)
+      until that surface stabilises in TS 7.1; the 7.0.2 report
+      ([#12518](https://github.com/typescript-eslint/typescript-eslint/issues/12518))
+      was closed with "there is nothing we can do about this until TS 7
+      provides an API".
+    - Running both side by side (`tsc` from `@typescript/native`, `typescript`
+      aliased to `@typescript/typescript6` so the linter keeps a TS 6 API, per
+      the [7.0 announcement](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/))
+      is possible and is what other projects do, but it would make the fast
+      compiler the authoritative gate while the two can still disagree, for a
+      build that takes seven seconds. Not worth it here.
+    - Revisit when typescript-eslint ships TS 7 support: bump `typescript`,
+      re-run `npm run typecheck`, both test suites and a VSIX build.
 
 - [x] Ship third-party notices for the bundled extractor
     - The VSIX distributes `markdown-org-extract` as a statically linked
