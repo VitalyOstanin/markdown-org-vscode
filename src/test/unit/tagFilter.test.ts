@@ -9,7 +9,7 @@ const TAGS: FileTag[] = [
     { name: 'OTHER', pattern: '!' }
 ];
 
-function task(file: string, heading: string = 'task'): Task {
+function task(file: string, heading = 'task'): Task {
     return {
         file,
         line: 1,

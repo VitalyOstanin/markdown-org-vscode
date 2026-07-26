@@ -114,11 +114,19 @@ npm run format          # Prettier
 npm run format:check
 ```
 
+The rule sets are `recommended-type-checked` and `stylistic-type-checked` from
+typescript-eslint, plus a hand-picked list of modern-API rules from
+[eslint-plugin-unicorn](https://github.com/sindresorhus/eslint-plugin-unicorn).
+Unicorn's own `recommended` preset is deliberately not used: it reports 1500+
+here, nearly all of it naming and filename conventions this project does not
+follow. What is enabled is the part about the standard library moving on --
+`String#replaceAll` over a global regex, `Array#at(-1)` over
+`arr[arr.length - 1]`, spread over `Array.from`.
+
 Three conventions in the config are worth knowing before a new file is written,
 because `--fix` will rewrite the imports otherwise:
 
-- Node built-ins carry the `node:` prefix (`no-restricted-imports` names every
-  bare specifier).
+- Node built-ins carry the `node:` prefix (`unicorn/prefer-node-protocol`).
 - Type-only imports are spelled `import type` on their own line
   (`@typescript-eslint/consistent-type-imports`). That keeps a value import
   visible, which matters for the modules inlined into the agenda page: only the

@@ -78,7 +78,7 @@ function tokenRun(seq: { token: string; expiresIn: number }[]): { run: DbusRun; 
     const methods: string[] = [];
     let i = 0;
     const run: DbusRun = async (_file, args) => {
-        const method = args[args.length - 1]!;
+        const method = args.at(-1)!;
         methods.push(method);
         if (method === 'EnsureCredentials') {
             return { stdout: JSON.stringify({ type: '(i)', data: [60] }), stderr: '', code: 0 };

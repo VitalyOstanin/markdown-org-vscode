@@ -68,7 +68,7 @@ suite('CLOCK Integration Tests', () => {
         const lines = text.split('\n');
 
         const clockLine = lines[2];
-        const match = clockLine!.match(/`CLOCK: \[\d{4}-\d{2}-\d{2} [^\s]+ (\d{2}):(\d{2})\]`$/);
+        const match = /`CLOCK: \[\d{4}-\d{2}-\d{2} [^\s]+ (\d{2}):(\d{2})\]`$/.exec(clockLine!);
         assert.ok(match, 'CLOCK line should match expected format');
 
         const minutes = parseInt(match[2]!, 10);
@@ -119,7 +119,7 @@ suite('CLOCK Integration Tests', () => {
         const lines = text.split('\n');
 
         const clockLine = lines[2];
-        const match = clockLine!.match(/=> +(\d+):(\d{2})`$/);
+        const match = /=> +(\d+):(\d{2})`$/.exec(clockLine!);
         assert.ok(match, 'Should have duration');
 
         const hours = parseInt(match[1]!, 10);
@@ -223,7 +223,7 @@ suite('CLOCK Integration Tests', () => {
         const text = editor.document.getText();
         const lines = text.split('\n');
 
-        const clockLines = lines.filter((line) => line.match(/^`CLOCK:/));
+        const clockLines = lines.filter((line) => /^`CLOCK:/.exec(line));
         assert.strictEqual(clockLines.length, 3, 'Should have 3 CLOCK entries');
     });
 });

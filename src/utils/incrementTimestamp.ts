@@ -27,10 +27,10 @@ export function incrementTimestamp(
     const year = parseInt(rawYear, 10);
     const month = parseInt(rawMonth, 10);
     const day = parseInt(rawDay, 10);
-    const weekday = g.weekday || '';
+    const weekday = g.weekday ?? '';
     const hour = g.hour ? parseInt(g.hour, 10) : undefined;
     const minute = g.minute ? parseInt(g.minute, 10) : undefined;
-    const repeater = g.repeater || '';
+    const repeater = g.repeater ?? '';
 
     const date = new Date(year, month - 1, day, hour ?? 0, minute ?? 0);
 

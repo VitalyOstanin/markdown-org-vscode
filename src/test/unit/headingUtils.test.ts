@@ -68,16 +68,16 @@ suite('Heading Utils Tests', () => {
         const priorities = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
 
         for (let i = 0; i < priorities.length - 1; i++) {
-            const current = priorities.charCodeAt(i);
+            const current = priorities.codePointAt(i)!;
             const next = current + 1;
 
-            assert.strictEqual(String.fromCharCode(next), priorities[i + 1]);
+            assert.strictEqual(String.fromCodePoint(next), priorities[i + 1]);
         }
     });
 
     test('Priority bounds check', () => {
-        const A_CODE = 'A'.charCodeAt(0);
-        const Z_CODE = 'Z'.charCodeAt(0);
+        const A_CODE = 'A'.codePointAt(0)!;
+        const Z_CODE = 'Z'.codePointAt(0)!;
 
         assert.strictEqual(A_CODE, 65);
         assert.strictEqual(Z_CODE, 90);

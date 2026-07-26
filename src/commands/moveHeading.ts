@@ -58,7 +58,7 @@ async function findHeadingAtCursor(editor: vscode.TextEditor): Promise<HeadingIn
         return null;
     }
     const lineText = editor.document.lineAt(headingLine).text;
-    const match = lineText.match(/^(#+)\s+(.+)$/);
+    const match = /^(#+)\s+(.+)$/.exec(lineText);
     if (!match) {
         return null;
     }
@@ -83,7 +83,7 @@ function getAncestorChain(document: vscode.TextDocument, startLine: number, targ
 
     for (let i = startLine - 1; i >= 0; i--) {
         const line = document.lineAt(i).text;
-        const match = line.match(/^(#+)\s+(.+)$/);
+        const match = /^(#+)\s+(.+)$/.exec(line);
         if (match) {
             const level = group(match, 1).length;
             if (level < currentLevel) {

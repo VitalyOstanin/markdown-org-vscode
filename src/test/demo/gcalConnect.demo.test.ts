@@ -85,7 +85,9 @@ suite('Demo: Connect Google Calendar', () => {
             // Swallow the dangling promise; the credentials are stored and the
             // toast shown well before that final await.
             const running = connectGcal(fake.context);
-            running.catch(() => {});
+            running.catch(() => {
+                /* the demo does not care why it ended */
+            });
 
             // Fill the client-secret password prompt the way a user would. The
             // prompt masks the value; `masked` makes the screencast overlay do

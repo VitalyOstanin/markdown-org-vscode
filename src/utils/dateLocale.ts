@@ -31,7 +31,7 @@ export function isUsableDateLocale(locale: string): boolean {
  * default" -- so it comes back without `rejected` and produces no warning.
  */
 export function resolveDateLocale(configured: string | undefined | null): { locale: string; rejected?: string } {
-    const trimmed = (configured || '').trim();
+    const trimmed = (configured ?? '').trim();
     if (!trimmed) {
         return { locale: FALLBACK_DATE_LOCALE };
     }

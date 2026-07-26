@@ -46,7 +46,7 @@ suite('wireDayHeaderNavigation (jsdom)', () => {
         // Wired headers carry a hover tooltip explaining the drill-down.
         linked.forEach((el) => assert.strictEqual(el.getAttribute('title'), OPEN_DAY_TITLE));
         // The header without data-date must stay inert.
-        const inert = Array.from(document.querySelectorAll('.day-header')).filter(
+        const inert = [...document.querySelectorAll('.day-header')].filter(
             (el) => !el.classList.contains('day-header-link')
         );
         assert.strictEqual(inert.length, 1, 'the data-date-less header stays unlinked');
@@ -58,8 +58,8 @@ suite('wireDayHeaderNavigation (jsdom)', () => {
 
         wireDayHeaderNavigation(document, 'week', (date) => seen.push(date), OPEN_DAY_TITLE);
 
-        (document.querySelector('.day-header[data-date="2025-12-09"]') as HTMLElement).click();
-        (document.querySelector('.day-header[data-date="2025-12-08"]') as HTMLElement).click();
+        document.querySelector<HTMLElement>('.day-header[data-date="2025-12-09"]')!.click();
+        document.querySelector<HTMLElement>('.day-header[data-date="2025-12-08"]')!.click();
 
         // Each click reports its own header's date (closure captures the
         // per-iteration date, not the last one).
@@ -79,7 +79,7 @@ suite('wireDayHeaderNavigation (jsdom)', () => {
                 0,
                 `${mode} mode must not add the day-header-link class`
             );
-            (document.querySelector('.day-header[data-date="2025-12-08"]') as HTMLElement).click();
+            document.querySelector<HTMLElement>('.day-header[data-date="2025-12-08"]')!.click();
             assert.deepStrictEqual(seen, [], `${mode} mode click must not navigate`);
         });
     }
@@ -97,7 +97,7 @@ suite('wireDayHeaderNavigation (jsdom)', () => {
         const count = wireDayHeaderNavigation(document, 'week', (date) => seen.push(date), OPEN_DAY_TITLE);
 
         assert.strictEqual(count, 0, 'empty data-date is not a navigable header');
-        (document.querySelector('.day-header') as HTMLElement).click();
+        document.querySelector<HTMLElement>('.day-header')!.click();
         assert.deepStrictEqual(seen, []);
     });
 });

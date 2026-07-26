@@ -1,7 +1,7 @@
 import type { TimestampLineMatch, TimestampLineKeyword } from '../orgPatterns';
 import { at } from './exactIndex';
 
-export const CYCLE_ORDER: ReadonlyArray<TimestampLineKeyword> = ['SCHEDULED', 'DEADLINE', 'CLOSED', 'CREATED'];
+export const CYCLE_ORDER: readonly TimestampLineKeyword[] = ['SCHEDULED', 'DEADLINE', 'CLOSED', 'CREATED'];
 
 const ACTIVE_KEYWORDS: ReadonlySet<TimestampLineKeyword> = new Set(['SCHEDULED', 'DEADLINE']);
 

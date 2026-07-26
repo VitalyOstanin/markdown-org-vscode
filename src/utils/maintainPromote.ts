@@ -71,7 +71,7 @@ export function computeMaintainInsertion(maintainContent: string, block: Promote
     const delta = 2 - block.headingLevel;
     const newHeading = '## ' + block.headingText;
     const transformedBody = block.bodyLines.map((line) => {
-        const m = line.match(/^(#+)\s+(.+)$/);
+        const m = /^(#+)\s+(.+)$/.exec(line);
         if (m) {
             const newLevel = Math.min(6, Math.max(1, group(m, 1).length + delta));
             return '#'.repeat(newLevel) + ' ' + group(m, 2);

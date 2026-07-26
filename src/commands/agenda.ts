@@ -35,7 +35,10 @@ export async function showAgenda(
     }
 
     const startupConfig = vscode.workspace.getConfiguration('markdown-org');
+    // An empty `workspaceDir` setting means "not set" and must fall through to
+    // the open folder, which is what `||` does and `??` would not.
     const workspaceDir =
+        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
         startupConfig.get<string>('workspaceDir') || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 
     if (!workspaceDir) {
@@ -97,7 +100,7 @@ export async function showAgenda(
         }
     };
 
-    const loadData = async (newShiftedToday?: string, userInitiated: boolean = false) => {
+    const loadData = async (newShiftedToday?: string, userInitiated = false) => {
         // `newShiftedToday` is set when the user clicked Prev/Next/Today
         // inside the webview (refreshCallback(message.date, true)) — that's
         // an explicit jump. When it's undefined, this is the initial open
@@ -106,9 +109,10 @@ export async function showAgenda(
         if (newShiftedToday !== undefined) {
             shiftedToday = newShiftedToday;
         }
-        if (!shiftedToday) {
-            shiftedToday = toIsoDate(new Date());
-        }
+        // Empty means "no anchor", same as absent -- hence the falsiness test
+        // rather than a nullish one.
+        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+        shiftedToday ||= toIsoDate(new Date());
 
         const args = ['--dir', workspaceDir, '--format', 'json', '--absolute-paths'];
         if (mode === 'tasks') {

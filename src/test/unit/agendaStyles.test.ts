@@ -11,7 +11,7 @@ import { AGENDA_STYLES } from '../../views/agendaStyles';
 suite('AGENDA_STYLES theming invariant', () => {
     test('contains no hardcoded HEX colours', () => {
         // Exclude `content: "…"` -- glyph/placeholder marker text, not a colour.
-        const withoutContent = AGENDA_STYLES.replace(/content:\s*"[^"]*"/g, '');
+        const withoutContent = AGENDA_STYLES.replaceAll(/content:\s*"[^"]*"/g, '');
         const hexes = withoutContent.match(/#[0-9a-fA-F]{3,8}\b/g);
         assert.strictEqual(hexes, null, `agenda CSS must not hardcode colours; found: ${hexes?.join(', ')}`);
     });
@@ -42,7 +42,7 @@ suite('AGENDA_STYLES theming invariant', () => {
     });
 
     test('no hardcoded hex colours anywhere', () => {
-        const withoutContent = AGENDA_STYLES.replace(/content:\s*"[^"]*"/g, '');
+        const withoutContent = AGENDA_STYLES.replaceAll(/content:\s*"[^"]*"/g, '');
         assert.strictEqual(/#[0-9a-fA-F]{3,8}\b/.test(withoutContent), false);
     });
 
@@ -62,7 +62,7 @@ suite('AGENDA_STYLES theming invariant', () => {
     // mismatch makes `1fr` land on the wrong cell and pushes the heading and
     // offset columns off to the side.
     test('.task-line grid declares one column per rendered cell', () => {
-        const m = AGENDA_STYLES.match(/\.task-line\s*\{[^}]*grid-template-columns:\s*([^;]+);/);
+        const m = /\.task-line\s*\{[^}]*grid-template-columns:\s*([^;]+);/.exec(AGENDA_STYLES);
         assert.ok(m, 'expected a grid-template-columns rule for .task-line');
         const tracks = m[1]!.trim().split(/\s+/);
         assert.strictEqual(
@@ -108,7 +108,7 @@ suite('AGENDA_STYLES theming invariant', () => {
  * indicator dot size and border widths are markup sizes and stay in px.
  */
 suite('AGENDA_STYLES spacing-scale invariant', () => {
-    const SCALE: ReadonlyArray<readonly [string, string]> = [
+    const SCALE: readonly (readonly [string, string])[] = [
         ['--space-1', '4px'],
         ['--space-2', '8px'],
         ['--space-3', '12px'],
@@ -159,13 +159,13 @@ suite('AGENDA_STYLES spacing-scale invariant', () => {
  * section count did: 20px/0.78em against 22px/0.8em).
  */
 suite('AGENDA_STYLES shape and type-scale invariant', () => {
-    const RADII: ReadonlyArray<readonly [string, string]> = [
+    const RADII: readonly (readonly [string, string])[] = [
         ['--radius-sm', '3px'],
         ['--radius-md', '6px'],
         ['--radius-pill', '999px']
     ];
 
-    const FONTS: ReadonlyArray<readonly [string, string]> = [
+    const FONTS: readonly (readonly [string, string])[] = [
         ['--font-xs', '0.78em'],
         ['--font-sm', '0.85em'],
         ['--font-md', '1em'],
@@ -213,7 +213,7 @@ suite('AGENDA_STYLES shape and type-scale invariant', () => {
     });
 
     test('the count chip is declared once for both places that use it', () => {
-        const shared = AGENDA_STYLES.match(/\.task-count,\s*\.day-section-count\s*\{([^}]*)\}/);
+        const shared = /\.task-count,\s*\.day-section-count\s*\{([^}]*)\}/.exec(AGENDA_STYLES);
         assert.ok(shared, 'expected one rule declaring .task-count and .day-section-count together');
         for (const prop of ['min-width', 'border-radius', 'font-size', 'padding']) {
             assert.ok(shared[1]!.includes(prop + ':'), `expected ${prop} on the shared count-chip rule`);
@@ -221,7 +221,7 @@ suite('AGENDA_STYLES shape and type-scale invariant', () => {
         // Neither of the two may re-declare the shape in its own rule -- the
         // one whose selector is exactly that class, not the shared pair.
         const rules = [...AGENDA_STYLES.matchAll(/([^{}]+)\{([^}]*)\}/g)].map((m) => ({
-            selector: m[1]!.replace(/\/\*[\s\S]*?\*\//g, '').trim(),
+            selector: m[1]!.replaceAll(/\/\*[\s\S]*?\*\//g, '').trim(),
             body: m[2]
         }));
         for (const cls of ['.task-count', '.day-section-count']) {
@@ -239,7 +239,7 @@ suite('AGENDA_STYLES shape and type-scale invariant', () => {
 
     test('the compact header only resizes the header, it hides nothing', () => {
         const rules = [...AGENDA_STYLES.matchAll(/([^{}]+)\{([^}]*)\}/g)]
-            .map((m) => ({ selector: m[1]!.replace(/\/\*[\s\S]*?\*\//g, '').trim(), body: m[2] }))
+            .map((m) => ({ selector: m[1]!.replaceAll(/\/\*[\s\S]*?\*\//g, '').trim(), body: m[2] }))
             .filter((r) => r.selector.startsWith('body.compact-header'));
         assert.ok(rules.length > 0, 'expected the compact-header block');
         for (const rule of rules) {
@@ -259,7 +259,7 @@ suite('AGENDA_STYLES shape and type-scale invariant', () => {
     });
 
     test('every interactive surface of the panel shares one focus ring', () => {
-        const rule = AGENDA_STYLES.match(/((?:\.[a-z-]+:focus-visible,\s*)+\.[a-z-]+:focus-visible)\s*\{/);
+        const rule = /((?:\.[a-z-]+:focus-visible,\s*)+\.[a-z-]+:focus-visible)\s*\{/.exec(AGENDA_STYLES);
         assert.ok(rule, 'expected a single :focus-visible rule listing the interactive classes');
         for (const cls of ['.nav-btn', '.seg-item', '.tag-menu-btn', '.tag-menu-item', '.calendar-day']) {
             assert.ok(rule[1]!.includes(`${cls}:focus-visible`), `${cls} must be covered by the shared focus ring`);

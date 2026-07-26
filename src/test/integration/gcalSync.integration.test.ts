@@ -57,7 +57,7 @@ suite('Google Calendar sync: DONE -> delete', () => {
     let withProgressStub: sinon.SinonStub;
     let progressSettled: boolean;
     let storageRoot: string;
-    let fetchCalls: Array<{ url: string; method: string }>;
+    let fetchCalls: { url: string; method: string }[];
 
     const donePayload = [
         {
@@ -83,7 +83,7 @@ suite('Google Calendar sync: DONE -> delete', () => {
 
         execFileStub = sinon.stub(exec, 'execFile');
         execFileStub.callsFake((..._args: unknown[]) => {
-            const callback = _args[_args.length - 1] as ExecFileCallback;
+            const callback = _args.at(-1) as ExecFileCallback;
             const stdout = JSON.stringify(donePayload);
             queueMicrotask(() => callback(null, stdout, ''));
             return {};
@@ -126,10 +126,18 @@ suite('Google Calendar sync: DONE -> delete', () => {
             ) =>
                 Promise.resolve(
                     task(
-                        { report: () => {} },
+                        {
+                            report: () => {
+                                /* progress is not asserted here */
+                            }
+                        },
                         {
                             isCancellationRequested: false,
-                            onCancellationRequested: () => ({ dispose: () => {} })
+                            onCancellationRequested: () => ({
+                                dispose: () => {
+                                    /* nothing to dispose in the stub */
+                                }
+                            })
                         }
                     )
                 ).then((r) => {
@@ -242,7 +250,11 @@ suite('Google Calendar sync: DONE -> delete', () => {
         // A summary toast the user never dismisses: showInformationMessage stays
         // pending. If the toast were awaited inside withProgress, the wrapped
         // task would never resolve and the spinner would turn forever.
-        infoStub.returns(new Promise<undefined>(() => {}));
+        infoStub.returns(
+            new Promise<undefined>(() => {
+                /* never settles: the toast stays up for the whole test */
+            })
+        );
 
         // Do not await syncNow: the final notifyInfo is awaited after the
         // progress wrapper and intentionally never resolves here. We only assert
@@ -367,7 +379,7 @@ suite('Google Calendar sync: makePropertiesWriter', () => {
         const onDisk = fs.readFileSync(file, 'utf-8');
         // Keys are sorted ascending, so GCAL_EVENT_ID precedes ID.
         assert.ok(onDisk.includes('```org-properties'), `block fence missing:\n${onDisk}`);
-        assert.ok(/GCAL_EVENT_ID: def\nID: abc/.test(onDisk), `keys not written in sorted order:\n${onDisk}`);
+        assert.ok(onDisk.includes('GCAL_EVENT_ID: def\nID: abc'), `keys not written in sorted order:\n${onDisk}`);
         // The block sits after the planning line, not before it.
         assert.ok(
             onDisk.indexOf(PLANNING) < onDisk.indexOf('```org-properties'),

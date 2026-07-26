@@ -169,7 +169,7 @@ suite('Keybindings: package.json contract', () => {
             if (!/\bctrl\+/.test(kb.key)) {
                 continue; // shift+up / shift+down are identical on every platform
             }
-            const expectedMac = kb.key.replace(/ctrl\+/g, 'cmd+');
+            const expectedMac = kb.key.replaceAll('ctrl+', 'cmd+');
             if (kb.mac !== expectedMac) {
                 offenders.push(
                     `${kb.command}: key=${kb.key} -> mac expected ${expectedMac}, got ${kb.mac ?? '(none)'}`

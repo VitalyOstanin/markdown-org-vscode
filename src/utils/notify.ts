@@ -1,5 +1,4 @@
 import * as vscode from 'vscode';
-import { formatError } from './formatError';
 
 const ORG_PREFIX = 'Markdown Org: ';
 
@@ -27,4 +26,4 @@ export function notifyStatus(message: string, timeoutMs: number = DEFAULT_STATUS
     return vscode.window.setStatusBarMessage(ORG_PREFIX + message, timeoutMs);
 }
 
-export { formatError };
+export { formatError } from './formatError';

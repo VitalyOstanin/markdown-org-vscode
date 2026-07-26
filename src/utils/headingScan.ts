@@ -55,7 +55,7 @@ function scanSiblingKeywords(
  * semantics match the adapter below.
  */
 export function collectSiblingKeywordsFromLines(
-    lines: ReadonlyArray<string>,
+    lines: readonly string[],
     cursorLine: number
 ): Set<TimestampLineKeyword> {
     return scanSiblingKeywords((i) => lines[i] ?? '', lines.length, cursorLine);

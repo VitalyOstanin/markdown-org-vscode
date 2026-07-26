@@ -70,7 +70,9 @@ suite('gcal/connect', () => {
                     startLoopback: fakeLoopback('c', () => {
                         disposed = true;
                     }),
-                    openExternal: async () => {},
+                    openExternal: async () => {
+                        /* the browser is never opened in a unit test */
+                    },
                     fetchFn: fakeFetch({ access_token: 'at', expires_in: 3600 }),
                     tokens,
                     timeoutMs: 1000
@@ -94,7 +96,9 @@ suite('gcal/connect', () => {
                     startLoopback: fakeLoopback('c', () => {
                         disposed = true;
                     }),
-                    openExternal: async () => {},
+                    openExternal: async () => {
+                        /* the browser is never opened in a unit test */
+                    },
                     fetchFn: fakeFetch(
                         { error: 'invalid_grant', error_description: 'bad' },
                         { ok: false, status: 400 }

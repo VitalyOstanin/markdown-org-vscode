@@ -8,16 +8,16 @@ suite('gcal/pkce', () => {
         const pkce = createPkce(rand);
         const expectedVerifier = Buffer.alloc(32, 7)
             .toString('base64')
-            .replace(/\+/g, '-')
-            .replace(/\//g, '_')
+            .replaceAll('+', '-')
+            .replaceAll('/', '_')
             .replace(/=+$/, '');
         assert.equal(pkce.verifier, expectedVerifier);
         assert.equal(pkce.method, 'S256');
         const expectedChallenge = createHash('sha256')
             .update(pkce.verifier)
             .digest('base64')
-            .replace(/\+/g, '-')
-            .replace(/\//g, '_')
+            .replaceAll('+', '-')
+            .replaceAll('/', '_')
             .replace(/=+$/, '');
         assert.equal(pkce.challenge, expectedChallenge);
         assert.match(pkce.verifier, /^[A-Za-z0-9_-]+$/);

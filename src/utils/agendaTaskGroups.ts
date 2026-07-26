@@ -48,7 +48,7 @@ export function computeTasksSummary(tasks: Task[]): TasksSummary {
     const all = Array.isArray(tasks) ? tasks : [];
     return {
         total: all.length,
-        highPriority: all.filter((t) => (t.priority || '').trim().toUpperCase() === 'A').length,
+        highPriority: all.filter((t) => (t.priority ?? '').trim().toUpperCase() === 'A').length,
         done: all.filter((t) => t.task_type === 'DONE').length
     };
 }
@@ -66,7 +66,7 @@ export function buildTaskGroups(tasks: Task[], labels: TaskGroupLabels): TaskGro
     const all = Array.isArray(tasks) ? tasks : [];
     // Inlined (not a module-scope helper) so the whole function survives the
     // `.toString()` injection into the webview.
-    const letter = (t: Task): string => (t.priority || '').trim().toUpperCase();
+    const letter = (t: Task): string => (t.priority ?? '').trim().toUpperCase();
     const groups: TaskGroup[] = [
         { key: 'a', title: labels.a, items: all.filter((t) => letter(t) === 'A') },
         { key: 'b', title: labels.b, items: all.filter((t) => letter(t) === 'B') },

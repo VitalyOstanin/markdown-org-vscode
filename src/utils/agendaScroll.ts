@@ -12,7 +12,7 @@
  * via `.toString()`, so the unit tests on these functions transitively
  * cover the runtime behaviour.
  */
-export type ScrollMemory = { [anchor: string]: number };
+export type ScrollMemory = Record<string, number>;
 
 /**
  * Save `scrollY` for `anchor`. No-op when `anchor` is empty (the webview

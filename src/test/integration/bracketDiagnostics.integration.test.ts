@@ -119,7 +119,7 @@ suite('Bracket-policy diagnostics + Quick Fix', () => {
             vscode.CodeActionKind.QuickFix.value
         );
         const ours = (actions ?? []).filter(
-            (a) => a.kind?.value === vscode.CodeActionKind.QuickFix.value && /Convert to/.test(a.title)
+            (a) => a.kind?.value === vscode.CodeActionKind.QuickFix.value && a.title.includes('Convert to')
         );
         assert.ok(ours.length >= 1, `expected a bracket-policy quick fix, got: ${actions?.map((a) => a.title)}`);
 
@@ -145,7 +145,7 @@ suite('Bracket-policy diagnostics + Quick Fix', () => {
             diagnostic!.range,
             vscode.CodeActionKind.QuickFix.value
         );
-        const ours = (actions ?? []).filter((a) => /Convert to/.test(a.title));
+        const ours = (actions ?? []).filter((a) => a.title.includes('Convert to'));
         assert.ok(ours[0]!.edit);
         await vscode.workspace.applyEdit(ours[0]!.edit);
         assert.strictEqual(editor.document.lineAt(0).text, '`SCHEDULED: <2026-05-25 Пн>`');

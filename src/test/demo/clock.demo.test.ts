@@ -121,7 +121,7 @@ suite('Demo: CLOCK', () => {
         const openClockLine = editor.document
             .getText()
             .split('\n')
-            .findIndex((l, idx) => idx > wireUpLine && /CLOCK: \[/.test(l));
+            .findIndex((l, idx) => idx > wireUpLine && l.includes('CLOCK: ['));
         await moveCursorTo(editor, openClockLine);
         await sleep(700);
 

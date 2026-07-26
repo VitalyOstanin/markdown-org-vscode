@@ -26,7 +26,7 @@ function jsonResponse(status: number, body: unknown): unknown {
 
 /** Derive the deterministic Google event id the engine computes from an org-id ID. */
 export function eventIdFromOrgId(orgId: string): string {
-    return orgId.replace(/-/g, '').toLowerCase();
+    return orgId.replaceAll('-', '').toLowerCase();
 }
 
 export interface DemoTask {
@@ -71,7 +71,7 @@ export function installFakeGcal(opts: {
 
     const execFileStub = sinon.stub(exec, 'execFile');
     execFileStub.callsFake((..._args: unknown[]) => {
-        const callback = _args[_args.length - 1] as ExecFileCallback;
+        const callback = _args.at(-1) as ExecFileCallback;
         const stdout = JSON.stringify(tasks);
         queueMicrotask(() => callback(null, stdout, ''));
         return {} as unknown as cp.ChildProcess;

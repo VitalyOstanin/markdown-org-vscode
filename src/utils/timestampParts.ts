@@ -153,8 +153,8 @@ function findPart(character: number, spans: Span[]): Span['part'] | null {
  * leak negative offsets into the spans.
  */
 export function getClockTimestampPartAt(lineText: string, character: number): ClockTimestampPartHit | null {
-    const match = lineText.match(CLOCK_PARTS_REGEX);
-    if (!match || match.index === undefined || !match.groups) return null;
+    const match = CLOCK_PARTS_REGEX.exec(lineText);
+    if (match?.index === undefined || !match.groups) return null;
 
     const timestampRegex = /(\d{4})-(\d{2})-(\d{2}) ([А-Яа-яA-Za-z]+) (\d{2}):(\d{2})/g;
     const timestamps = [...match[0].matchAll(timestampRegex)];

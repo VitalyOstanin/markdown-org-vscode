@@ -26,7 +26,7 @@ export interface ExtractorPayloads {
  */
 export function makeExtractorFake(payloads: ExtractorPayloads) {
     return (..._args: unknown[]) => {
-        const callback = _args[_args.length - 1] as ExecFileCallback;
+        const callback = _args.at(-1) as ExecFileCallback;
         const cliArgs = (_args[1] as string[]) || [];
         let response: unknown = [];
         if (cliArgs.includes('--holidays')) {

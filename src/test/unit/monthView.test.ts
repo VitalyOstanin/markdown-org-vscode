@@ -4,7 +4,7 @@ import type { DayAgenda } from '../../types';
 
 suite('Month View Calendar', () => {
     suite('isHoliday', () => {
-        const mockHolidays2025 = [
+        const mockHolidays2025 = new Set([
             '2025-01-01',
             '2025-01-02',
             '2025-01-03',
@@ -20,10 +20,10 @@ suite('Month View Calendar', () => {
             '2025-06-12',
             '2025-11-04',
             '2025-12-31'
-        ];
+        ]);
 
         const isHoliday = (date: string): boolean => {
-            return mockHolidays2025.includes(date);
+            return mockHolidays2025.has(date);
         };
 
         test('should return true for New Year holidays', () => {

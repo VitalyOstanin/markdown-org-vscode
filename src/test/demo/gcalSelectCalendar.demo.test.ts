@@ -72,7 +72,9 @@ suite('Demo: Select Google Calendar', () => {
             // under headless Xvfb, so we never await `running` -- the pick and the
             // toast both happen before that await. Swallow the dangling promise.
             const running = selectCalendar(fake.context);
-            running.catch(() => {});
+            running.catch(() => {
+                /* the demo does not care why it ended */
+            });
 
             // Wait for the calendar list to load (token + calendarList fetch) and
             // the QuickPick to render, then hold it on screen so viewers can read

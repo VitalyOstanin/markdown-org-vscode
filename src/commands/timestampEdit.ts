@@ -13,8 +13,8 @@ import { collectSiblingKeywords } from '../utils/headingScan';
 import { namedGroups } from '../utils/regexGroups';
 import { notifyWarn, notifyStatus } from '../utils/notify';
 
-const PRIORITY_A_CODE = 'A'.charCodeAt(0);
-const PRIORITY_Z_CODE = 'Z'.charCodeAt(0);
+const PRIORITY_A_CODE = 'A'.codePointAt(0)!;
+const PRIORITY_Z_CODE = 'Z'.codePointAt(0)!;
 // Numeric priorities mirror org-mode's `[#0]..[#64]` range -- same bounds
 // markdown-org-extract enforces in `Priority::parse`.
 const PRIORITY_NUMERIC_MIN = 0;
@@ -103,8 +103,8 @@ function getHeadingPartAtCursor(
 
 function adjustHeadingPart(match: RegExpMatchArray, part: HeadingPart, delta: number): string {
     const { hashes, title } = namedGroups(match, 'hashes', 'title');
-    const status = match.groups?.status || '';
-    const priority = match.groups?.priority || '';
+    const status = match.groups?.status ?? '';
+    const priority = match.groups?.priority ?? '';
 
     let newStatus = status;
     let newPriority = priority;
@@ -123,10 +123,10 @@ function adjustHeadingPart(match: RegExpMatchArray, part: HeadingPart, delta: nu
                 newPriority = String(newValue);
             }
         } else {
-            const currentCode = priority.charCodeAt(0);
+            const currentCode = priority.codePointAt(0) ?? 0;
             const newCode = currentCode + delta;
             if (newCode >= PRIORITY_A_CODE && newCode <= PRIORITY_Z_CODE) {
-                newPriority = String.fromCharCode(newCode);
+                newPriority = String.fromCodePoint(newCode);
             }
         }
     }

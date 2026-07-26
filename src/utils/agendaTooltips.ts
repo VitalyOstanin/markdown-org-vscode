@@ -65,9 +65,9 @@ export function flagTooltip(
     fmtDate: FormatDate,
     task?: FlagTooltipTask
 ): string {
-    const t = task || {};
-    const time = t.timestamp_time || '';
-    const endTime = t.timestamp_end_time || '';
+    const t = task ?? {};
+    const time = t.timestamp_time ?? '';
+    const endTime = t.timestamp_end_time ?? '';
     // "<date> 14:00" / "<date> 14:00–15:00" / "<date>" / "" from a Y-M-D date;
     // the time part (if any) stays the same across occurrences.
     const whenOf = (iso: string): string => {
@@ -82,15 +82,15 @@ export function flagTooltip(
         case 'cancelled':
             return strings.cancelled;
         case 'deadline': {
-            const when = whenOf(t.timestamp_date || '');
+            const when = whenOf(t.timestamp_date ?? '');
             return when ? fill(strings.deadlineAt, when) : strings.deadline;
         }
         case 'scheduled': {
-            const when = whenOf(t.timestamp_date || '');
+            const when = whenOf(t.timestamp_date ?? '');
             return when ? fill(strings.scheduledAt, when) : strings.scheduled;
         }
         case 'repeat': {
-            const when = whenOf(t.timestamp_date || '');
+            const when = whenOf(t.timestamp_date ?? '');
             const rep = t.timestamp_repeater ? ' (' + t.timestamp_repeater + ')' : '';
             if (t.timestamp_next) {
                 // markdown-org-extract resolved the next still-upcoming
@@ -99,7 +99,7 @@ export function flagTooltip(
                 // the stored clock time is not the time of that occurrence and
                 // is left out; every other unit keeps the time of day.
                 // Units are lower-case in the extractor's grammar, so the test is too.
-                const hourly = /h$/.test((t.timestamp_repeater ?? '').trim());
+                const hourly = (t.timestamp_repeater ?? '').trim().endsWith('h');
                 const resolved = hourly ? fmtDate(t.timestamp_next) : whenOf(t.timestamp_next);
                 return fill(strings.repeatingNext, rep, resolved);
             }

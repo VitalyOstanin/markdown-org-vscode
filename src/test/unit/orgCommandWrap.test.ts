@@ -63,7 +63,9 @@ suite('orgCommandWrap.withErrorReporting', () => {
         const received: unknown[][] = [];
         const wrapped = withErrorReporting<[string, number], void>(
             'markdown-org.x',
-            () => {},
+            () => {
+                /* the wrapped command body is irrelevant here */
+            },
             (...args) => {
                 received.push(args);
             }

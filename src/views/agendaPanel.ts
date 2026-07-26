@@ -225,6 +225,8 @@ export class AgendaPanel {
         if (refreshCallback) {
             AgendaPanel.refreshCallback = refreshCallback;
         }
+        // An empty anchor means "today", same as an absent one.
+        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
         AgendaPanel.shiftedToday = shiftedToday || toIsoDate(new Date());
         // Record this view state in the navigation history, unless we are
         // replaying an existing entry (Back/Forward) -- see historyReplayDepth.
@@ -445,9 +447,10 @@ export class AgendaPanel {
             mode: args.mode,
             locale: args.locale,
             shiftedToday: AgendaPanel.shiftedToday,
+            // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty tag is no tag, which is what ALL means
             currentTag: args.currentTag || 'ALL',
             availableTags: args.availableTags,
-            holidays: args.holidays || [],
+            holidays: args.holidays ?? [],
             firstDayOfWeek: args.firstDayOfWeek,
             headerMode: args.headerMode,
             language,
@@ -715,7 +718,7 @@ export class AgendaPanel {
             // work regardless of how `fsPath` is rendered on the current
             // platform (Windows can produce either style depending on the
             // URI source).
-            const normalized = uri.fsPath.replace(/\\/g, '/');
+            const normalized = uri.fsPath.replaceAll('\\', '/');
             return (
                 normalized.endsWith('.archive.md') ||
                 normalized.includes('/.git/') ||
@@ -747,7 +750,7 @@ export class AgendaPanel {
      * expected dates for a given anchor; production code never queries
      * this. Returns null when no panel is open.
      */
-    public static queryRenderedInfoForTesting(timeoutMs: number = 2000): Promise<{
+    public static queryRenderedInfoForTesting(timeoutMs = 2000): Promise<{
         dayHeaders: string[];
         mode: string;
         flags: string[];
@@ -919,7 +922,7 @@ export class AgendaPanel {
             .join('\n\n');
         const depsLiteral = '{ ' + Object.keys(AgendaPanel.INLINED_HELPERS).join(', ') + ' }';
         const boot: AgendaClientBootstrap = AgendaPanel.uiStrings();
-        const bootLiteral = JSON.stringify(boot).replace(/</g, '\\u003c');
+        const bootLiteral = JSON.stringify(boot).replaceAll('<', '\\u003c');
         return `${helpers}\n\n(${agendaClientMain.toString()})(${bootLiteral}, ${depsLiteral});`;
     }
 

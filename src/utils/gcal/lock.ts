@@ -21,7 +21,9 @@ async function atomicWrite(path: string, contents: string): Promise<void> {
     try {
         await rename(tmp, path);
     } catch (e) {
-        await unlink(tmp).catch(() => {});
+        await unlink(tmp).catch(() => {
+            /* best effort */
+        });
         throw e;
     }
 }

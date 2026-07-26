@@ -9,7 +9,7 @@ export function isValidEventId(id: string): boolean {
 
 /** Derive a deterministic Calendar event id from a task's org-id `ID`. */
 export function taskIdToEventId(orgId: string): string {
-    const id = orgId.replace(/-/g, '').toLowerCase();
+    const id = orgId.replaceAll('-', '').toLowerCase();
     if (!isValidEventId(id)) {
         throw new Error(`cannot derive a valid Google event id from ID "${orgId}"`);
     }

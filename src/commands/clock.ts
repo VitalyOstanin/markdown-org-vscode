@@ -74,7 +74,7 @@ export async function insertClockStart() {
         let lastTimestampLine = headingLine;
         for (let i = headingLine + 1; i < editor.document.lineCount; i++) {
             const line = editor.document.lineAt(i);
-            if (line.text.match(TIMESTAMP_LINE_REGEX)) {
+            if (TIMESTAMP_LINE_REGEX.test(line.text)) {
                 lastTimestampLine = i;
             } else {
                 break;
@@ -127,7 +127,7 @@ export async function insertClockFinish() {
     const startMonth = parseInt(m, 10);
     const startDay = parseInt(d, 10);
 
-    const timeMatch = startBody.match(/(\d{2}):(\d{2})$/);
+    const timeMatch = /(\d{2}):(\d{2})$/.exec(startBody);
     if (!timeMatch) {
         return;
     }

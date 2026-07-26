@@ -10,7 +10,7 @@ suite('Timestamp Tests', () => {
 
     test('Parse timestamp with date only', () => {
         const timestamp = '<2025-12-06 Fri>';
-        const match = timestamp.match(TIMESTAMP_REGEX);
+        const match = TIMESTAMP_REGEX.exec(timestamp);
 
         assert.ok(match);
         assert.strictEqual(match.groups?.year, '2025');
@@ -23,7 +23,7 @@ suite('Timestamp Tests', () => {
 
     test('Parse timestamp with date and time', () => {
         const timestamp = '<2025-12-06 Fri 14:30>';
-        const match = timestamp.match(TIMESTAMP_REGEX);
+        const match = TIMESTAMP_REGEX.exec(timestamp);
 
         assert.ok(match);
         assert.strictEqual(match.groups?.year, '2025');
@@ -36,7 +36,7 @@ suite('Timestamp Tests', () => {
 
     test('Parse timestamp with repeater', () => {
         const timestamp = '<2025-12-06 Fri 10:00 +1d>';
-        const match = timestamp.match(TIMESTAMP_REGEX);
+        const match = TIMESTAMP_REGEX.exec(timestamp);
 
         assert.ok(match);
         assert.strictEqual(match.groups?.repeater, '+1d');
@@ -44,7 +44,7 @@ suite('Timestamp Tests', () => {
 
     test('Parse timestamp with workday repeater', () => {
         const timestamp = '<2025-12-06 Fri +2wd>';
-        const match = timestamp.match(TIMESTAMP_REGEX);
+        const match = TIMESTAMP_REGEX.exec(timestamp);
 
         assert.ok(match);
         assert.strictEqual(match.groups?.repeater, '+2wd');
@@ -55,7 +55,7 @@ suite('Timestamp Tests', () => {
         // [А-Яа-яA-Za-z]+. This also unblocks the isFull branch in
         // getWeekdayName for <>-timestamps -- it was previously unreachable.
         const timestamp = '<2025-12-06 Friday 14:30>';
-        const match = timestamp.match(TIMESTAMP_REGEX);
+        const match = TIMESTAMP_REGEX.exec(timestamp);
 
         assert.ok(match);
         assert.strictEqual(match.groups?.weekday, 'Friday');
@@ -63,7 +63,7 @@ suite('Timestamp Tests', () => {
 
     test('Parse timestamp with full Russian weekday name (long form)', () => {
         const timestamp = '<2025-12-06 Пятница 14:30>';
-        const match = timestamp.match(TIMESTAMP_REGEX);
+        const match = TIMESTAMP_REGEX.exec(timestamp);
 
         assert.ok(match);
         assert.strictEqual(match.groups?.weekday, 'Пятница');

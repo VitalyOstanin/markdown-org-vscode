@@ -4,11 +4,10 @@ import { matchTimestampLine } from './orgPatterns';
 import { buildOrgTimestamp } from './utils/orgTimestamp';
 import { notifyError } from './utils/notify';
 
-import { DAY_NAMES_SHORT_RU, DAY_NAMES_SHORT_EN, DAY_NAMES_FULL_RU, DAY_NAMES_FULL_EN } from './utils/dayNames';
+import { DAY_NAMES_SHORT_RU, DAY_NAMES_SHORT_EN } from './utils/dayNames';
 // Re-export the day-name tables (now defined in the vscode-free dayNames
 // module) so existing `import { DAY_NAMES_* } from '../utils'` call sites and
 // the locale helpers below keep working unchanged.
-export { DAY_NAMES_SHORT_RU, DAY_NAMES_SHORT_EN, DAY_NAMES_FULL_RU, DAY_NAMES_FULL_EN };
 
 /**
  * Legacy export: kept as-is (Russian short names) so any downstream caller
@@ -160,3 +159,5 @@ export async function findNearestHeading(editor: vscode.TextEditor): Promise<num
 
     return null;
 }
+
+export { DAY_NAMES_FULL_RU, DAY_NAMES_FULL_EN, DAY_NAMES_SHORT_RU, DAY_NAMES_SHORT_EN } from './utils/dayNames';

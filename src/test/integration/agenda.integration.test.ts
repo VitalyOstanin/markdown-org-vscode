@@ -487,7 +487,7 @@ suite('Agenda Show Integration Tests', () => {
         assert.ok(panel, 'expected AgendaPanel to be open after showAgendaDay');
         const html = panel.webview.html;
 
-        const depsCall = html.match(/\},\s*\{ ([A-Za-z0-9_, ]+) \}\);/);
+        const depsCall = /\},\s*\{ ([A-Za-z0-9_, ]+) \}\);/.exec(html);
         assert.ok(depsCall, 'expected the script to call the client with a shorthand helper object');
         const names = depsCall[1]!.split(',').map((n) => n.trim());
         assert.ok(names.length >= 20, `expected the full helper set, got ${names.length}: ${names.join(', ')}`);
@@ -566,7 +566,7 @@ suite('Agenda Show Integration Tests', () => {
         );
         // Every calendar cell goes through one opening-tag helper, which is
         // also where the drill-down tooltip is attached.
-        const cellTag = script.match(/function calendarCellOpenTag\([\s\S]*?\n {4}\}/);
+        const cellTag = /function calendarCellOpenTag\([\s\S]*?\n {4}\}/.exec(script);
         assert.ok(cellTag, 'expected calendarCellOpenTag in the injected script');
         assert.ok(cellTag[0].includes('\'<button type="button" class="\''), 'calendar cells must be buttons');
         assert.ok(cellTag[0].includes('openDayView'), 'calendar cells must carry the drill-down tooltip');
@@ -793,7 +793,7 @@ suite('Agenda webview keybindings scope', () => {
     test('package.json: all four view commands are bound and reach the agenda panel', () => {
         const ext = vscode.extensions.getExtension('vitalyostanin.markdown-org-vscode');
         assert.ok(ext, 'extension not found');
-        const keybindings: Array<{ command: string; key?: string; mac?: string; when?: string }> =
+        const keybindings: { command: string; key?: string; mac?: string; when?: string }[] =
             ext.packageJSON.contributes.keybindings;
         const views = [
             'markdown-org.showAgendaDay',
@@ -807,7 +807,7 @@ suite('Agenda webview keybindings scope', () => {
             assert.ok(binding.key, `${command} keybinding has no key`);
             assert.ok(binding.mac, `${command} keybinding has no mac variant`);
             assert.ok(
-                binding.when && binding.when.includes('markdown-org.agendaFocused'),
+                binding.when?.includes('markdown-org.agendaFocused'),
                 `${command} when missing agendaFocused: ${binding.when}`
             );
         }
@@ -824,8 +824,7 @@ suite('Agenda webview keybindings scope', () => {
     test('package.json: history navigation is a contributed keybinding, scoped to the agenda', () => {
         const ext = vscode.extensions.getExtension('vitalyostanin.markdown-org-vscode');
         assert.ok(ext, 'extension not found');
-        const keybindings: Array<{ command: string; key?: string; when?: string }> =
-            ext.packageJSON.contributes.keybindings;
+        const keybindings: { command: string; key?: string; when?: string }[] = ext.packageJSON.contributes.keybindings;
         const back = keybindings.find((k) => k.command === 'markdown-org.agendaBack');
         const forward = keybindings.find((k) => k.command === 'markdown-org.agendaForward');
         assert.ok(back, 'agendaBack keybinding missing');
@@ -834,7 +833,7 @@ suite('Agenda webview keybindings scope', () => {
         assert.strictEqual(forward.key, 'alt+shift+=');
         for (const binding of [back, forward]) {
             assert.ok(
-                binding.when && binding.when.includes('markdown-org.agendaFocused'),
+                binding.when?.includes('markdown-org.agendaFocused'),
                 `${binding.command} must be scoped to the agenda, got: ${binding.when}`
             );
         }
@@ -867,7 +866,7 @@ suite('Agenda webview keybindings scope', () => {
         // live in every editor. The agenda clause is what keeps it working from
         // inside the panel, where there is no text editor to focus.
         const ext = vscode.extensions.getExtension('vitalyostanin.markdown-org-vscode');
-        const keybindings: Array<{ command: string; when?: string }> = ext!.packageJSON.contributes.keybindings;
+        const keybindings: { command: string; when?: string }[] = ext!.packageJSON.contributes.keybindings;
         const cycle = keybindings.find((k) => k.command === 'markdown-org.cycleTag');
         assert.ok(cycle, 'cycleTag keybinding missing');
         assert.ok(cycle.when, 'cycleTag should carry the same when-clause as the rest');
@@ -954,7 +953,7 @@ suite('Agenda webview keybindings scope', () => {
         await waitForAgendaRender('week');
         let tab = vscode.window.tabGroups.activeTabGroup.activeTab;
         assert.ok(
-            tab && tab.label.toLowerCase().includes('week'),
+            tab?.label.toLowerCase().includes('week'),
             `expected active tab to show week mode, got ${tab?.label}`
         );
 
@@ -962,23 +961,20 @@ suite('Agenda webview keybindings scope', () => {
         await waitForAgendaRender('month');
         tab = vscode.window.tabGroups.activeTabGroup.activeTab;
         assert.ok(
-            tab && tab.label.toLowerCase().includes('month'),
+            tab?.label.toLowerCase().includes('month'),
             `expected active tab to show month mode, got ${tab?.label}`
         );
 
         await vscode.commands.executeCommand('markdown-org.showAgendaDay');
         await waitForAgendaRender('day');
         tab = vscode.window.tabGroups.activeTabGroup.activeTab;
-        assert.ok(
-            tab && tab.label.toLowerCase().includes('day'),
-            `expected active tab to show day mode, got ${tab?.label}`
-        );
+        assert.ok(tab?.label.toLowerCase().includes('day'), `expected active tab to show day mode, got ${tab?.label}`);
 
         await vscode.commands.executeCommand('markdown-org.showTasks');
         await waitForAgendaRender('tasks');
         tab = vscode.window.tabGroups.activeTabGroup.activeTab;
         assert.ok(
-            tab && tab.label.toLowerCase().includes('tasks'),
+            tab?.label.toLowerCase().includes('tasks'),
             `expected active tab to show tasks mode, got ${tab?.label}`
         );
 

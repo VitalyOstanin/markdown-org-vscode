@@ -11,7 +11,7 @@ export interface DayHeaderElementLike {
 
 /** Root that can query for day-header elements (a Document or a container). */
 export interface DayHeaderRootLike {
-    querySelectorAll(selectors: string): ArrayLike<DayHeaderElementLike>;
+    querySelectorAll(selectors: string): Iterable<DayHeaderElementLike>;
 }
 
 /**
@@ -45,7 +45,7 @@ export function wireDayHeaderNavigation(
     }
     const headers = root.querySelectorAll('.day-header[data-date]');
     let wired = 0;
-    for (const el of Array.from(headers)) {
+    for (const el of headers) {
         const date = el.getAttribute('data-date');
         if (!date) {
             continue;

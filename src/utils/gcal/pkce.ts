@@ -8,7 +8,7 @@ export interface Pkce {
 }
 
 function base64url(buf: Buffer): string {
-    return buf.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+    return buf.toString('base64').replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
 }
 
 /** PKCE verifier/challenge pair (S256). `rand` is injectable for tests. */

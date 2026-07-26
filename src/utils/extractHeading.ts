@@ -19,7 +19,7 @@ export function extractHeadingBlockLines(lines: string[], startLine: number, lev
     for (let i = startLine + 1; i < lines.length; i++) {
         const line = lines[i];
         if (line === undefined) break;
-        const match = line.match(/^(#+)\s+/);
+        const match = /^(#+)\s+/.exec(line);
         if (match && group(match, 1).length <= level) {
             break;
         }

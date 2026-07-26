@@ -2,6 +2,7 @@ import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import prettier from 'eslint-config-prettier';
 import importX from 'eslint-plugin-import-x';
+import unicorn from 'eslint-plugin-unicorn';
 import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript';
 
 // Node globals used by the CommonJS scripts and the .mjs configs. Declared by
@@ -22,47 +23,54 @@ const nodeGlobals = {
     Buffer: 'readonly'
 };
 
-// Node built-ins are imported with the `node:` prefix everywhere, so a package
-// in node_modules cannot shadow one and resolution skips the package lookup.
-// The pin is `no-restricted-imports` rather than `n/prefer-node-protocol` or
-// `unicorn/prefer-node-protocol`: either would mean a dev dependency and a rule
-// set to tune for the single rule actually wanted here.
-const bareNodeBuiltins = [
-    'assert',
-    'assert/strict',
-    'buffer',
-    'child_process',
-    'crypto',
-    'dns',
-    'events',
-    'fs',
-    'fs/promises',
-    'http',
-    'https',
-    'module',
-    'net',
-    'os',
-    'path',
-    'process',
-    'querystring',
-    'readline',
-    'stream',
-    'stream/promises',
-    'string_decoder',
-    'timers',
-    'timers/promises',
-    'tls',
-    'tty',
-    'url',
-    'util',
-    'worker_threads',
-    'zlib'
+// Modern-API rules from eslint-plugin-unicorn, picked one by one rather than
+// through its `recommended` preset: that preset is 1500+ reports here, and all
+// but a handful are naming and filename conventions this project does not
+// follow (`filename-case` wants kebab-case, `no-null` argues with the VS Code
+// API, `name-replacements` renames `err` to `error` across the tree). What is
+// left below is the part that is about the language and its standard library
+// moving on -- `String#replaceAll` over a global regex, `Array#at(-1)` over
+// `arr[arr.length - 1]`, spread over `Array.from`.
+const unicornModernApiRules = [
+    'prefer-add-event-listener',
+    'prefer-array-flat',
+    'prefer-array-flat-map',
+    'prefer-array-index-of',
+    'prefer-array-some',
+    'prefer-at',
+    'prefer-blob-reading-methods',
+    'prefer-code-point',
+    'prefer-date-now',
+    'prefer-dom-node-text-content',
+    'prefer-event-target',
+    'prefer-export-from',
+    'prefer-logical-operator-over-ternary',
+    'prefer-math-min-max',
+    'prefer-modern-dom-apis',
+    // `prefer-includes` and `prefer-string-starts-ends-with` are left to
+    // typescript-eslint, which has the same rules but reads types and so does
+    // not have to guess at the receiver.
+    'prefer-native-coercion-functions',
+    'prefer-negative-index',
+    // Node built-ins are imported with the `node:` prefix everywhere, so a
+    // package in node_modules cannot shadow one and resolution skips the
+    // package lookup. This replaces a hand-written `no-restricted-imports`
+    // list, which only covered the built-ins someone remembered to add.
+    'prefer-node-protocol',
+    'prefer-number-properties',
+    'prefer-object-from-entries',
+    // `prefer-promise-with-resolvers` stays off: `Promise.withResolvers` is
+    // ES2024 and the projects declare `lib: ES2022`.
+    'prefer-optional-catch-binding',
+    'prefer-regexp-test',
+    'prefer-set-has',
+    'prefer-spread',
+    'prefer-string-replace-all',
+    'prefer-string-slice',
+    'prefer-structured-clone'
 ];
 
-const noBareNodeBuiltins = bareNodeBuiltins.map((name) => ({
-    name,
-    message: `Import Node built-ins with the 'node:' prefix -- 'node:${name}'.`
-}));
+const unicornRules = Object.fromEntries(unicornModernApiRules.map((name) => [`unicorn/${name}`, 'error']));
 
 export default tseslint.config(
     {
@@ -73,7 +81,11 @@ export default tseslint.config(
     // promises, misused promises, unnecessary assertions) cannot run without
     // one, and the plugin silently skips them otherwise. `projectService`
     // hands ESLint the same program `tsc -b` builds, both projects included.
-    ...tseslint.configs.recommendedTypeChecked.map((config) => ({
+    // `stylistic` rides along because the rules it adds are not decoration:
+    // they are the modern spelling of things the codebase already does by hand
+    // -- `??` over an undefined-test ternary, `?.` over an `&&` chain,
+    // `RegExp#exec` over `String#match` for a single lookup.
+    ...[...tseslint.configs.recommendedTypeChecked, ...tseslint.configs.stylisticTypeChecked].map((config) => ({
         ...config,
         files: ['**/*.ts']
     })),
@@ -155,9 +167,14 @@ export default tseslint.config(
             // `null: 'ignore'` keeps the deliberate `value == null` idiom (one
             // check covering null and undefined) and rejects every other loose
             // comparison.
-            eqeqeq: ['error', 'always', { null: 'ignore' }],
-            'no-restricted-imports': ['error', { paths: noBareNodeBuiltins }]
+            eqeqeq: ['error', 'always', { null: 'ignore' }]
         }
+    },
+    {
+        // Applies to every file, scripts and configs included: the `node:`
+        // prefix and the standard-library preferences are not TypeScript-only.
+        plugins: { unicorn },
+        rules: unicornRules
     },
     {
         // Test code drives stubs and hand-built payloads, where `any` flows in
@@ -178,14 +195,10 @@ export default tseslint.config(
     {
         files: ['src/test/unit/**/*.ts'],
         rules: {
-            // Repeats the built-in restriction: a rule configured twice is not
-            // merged, the later config replaces the earlier one outright, so
-            // dropping it here would let unit tests import `fs` bare again.
             'no-restricted-imports': [
                 'error',
                 {
                     paths: [
-                        ...noBareNodeBuiltins,
                         {
                             name: 'vscode',
                             message:

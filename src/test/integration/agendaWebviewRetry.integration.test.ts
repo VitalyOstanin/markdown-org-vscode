@@ -64,7 +64,7 @@ suite('Agenda webview ServiceWorker-race retry', () => {
 
         resolveExtractorStub = sinon.stub(extractor, 'resolveExtractorPath').resolves('markdown-org-extract');
         execFileStub = sinon.stub(exec, 'execFile').callsFake((..._args: unknown[]) => {
-            const callback = _args[_args.length - 1] as ExecFileCallback;
+            const callback = _args.at(-1) as ExecFileCallback;
             // Empty payload is fine -- this suite cares about webview retry,
             // not rendered tasks.
             queueMicrotask(() => callback(null, JSON.stringify([]), ''));

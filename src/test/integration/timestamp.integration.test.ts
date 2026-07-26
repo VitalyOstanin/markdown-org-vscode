@@ -202,7 +202,7 @@ suite('Timestamp Integration Tests', () => {
             const inserted = document.lineAt(1).text;
             assert.ok(inserted.startsWith('`SCHEDULED:'), `expected SCHEDULED line, got: ${inserted}`);
             const englishDays = new Set(['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']);
-            const match = inserted.match(/<\d{4}-\d{2}-\d{2}\s+(\S+)\s/);
+            const match = /<\d{4}-\d{2}-\d{2}\s+(\S+)\s/.exec(inserted);
             assert.ok(match, `cannot extract weekday from: ${inserted}`);
             assert.ok(englishDays.has(match[1]!), `weekday "${match[1]}" is not an English short name`);
         } finally {
@@ -222,7 +222,7 @@ suite('Timestamp Integration Tests', () => {
 
         const inserted = document.lineAt(1).text;
         const russianDays = new Set(['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб']);
-        const match = inserted.match(/<\d{4}-\d{2}-\d{2}\s+(\S+)\s/);
+        const match = /<\d{4}-\d{2}-\d{2}\s+(\S+)\s/.exec(inserted);
         assert.ok(match, `cannot extract weekday from: ${inserted}`);
         assert.ok(russianDays.has(match[1]!), `weekday "${match[1]}" should default to Russian`);
     });

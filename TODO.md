@@ -334,6 +334,31 @@
       `regexGroups_1 is not defined`. The integration suite now trips on that
       alias pattern the same way it already trips on `exports.`.
 
+- [x] Adopt the modern-TypeScript rule sets
+    - `stylistic-type-checked` from typescript-eslint, plus 30 hand-picked
+      modern-API rules from `eslint-plugin-unicorn`. Measured before choosing:
+      `stylistic` was +101 reports, unicorn's own `recommended` preset 1529 --
+      86% of it naming and filename conventions this project does not follow
+      (`filename-case` wants kebab-case, `no-null` argues with the VS Code API,
+      `name-replacements` renames `err` to `error` across the tree). The picked
+      subset was 54.
+    - 102 of the reports were fixed by `--fix`; the rest by hand. `||` became
+      `??` only where the operand cannot be an empty string that has to fall
+      through -- the eight places where it can (an unset `workspaceDir`, an
+      empty stderr, an empty anchor or tag) keep `||` behind a disable comment
+      that says why. Lazy singletons became `??=`.
+    - `unicorn/prefer-node-protocol` replaced the hand-written
+      `no-restricted-imports` list, which only covered the built-ins someone
+      remembered to add.
+    - Two rules stay off: `prefer-promise-with-resolvers` needs ES2024 and the
+      projects declare `lib: ES2022`; `prefer-includes` and
+      `prefer-string-starts-ends-with` are left to typescript-eslint, which
+      reads types instead of guessing at the receiver.
+    - `--fix` broke two things, both caught by `tsc -b`: a spread over a
+      structurally-typed `ArrayLike` (now declared `Iterable`, which is what a
+      NodeList is), and an `as HTMLElement` cast rewritten to `!`, which lost
+      the widening (now `querySelector<HTMLElement>`).
+
 - [x] Adopt `eslint-plugin-import-x`
     - Added with `eslint-import-resolver-typescript` (without a resolver
       `no-cycle` cannot follow an extensionless relative specifier to its `.ts`

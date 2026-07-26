@@ -273,9 +273,7 @@ let singleFlight: SingleFlight | undefined;
 function getSingleFlight(): SingleFlight {
     const policy = (vscode.workspace.getConfiguration('markdown-org').get<string>('gcalSync.concurrencyPolicy') ??
         'queue') as ConcurrencyPolicy;
-    if (!singleFlight) {
-        singleFlight = new SingleFlight(policy);
-    }
+    singleFlight ??= new SingleFlight(policy);
     return singleFlight;
 }
 
@@ -297,9 +295,7 @@ const TOAST_SYMBOL: Record<SyncChange['action'], string> = {
 // across runs). Opened on demand via the toast's "Show details" button.
 let syncChannel: vscode.OutputChannel | undefined;
 function getSyncChannel(): vscode.OutputChannel {
-    if (!syncChannel) {
-        syncChannel = vscode.window.createOutputChannel('Markdown Org: Calendar Sync');
-    }
+    syncChannel ??= vscode.window.createOutputChannel('Markdown Org: Calendar Sync');
     return syncChannel;
 }
 
@@ -543,6 +539,8 @@ export async function syncNow(context: vscode.ExtensionContext, opts: { trigger?
     }
     const cfg = vscode.workspace.getConfiguration('markdown-org');
     const getToken = await resolveTokenProvider(context, cfg);
+    // Same as in commands/agenda.ts: an empty setting is "not set".
+    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
     const workspaceDir = cfg.get<string>('workspaceDir') || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
     if (!workspaceDir) {
         throw new Error('open a workspace folder or set markdown-org.workspaceDir');
@@ -637,23 +635,21 @@ export function registerGcalSaveTrigger(context: vscode.ExtensionContext): void 
             return;
         }
         const delay = cfg.get<number>('gcalSync.syncOnSaveDebounceMs') ?? 5000;
-        if (!debounced) {
-            debounced = debounce(() => {
-                // Background automation: silent on success/no-changes, toast
-                // only on failures. See reportSyncSummary's toast policy.
-                //
-                // Errors thrown *before* runSync (broken auth, missing
-                // extractor, calendar resolution) never reach reportSyncSummary,
-                // so they must not be swallowed silently here: log the reason to
-                // the details channel and surface a warning toast, otherwise an
-                // on-save sync that can never succeed fails invisibly.
-                void syncNow(context, { trigger: 'onSave' }).catch((e: unknown) => {
-                    const reason = formatError(e);
-                    syncLog(`sync (onSave) failed before run: ${reason}`);
-                    void notifyWarn(`Calendar sync (on save) failed: ${reason}`);
-                });
-            }, delay);
-        }
+        debounced ??= debounce(() => {
+            // Background automation: silent on success/no-changes, toast
+            // only on failures. See reportSyncSummary's toast policy.
+            //
+            // Errors thrown *before* runSync (broken auth, missing
+            // extractor, calendar resolution) never reach reportSyncSummary,
+            // so they must not be swallowed silently here: log the reason to
+            // the details channel and surface a warning toast, otherwise an
+            // on-save sync that can never succeed fails invisibly.
+            void syncNow(context, { trigger: 'onSave' }).catch((e: unknown) => {
+                const reason = formatError(e);
+                syncLog(`sync (onSave) failed before run: ${reason}`);
+                void notifyWarn(`Calendar sync (on save) failed: ${reason}`);
+            });
+        }, delay);
         debounced();
     });
     context.subscriptions.push(sub);

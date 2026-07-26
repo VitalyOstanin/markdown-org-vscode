@@ -140,7 +140,9 @@ suite('gcal/calendarClient', () => {
             forced.push(!!opts?.forceRefresh);
             return 'AT';
         };
-        setRetrySleepForTests(async () => {});
+        setRetrySleepForTests(async () => {
+            /* no real sleeping in unit tests */
+        });
         try {
             await listWritableCalendars(r.fn, tok);
         } finally {

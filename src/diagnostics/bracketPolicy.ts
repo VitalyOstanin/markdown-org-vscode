@@ -65,7 +65,7 @@ export function validateLines(lines: string[]): BracketViolation[] {
 }
 
 function validateLine(text: string, line: number): BracketViolation | null {
-    const m = text.match(LENIENT_LINE_REGEX);
+    const m = LENIENT_LINE_REGEX.exec(text);
     if (!m?.groups) return null;
 
     const { type: keyword, open, close, inner } = namedGroups(m, 'type', 'open', 'close', 'inner');

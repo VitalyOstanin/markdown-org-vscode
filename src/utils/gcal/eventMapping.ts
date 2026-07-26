@@ -51,11 +51,11 @@ function buildDescription(content: string | undefined, relPath: string, line: nu
 
 /** Map a syncable task to a Google Calendar event resource. */
 export function mapTaskToEvent(task: Task, orgId: string, opts: MapOptions): GcalEventResource {
-    const date = task.timestamp_date as string;
+    const date = task.timestamp_date!;
     const ext = {
         private: {
             mdOrgId: orgId,
-            mdOrgTsType: task.timestamp_type as string
+            mdOrgTsType: task.timestamp_type!
         }
     };
 

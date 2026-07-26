@@ -4,8 +4,6 @@ import * as path from 'node:path';
 import { spawn } from 'node:child_process';
 import { setTimeout as sleep } from 'node:timers/promises';
 
-export { sleep };
-
 /**
  * Hide everything in the VS Code chrome that is irrelevant to the recorded
  * action: primary side bar (Explorer), secondary side bar, bottom panel
@@ -131,7 +129,7 @@ export async function maximizeVscodeWindow(): Promise<void> {
         throw new Error('xdotool: could not find a VS Code Extension Development Host window');
     }
     const ids = search.stdout.split('\n').filter(Boolean);
-    const wid = ids[ids.length - 1]!;
+    const wid = ids.at(-1)!;
     const runSync = (args: string[]): Promise<number> =>
         new Promise((resolve, reject) => {
             const proc = spawn('xdotool', args, {
@@ -308,7 +306,7 @@ async function ensureVscodeWindowFocused(): Promise<void> {
         throw new Error('xdotool: could not find a VS Code Extension Development Host window');
     }
     const ids = stdout.split('\n').filter(Boolean);
-    const wid = ids[ids.length - 1]!;
+    const wid = ids.at(-1)!;
     await runXdotool(['windowactivate', '--sync', wid]);
     // Force pointer-follows-keyboard semantics by raising the window too.
     await runXdotool(['windowraise', wid]);
@@ -497,3 +495,5 @@ export async function pressKey(sequence: string): Promise<void> {
         }
     }
 }
+
+export { setTimeout as sleep } from 'node:timers/promises';

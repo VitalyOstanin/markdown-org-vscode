@@ -29,7 +29,7 @@ export interface TimestampLineMatch {
 }
 
 export function matchTimestampLine(text: string): TimestampLineMatch | null {
-    const m = text.match(TIMESTAMP_LINE_REGEX);
+    const m = TIMESTAMP_LINE_REGEX.exec(text);
     if (!m?.groups) return null;
     const { indent, schedTs, deadTs, closedTs, createdTs } = m.groups;
     if (schedTs) return { indent: indent ?? '', type: 'SCHEDULED', timestamp: schedTs, active: true };

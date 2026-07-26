@@ -72,4 +72,6 @@ export function activate(context: vscode.ExtensionContext) {
     registerGcalSaveTrigger(context);
 }
 
-export function deactivate() {}
+export function deactivate() {
+    /* Nothing to tear down: every disposable is registered on the context. */
+}

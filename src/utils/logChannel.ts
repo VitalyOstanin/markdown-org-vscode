@@ -16,9 +16,7 @@ import { timestampedLine } from './logLine';
 let channel: vscode.OutputChannel | undefined;
 
 function getLogChannel(): vscode.OutputChannel {
-    if (!channel) {
-        channel = vscode.window.createOutputChannel('Markdown Org');
-    }
+    channel ??= vscode.window.createOutputChannel('Markdown Org');
     return channel;
 }
 

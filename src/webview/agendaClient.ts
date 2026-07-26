@@ -58,7 +58,7 @@ export interface TaskRef {
 }
 
 /** Anchor date (`YYYY-MM-DD`) -> remembered `scrollY`. */
-export type ScrollMemory = { [anchor: string]: number };
+export type ScrollMemory = Record<string, number>;
 
 /** Task fields the heading tint rule reads. */
 export interface HeadingTintInput {
@@ -165,7 +165,7 @@ export interface DayHeaderElementLike {
 
 /** Root that can query for day-header elements (a Document or a container). */
 export interface DayHeaderRootLike {
-    querySelectorAll(selectors: string): ArrayLike<DayHeaderElementLike>;
+    querySelectorAll(selectors: string): Iterable<DayHeaderElementLike>;
 }
 
 /**
@@ -498,6 +498,8 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             }
             if (message.strings) {
                 UI = message.strings;
+                // An empty language tag leaves the current one in place.
+                // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
                 uiLang = message.language || uiLang;
             }
             // After renderNavBar, not before: the layout is decided from the
@@ -535,6 +537,8 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             }
             if (message.strings) {
                 UI = message.strings;
+                // As above: an empty language tag keeps the current one.
+                // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
                 uiLang = message.language || uiLang;
             }
             initialData = message.data ?? [];
@@ -585,13 +589,13 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             // verify that renderAgenda produced the expected day-headers for the
             // given anchor date. Production code never sends this query, so it
             // has no effect on normal use.
-            const headers = Array.from(document.querySelectorAll('.day-header'))
+            const headers = [...document.querySelectorAll('.day-header')]
                 .map((el) => el.getAttribute('data-date'))
                 .filter((d) => d !== null);
-            const flags = Array.from(document.querySelectorAll('.flag')).map((el) => el.getAttribute('data-flag'));
+            const flags = [...document.querySelectorAll('.flag')].map((el) => el.getAttribute('data-flag'));
             // Section-panel titles in document order (Day and Tasks cards), so a
             // test can assert the grouping and its order.
-            const sections = Array.from(document.querySelectorAll('.day-section-name')).map((el) => el.textContent);
+            const sections = [...document.querySelectorAll('.day-section-name')].map((el) => el.textContent);
             // Measured, not inferred: the compact header is only compact if the
             // hero really shares a line with the control block. A class on
             // <body> proves nothing about the layout it was supposed to
@@ -608,7 +612,7 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             // non-Latin digits must reach the page as such, and nothing but the
             // rendered text proves it.
             const heroSub = document.querySelector('.hero-sub span')?.textContent ?? '';
-            const dayNumbers = Array.from(document.querySelectorAll('.calendar-day .day-number')).map(
+            const dayNumbers = [...document.querySelectorAll('.calendar-day .day-number')].map(
                 (el) => el.textContent ?? ''
             );
             vscode.postMessage({
@@ -953,8 +957,8 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
     }
 
     function renderTask(task: TaskWithOffset, daysOffset?: number, taskType?: string): string {
-        const status = task.task_type || '';
-        const priorityLetter = task.priority || '';
+        const status = task.task_type ?? '';
+        const priorityLetter = task.priority ?? '';
         const statusKind =
             status === 'TODO' ? 'todo' : status === 'DONE' ? 'done' : isCancelled(status) ? 'cancelled' : '';
         // Escaped once and used in both the row and the chip: this is the
@@ -994,7 +998,7 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             // The big-time column: a clean HH:MM, or empty for an all-day task
             // (the stylesheet then fills in an em-dash placeholder).
             '<span class="time-plain">' +
-            escapeHtml(task.timestamp_time || '') +
+            escapeHtml(task.timestamp_time ?? '') +
             '</span>' +
             '<span class="status" data-status="' +
             statusKind +
@@ -1069,10 +1073,10 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         }
         try {
             const info = (new Intl.Locale(locale) as unknown as LocaleWithWeekInfo).weekInfo;
-            if (info && info.firstDay === 7) {
+            if (info?.firstDay === 7) {
                 return 0;
             }
-            if (info && info.firstDay !== undefined && info.firstDay >= 1 && info.firstDay <= 6) {
+            if (info?.firstDay !== undefined && info.firstDay >= 1 && info.firstDay <= 6) {
                 return 1;
             }
         } catch {
