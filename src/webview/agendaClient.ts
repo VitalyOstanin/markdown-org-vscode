@@ -183,7 +183,7 @@ export interface AgendaClientDeps {
     isMeaningfulSelection: (sel: SelectionLike | null) => boolean;
     resolveTaskClickIntent: (event: ClickEventLike, selection: SelectionLike | null) => TaskRef | null;
     sanitizeTaskLine: (value: unknown) => number;
-    escapeHtml: (text: string | undefined | null) => string;
+    escapeHtml: (text: string | number | boolean | undefined | null) => string;
     rememberScroll: (history: ScrollMemory, anchor: string, scrollY: number) => void;
     recallScroll: (history: ScrollMemory, anchor: string) => number | null;
     resolveHeadingClass: (task: HeadingTintInput) => string;
@@ -245,6 +245,48 @@ export interface AgendaClientDeps {
         }
     ) => 'full' | 'compact';
     formatNumber: (value: number, locale: string) => string;
+    countLabel: (
+        n: number,
+        forms: string[],
+        ctx: {
+            locale: string;
+            uiLang: string;
+            formatNumber: (value: number, locale: string) => string;
+            pluralIndex: (n: number, lang: string) => number;
+        }
+    ) => string;
+    summaryStat: (
+        n: number,
+        word: string | string[],
+        cls: string,
+        ctx: {
+            uiLang: string;
+            escapeHtml: (text: string | number | boolean | undefined | null) => string;
+            pluralIndex: (n: number, lang: string) => number;
+        }
+    ) => string;
+    renderSummaryBar: (
+        dateIso: string,
+        pieces: string[],
+        ctx: { escapeHtml: (text: string | number | boolean | undefined | null) => string }
+    ) => string;
+    renderSectionPanel: (
+        key: string,
+        title: string,
+        count: number,
+        rowsHtml: string,
+        ctx: {
+            locale: string;
+            uiLang: string;
+            inSectionTemplate: string;
+            taskForms: string[];
+            escapeHtml: (text: string | number | boolean | undefined | null) => string;
+            formatString: (template: string, ...values: string[]) => string;
+            formatNumber: (value: number, locale: string) => string;
+            pluralIndex: (n: number, lang: string) => number;
+        }
+    ) => string;
+    renderDayHeaderHtml: (parts: DayHeaderParts) => string;
 }
 
 /**
@@ -323,7 +365,12 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         formatIsoDate,
         nextHeaderMode,
         resolveHeaderLayout,
-        formatNumber
+        formatNumber,
+        countLabel: countLabelHtml,
+        summaryStat: summaryStatHtml,
+        renderSummaryBar: renderSummaryBarHtml,
+        renderSectionPanel: renderSectionPanelHtml,
+        renderDayHeaderHtml
     } = deps;
 
     /** Columns in the month calendar grid -- a week. */
@@ -335,11 +382,10 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
     let UI: AgendaStrings = boot.strings;
     let uiLang: string = boot.language;
 
-    // "3 tasks" / "3 задачи": picks the plural form for n and fills it in.
+    // "3 tasks" / "3 задачи". The body is in utils/agendaSummaryHtml.ts; these
+    // wrappers only bind the page's live state to it.
     function countLabel(n: number, forms: string[]): string {
-        // The plural form follows the UI language; the digits follow the date
-        // locale, like every other number on the panel.
-        return `${formatNumber(n, locale)} ${forms[pluralIndex(n, uiLang)] ?? ''}`;
+        return countLabelHtml(n, forms, { locale, uiLang, formatNumber, pluralIndex });
     }
 
     const vscode = acquireVsCodeApi();
@@ -823,42 +869,25 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
     // their rows as standard .task-line elements, so the markup lives here once
     // instead of being duplicated per view.
 
-    // One "<b>N</b> word" stat for the summary bar. The word argument is either
-    // a plain qualifier ("overdue") or the plural forms of a counted noun
-    // (["task","tasks"] in English, three forms in Russian).
     function summaryStat(n: number, word: string | string[], cls: string): string {
-        const label = Array.isArray(word) ? word[pluralIndex(n, uiLang)] : word;
-        return `<span class="day-summary-stat${cls ? ` ${cls}` : ''}"><b>${n}</b> ${escapeHtml(label)}</span>`;
+        return summaryStatHtml(n, word, cls, { uiLang, escapeHtml, pluralIndex });
     }
 
-    // The bar reuses the sticky .day-header shell. dateIso is the view's anchor
-    // date for the day view and empty for the date-less tasks view, which then
-    // emits no data-date (getRenderedInfo only collects headers that carry one).
     function renderSummaryBar(dateIso: string, pieces: string[]): string {
-        const dateAttr = dateIso ? ' data-date="' + escapeHtml(dateIso) + '"' : '';
-        return (
-            '<div class="day-header day-summary"' +
-            dateAttr +
-            '>' +
-            pieces.join('<span class="day-summary-sep">·</span>') +
-            '</div>'
-        );
+        return renderSummaryBarHtml(dateIso, pieces, { escapeHtml });
     }
 
-    /** One section panel: title, count chip and the already-rendered rows. */
     function renderSectionPanel(key: string, title: string, count: number, rowsHtml: string): string {
-        // The count chip is the same component as the month cell's task-load
-        // chip, so it explains its number the same way.
-        const chipTitle = escapeHtml(formatString(UI.countChip.inSection, countLabel(count, UI.countChip.tasks)));
-        return (
-            `<section class="day-section day-section-${key}">` +
-            '<div class="day-section-head">' +
-            `<span class="day-section-name">${escapeHtml(title)}</span>` +
-            `<span class="day-section-count" title="${chipTitle}">${count}</span>` +
-            '</div>' +
-            `<div class="day-section-body">${rowsHtml}</div>` +
-            '</section>'
-        );
+        return renderSectionPanelHtml(key, title, count, rowsHtml, {
+            locale,
+            uiLang,
+            inSectionTemplate: UI.countChip.inSection,
+            taskForms: UI.countChip.tasks,
+            escapeHtml,
+            formatString,
+            formatNumber,
+            pluralIndex
+        });
     }
 
     // The week view scrolls to today's header when today is in the visible
@@ -925,20 +954,7 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
     }
 
     function formatDayHeader(date: string): string {
-        const { weekday, day, month, year } = formatDayHeaderParts(date, locale);
-        return (
-            '<span class="day-weekday">' +
-            weekday +
-            '</span>' +
-            '<span class="day-num">' +
-            day +
-            '</span>' +
-            '<span class="day-rest">' +
-            month +
-            ' ' +
-            year +
-            '</span>'
-        );
+        return renderDayHeaderHtml(formatDayHeaderParts(date, locale));
     }
 
     function renderTask(task: TaskWithOffset, daysOffset?: number, taskType?: string): string {

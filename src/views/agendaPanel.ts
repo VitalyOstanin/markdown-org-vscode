@@ -17,6 +17,13 @@ import { formatIsoDate } from '../utils/formatIsoDate';
 import { explicitSettingValue } from '../utils/explicitSetting';
 import { resolveDateLocale } from '../utils/dateLocale';
 import { formatDayHeaderParts } from '../utils/agendaDayHeader';
+import {
+    countLabel,
+    renderDayHeaderHtml,
+    renderSectionPanel,
+    renderSummaryBar,
+    summaryStat
+} from '../utils/agendaSummaryHtml';
 import { isCancelled } from '../utils/normalizeTaskType';
 import { shiftMonthAnchor } from '../utils/monthNav';
 import { wireDayHeaderNavigation } from '../utils/agendaDayHeaderNav';
@@ -913,7 +920,12 @@ export class AgendaPanel {
         formatIsoDate,
         nextHeaderMode,
         resolveHeaderLayout,
-        formatNumber
+        formatNumber,
+        countLabel,
+        summaryStat,
+        renderSummaryBar,
+        renderSectionPanel,
+        renderDayHeaderHtml
     } satisfies AgendaClientDeps;
 
     /**

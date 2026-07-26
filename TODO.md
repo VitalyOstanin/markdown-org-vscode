@@ -304,9 +304,24 @@
     - What holds it today: the helpers it is handed are unit-tested modules, and
       its observable output is asserted through `queryRenderedInfoForTesting` in
       the integration suite.
-    - Options to explore: keep extracting page logic into `src/utils/` modules
-      with jsdom unit tests (the established route), or collect V8 coverage from
-      the webview process and merge it into the report.
+    - Route chosen (2026-07-26): keep extracting page logic into `src/utils/`
+      modules with unit tests, rather than collecting V8 coverage from the
+      webview process. The reason the file resists extraction is its shape: the
+      client is one function inlined through `toString()`, so the page has no
+      module scope and everything -- the 30 injected helpers and the mutable
+      session state (`UI`, `locale`, `uiLang`, `shiftedToday`, `holidays`, ...)
+      -- lives in its closure. Taking that state as an explicit parameter is
+      what makes a renderer testable.
+    - Step 1 done: `countLabel`, `summaryStat`, `renderSummaryBar`,
+      `renderSectionPanel` and the day-header markup moved to
+      `src/utils/agendaSummaryHtml.ts` with 15 unit tests. What stays in the
+      client are one-line wrappers that bind the live state to them.
+    - Remaining, in descending size: `renderNavBar` (135 lines),
+      `renderMonthCalendar` (105), `renderTask` (58), `renderDayCard` (56),
+      `renderTagMenu` (37), `renderTasks` (34), `renderModeSwitch`,
+      `renderHeaderModeButton`, `calendarCellOpenTag`, `tagLabel`,
+      `tagButtonText`. `handleHostMessage` (153) is dispatch, not markup, and is
+      better left where it is.
 
 - [x] Turn on the remaining strict TypeScript option: `noUncheckedIndexedAccess`
     - On in both projects as of 2026-07-26, which completes the strict set:
