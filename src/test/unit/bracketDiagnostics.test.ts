@@ -1,4 +1,4 @@
-import * as assert from 'assert';
+import * as assert from 'node:assert';
 import { validateLines } from '../../diagnostics/bracketPolicy';
 
 suite('validateLines (ADR-0014 bracket policy)', () => {

@@ -20,6 +20,48 @@ const nodeGlobals = {
     Buffer: 'readonly'
 };
 
+// Node built-ins are imported with the `node:` prefix everywhere, so a package
+// in node_modules cannot shadow one and resolution skips the package lookup.
+// The pin is `no-restricted-imports` rather than `n/prefer-node-protocol` or
+// `unicorn/prefer-node-protocol`: either would mean a dev dependency and a rule
+// set to tune for the single rule actually wanted here.
+const bareNodeBuiltins = [
+    'assert',
+    'assert/strict',
+    'buffer',
+    'child_process',
+    'crypto',
+    'dns',
+    'events',
+    'fs',
+    'fs/promises',
+    'http',
+    'https',
+    'module',
+    'net',
+    'os',
+    'path',
+    'process',
+    'querystring',
+    'readline',
+    'stream',
+    'stream/promises',
+    'string_decoder',
+    'timers',
+    'timers/promises',
+    'tls',
+    'tty',
+    'url',
+    'util',
+    'worker_threads',
+    'zlib'
+];
+
+const noBareNodeBuiltins = bareNodeBuiltins.map((name) => ({
+    name,
+    message: `Import Node built-ins with the 'node:' prefix -- 'node:${name}'.`
+}));
+
 export default tseslint.config(
     {
         ignores: ['out/**', 'node_modules/**', '.vscode-test/**', 'coverage/**', 'media/**', 'docs/**']
@@ -74,7 +116,8 @@ export default tseslint.config(
             // `null: 'ignore'` keeps the deliberate `value == null` idiom (one
             // check covering null and undefined) and rejects every other loose
             // comparison.
-            eqeqeq: ['error', 'always', { null: 'ignore' }]
+            eqeqeq: ['error', 'always', { null: 'ignore' }],
+            'no-restricted-imports': ['error', { paths: noBareNodeBuiltins }]
         }
     },
     {
@@ -96,10 +139,14 @@ export default tseslint.config(
     {
         files: ['src/test/unit/**/*.ts'],
         rules: {
+            // Repeats the built-in restriction: a rule configured twice is not
+            // merged, the later config replaces the earlier one outright, so
+            // dropping it here would let unit tests import `fs` bare again.
             'no-restricted-imports': [
                 'error',
                 {
                     paths: [
+                        ...noBareNodeBuiltins,
                         {
                             name: 'vscode',
                             message:

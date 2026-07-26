@@ -1,4 +1,4 @@
-import * as path from 'path';
+import * as path from 'node:path';
 import { AgendaData, DayAgenda, FileTag, Task } from '../types';
 
 function isPositivePattern(pattern: string): boolean {

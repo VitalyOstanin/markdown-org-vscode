@@ -1,4 +1,4 @@
-import * as assert from 'assert';
+import * as assert from 'node:assert';
 import { filterTasksByTag } from '../../utils/tagFilter';
 import { FileTag, Task, DayAgenda } from '../../types';
 

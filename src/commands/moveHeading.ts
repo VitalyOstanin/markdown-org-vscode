@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
-import * as fs from 'fs';
-import * as path from 'path';
+import { lstat, readFile, rename, unlink, writeFile } from 'node:fs/promises';
+import * as path from 'node:path';
 import { findNearestHeading, isPathInsideWorkspace, requireActiveEditor, resolveWorkspacePath } from '../utils';
 import { notifyError, notifyInfo, notifyWarn } from '../utils/notify';
 import { computeBlockDeletionCoords } from '../utils/blockDeletion';
@@ -9,7 +9,7 @@ import { computeMaintainInsertion } from '../utils/maintainPromote';
 
 async function readIfExists(filePath: string): Promise<string | null> {
     try {
-        return await fs.promises.readFile(filePath, 'utf8');
+        return await readFile(filePath, 'utf8');
     } catch (err) {
         if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
             return null;
@@ -20,7 +20,7 @@ async function readIfExists(filePath: string): Promise<string | null> {
 
 async function refuseIfSymlink(filePath: string): Promise<boolean> {
     try {
-        const stat = await fs.promises.lstat(filePath);
+        const stat = await lstat(filePath);
         if (stat.isSymbolicLink()) {
             notifyError(`refused to follow symlink at ${filePath}`);
             return true;
@@ -35,11 +35,11 @@ async function refuseIfSymlink(filePath: string): Promise<boolean> {
 
 async function atomicWrite(filePath: string, content: string): Promise<void> {
     const tmpPath = `${filePath}.tmp-${process.pid}-${Date.now()}`;
-    await fs.promises.writeFile(tmpPath, content);
+    await writeFile(tmpPath, content);
     try {
-        await fs.promises.rename(tmpPath, filePath);
+        await rename(tmpPath, filePath);
     } catch (err) {
-        await fs.promises.unlink(tmpPath).catch(() => undefined);
+        await unlink(tmpPath).catch(() => undefined);
         throw err;
     }
 }

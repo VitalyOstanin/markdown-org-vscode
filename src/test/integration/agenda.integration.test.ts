@@ -1,7 +1,7 @@
-import * as assert from 'assert';
-import * as path from 'path';
-import * as fs from 'fs';
-import * as os from 'os';
+import * as assert from 'node:assert';
+import * as path from 'node:path';
+import * as fs from 'node:fs';
+import * as os from 'node:os';
 import * as vscode from 'vscode';
 import * as sinon from 'sinon';
 import { suite, before, beforeEach, after, afterEach, test } from 'mocha';

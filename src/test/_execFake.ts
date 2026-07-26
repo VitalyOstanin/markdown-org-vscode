@@ -1,4 +1,4 @@
-import type * as cp from 'child_process';
+import type * as cp from 'node:child_process';
 
 /**
  * The callback shape Node's `execFile` invokes. Every suite that stubs

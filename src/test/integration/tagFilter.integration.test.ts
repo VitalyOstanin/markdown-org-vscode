@@ -1,7 +1,7 @@
-import * as assert from 'assert';
+import * as assert from 'node:assert';
 import * as vscode from 'vscode';
-import * as path from 'path';
-import * as fs from 'fs';
+import * as path from 'node:path';
+import * as fs from 'node:fs';
 import { suite, before, after, beforeEach, test } from 'mocha';
 
 suite('Tag Filter Integration Tests', () => {

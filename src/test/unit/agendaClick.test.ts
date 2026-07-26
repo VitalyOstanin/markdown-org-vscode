@@ -1,4 +1,4 @@
-import * as assert from 'assert';
+import * as assert from 'node:assert';
 import { suite, test } from 'mocha';
 import { JSDOM } from 'jsdom';
 import { resolveTaskClickIntent, sanitizeTaskLine, ClickTargetLike } from '../../utils/agendaClick';

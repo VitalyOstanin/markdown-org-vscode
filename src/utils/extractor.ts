@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
-import * as path from 'path';
-import * as fs from 'fs';
+import * as path from 'node:path';
+import * as fs from 'node:fs';
 import { exec } from './exec';
 import { notifyError, notifyWarn } from './notify';
 import { findBundledBinary } from './bundledBinary';

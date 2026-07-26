@@ -1,4 +1,4 @@
-import * as assert from 'assert';
+import * as assert from 'node:assert';
 import { suite, test } from 'mocha';
 import { attentionTooltip, flagTooltip, priorityTooltip } from '../../utils/agendaTooltips';
 import { AGENDA_STRINGS, formatString } from '../../utils/agendaI18n';

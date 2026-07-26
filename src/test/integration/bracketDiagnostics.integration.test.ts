@@ -1,4 +1,4 @@
-import * as assert from 'assert';
+import * as assert from 'node:assert';
 import { setTimeout as sleep } from 'node:timers/promises';
 import * as vscode from 'vscode';
 import { suite, test, teardown } from 'mocha';

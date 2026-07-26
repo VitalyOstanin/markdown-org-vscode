@@ -1,4 +1,4 @@
-import * as assert from 'assert';
+import * as assert from 'node:assert';
 import * as vscode from 'vscode';
 import * as sinon from 'sinon';
 import { suite, test } from 'mocha';

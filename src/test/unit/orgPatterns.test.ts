@@ -1,4 +1,4 @@
-import * as assert from 'assert';
+import * as assert from 'node:assert';
 import { CLOCK_REGEX, HEADING_REGEX, TIMESTAMP_LINE_REGEX } from '../../orgPatterns';
 
 suite('orgPatterns named groups', () => {

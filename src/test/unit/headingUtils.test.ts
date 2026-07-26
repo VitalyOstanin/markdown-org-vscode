@@ -1,4 +1,4 @@
-import * as assert from 'assert';
+import * as assert from 'node:assert';
 import { HEADING_REGEX } from '../../orgPatterns';
 
 suite('Heading Utils Tests', () => {

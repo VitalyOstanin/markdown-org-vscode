@@ -1,4 +1,4 @@
-import * as assert from 'assert';
+import * as assert from 'node:assert';
 import { DEFAULT_HOLIDAYS_TTL_MS, clearHolidaysCache, getCachedHolidays } from '../../utils/holidaysCache';
 
 suite('holidaysCache', () => {

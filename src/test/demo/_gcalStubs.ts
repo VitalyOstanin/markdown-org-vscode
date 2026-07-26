@@ -16,7 +16,7 @@ import * as sinon from 'sinon';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { exec } from '../../utils/exec';
 import { extractor } from '../../utils/extractor';
-import type * as cp from 'child_process';
+import type * as cp from 'node:child_process';
 import type { ExecFileCallback } from '../_execFake';
 
 /** A Response-like object matching what oauth.postToken and calendarClient read. */

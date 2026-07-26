@@ -1,4 +1,4 @@
-import * as assert from 'assert';
+import * as assert from 'node:assert';
 import { suite, test } from 'mocha';
 import { buildCommandErrorMessage, withErrorReporting } from '../../utils/orgCommandWrap';
 

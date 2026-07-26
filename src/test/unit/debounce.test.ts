@@ -1,4 +1,4 @@
-import * as assert from 'assert';
+import * as assert from 'node:assert';
 import { suite, test, setup, teardown } from 'mocha';
 import * as sinon from 'sinon';
 import { debounce } from '../../utils/debounce';

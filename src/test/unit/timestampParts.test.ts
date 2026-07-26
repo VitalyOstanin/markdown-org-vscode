@@ -1,4 +1,4 @@
-import * as assert from 'assert';
+import * as assert from 'node:assert';
 import { getTimestampPartAt, getClockTimestampPartAt } from '../../utils/timestampParts';
 
 suite('getTimestampPartAt (plain timestamp)', () => {

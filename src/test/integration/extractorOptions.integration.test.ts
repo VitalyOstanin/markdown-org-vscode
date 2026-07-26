@@ -1,10 +1,10 @@
-import * as assert from 'assert';
-import * as path from 'path';
-import * as fs from 'fs';
+import * as assert from 'node:assert';
+import * as path from 'node:path';
+import * as fs from 'node:fs';
 import { setTimeout as sleep } from 'node:timers/promises';
 import * as vscode from 'vscode';
 import * as sinon from 'sinon';
-import type * as cp from 'child_process';
+import type * as cp from 'node:child_process';
 import { suite, before, beforeEach, after, afterEach, test } from 'mocha';
 import { exec } from '../../utils/exec';
 import { EXTRACTOR_MAX_BUFFER_BYTES } from '../../utils/extractor';

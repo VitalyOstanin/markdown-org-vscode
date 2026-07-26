@@ -1,4 +1,4 @@
-import * as assert from 'assert';
+import * as assert from 'node:assert';
 import { TAG_ALL, computeNextTag, buildTagCycle, resolveRequestedTag } from '../../utils/cycleTag';
 
 suite('computeNextTag', () => {

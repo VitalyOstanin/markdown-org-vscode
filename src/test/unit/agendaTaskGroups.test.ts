@@ -1,4 +1,4 @@
-import * as assert from 'assert';
+import * as assert from 'node:assert';
 import { suite, test } from 'mocha';
 import { buildTaskGroups, computeTasksSummary } from '../../utils/agendaTaskGroups';
 import { AGENDA_STRINGS } from '../../utils/agendaI18n';

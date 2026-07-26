@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import { randomBytes } from 'crypto';
+import { randomBytes } from 'node:crypto';
 import { AgendaData, FileTag } from '../types';
 import { isMeaningfulSelection, resolveTaskClickIntent, sanitizeTaskLine } from '../utils/agendaClick';
 import { escapeHtml } from '../utils/agendaEscapeHtml';

@@ -1,4 +1,4 @@
-import * as cp from 'child_process';
+import * as cp from 'node:child_process';
 
 /**
  * The one `execFile` shape this codebase uses: file, args, options with

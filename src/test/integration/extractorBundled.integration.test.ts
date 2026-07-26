@@ -1,8 +1,8 @@
-import * as assert from 'assert';
-import * as path from 'path';
-import * as fs from 'fs';
-import { execFile } from 'child_process';
-import { promisify } from 'util';
+import * as assert from 'node:assert';
+import * as path from 'node:path';
+import * as fs from 'node:fs';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import * as vscode from 'vscode';
 import { suite, before, beforeEach, after, test } from 'mocha';
 import { extractor } from '../../utils/extractor';

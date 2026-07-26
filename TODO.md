@@ -323,23 +323,29 @@
     - Deferred because it adds a dev dependency and a rule set to tune; module
       resolution itself is already checked by `npm run typecheck`.
 
-- [ ] Move `src/` onto the `node:` import prefix
-    - Built-in modules are imported both ways today: ~126 bare specifiers
-      (`from 'fs'`, `'path'`, `'crypto'`, `'assert'`) against ~64 prefixed ones.
-      The split follows the age of the code -- the `gcal` subsystem, the demo
-      helpers and the newer tests already use `node:`; `scripts/*.js` is fully
-      on it. The prefix rules out a `node_modules` package shadowing a built-in
-      and resolves without the package lookup.
+- [x] Move `src/` onto the `node:` import prefix
+    - Built-in modules used to be imported both ways: 133 bare specifiers
+      (`from 'fs'`, `'path'`, `'crypto'`, `'assert'`) across 90 files against
+      the prefixed ones in the `gcal` subsystem, the demo helpers, the newer
+      tests and `scripts/*.js`. The prefix rules out a `node_modules` package
+      shadowing a built-in and resolves without the package lookup.
     - Deliberately not done before the release: the change touches most files
-      and would drown the release diff in noise.
-    - Afterwards: one sweep over `src/`, then pin it with a lint rule
-      (`n/prefer-node-protocol` from
-      [eslint-plugin-n](https://github.com/eslint-community/eslint-plugin-n) or
-      `unicorn/prefer-node-protocol` from
-      [eslint-plugin-unicorn](https://github.com/sindresorhus/eslint-plugin-unicorn)).
-      Fold in `import * as fs from 'fs'` + `fs.promises.*` (`moveHeading.ts`)
-      into a direct `import { readFile } from 'node:fs/promises'`, as
-      `utils/gcal/lock.ts` already does.
+      and would have drowned the release diff in noise.
+    - Done in one sweep over `src/`, plus `moveHeading.ts` folded from
+      `import * as fs from 'fs'` + `fs.promises.*` into
+      `import { lstat, readFile, rename, unlink, writeFile } from 'node:fs/promises'`,
+      as `utils/gcal/lock.ts` already did. `utils/extractor.ts` keeps its `fs`
+      namespace import: it needs `readFileSync` and `fs.constants` as well.
+    - Pinned by `no-restricted-imports` in `eslint.config.mjs`, which names
+      every bare built-in specifier. That is a rule the linter already ships,
+      unlike `n/prefer-node-protocol`
+      ([eslint-plugin-n](https://github.com/eslint-community/eslint-plugin-n))
+      or `unicorn/prefer-node-protocol`
+      ([eslint-plugin-unicorn](https://github.com/sindresorhus/eslint-plugin-unicorn)),
+      either of which would have meant a dev dependency and a rule set to tune
+      for the one rule wanted. The restriction is repeated in the unit-test
+      block: a rule configured twice is replaced, not merged, so leaving it out
+      there would have let unit tests import `fs` bare again.
 
 - [ ] TypeScript 6 -> 7
     - Deferred deliberately: the urgent part of the upgrade is already done --
