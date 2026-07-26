@@ -9,13 +9,17 @@
     "rootDir": "src",
     "strict": true,
     // Free (zero errors) and keeps an override honest once class hierarchies
-    // grow. noUncheckedIndexedAccess is the one strict option still off; it is
-    // tracked in TODO.md and needs code changes.
+    // grow.
     "noImplicitOverride": true,
     // An optional property is either absent or holds a value: `{ x: undefined }`
     // no longer passes for `{ x?: T }`. Fields that legitimately accept an
     // explicit undefined say so as `x?: T | undefined`.
     "exactOptionalPropertyTypes": true,
+    // Indexing an array or a record yields `T | undefined`, because it can. The
+    // helpers in `src/utils/regexGroups.ts` cover the one case that is a defect
+    // rather than a value -- a capture group the pattern promised and did not
+    // deliver.
+    "noUncheckedIndexedAccess": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
     "types": ["node", "mocha"],

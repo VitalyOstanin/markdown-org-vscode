@@ -74,7 +74,7 @@ suite('Agenda failure reporting', () => {
 
         assert.strictEqual(showErrorStub.callCount, 1, 'exactly one toast per panel');
         assert.strictEqual(logged.length, 2, `both reasons should be logged, got: ${JSON.stringify(logged)}`);
-        assert.ok(logged[1].includes('second, different failure'), `the later reason must survive, got: ${logged[1]}`);
+        assert.ok(logged[1]!.includes('second, different failure'), `the later reason must survive, got: ${logged[1]}`);
     });
 
     test('an undelivered headerMode is logged and re-sent on the next ready', async function () {

@@ -1,6 +1,8 @@
 import { buildOrgTimestamp } from './orgTimestamp';
 import type { TimestampPart } from './timestampParts';
 import { DAY_NAMES_SHORT_RU, DAY_NAMES_SHORT_EN, DAY_NAMES_FULL_RU, DAY_NAMES_FULL_EN } from './dayNames';
+import { namedGroups } from './regexGroups';
+import { at } from './exactIndex';
 
 /**
  * Shift a single part of a parsed timestamp by `delta` (+1 for Shift+Up, -1 for
@@ -20,10 +22,11 @@ export function incrementTimestamp(
     delta: number,
     active: boolean
 ): string {
-    const g = match.groups!;
-    const year = parseInt(g.year, 10);
-    const month = parseInt(g.month, 10);
-    const day = parseInt(g.day, 10);
+    const g = match.groups ?? {};
+    const { year: rawYear, month: rawMonth, day: rawDay } = namedGroups(match, 'year', 'month', 'day');
+    const year = parseInt(rawYear, 10);
+    const month = parseInt(rawMonth, 10);
+    const day = parseInt(rawDay, 10);
     const weekday = g.weekday || '';
     const hour = g.hour ? parseInt(g.hour, 10) : undefined;
     const minute = g.minute ? parseInt(g.minute, 10) : undefined;
@@ -73,9 +76,9 @@ export function getWeekdayName(date: Date, originalFormat: string): string {
 
     if (isRussian) {
         const days = isFull ? DAY_NAMES_FULL_RU : DAY_NAMES_SHORT_RU;
-        return days[dayIndex];
+        return at(days, dayIndex, 'weekday name');
     } else {
         const days = isFull ? DAY_NAMES_FULL_EN : DAY_NAMES_SHORT_EN;
-        return days[dayIndex];
+        return at(days, dayIndex, 'weekday name');
     }
 }

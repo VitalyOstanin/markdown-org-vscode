@@ -6,6 +6,7 @@ import { notifyError, notifyInfo, notifyWarn } from '../utils/notify';
 import { computeBlockDeletionCoords } from '../utils/blockDeletion';
 import { extractHeadingBlockLines } from '../utils/extractHeading';
 import { computeMaintainInsertion } from '../utils/maintainPromote';
+import { group } from '../utils/regexGroups';
 
 async function readIfExists(filePath: string): Promise<string | null> {
     try {
@@ -61,8 +62,8 @@ async function findHeadingAtCursor(editor: vscode.TextEditor): Promise<HeadingIn
     if (!match) {
         return null;
     }
-    const level = match[1].length;
-    const text = match[2];
+    const level = group(match, 1).length;
+    const text = group(match, 2);
     const content = extractHeadingContent(editor.document, headingLine, level);
     return { level, text, line: headingLine, content };
 }
@@ -84,9 +85,9 @@ function getAncestorChain(document: vscode.TextDocument, startLine: number, targ
         const line = document.lineAt(i).text;
         const match = line.match(/^(#+)\s+(.+)$/);
         if (match) {
-            const level = match[1].length;
+            const level = group(match, 1).length;
             if (level < currentLevel) {
-                ancestors.unshift({ level, text: match[2], line: i, content: [] });
+                ancestors.unshift({ level, text: group(match, 2), line: i, content: [] });
                 currentLevel = level;
                 if (level === 1) break;
             }

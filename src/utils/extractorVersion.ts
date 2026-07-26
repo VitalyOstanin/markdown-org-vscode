@@ -13,10 +13,12 @@
  * `extractor.ts`.
  */
 
+import { group } from './regexGroups';
+
 /** `markdown-org-extract 0.11.0` -> `0.11.0`. Undefined when unrecognised. */
 export function parseExtractorVersion(stdout: string): string | undefined {
     const m = /(\d+)\.(\d+)\.(\d+)/.exec(stdout ?? '');
-    return m ? `${m[1]}.${m[2]}.${m[3]}` : undefined;
+    return m ? `${group(m, 1)}.${group(m, 2)}.${group(m, 3)}` : undefined;
 }
 
 /**
@@ -25,9 +27,9 @@ export function parseExtractorVersion(stdout: string): string | undefined {
  * not part of the extractor's versioning scheme and are ignored.
  */
 export function compareVersions(a: string, b: string): number {
-    const parts = (v: string): number[] => {
+    const parts = (v: string): [number, number, number] => {
         const m = /(\d+)\.(\d+)\.(\d+)/.exec(v);
-        return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : [0, 0, 0];
+        return m ? [Number(group(m, 1)), Number(group(m, 2)), Number(group(m, 3))] : [0, 0, 0];
     };
     const [aMajor, aMinor, aPatch] = parts(a);
     const [bMajor, bMinor, bPatch] = parts(b);

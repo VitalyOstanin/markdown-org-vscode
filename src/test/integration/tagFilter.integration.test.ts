@@ -78,7 +78,7 @@ suite('Tag Filter Integration Tests', () => {
         await vscode.commands.executeCommand('markdown-org.cycleTag');
 
         const after = vscode.workspace.getConfiguration('markdown-org');
-        assert.strictEqual(after.get('currentTag'), baseFileTags[0].name);
+        assert.strictEqual(after.get('currentTag'), baseFileTags[0]!.name);
     });
 
     test('cycleTag warns when fileTags is empty', async function () {

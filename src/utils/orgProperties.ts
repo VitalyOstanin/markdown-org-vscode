@@ -42,15 +42,15 @@ export interface OrgPropertiesRange {
  */
 export function findOrgPropertiesBlock(lines: string[], headingLine: number): OrgPropertiesRange | null {
     let i = headingLine + 1;
-    while (i < lines.length && matchTimestampLine(lines[i])) {
+    while (i < lines.length && matchTimestampLine(lines[i] ?? '')) {
         i++;
     }
-    if (i >= lines.length || !OPEN_FENCE.test(lines[i])) {
+    if (i >= lines.length || !OPEN_FENCE.test(lines[i] ?? '')) {
         return null;
     }
     const startLine = i;
     i++;
-    while (i < lines.length && !CLOSE_FENCE.test(lines[i])) {
+    while (i < lines.length && !CLOSE_FENCE.test(lines[i] ?? '')) {
         i++;
     }
     if (i >= lines.length) {
@@ -103,7 +103,7 @@ export function computeOrgPropertiesEdit(
         return { startLine: existing.startLine, endLineExclusive: existing.endLineExclusive, blockLines };
     }
     let insertAt = headingLine + 1;
-    while (insertAt < lines.length && matchTimestampLine(lines[insertAt])) {
+    while (insertAt < lines.length && matchTimestampLine(lines[insertAt] ?? '')) {
         insertAt++;
     }
     return { startLine: insertAt, endLineExclusive: insertAt, blockLines };

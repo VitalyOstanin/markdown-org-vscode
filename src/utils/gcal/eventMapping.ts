@@ -1,5 +1,6 @@
 // Pure mapping from an org task to a Google Calendar event resource (no VS Code, no I/O).
 import type { Task } from '../../types';
+import { splitInto } from '../regexGroups';
 import type { GcalEventResource } from './types';
 import { repeaterToRrule } from './rrule';
 
@@ -24,16 +25,16 @@ export function isSyncable(task: Task): boolean {
 
 /** Add `n` whole days to an ISO `YYYY-MM-DD` date (pure, UTC-based). */
 export function addDaysToIsoDate(iso: string, n: number): string {
-    const [y, m, d] = iso.split('-').map((s) => parseInt(s, 10));
-    const dt = new Date(Date.UTC(y, m - 1, d));
+    const [y, m, d] = splitInto(iso, '-', 3);
+    const dt = new Date(Date.UTC(parseInt(y, 10), parseInt(m, 10) - 1, parseInt(d, 10)));
     dt.setUTCDate(dt.getUTCDate() + n);
     return dt.toISOString().slice(0, 10);
 }
 
 /** Add minutes to a wall-clock `date`/`HH:MM`, rolling the date if needed. */
 export function addMinutesToWallClock(date: string, time: string, minutes: number): { date: string; time: string } {
-    const [h, m] = time.split(':').map((s) => parseInt(s, 10));
-    const total = h * 60 + m + minutes;
+    const [h, m] = splitInto(time, ':', 2);
+    const total = parseInt(h, 10) * 60 + parseInt(m, 10) + minutes;
     const dayShift = Math.floor(total / 1440);
     const within = ((total % 1440) + 1440) % 1440;
     const nh = Math.floor(within / 60);
@@ -112,6 +113,6 @@ export function mapTaskToEvent(task: Task, orgId: string, opts: MapOptions): Gca
 }
 
 function toMinutes(time: string): number {
-    const [h, m] = time.split(':').map((s) => parseInt(s, 10));
-    return h * 60 + m;
+    const [h, m] = splitInto(time, ':', 2);
+    return parseInt(h, 10) * 60 + parseInt(m, 10);
 }

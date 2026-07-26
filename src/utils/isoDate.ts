@@ -7,11 +7,14 @@
  * well-formed but impossible day (`2026-02-30`) would only surface as an
  * extractor error much later.
  */
+import { splitInto } from './regexGroups';
+
 export function isIsoDate(value: string | undefined | null): boolean {
     if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
         return false;
     }
-    const [year, month, day] = value.split('-').map(Number);
+    const [rawYear, rawMonth, rawDay] = splitInto(value, '-', 3);
+    const [year, month, day] = [Number(rawYear), Number(rawMonth), Number(rawDay)];
     const date = new Date(year, month - 1, day);
     // Round-trip guards against overflow: `new Date(2026, 1, 30)` silently
     // becomes March 2, so a mismatch means the input named no such day.

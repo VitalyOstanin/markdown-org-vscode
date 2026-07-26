@@ -27,8 +27,9 @@
     "sourceMap": true,
     "strict": true,
     // Same as the host project: an optional property is absent or holds a
-    // value, never an explicit undefined.
+    // value, never an explicit undefined, and indexing yields `T | undefined`.
     "exactOptionalPropertyTypes": true,
+    "noUncheckedIndexedAccess": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
     "composite": true,

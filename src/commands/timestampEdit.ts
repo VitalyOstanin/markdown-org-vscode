@@ -10,6 +10,7 @@ import type { TimestampPart, ClockTimestampPart } from '../utils/timestampParts'
 import { getTimestampPartAt, getClockTimestampPartAt } from '../utils/timestampParts';
 import { cycleTimestampKeyword, normaliseBracket } from '../utils/toggleTimestampType';
 import { collectSiblingKeywords } from '../utils/headingScan';
+import { namedGroups } from '../utils/regexGroups';
 import { notifyWarn, notifyStatus } from '../utils/notify';
 
 const PRIORITY_A_CODE = 'A'.charCodeAt(0);
@@ -72,7 +73,8 @@ function getHeadingPartAtCursor(
     const match = lineText.match(HEADING_REGEX);
     if (!match?.groups) return null;
 
-    const { hashes, status, priority } = match.groups;
+    const { status, priority } = match.groups;
+    const { hashes } = namedGroups(match, 'hashes');
     const hashesEnd = hashes.length + 1;
 
     if (status) {
@@ -100,9 +102,9 @@ function getHeadingPartAtCursor(
 }
 
 function adjustHeadingPart(match: RegExpMatchArray, part: HeadingPart, delta: number): string {
-    const { hashes, status: rawStatus, priority: rawPriority, title } = match.groups!;
-    const status = rawStatus || '';
-    const priority = rawPriority || '';
+    const { hashes, title } = namedGroups(match, 'hashes', 'title');
+    const status = match.groups?.status || '';
+    const priority = match.groups?.priority || '';
 
     let newStatus = status;
     let newPriority = priority;
@@ -112,7 +114,7 @@ function adjustHeadingPart(match: RegExpMatchArray, part: HeadingPart, delta: nu
         const currentIndex = statuses.indexOf(status);
         if (currentIndex !== -1) {
             const newIndex = (currentIndex + delta + statuses.length) % statuses.length;
-            newStatus = statuses[newIndex];
+            newStatus = statuses[newIndex] ?? status;
         }
     } else if (part === 'priority') {
         if (/^\d+$/.test(priority)) {
@@ -148,18 +150,31 @@ function getTimestampAtCursor(
 }
 
 function adjustClockTimestamp(match: RegExpMatchArray, part: ClockTimestampPart, delta: number): string {
-    const g = match.groups!;
-    const indent = g.indent;
-    const startBracket = g.startOpenBracket;
+    const g = match.groups ?? {};
+    // The start half of a CLOCK line is mandatory in the pattern; the end half
+    // sits in an optional group and is read from `g` with that in mind.
+    const start = namedGroups(
+        match,
+        'indent',
+        'startOpenBracket',
+        'startYear',
+        'startMonth',
+        'startDay',
+        'startHour',
+        'startMinute',
+        'startWeekday'
+    );
+    const indent = start.indent;
+    const startBracket = start.startOpenBracket;
 
     const startDate = new Date(
-        parseInt(g.startYear, 10),
-        parseInt(g.startMonth, 10) - 1,
-        parseInt(g.startDay, 10),
-        parseInt(g.startHour, 10),
-        parseInt(g.startMinute, 10)
+        parseInt(start.startYear, 10),
+        parseInt(start.startMonth, 10) - 1,
+        parseInt(start.startDay, 10),
+        parseInt(start.startHour, 10),
+        parseInt(start.startMinute, 10)
     );
-    const startWeekday = g.startWeekday;
+    const startWeekday = start.startWeekday;
 
     // Adjust start date based on part
     if (part === 'start-year') startDate.setFullYear(startDate.getFullYear() + delta);
@@ -182,16 +197,28 @@ function adjustClockTimestamp(match: RegExpMatchArray, part: ClockTimestampPart,
         return `${indent}\`CLOCK: ${startTimestamp}\``;
     }
 
-    const endStartBracket = g.endOpenBracket;
+    // Past the guard above the whole optional group matched, so its members are
+    // read together the same way the start half is.
+    const end = namedGroups(
+        match,
+        'endOpenBracket',
+        'endYear',
+        'endMonth',
+        'endDay',
+        'endHour',
+        'endMinute',
+        'endWeekday'
+    );
+    const endStartBracket = end.endOpenBracket;
 
     const endDate = new Date(
-        parseInt(g.endYear, 10),
-        parseInt(g.endMonth, 10) - 1,
-        parseInt(g.endDay, 10),
-        parseInt(g.endHour, 10),
-        parseInt(g.endMinute, 10)
+        parseInt(end.endYear, 10),
+        parseInt(end.endMonth, 10) - 1,
+        parseInt(end.endDay, 10),
+        parseInt(end.endHour, 10),
+        parseInt(end.endMinute, 10)
     );
-    const endWeekday = g.endWeekday;
+    const endWeekday = end.endWeekday;
 
     // Adjust end date based on part
     if (part === 'end-year') endDate.setFullYear(endDate.getFullYear() + delta);

@@ -10,6 +10,7 @@ import { CLOCK_REGEX, TIMESTAMP_LINE_REGEX } from '../orgPatterns';
 import { notifyWarn } from '../utils/notify';
 import { roundTime, roundEndTime } from '../utils/clockRounding';
 import { findClockLinesInLines } from '../utils/findClockLines';
+import { group, namedGroups } from '../utils/regexGroups';
 
 function formatTimestamp(date: Date): string {
     return formatOrgTimestamp(date, 'square');
@@ -66,8 +67,9 @@ export async function insertClockStart() {
     const newLine = `${indent}\`CLOCK: ${timestamp}\``;
 
     let insertLine: number;
-    if (clockLines.length > 0) {
-        insertLine = clockLines[clockLines.length - 1] + 1;
+    const lastClockLine = clockLines.at(-1);
+    if (lastClockLine !== undefined) {
+        insertLine = lastClockLine + 1;
     } else {
         let lastTimestampLine = headingLine;
         for (let i = headingLine + 1; i < editor.document.lineCount; i++) {
@@ -114,7 +116,13 @@ export async function insertClockFinish() {
         return;
     }
 
-    const { indent, startYear: y, startMonth: m, startDay: d, startBody } = match.groups;
+    const {
+        indent,
+        startYear: y,
+        startMonth: m,
+        startDay: d,
+        startBody
+    } = namedGroups(match, 'indent', 'startYear', 'startMonth', 'startDay', 'startBody');
     const startYear = parseInt(y, 10);
     const startMonth = parseInt(m, 10);
     const startDay = parseInt(d, 10);
@@ -123,8 +131,8 @@ export async function insertClockFinish() {
     if (!timeMatch) {
         return;
     }
-    const startHour = parseInt(timeMatch[1], 10);
-    const startMinute = parseInt(timeMatch[2], 10);
+    const startHour = parseInt(group(timeMatch, 1), 10);
+    const startMinute = parseInt(group(timeMatch, 2), 10);
     const startDate = new Date(startYear, startMonth - 1, startDay, startHour, startMinute);
 
     const config = vscode.workspace.getConfiguration('markdown-org');

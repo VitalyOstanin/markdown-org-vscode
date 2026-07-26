@@ -1,5 +1,6 @@
 import { CLOCK_REGEX, HEADING_REGEX } from '../orgPatterns';
 import { findClockLinesInLines } from './findClockLines';
+import { namedGroups } from './regexGroups';
 
 export interface ClockTableRow {
     title: string;
@@ -34,7 +35,7 @@ export function parseClockEntries(text: string): ClockTableRow[] {
     const rows: ClockTableRow[] = [];
 
     for (let i = 0; i < lines.length; i++) {
-        const headingMatch = lines[i].match(HEADING_REGEX);
+        const headingMatch = (lines[i] ?? '').match(HEADING_REGEX);
         if (!headingMatch?.groups) {
             continue;
         }
@@ -42,7 +43,7 @@ export function parseClockEntries(text: string): ClockTableRow[] {
         const clockLineIndices = findClockLinesInLines(lines, i);
         let totalMinutes = 0;
         for (const idx of clockLineIndices) {
-            const clockMatch = lines[idx].match(CLOCK_REGEX);
+            const clockMatch = (lines[idx] ?? '').match(CLOCK_REGEX);
             if (!clockMatch?.groups) {
                 continue;
             }
@@ -67,7 +68,7 @@ export function parseClockEntries(text: string): ClockTableRow[] {
         }
 
         if (totalMinutes > 0) {
-            rows.push({ title: headingMatch.groups.title, totalMinutes });
+            rows.push({ title: namedGroups(headingMatch, 'title').title, totalMinutes });
         }
     }
 

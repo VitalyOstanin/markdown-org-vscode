@@ -78,14 +78,14 @@ function tokenRun(seq: { token: string; expiresIn: number }[]): { run: DbusRun; 
     const methods: string[] = [];
     let i = 0;
     const run: DbusRun = async (_file, args) => {
-        const method = args[args.length - 1];
+        const method = args[args.length - 1]!;
         methods.push(method);
         if (method === 'EnsureCredentials') {
             return { stdout: JSON.stringify({ type: '(i)', data: [60] }), stderr: '', code: 0 };
         }
         const cur = seq[Math.min(i, seq.length - 1)];
         i++;
-        return { stdout: JSON.stringify({ type: '(si)', data: [cur.token, cur.expiresIn] }), stderr: '', code: 0 };
+        return { stdout: JSON.stringify({ type: '(si)', data: [cur!.token, cur!.expiresIn] }), stderr: '', code: 0 };
     };
     return { run, calls: () => methods };
 }

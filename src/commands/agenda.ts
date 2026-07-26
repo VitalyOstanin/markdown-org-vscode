@@ -86,7 +86,9 @@ export async function showAgenda(
             const currentTag = config.get<string>('currentTag', 'ALL');
             const fileTags = config.get<FileTag[]>('fileTags', []);
             const data = filterTasksByTag(rawData, currentTag, fileTags);
-            const year = anchor ? parseInt(anchor.split('-')[0], 10) : new Date().getFullYear();
+            // `anchor` is an ISO date when set, so the year is its first part;
+            // an unexpected shape parses to NaN exactly as it did before.
+            const year = anchor ? parseInt(anchor.split('-')[0] ?? '', 10) : new Date().getFullYear();
 
             return { data, currentTag, holidays: await getHolidays(year) };
         } catch (error) {

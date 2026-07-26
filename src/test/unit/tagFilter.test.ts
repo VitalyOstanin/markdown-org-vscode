@@ -135,26 +135,26 @@ suite('Tag Filter Unit Tests', () => {
             assert.strictEqual(result.length, 1);
             const r = result[0];
             assert.deepStrictEqual(
-                r.overdue.map((t) => t.file),
+                r!.overdue.map((t) => t.file),
                 [T_WORK.file]
             );
             assert.deepStrictEqual(
-                r.scheduled_timed.map((t) => t.file),
+                r!.scheduled_timed.map((t) => t.file),
                 []
             );
             assert.deepStrictEqual(
-                r.scheduled_no_time.map((t) => t.file),
+                r!.scheduled_no_time.map((t) => t.file),
                 []
             );
             assert.deepStrictEqual(
-                r.upcoming.map((t) => t.file),
+                r!.upcoming.map((t) => t.file),
                 [T_WORK.file]
             );
         });
 
         test('preserves the date field on filtered days', () => {
             const result = filterTasksByTag(dayAgenda(TASKS), 'WORK', TAGS) as DayAgenda[];
-            assert.strictEqual(result[0].date, '2025-12-09');
+            assert.strictEqual(result[0]!.date, '2025-12-09');
         });
 
         test('an empty input returns an empty array (Task[] branch is taken without crashing)', () => {
@@ -174,12 +174,12 @@ suite('Tag Filter Unit Tests', () => {
             const result = filterTasksByTag([partialDay], 'WORK', TAGS) as DayAgenda[];
             assert.strictEqual(result.length, 1);
             assert.deepStrictEqual(
-                result[0].scheduled_timed.map((t) => t.file),
+                result[0]!.scheduled_timed.map((t) => t.file),
                 [T_WORK.file]
             );
-            assert.deepStrictEqual(result[0].overdue, []);
-            assert.deepStrictEqual(result[0].scheduled_no_time, []);
-            assert.deepStrictEqual(result[0].upcoming, []);
+            assert.deepStrictEqual(result[0]!.overdue, []);
+            assert.deepStrictEqual(result[0]!.scheduled_no_time, []);
+            assert.deepStrictEqual(result[0]!.upcoming, []);
         });
     });
 });

@@ -68,8 +68,8 @@ suite('buildTaskGroups', () => {
                 ['none', 'No priority', 1]
             ]
         );
-        assert.strictEqual(groups[0].items[0].heading, 'a');
-        assert.strictEqual(groups[3].items[0].heading, 'plain');
+        assert.strictEqual(groups[0]!.items[0]!.heading, 'a');
+        assert.strictEqual(groups[3]!.items[0]!.heading, 'plain');
     });
 
     test('empty groups are dropped so no "(0)" panel is rendered', () => {
@@ -78,7 +78,7 @@ suite('buildTaskGroups', () => {
             groups.map((g) => g.key),
             ['b']
         );
-        assert.strictEqual(groups[0].items.length, 2);
+        assert.strictEqual(groups[0]!.items.length, 2);
     });
 
     test('input order is preserved inside a group', () => {
@@ -87,7 +87,7 @@ suite('buildTaskGroups', () => {
             GROUPS
         );
         assert.deepStrictEqual(
-            groups[0].items.map((t) => t.heading),
+            groups[0]!.items.map((t) => t.heading),
             ['first', 'second']
         );
     });

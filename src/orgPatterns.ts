@@ -31,11 +31,11 @@ export interface TimestampLineMatch {
 export function matchTimestampLine(text: string): TimestampLineMatch | null {
     const m = text.match(TIMESTAMP_LINE_REGEX);
     if (!m?.groups) return null;
-    const indent = m.groups.indent;
-    if (m.groups.schedTs) return { indent, type: 'SCHEDULED', timestamp: m.groups.schedTs, active: true };
-    if (m.groups.deadTs) return { indent, type: 'DEADLINE', timestamp: m.groups.deadTs, active: true };
-    if (m.groups.closedTs) return { indent, type: 'CLOSED', timestamp: m.groups.closedTs, active: false };
-    if (m.groups.createdTs) return { indent, type: 'CREATED', timestamp: m.groups.createdTs, active: false };
+    const { indent, schedTs, deadTs, closedTs, createdTs } = m.groups;
+    if (schedTs) return { indent: indent ?? '', type: 'SCHEDULED', timestamp: schedTs, active: true };
+    if (deadTs) return { indent: indent ?? '', type: 'DEADLINE', timestamp: deadTs, active: true };
+    if (closedTs) return { indent: indent ?? '', type: 'CLOSED', timestamp: closedTs, active: false };
+    if (createdTs) return { indent: indent ?? '', type: 'CREATED', timestamp: createdTs, active: false };
     return null;
 }
 

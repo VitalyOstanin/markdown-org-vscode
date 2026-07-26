@@ -204,7 +204,7 @@ suite('Timestamp Integration Tests', () => {
             const englishDays = new Set(['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']);
             const match = inserted.match(/<\d{4}-\d{2}-\d{2}\s+(\S+)\s/);
             assert.ok(match, `cannot extract weekday from: ${inserted}`);
-            assert.ok(englishDays.has(match[1]), `weekday "${match[1]}" is not an English short name`);
+            assert.ok(englishDays.has(match[1]!), `weekday "${match[1]}" is not an English short name`);
         } finally {
             await cfg.update('weekdayLocale', undefined, vscode.ConfigurationTarget.Workspace);
         }
@@ -224,7 +224,7 @@ suite('Timestamp Integration Tests', () => {
         const russianDays = new Set(['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб']);
         const match = inserted.match(/<\d{4}-\d{2}-\d{2}\s+(\S+)\s/);
         assert.ok(match, `cannot extract weekday from: ${inserted}`);
-        assert.ok(russianDays.has(match[1]), `weekday "${match[1]}" should default to Russian`);
+        assert.ok(russianDays.has(match[1]!), `weekday "${match[1]}" should default to Russian`);
     });
 
     // Repeater preservation across day-shift commands: all three prefixes

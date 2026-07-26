@@ -653,7 +653,9 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
     }
 
     function parseLocalDate(str: string): Date {
-        const [y, m, d] = str.split('-').map(Number);
+        // The page only ever parses dates the extractor emitted, so the three
+        // parts are there; zeros keep the reader total instead of asserting it.
+        const [y = 0, m = 1, d = 1] = str.split('-').map(Number);
         return new Date(y, m - 1, d);
     }
 

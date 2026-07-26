@@ -38,6 +38,8 @@ const UNIT_TO_FREQ: Record<string, string> = {
  *   returns `undefined` (the event stays one-shot).
  * - anything unrecognised (bad shape, `N < 1`) returns `undefined`.
  */
+import { group } from '../regexGroups';
+
 export function repeaterToRrule(repeater: string | undefined): string[] | undefined {
     if (!repeater) {
         return undefined;
@@ -46,8 +48,8 @@ export function repeaterToRrule(repeater: string | undefined): string[] | undefi
     if (!m) {
         return undefined;
     }
-    const n = parseInt(m[1], 10);
-    const unit = m[2];
+    const n = parseInt(group(m, 1), 10);
+    const unit = group(m, 2);
     // n comes from the matched `\d+`, so it always parses; only a zero step
     // (`+0d`) needs rejecting.
     if (n < 1) {

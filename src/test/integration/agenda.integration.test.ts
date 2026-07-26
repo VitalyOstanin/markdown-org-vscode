@@ -131,7 +131,7 @@ suite('Agenda Show Integration Tests', () => {
         const args = agendaCall.args[1] as string[];
         const currentDateIndex = args.indexOf('--current-date');
         assert.notStrictEqual(currentDateIndex, -1, `extractor args missing --current-date: ${args.join(' ')}`);
-        assert.match(args[currentDateIndex + 1], /^\d{4}-\d{2}-\d{2}$/);
+        assert.match(args[currentDateIndex + 1]!, /^\d{4}-\d{2}-\d{2}$/);
         // The anchor stays the requested date, so the two flags carry different
         // values here -- which is exactly why both are needed.
         const dateIndex = args.indexOf('--date');
@@ -489,7 +489,7 @@ suite('Agenda Show Integration Tests', () => {
 
         const depsCall = html.match(/\},\s*\{ ([A-Za-z0-9_, ]+) \}\);/);
         assert.ok(depsCall, 'expected the script to call the client with a shorthand helper object');
-        const names = depsCall[1].split(',').map((n) => n.trim());
+        const names = depsCall[1]!.split(',').map((n) => n.trim());
         assert.ok(names.length >= 20, `expected the full helper set, got ${names.length}: ${names.join(', ')}`);
         for (const name of names) {
             assert.ok(
@@ -513,6 +513,16 @@ suite('Agenda Show Integration Tests', () => {
         assert.ok(
             !/\bexports\./.test(html),
             'inlined sources must not reference module exports (they are undefined in the page)'
+        );
+
+        // The same hazard from the other side: a body that CALLS an import
+        // arrives as `moduleName_1.fn(...)`, the alias the CommonJS emit gives
+        // every imported module. `formatDayHeaderParts` once picked up a helper
+        // that way and the page died with "regexGroups_1 is not defined".
+        const importAlias = /\b([A-Za-z_$][\w$]*)_\d+\./.exec(html);
+        assert.ok(
+            !importAlias,
+            `inlined sources must not call imports (they are undefined in the page); found ${importAlias?.[0]}`
         );
     });
 
@@ -706,7 +716,7 @@ suite('AgendaPanel.openTaskInEditor', () => {
         await AgendaPanel.openTaskInEditor(missing, 1);
         const calls = showErrorStub.getCalls().map((c) => String(c.args[0]));
         assert.strictEqual(calls.length, 1, 'expected exactly one error message');
-        assert.ok(calls[0].includes('failed to open'), `unexpected error message: ${calls[0]}`);
+        assert.ok(calls[0]!.includes('failed to open'), `unexpected error message: ${calls[0]}`);
     });
 });
 

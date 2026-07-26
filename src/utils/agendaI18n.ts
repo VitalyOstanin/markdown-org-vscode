@@ -256,7 +256,9 @@ export function formatString(template: string, ...values: string[]): string {
  * dates already do), then the editor display language, then English.
  */
 export function resolveUiLanguage(setting: string, dateLocale: string, displayLanguage: string): UiLanguage {
-    const normalize = (value: string): string => (value || '').trim().toLowerCase().split(/[-_]/)[0];
+    // `split` always yields at least one element, so the `??` is unreachable;
+    // it stands in for an assertion the compiler cannot make on its own.
+    const normalize = (value: string): string => (value || '').trim().toLowerCase().split(/[-_]/)[0] ?? '';
     const explicit = normalize(setting);
     if (explicit && explicit !== 'auto') {
         return (UI_LANGUAGES as string[]).includes(explicit) ? (explicit as UiLanguage) : 'en';

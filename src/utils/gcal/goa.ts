@@ -1,3 +1,4 @@
+import { at } from '../exactIndex';
 import { busctlCall, gdbusGetAccessToken, BusctlMissingError, type DbusRun } from './dbus';
 import type { AccessTokenProvider } from './accessToken';
 
@@ -68,7 +69,7 @@ export function resolveGoaAccount(accounts: GoaAccount[], setting: string): GoaA
             : { needsPick: false, error: `GOA account "${want}" not found` };
     }
     if (accounts.length === 1) {
-        return { account: accounts[0], needsPick: false };
+        return { account: at(accounts, 0, 'account'), needsPick: false };
     }
     return { needsPick: true };
 }

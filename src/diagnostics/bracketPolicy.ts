@@ -4,6 +4,8 @@
  * `vscode.Diagnostic` / `vscode.CodeAction` lives in `./timestampBrackets.ts`.
  */
 
+import { namedGroups } from '../utils/regexGroups';
+
 type Policy = 'active' | 'inactive';
 
 const KEYWORD_POLICY: Record<string, Policy> = {
@@ -53,12 +55,12 @@ export interface BracketViolation {
  */
 export function validateLines(lines: string[]): BracketViolation[] {
     const violations: BracketViolation[] = [];
-    for (let line = 0; line < lines.length; line++) {
-        const violation = validateLine(lines[line], line);
+    lines.forEach((text, line) => {
+        const violation = validateLine(text, line);
         if (violation) {
             violations.push(violation);
         }
-    }
+    });
     return violations;
 }
 
@@ -66,10 +68,7 @@ function validateLine(text: string, line: number): BracketViolation | null {
     const m = text.match(LENIENT_LINE_REGEX);
     if (!m?.groups) return null;
 
-    const keyword = m.groups.type;
-    const open = m.groups.open;
-    const close = m.groups.close;
-    const inner = m.groups.inner;
+    const { type: keyword, open, close, inner } = namedGroups(m, 'type', 'open', 'close', 'inner');
 
     const requiredPolicy = KEYWORD_POLICY[keyword];
     if (!requiredPolicy) return null;

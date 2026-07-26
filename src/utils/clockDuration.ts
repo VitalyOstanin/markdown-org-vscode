@@ -4,11 +4,12 @@
 // and render "NaN:NaN" in the clock table.
 export function parseClockDuration(duration: string): number {
     const parts = duration.split(':');
-    if (parts.length !== 2) {
+    const [rawHours, rawMins] = parts;
+    if (parts.length !== 2 || rawHours === undefined || rawMins === undefined) {
         return 0;
     }
-    const hours = parseInt(parts[0], 10);
-    const mins = parseInt(parts[1], 10);
+    const hours = parseInt(rawHours, 10);
+    const mins = parseInt(rawMins, 10);
     if (!Number.isFinite(hours) || !Number.isFinite(mins)) {
         return 0;
     }

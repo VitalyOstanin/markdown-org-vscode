@@ -38,8 +38,8 @@ export function recallScroll(history: ScrollMemory, anchor: string): number | nu
     if (!anchor) {
         return null;
     }
-    if (Object.prototype.hasOwnProperty.call(history, anchor)) {
-        return history[anchor];
+    if (!Object.prototype.hasOwnProperty.call(history, anchor)) {
+        return null;
     }
-    return null;
+    return history[anchor] ?? null;
 }

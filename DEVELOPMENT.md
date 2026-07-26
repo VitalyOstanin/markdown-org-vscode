@@ -129,12 +129,24 @@ because `--fix` will rewrite the imports otherwise:
   imports and self-imports; `no-unresolved` stays off, since `npm run typecheck`
   already resolves every specifier.
 
-One more rule comes from the compiler rather than the linter:
+Two more rules come from the compiler rather than the linter.
+
 `exactOptionalPropertyTypes` is on, so `{ x: undefined }` no longer satisfies
 `{ x?: T }`. Declare `x?: T | undefined` when the field really does accept an
 explicit undefined (a slot cleared with `= undefined`, an option passed straight
 through); otherwise leave the key out, which is also what the extractor's JSON
 does for a field it did not emit.
+
+`noUncheckedIndexedAccess` is on, so indexing an array or a record yields
+`T | undefined`. Handle it where it can happen -- a line index, `arr.at(-1)`, a
+record read by key (and keep the `hasOwnProperty` guard when inherited keys
+matter). Where a pattern already guarantees the read, say so through
+`src/utils/regexGroups.ts` (`group`, `namedGroups`, `splitInto`) or
+`src/utils/exactIndex.ts` (`at`) rather than asserting with `!`: they throw when
+the guarantee turns out to be false. Tests are the exception -- there `!` is the
+house style, since the value comes from the fixture. Helpers inlined into the
+agenda page are the other exception: their bodies travel through
+`Function.prototype.toString()`, so they must not call an import at all.
 
 ## Debug
 

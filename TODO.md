@@ -308,21 +308,31 @@
       with jsdom unit tests (the established route), or collect V8 coverage from
       the webview process and merge it into the report.
 
-- [ ] Turn on the remaining strict TypeScript option: `noUncheckedIndexedAccess`
-    - `noImplicitOverride` was free; `exactOptionalPropertyTypes` is on as of
-      2026-07-26 (both projects). What is left is `noUncheckedIndexedAccess`
-      (~216 errors, a large share of them indexed access in tests).
-    - How `exactOptionalPropertyTypes` was closed, since the same shapes recur:
-      43 errors in the host project, none in the webview one. Roughly half were
-      class fields cleared with `= undefined` (`agendaPanel`, `mutex`), fixed by
-      declaring them `?: T | undefined`. Most of the rest were declarations that
-      always meant "absent or a value" -- `HeadingParts.status`,
-      `OrgTimestampOptions.weekday`, `SyncChange.date`, `CallOptions.signal`,
-      `TokenResponse.refreshToken` -- widened the same way. Three were genuine:
-      a `body: ... : undefined` in a `fetch` init and an `id: undefined`
-      placeholder became conditional spreads / an omitted key, and the fixtures
-      that spelled a missing extractor field as `undefined` now drop the key,
-      which is what the JSON they stand in for actually does.
+- [x] Turn on the remaining strict TypeScript option: `noUncheckedIndexedAccess`
+    - On in both projects as of 2026-07-26, which completes the strict set:
+      `noImplicitOverride` was free, `exactOptionalPropertyTypes` landed the same
+      day. 236 errors in the host project and 3 in the webview one.
+    - Capture groups were the largest family (~121 sites) and the only one where
+      the compiler was wrong: a group the pattern does not mark optional is
+      filled whenever the pattern matched. `src/utils/regexGroups.ts` reads those
+      -- `group(match, n)`, `namedGroups(match, ...keys)`, plus `splitInto` for
+      strings a pattern has already vouched for -- and throws when a group the
+      pattern promised is missing, rather than falling back to an empty string.
+      `src/utils/exactIndex.ts` does the same for a table lookup an invariant
+      next to the call already bounds (a weekday 0..6 into a seven-entry table).
+    - The other families were the point of the option: an index into a line
+      array, `arr[arr.length - 1]`, a record read by key. Those got real checks,
+      `.at(-1)`, or an iteration that never indexes.
+    - Tests assert with `!`: the value is guaranteed by the fixture, and a
+      failure there reads as a test failure either way. 116 of the 127 were
+      inserted mechanically from the compiler's own positions.
+    - Two things the suites caught, both worth keeping in mind: reading a record
+      by key is not the same as `hasOwnProperty` (dropping the guard in
+      `recallScroll` let an inherited `Object.prototype` key through), and a
+      helper whose source is inlined into the agenda page must not call an
+      import -- `formatDayHeaderParts` picked one up and the page died with
+      `regexGroups_1 is not defined`. The integration suite now trips on that
+      alias pattern the same way it already trips on `exports.`.
 
 - [x] Adopt `eslint-plugin-import-x`
     - Added with `eslint-import-resolver-typescript` (without a resolver

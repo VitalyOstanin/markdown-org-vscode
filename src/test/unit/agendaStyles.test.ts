@@ -64,11 +64,11 @@ suite('AGENDA_STYLES theming invariant', () => {
     test('.task-line grid declares one column per rendered cell', () => {
         const m = AGENDA_STYLES.match(/\.task-line\s*\{[^}]*grid-template-columns:\s*([^;]+);/);
         assert.ok(m, 'expected a grid-template-columns rule for .task-line');
-        const tracks = m[1].trim().split(/\s+/);
+        const tracks = m[1]!.trim().split(/\s+/);
         assert.strictEqual(
             tracks.length,
             6,
-            `.task-line must have 6 columns (one per rendered cell), found ${tracks.length}: ${m[1].trim()}`
+            `.task-line must have 6 columns (one per rendered cell), found ${tracks.length}: ${m[1]!.trim()}`
         );
     });
 
@@ -216,12 +216,12 @@ suite('AGENDA_STYLES shape and type-scale invariant', () => {
         const shared = AGENDA_STYLES.match(/\.task-count,\s*\.day-section-count\s*\{([^}]*)\}/);
         assert.ok(shared, 'expected one rule declaring .task-count and .day-section-count together');
         for (const prop of ['min-width', 'border-radius', 'font-size', 'padding']) {
-            assert.ok(shared[1].includes(prop + ':'), `expected ${prop} on the shared count-chip rule`);
+            assert.ok(shared[1]!.includes(prop + ':'), `expected ${prop} on the shared count-chip rule`);
         }
         // Neither of the two may re-declare the shape in its own rule -- the
         // one whose selector is exactly that class, not the shared pair.
         const rules = [...AGENDA_STYLES.matchAll(/([^{}]+)\{([^}]*)\}/g)].map((m) => ({
-            selector: m[1].replace(/\/\*[\s\S]*?\*\//g, '').trim(),
+            selector: m[1]!.replace(/\/\*[\s\S]*?\*\//g, '').trim(),
             body: m[2]
         }));
         for (const cls of ['.task-count', '.day-section-count']) {
@@ -229,7 +229,7 @@ suite('AGENDA_STYLES shape and type-scale invariant', () => {
             assert.ok(own, `expected a placement rule for ${cls}`);
             for (const prop of ['min-width', 'border-radius', 'font-size']) {
                 assert.strictEqual(
-                    own.body.includes(prop + ':'),
+                    own.body!.includes(prop + ':'),
                     false,
                     `${cls} must inherit ${prop} from the shared chip rule`
                 );
@@ -239,7 +239,7 @@ suite('AGENDA_STYLES shape and type-scale invariant', () => {
 
     test('the compact header only resizes the header, it hides nothing', () => {
         const rules = [...AGENDA_STYLES.matchAll(/([^{}]+)\{([^}]*)\}/g)]
-            .map((m) => ({ selector: m[1].replace(/\/\*[\s\S]*?\*\//g, '').trim(), body: m[2] }))
+            .map((m) => ({ selector: m[1]!.replace(/\/\*[\s\S]*?\*\//g, '').trim(), body: m[2] }))
             .filter((r) => r.selector.startsWith('body.compact-header'));
         assert.ok(rules.length > 0, 'expected the compact-header block');
         for (const rule of rules) {
@@ -247,13 +247,13 @@ suite('AGENDA_STYLES shape and type-scale invariant', () => {
             // control in compact mode would make it reachable only by resizing
             // the panel, and `auto` resizes it without asking.
             assert.ok(
-                !/(display:\s*none|visibility:\s*hidden)/.test(rule.body),
+                !/(display:\s*none|visibility:\s*hidden)/.test(rule.body!),
                 `${rule.selector} must not hide anything in compact mode`
             );
         }
         // The header itself has to shrink, otherwise the class buys nothing.
         assert.ok(
-            rules.some((r) => r.selector === 'body.compact-header .agenda-header' && r.body.includes('padding:')),
+            rules.some((r) => r.selector === 'body.compact-header .agenda-header' && r.body!.includes('padding:')),
             'expected the compact header to tighten its own padding'
         );
     });
@@ -262,7 +262,7 @@ suite('AGENDA_STYLES shape and type-scale invariant', () => {
         const rule = AGENDA_STYLES.match(/((?:\.[a-z-]+:focus-visible,\s*)+\.[a-z-]+:focus-visible)\s*\{/);
         assert.ok(rule, 'expected a single :focus-visible rule listing the interactive classes');
         for (const cls of ['.nav-btn', '.seg-item', '.tag-menu-btn', '.tag-menu-item', '.calendar-day']) {
-            assert.ok(rule[1].includes(`${cls}:focus-visible`), `${cls} must be covered by the shared focus ring`);
+            assert.ok(rule[1]!.includes(`${cls}:focus-visible`), `${cls} must be covered by the shared focus ring`);
         }
     });
 });

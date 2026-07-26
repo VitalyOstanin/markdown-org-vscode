@@ -1,5 +1,6 @@
 import { HEADING_REGEX, matchTimestampLine } from '../orgPatterns';
 import { getTimestampPartAt, getClockTimestampPartAt } from './timestampParts';
+import { namedGroups } from './regexGroups';
 
 /**
  * Whether Shift+Up/Down on `character` of `lineText` would act on something
@@ -77,7 +78,8 @@ function isOnHeadingStatusOrPriority(lineText: string, character: number): boole
     const match = lineText.match(HEADING_REGEX);
     if (!match?.groups) return false;
 
-    const { hashes, status, priority } = match.groups;
+    const { status, priority } = match.groups;
+    const { hashes } = namedGroups(match, 'hashes');
     const hashesEnd = hashes.length + 1;
 
     if (status) {

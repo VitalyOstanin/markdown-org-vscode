@@ -37,8 +37,8 @@ suite('Month View Integration Tests', () => {
         });
 
         assert.strictEqual(daysWithTasks.length, 2);
-        assert.strictEqual(daysWithTasks[0].date, '2025-12-01');
-        assert.strictEqual(daysWithTasks[1].date, '2025-12-06');
+        assert.strictEqual(daysWithTasks[0]!.date, '2025-12-01');
+        assert.strictEqual(daysWithTasks[1]!.date, '2025-12-06');
     });
 
     test('should correctly calculate first day of month', () => {

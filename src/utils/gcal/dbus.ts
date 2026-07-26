@@ -1,4 +1,5 @@
 import { exec } from '../exec';
+import { group } from '../regexGroups';
 
 /** Run a subprocess and resolve with its stdout/stderr and exit/error code.
  *  `code` is the numeric exit code, or a string error code like 'ENOENT' when
@@ -81,5 +82,5 @@ export async function gdbusGetAccessToken(run: DbusRun, objectPath: string): Pro
     if (!m) {
         throw new Error('gdbus GetAccessToken: unexpected output');
     }
-    return [m[1], Number(m[2])];
+    return [group(m, 1), Number(group(m, 2))];
 }

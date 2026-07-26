@@ -60,7 +60,8 @@ export function normalizeAgendaTaskTypes(data: AgendaData): AgendaData {
     // плоский `Task` — нет. Пустой массив идёт по ветке `Task[]`; это безопасно,
     // т.к. для обоих режимов (`--agenda` без дней и `--tasks` без задач) результат
     // отображения пустого списка — снова `[]`, наблюдаемо идентично.
-    if (data.length > 0 && 'date' in data[0]) {
+    const first = data[0];
+    if (first !== undefined && 'date' in first) {
         return (data as DayAgenda[]).map((day) => ({
             ...day,
             overdue: (day.overdue ?? []).map<TaskWithOffset>(normalizeTask),

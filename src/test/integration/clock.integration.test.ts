@@ -53,7 +53,7 @@ suite('CLOCK Integration Tests', () => {
 
         assert.strictEqual(lines[0], '## TODO Test task');
         assert.strictEqual(lines[1], '`CREATED: [2025-12-09 Пн 10:00]`');
-        assert.match(lines[2], /^`CLOCK: \[\d{4}-\d{2}-\d{2} [^\]]+\]`$/);
+        assert.match(lines[2]!, /^`CLOCK: \[\d{4}-\d{2}-\d{2} [^\]]+\]`$/);
     });
 
     test('Insert CLOCK start with 30 minute rounding', async () => {
@@ -68,10 +68,10 @@ suite('CLOCK Integration Tests', () => {
         const lines = text.split('\n');
 
         const clockLine = lines[2];
-        const match = clockLine.match(/`CLOCK: \[\d{4}-\d{2}-\d{2} [^\s]+ (\d{2}):(\d{2})\]`$/);
+        const match = clockLine!.match(/`CLOCK: \[\d{4}-\d{2}-\d{2} [^\s]+ (\d{2}):(\d{2})\]`$/);
         assert.ok(match, 'CLOCK line should match expected format');
 
-        const minutes = parseInt(match[2], 10);
+        const minutes = parseInt(match[2]!, 10);
         assert.ok(minutes === 0 || minutes === 30, `Minutes should be 0 or 30, got ${minutes}`);
     });
 
@@ -90,7 +90,7 @@ suite('CLOCK Integration Tests', () => {
         const text = editor.document.getText();
         const lines = text.split('\n');
 
-        const clockLine = lines[2];
+        const clockLine = lines[2]!;
         assert.match(clockLine, /^`CLOCK: \[\d{4}-\d{2}-\d{2} [^\]]+\]--\[\d{4}-\d{2}-\d{2} [^\]]+\] => +\d+:\d{2}`$/);
     });
 
@@ -119,11 +119,11 @@ suite('CLOCK Integration Tests', () => {
         const lines = text.split('\n');
 
         const clockLine = lines[2];
-        const match = clockLine.match(/=> +(\d+):(\d{2})`$/);
+        const match = clockLine!.match(/=> +(\d+):(\d{2})`$/);
         assert.ok(match, 'Should have duration');
 
-        const hours = parseInt(match[1], 10);
-        const minutes = parseInt(match[2], 10);
+        const hours = parseInt(match[1]!, 10);
+        const minutes = parseInt(match[2]!, 10);
         const totalMinutes = hours * 60 + minutes;
 
         assert.ok(totalMinutes > 0, 'Duration should be greater than zero');
@@ -178,8 +178,8 @@ suite('CLOCK Integration Tests', () => {
         const text = editor.document.getText();
         const lines = text.split('\n');
 
-        assert.match(lines[2], /`CLOCK: \[2025-12-09 [^\]]+\]--\[2025-12-09 [^\]]+\] => +1:00`/);
-        assert.match(lines[3], /^`CLOCK: \[\d{4}-\d{2}-\d{2} [^\]]+\]`$/);
+        assert.match(lines[2]!, /`CLOCK: \[2025-12-09 [^\]]+\]--\[2025-12-09 [^\]]+\] => +1:00`/);
+        assert.match(lines[3]!, /^`CLOCK: \[\d{4}-\d{2}-\d{2} [^\]]+\]`$/);
     });
 
     test('CLOCK entries placed after timestamps', async () => {
@@ -195,7 +195,7 @@ suite('CLOCK Integration Tests', () => {
 
         assert.strictEqual(lines[3], '## TODO Another task');
         assert.strictEqual(lines[4], '`SCHEDULED: <2025-12-10 Вт 14:00>`');
-        assert.match(lines[5], /^`CLOCK: \[\d{4}-\d{2}-\d{2} [^\]]+\]`$/);
+        assert.match(lines[5]!, /^`CLOCK: \[\d{4}-\d{2}-\d{2} [^\]]+\]`$/);
     });
 
     test('Multiple CLOCK entries can exist', async () => {

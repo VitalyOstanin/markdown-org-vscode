@@ -106,7 +106,7 @@ suite('gcal/calendarClient', () => {
     test('deleteEvent ignores 404/410', async () => {
         const r = recorder(() => ({ status: 404, body: {} }));
         await deleteEvent(r.fn, token, 'cal', 'eid'); // must not throw
-        assert.equal(r.calls[0].method, 'DELETE');
+        assert.equal(r.calls[0]!.method, 'DELETE');
     });
 
     test('call retries once on 401 with a forced token refresh', async () => {
@@ -182,7 +182,7 @@ suite('gcal/calendarClient', () => {
             assert.equal(r.calls.length, 2);
             // Not less than what the server asked for, and no more than the
             // jitter (up to one base interval) can add on top.
-            assert.ok(sleeps[0] >= 2000 && sleeps[0] <= 2500, `honoured Retry-After: 2s (+jitter), got ${sleeps[0]}`);
+            assert.ok(sleeps[0]! >= 2000 && sleeps[0]! <= 2500, `honoured Retry-After: 2s (+jitter), got ${sleeps[0]}`);
         });
 
         test('gives up after MAX_RETRIES and surfaces the error', async () => {
@@ -339,8 +339,8 @@ suite('gcal/calendarClient', () => {
             end: { date: '2026-06-02' }
         });
         assert.equal(r.calls.length, 1);
-        assert.equal(r.calls[0].method, 'PATCH');
-        assert.ok(r.calls[0].url.endsWith('/calendars/cal/events/eid'), `unexpected PATCH url: ${r.calls[0].url}`);
+        assert.equal(r.calls[0]!.method, 'PATCH');
+        assert.ok(r.calls[0]!.url.endsWith('/calendars/cal/events/eid'), `unexpected PATCH url: ${r.calls[0]!.url}`);
     });
 
     test('patchEvent throws with an "update event" message on a server error', async () => {

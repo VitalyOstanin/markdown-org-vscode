@@ -81,8 +81,8 @@ suite('gcal/syncEngine', () => {
         assert.equal(summary.created, 1);
         // ID generated then GCAL_EVENT_ID cached -> two property writes
         assert.equal(w.writes.length, 2);
-        assert.equal(w.writes[0].props.ID, 'gen-0000-0000-0000-000000000000');
-        assert.ok(w.writes[1].props.GCAL_EVENT_ID);
+        assert.equal(w.writes[0]!.props.ID, 'gen-0000-0000-0000-000000000000');
+        assert.ok(w.writes[1]!.props.GCAL_EVENT_ID);
     });
 
     test('insert conflict (409) becomes update', async () => {
@@ -238,11 +238,11 @@ suite('gcal/syncEngine', () => {
         assert.equal(summary.changes.length, 2);
         const byAction = Object.fromEntries(summary.changes.map((c) => [c.action, c]));
         assert.deepEqual(
-            { action: byAction.created.action, date: byAction.created.date, heading: byAction.created.heading },
+            { action: byAction.created!.action, date: byAction.created!.date, heading: byAction.created!.heading },
             { action: 'created', date: '2026-06-01', heading: 'New event' }
         );
         assert.deepEqual(
-            { action: byAction.deleted.action, date: byAction.deleted.date, heading: byAction.deleted.heading },
+            { action: byAction.deleted!.action, date: byAction.deleted!.date, heading: byAction.deleted!.heading },
             { action: 'deleted', date: '2026-06-02', heading: 'Done event' }
         );
     });
@@ -260,7 +260,7 @@ suite('gcal/syncEngine', () => {
         const ids = ['11111111-1111-1111-1111-111111111111', '22222222-2222-2222-2222-222222222222'];
         let n = 0;
         const deps = baseDeps(tasks, r.fn, writer);
-        deps.genUuid = () => ids[n++];
+        deps.genUuid = () => ids[n++]!;
 
         const summary = await runSync(deps);
 

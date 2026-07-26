@@ -35,6 +35,7 @@ import type { Task } from '../types';
 import { formatError, notifyInfo, notifyWarn } from '../utils/notify';
 import { debounce, type DebouncedFunction } from '../utils/debounce';
 import { timestampedLine } from '../utils/logLine';
+import { at } from '../utils/exactIndex';
 
 const CONNECT_TIMEOUT_MS = 5 * 60 * 1000;
 
@@ -144,7 +145,7 @@ async function connectGoa(cfg: vscode.WorkspaceConfiguration, accounts: GoaAccou
             'no Google account in GNOME Online Accounts — add one in GNOME Settings → Online Accounts (enable Calendar)'
         );
     }
-    let email = accounts[0].email;
+    let email = at(accounts, 0, 'account').email;
     if (accounts.length > 1) {
         const chosen = await vscode.window.showQuickPick(
             accounts.map((a) => ({ label: a.email })),
@@ -485,7 +486,8 @@ export function makePropertiesWriter(): PropertiesWriter {
             }
             const lines = doc.getText().split(/\r?\n/);
             const headingIdx = line - 1;
-            const m = headingIdx >= 0 && headingIdx < lines.length ? HEADING_REGEX.exec(lines[headingIdx]) : null;
+            const headingText = lines[headingIdx];
+            const m = headingText !== undefined ? HEADING_REGEX.exec(headingText) : null;
             if (!m || (m.groups?.title ?? '').trim() !== expectedHeading.trim()) {
                 return 'deferred';
             }

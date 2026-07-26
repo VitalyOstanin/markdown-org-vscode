@@ -82,7 +82,7 @@ suite('Keybindings: package.json contract', () => {
             1,
             `expected exactly one binding on ctrl+k ctrl+k ctrl+d, got ${matches.map((kb) => kb.command).join(', ')}`
         );
-        assert.strictEqual(matches[0].command, 'markdown-org.insertDeadline');
+        assert.strictEqual(matches[0]!.command, 'markdown-org.insertDeadline');
     });
 
     test('Ctrl+K Ctrl+D still belongs to setDone -- the longer chord does not shadow it', () => {

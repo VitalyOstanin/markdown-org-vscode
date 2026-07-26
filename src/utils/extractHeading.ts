@@ -11,12 +11,16 @@
  * cheaper than asking the TextDocument for each line individually on large
  * markdown files.
  */
+import { group } from './regexGroups';
+
 export function extractHeadingBlockLines(lines: string[], startLine: number, level: number): string[] {
-    const out: string[] = [lines[startLine]];
+    const first = lines[startLine];
+    const out: string[] = first === undefined ? [] : [first];
     for (let i = startLine + 1; i < lines.length; i++) {
         const line = lines[i];
+        if (line === undefined) break;
         const match = line.match(/^(#+)\s+/);
-        if (match && match[1].length <= level) {
+        if (match && group(match, 1).length <= level) {
             break;
         }
         out.push(line);

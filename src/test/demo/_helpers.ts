@@ -131,7 +131,7 @@ export async function maximizeVscodeWindow(): Promise<void> {
         throw new Error('xdotool: could not find a VS Code Extension Development Host window');
     }
     const ids = search.stdout.split('\n').filter(Boolean);
-    const wid = ids[ids.length - 1];
+    const wid = ids[ids.length - 1]!;
     const runSync = (args: string[]): Promise<number> =>
         new Promise((resolve, reject) => {
             const proc = spawn('xdotool', args, {
@@ -283,8 +283,6 @@ export async function moveCursorTo(editor: vscode.TextEditor, line: number, colu
  * "active" on the empty Xvfb (usually nothing), and VS Code would never see
  * the chord that the demo just pressed.
  */
-let vscodeWindowId: string | null = null;
-
 async function runXdotool(args: string[]): Promise<{ status: number; stdout: string }> {
     const display = process.env.DISPLAY ?? ':99';
     return new Promise((resolve, reject) => {
@@ -310,10 +308,10 @@ async function ensureVscodeWindowFocused(): Promise<void> {
         throw new Error('xdotool: could not find a VS Code Extension Development Host window');
     }
     const ids = stdout.split('\n').filter(Boolean);
-    vscodeWindowId = ids[ids.length - 1];
-    await runXdotool(['windowactivate', '--sync', vscodeWindowId]);
+    const wid = ids[ids.length - 1]!;
+    await runXdotool(['windowactivate', '--sync', wid]);
     // Force pointer-follows-keyboard semantics by raising the window too.
-    await runXdotool(['windowraise', vscodeWindowId]);
+    await runXdotool(['windowraise', wid]);
 }
 
 /**
@@ -438,7 +436,7 @@ export async function pressKeyInPicker(sequence: string): Promise<void> {
     }
     const tokens = sequence.split(/\s+/).filter(Boolean);
     for (let i = 0; i < tokens.length; i++) {
-        const { modifiers, key } = splitToken(tokens[i]);
+        const { modifiers, key } = splitToken(tokens[i]!);
         for (const mod of modifiers) {
             const r = await runXdotool(['keydown', mod]);
             if (r.status !== 0) throw new Error(`xdotool keydown ${mod} failed`);
@@ -483,7 +481,7 @@ export async function pressKey(sequence: string): Promise<void> {
     // invocations causes the second prefix to fail randomly on Xvfb after
     // the first chord has already entered multi-chord mode.
     for (let i = 0; i < tokens.length; i++) {
-        const { modifiers, key } = splitToken(tokens[i]);
+        const { modifiers, key } = splitToken(tokens[i]!);
         for (const mod of modifiers) {
             const r = await runXdotool(['keydown', mod]);
             if (r.status !== 0) throw new Error(`xdotool keydown ${mod} failed`);

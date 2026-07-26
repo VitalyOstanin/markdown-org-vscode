@@ -49,9 +49,9 @@ suite('normalizeAgendaTaskTypes', () => {
             task({ task_type: 'MAYBE' as unknown as NonNullable<Task['task_type']> })
         ];
         const out = normalizeAgendaTaskTypes(input) as Task[];
-        assert.strictEqual(out[0].task_type, 'TODO');
-        assert.strictEqual(out[1].task_type, 'CANCELLED');
-        assert.strictEqual(out[2].task_type, undefined);
+        assert.strictEqual(out[0]!.task_type, 'TODO');
+        assert.strictEqual(out[1]!.task_type, 'CANCELLED');
+        assert.strictEqual(out[2]!.task_type, undefined);
     });
 
     test('does not mutate the input tasks', () => {
@@ -69,16 +69,16 @@ suite('normalizeAgendaTaskTypes', () => {
             upcoming: [task({ task_type: 'DONE' })]
         };
         const out = normalizeAgendaTaskTypes([day]) as DayAgenda[];
-        assert.strictEqual(out[0].overdue[0].task_type, undefined);
-        assert.strictEqual(out[0].scheduled_timed[0].task_type, 'CANCELLED');
-        assert.strictEqual(out[0].upcoming[0].task_type, 'DONE');
+        assert.strictEqual(out[0]!.overdue[0]!.task_type, undefined);
+        assert.strictEqual(out[0]!.scheduled_timed[0]!.task_type, 'CANCELLED');
+        assert.strictEqual(out[0]!.upcoming[0]!.task_type, 'DONE');
     });
 
     test('tolerates DayAgenda buckets omitted by the extractor', () => {
         const day = { date: '2026-05-29' } as unknown as DayAgenda;
         const out = normalizeAgendaTaskTypes([day]) as DayAgenda[];
-        assert.deepStrictEqual(out[0].overdue, []);
-        assert.deepStrictEqual(out[0].upcoming, []);
+        assert.deepStrictEqual(out[0]!.overdue, []);
+        assert.deepStrictEqual(out[0]!.upcoming, []);
     });
 
     test('returns empty input unchanged', () => {

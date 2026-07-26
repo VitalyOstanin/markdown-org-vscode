@@ -27,10 +27,10 @@ suite('gcal/mutex', () => {
         assert.equal(starts, 1);
         void sf.run(task); // pending
         void sf.run(task); // coalesced, still one pending
-        gates[0].resolve(); // finish #1 -> rerun #2
+        gates[0]!.resolve(); // finish #1 -> rerun #2
         await tick();
         assert.equal(starts, 2);
-        gates[1].resolve(); // finish #2, no pending
+        gates[1]!.resolve(); // finish #2, no pending
         await p;
         assert.equal(starts, 2);
     });
@@ -51,12 +51,12 @@ suite('gcal/mutex', () => {
         const p = sf.run(task); // run #1
         await tick();
         void sf.run(task); // cancel: abort #1, schedule rerun
-        assert.equal(handles[0].aborted, true);
-        gates[0].resolve(); // #1 returns -> rerun #2
+        assert.equal(handles[0]!.aborted, true);
+        gates[0]!.resolve(); // #1 returns -> rerun #2
         await tick();
         assert.equal(starts, 2);
-        assert.equal(handles[1].aborted, false);
-        gates[1].resolve();
+        assert.equal(handles[1]!.aborted, false);
+        gates[1]!.resolve();
         await p;
     });
 });

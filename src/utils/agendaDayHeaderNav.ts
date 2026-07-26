@@ -45,8 +45,7 @@ export function wireDayHeaderNavigation(
     }
     const headers = root.querySelectorAll('.day-header[data-date]');
     let wired = 0;
-    for (let i = 0; i < headers.length; i++) {
-        const el = headers[i];
+    for (const el of Array.from(headers)) {
         const date = el.getAttribute('data-date');
         if (!date) {
             continue;

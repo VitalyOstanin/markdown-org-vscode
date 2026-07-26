@@ -12,7 +12,8 @@ function isPositivePattern(pattern: string): boolean {
 // `Task[]` branch is harmless and avoids guessing at a shape with no
 // discriminating element to inspect.
 function isDayAgendaArray(value: AgendaData): value is DayAgenda[] {
-    return value.length > 0 && 'date' in value[0];
+    const first = value[0];
+    return first !== undefined && 'date' in first;
 }
 
 /**

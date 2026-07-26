@@ -8,6 +8,8 @@
  * jumping to the first configured tag, which would surprise the user.
  */
 
+import { at } from './exactIndex';
+
 export const TAG_ALL = 'ALL';
 
 /**
@@ -40,5 +42,5 @@ export function computeNextTag(currentTag: string, tagNames: readonly string[]):
     const cycle = buildTagCycle(tagNames);
     const currentIndex = cycle.indexOf(currentTag);
     const nextIndex = currentIndex === -1 ? 0 : (currentIndex + 1) % cycle.length;
-    return cycle[nextIndex];
+    return at(cycle, nextIndex, 'tag');
 }

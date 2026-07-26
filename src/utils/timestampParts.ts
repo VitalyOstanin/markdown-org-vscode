@@ -1,3 +1,6 @@
+import { group, namedGroups } from './regexGroups';
+import { at } from './exactIndex';
+
 export type TimestampPart = 'year' | 'month' | 'day' | 'weekday' | 'hour' | 'minute';
 
 export type ClockTimestampPart =
@@ -81,7 +84,8 @@ export function getTimestampPartAt(lineText: string, character: number): Timesta
     let match: RegExpExecArray | null;
     while ((match = regex.exec(lineText)) !== null) {
         if (!match.groups) continue;
-        if (!isPairedBracket(match.groups.open, match.groups.close)) continue;
+        const { open, close } = namedGroups(match, 'open', 'close');
+        if (!isPairedBracket(open, close)) continue;
         const tsStart = match.index;
         const tsEnd = tsStart + match[0].length;
         if (character < tsStart || character >= tsEnd) continue;
@@ -156,9 +160,10 @@ export function getClockTimestampPartAt(lineText: string, character: number): Cl
     const timestamps = [...match[0].matchAll(timestampRegex)];
     if (timestamps.length === 0) return null;
 
-    const spans = clockSpans(timestamps[0], match.index, 'start');
-    if (match.groups.endOpenBracket && timestamps.length > 1) {
-        spans.push(...clockSpans(timestamps[1], match.index, 'end'));
+    const spans = clockSpans(at(timestamps, 0, 'timestamp'), match.index, 'start');
+    const endTimestamp = timestamps[1];
+    if (match.groups.endOpenBracket && endTimestamp) {
+        spans.push(...clockSpans(endTimestamp, match.index, 'end'));
     }
 
     const direct = findPart(character, spans);
@@ -172,7 +177,7 @@ export function getClockTimestampPartAt(lineText: string, character: number): Cl
 
 function clockSpans(ts: RegExpMatchArray, lineOffset: number, prefix: 'start' | 'end'): Span[] {
     const base = lineOffset + (ts.index ?? 0);
-    const weekday = ts[4];
+    const weekday = group(ts, 4);
     const weekdayStart = base + 11;
     const weekdayEnd = weekdayStart + weekday.length;
     const hourStart = weekdayEnd + 1;

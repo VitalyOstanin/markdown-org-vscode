@@ -15,6 +15,8 @@
  * lives in `src/commands/moveHeading.ts`.
  */
 
+import { group } from './regexGroups';
+
 /** A heading block extracted from the source document. */
 export interface PromoteBlock {
     /** Heading text without the leading `#` characters or the gap space. */
@@ -60,7 +62,7 @@ export function computeMaintainInsertion(maintainContent: string, block: Promote
     const lines = maintainContent.split('\n');
     let incomingIndex = -1;
     for (let i = 0; i < lines.length; i++) {
-        if (INCOMING_HEADING_RE.test(lines[i])) {
+        if (INCOMING_HEADING_RE.test(lines[i] ?? '')) {
             incomingIndex = i;
             break;
         }
@@ -71,8 +73,8 @@ export function computeMaintainInsertion(maintainContent: string, block: Promote
     const transformedBody = block.bodyLines.map((line) => {
         const m = line.match(/^(#+)\s+(.+)$/);
         if (m) {
-            const newLevel = Math.min(6, Math.max(1, m[1].length + delta));
-            return '#'.repeat(newLevel) + ' ' + m[2];
+            const newLevel = Math.min(6, Math.max(1, group(m, 1).length + delta));
+            return '#'.repeat(newLevel) + ' ' + group(m, 2);
         }
         return line;
     });

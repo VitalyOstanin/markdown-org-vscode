@@ -35,8 +35,10 @@ export interface DayHeaderParts {
  * better than the previous behavior, which dropped the month entirely.
  */
 export function formatDayHeaderParts(dateStr: string, locale: string): DayHeaderParts {
-    const [year, month, day] = dateStr.split('-').map(Number);
-    const date = new Date(year, month - 1, day);
+    // Parsed inline rather than through a helper: this function's source is
+    // inlined into the agenda page, where no import binding exists.
+    const [rawYear, rawMonth, rawDay] = dateStr.split('-');
+    const date = new Date(Number(rawYear), Number(rawMonth) - 1, Number(rawDay));
 
     // A malformed tag (`ru_RU` for `ru-RU`) makes Intl throw a RangeError, not
     // degrade. The host already validates the setting (utils/dateLocale.ts),

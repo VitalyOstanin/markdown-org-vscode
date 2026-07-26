@@ -18,6 +18,7 @@ export function findClockLinesInLines(lines: string[], headingLine: number): num
     const clockLines: number[] = [];
     for (let i = headingLine + 1; i < lines.length; i++) {
         const text = lines[i];
+        if (text === undefined) break;
 
         if (TIMESTAMP_LINE_REGEX.test(text)) {
             continue;

@@ -24,9 +24,10 @@ export function buildClockTable(rows: ClockTableRow[]): string {
     lines.push(`| ${'Heading'.padEnd(maxHeadingLen)} | ${'Time'.padEnd(maxTimeLen)} |`);
     lines.push(`|${'-'.repeat(maxHeadingLen + 2)}|${'-'.repeat(maxTimeLen + 2)}|`);
 
-    for (let i = 0; i < headingStrs.length; i++) {
-        lines.push(`| ${headingStrs[i].padEnd(maxHeadingLen)} | ${timeStrs[i].padEnd(maxTimeLen)} |`);
-    }
+    headingStrs.forEach((heading, i) => {
+        const time = timeStrs[i] ?? '';
+        lines.push(`| ${heading.padEnd(maxHeadingLen)} | ${time.padEnd(maxTimeLen)} |`);
+    });
 
     lines.push(`|${'-'.repeat(maxHeadingLen + 2)}|${'-'.repeat(maxTimeLen + 2)}|`);
     lines.push(`| ${'**Total**'.padEnd(maxHeadingLen)} | **${totalStr}**${' '.repeat(maxTimeLen - totalStr.length)} |`);

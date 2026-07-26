@@ -51,8 +51,8 @@ suite('Bracket-policy diagnostics + Quick Fix', () => {
         });
         await vscode.window.showTextDocument(doc);
         const diagnostics = await waitForBracketDiagnostics(doc.uri, 1);
-        assert.strictEqual(diagnostics[0].severity, vscode.DiagnosticSeverity.Warning);
-        assert.match(diagnostics[0].message, /CLOSED requires inactive bracket form/);
+        assert.strictEqual(diagnostics[0]!.severity, vscode.DiagnosticSeverity.Warning);
+        assert.match(diagnostics[0]!.message, /CLOSED requires inactive bracket form/);
     });
 
     test('SCHEDULED with inactive `[...]` is reported', async () => {
@@ -62,7 +62,7 @@ suite('Bracket-policy diagnostics + Quick Fix', () => {
         });
         await vscode.window.showTextDocument(doc);
         const diagnostics = await waitForBracketDiagnostics(doc.uri, 1);
-        assert.match(diagnostics[0].message, /SCHEDULED requires active bracket form/);
+        assert.match(diagnostics[0]!.message, /SCHEDULED requires active bracket form/);
     });
 
     test('mixed pair `<...]` is reported as mixed-pair', async () => {
@@ -72,7 +72,7 @@ suite('Bracket-policy diagnostics + Quick Fix', () => {
         });
         await vscode.window.showTextDocument(doc);
         const diagnostics = await waitForBracketDiagnostics(doc.uri, 1);
-        assert.match(diagnostics[0].message, /Mixed bracket pair/);
+        assert.match(diagnostics[0]!.message, /Mixed bracket pair/);
     });
 
     test('diagnostics refresh on edit (legacy line fixed by hand)', async () => {
@@ -115,7 +115,7 @@ suite('Bracket-policy diagnostics + Quick Fix', () => {
         const actions = await vscode.commands.executeCommand<vscode.CodeAction[]>(
             'vscode.executeCodeActionProvider',
             doc.uri,
-            diagnostic.range,
+            diagnostic!.range,
             vscode.CodeActionKind.QuickFix.value
         );
         const ours = (actions ?? []).filter(
@@ -123,7 +123,7 @@ suite('Bracket-policy diagnostics + Quick Fix', () => {
         );
         assert.ok(ours.length >= 1, `expected a bracket-policy quick fix, got: ${actions?.map((a) => a.title)}`);
 
-        const edit = ours[0].edit;
+        const edit = ours[0]!.edit;
         assert.ok(edit, 'quick fix must carry a WorkspaceEdit');
         await vscode.workspace.applyEdit(edit);
 
@@ -142,12 +142,12 @@ suite('Bracket-policy diagnostics + Quick Fix', () => {
         const actions = await vscode.commands.executeCommand<vscode.CodeAction[]>(
             'vscode.executeCodeActionProvider',
             doc.uri,
-            diagnostic.range,
+            diagnostic!.range,
             vscode.CodeActionKind.QuickFix.value
         );
         const ours = (actions ?? []).filter((a) => /Convert to/.test(a.title));
-        assert.ok(ours[0].edit);
-        await vscode.workspace.applyEdit(ours[0].edit);
+        assert.ok(ours[0]!.edit);
+        await vscode.workspace.applyEdit(ours[0]!.edit);
         assert.strictEqual(editor.document.lineAt(0).text, '`SCHEDULED: <2026-05-25 Пн>`');
     });
 });

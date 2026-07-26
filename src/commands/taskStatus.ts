@@ -4,6 +4,7 @@ import { HEADING_REGEX, matchTimestampLine } from '../orgPatterns';
 import { buildHeading } from '../utils/buildHeading';
 import { computeToggledStatus, normalizeTaskType } from '../utils/normalizeTaskType';
 import type { TaskStatus } from '../types';
+import { namedGroups } from '../utils/regexGroups';
 
 function formatActiveTimestamp(date: Date): string {
     return formatOrgTimestamp(date, 'angle');
@@ -33,7 +34,8 @@ export async function setTaskStatus(status: TaskStatus) {
         return;
     }
 
-    const { hashes, status: currentStatus, priority, title } = match.groups;
+    const { status: currentStatus, priority } = match.groups;
+    const { hashes, title } = namedGroups(match, 'hashes', 'title');
 
     // Toggle rule lives in computeToggledStatus (unit-tested): re-applying the
     // same logical keyword clears it; cancelled spellings count as one status.
@@ -74,7 +76,8 @@ export async function togglePriority() {
         return;
     }
 
-    const { hashes, status, priority: currentPriority, title } = match.groups;
+    const { status, priority: currentPriority } = match.groups;
+    const { hashes, title } = namedGroups(match, 'hashes', 'title');
 
     // Toggle: clear an existing priority, otherwise default a fresh one to A.
     // `status` is the raw HEADING_REGEX capture (string | undefined); normalize

@@ -58,7 +58,7 @@ export function collectSiblingKeywordsFromLines(
     lines: ReadonlyArray<string>,
     cursorLine: number
 ): Set<TimestampLineKeyword> {
-    return scanSiblingKeywords((i) => lines[i], lines.length, cursorLine);
+    return scanSiblingKeywords((i) => lines[i] ?? '', lines.length, cursorLine);
 }
 
 /**

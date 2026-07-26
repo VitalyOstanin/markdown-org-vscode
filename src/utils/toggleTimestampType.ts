@@ -1,4 +1,5 @@
 import type { TimestampLineMatch, TimestampLineKeyword } from '../orgPatterns';
+import { at } from './exactIndex';
 
 export const CYCLE_ORDER: ReadonlyArray<TimestampLineKeyword> = ['SCHEDULED', 'DEADLINE', 'CLOSED', 'CREATED'];
 
@@ -49,7 +50,7 @@ export function cycleTimestampKeyword(
     const skipped: TimestampLineKeyword[] = [];
     let newType: TimestampLineKeyword = type;
     for (let step = 1; step <= CYCLE_ORDER.length; step++) {
-        const candidate = CYCLE_ORDER[(currentIndex + step) % CYCLE_ORDER.length];
+        const candidate = at(CYCLE_ORDER, (currentIndex + step) % CYCLE_ORDER.length, 'keyword');
         if (candidate === type) {
             // Wrapped around without finding a free slot -- preserve current type.
             newType = candidate;

@@ -7,7 +7,7 @@ suite('Heading Utils Tests', () => {
         const match = heading.match(HEADING_REGEX);
 
         assert.ok(match);
-        assert.strictEqual(match.groups?.hashes.length, 1);
+        assert.strictEqual(match.groups?.hashes?.length, 1);
     });
 
     test('Detect heading level 2', () => {
@@ -15,7 +15,7 @@ suite('Heading Utils Tests', () => {
         const match = heading.match(HEADING_REGEX);
 
         assert.ok(match);
-        assert.strictEqual(match.groups?.hashes.length, 2);
+        assert.strictEqual(match.groups?.hashes?.length, 2);
     });
 
     test('Detect heading level 3', () => {
@@ -23,7 +23,7 @@ suite('Heading Utils Tests', () => {
         const match = heading.match(HEADING_REGEX);
 
         assert.ok(match);
-        assert.strictEqual(match.groups?.hashes.length, 3);
+        assert.strictEqual(match.groups?.hashes?.length, 3);
     });
 
     test('Extract title from heading', () => {

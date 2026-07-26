@@ -95,8 +95,8 @@ suite('buildDaySections', () => {
     test('overdue items are tagged overdue; timed items tagged timed', () => {
         const d = day({ overdue: [task()], scheduled_timed: [task()] });
         const sections = buildDaySections(d, SECTIONS);
-        assert.strictEqual(sections.find((s) => s.key === 'overdue')!.items[0].kind, 'overdue');
-        assert.strictEqual(sections.find((s) => s.key === 'scheduled')!.items[0].kind, 'timed');
+        assert.strictEqual(sections.find((s) => s.key === 'overdue')!.items[0]!.kind, 'overdue');
+        assert.strictEqual(sections.find((s) => s.key === 'scheduled')!.items[0]!.kind, 'timed');
     });
 
     test('drops empty sections entirely', () => {
@@ -120,6 +120,6 @@ suite('buildDaySections', () => {
 
     test('item count matches the source bucket sizes', () => {
         const d = day({ scheduled_timed: [task(), task(), task()] });
-        assert.strictEqual(buildDaySections(d, SECTIONS)[0].items.length, 3);
+        assert.strictEqual(buildDaySections(d, SECTIONS)[0]!.items.length, 3);
     });
 });
