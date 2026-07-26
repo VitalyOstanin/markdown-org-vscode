@@ -44,7 +44,17 @@ case "$vscode_target" in
 esac
 
 repo_root=$(cd "$(dirname "$0")/.." && pwd)
-extractor_version=$(node -p "require('$repo_root/package.json')['x-markdown-org'].extractorVersion")
+
+# package.json is read with `require('./package.json')` from the repository
+# root rather than by absolute path: under Git Bash on Windows `pwd` reports an
+# MSYS path (/d/a/repo/repo) that the native node binary cannot resolve
+# ("Cannot find module '/d/a/...'"). A relative require goes through node's own
+# working directory, which is correct on every platform.
+read_package_field() {
+  (cd "$repo_root" && node -p "$1")
+}
+
+extractor_version=$(read_package_field "require('./package.json')['x-markdown-org'].extractorVersion")
 if [ -z "$extractor_version" ] || [ "$extractor_version" = "undefined" ]; then
   echo "error: x-markdown-org.extractorVersion missing from package.json" >&2
   exit 1
@@ -82,6 +92,36 @@ sha_of_file() {
   sha_cmd "$1" | awk '{print $1}'
 }
 
+# zip helpers. `unzip` is present on Linux and macOS runners but not in Git for
+# Windows, whose image ships 7-Zip instead -- and the Windows job is the one
+# that actually takes the zip branch. Both tools are addressed through these
+# two operations so the branch below reads the same either way.
+zip_stream() {
+  # $1 archive, $2 path inside it -> bytes on stdout
+  if command -v unzip >/dev/null 2>&1; then
+    unzip -p "$1" "$2"
+  elif command -v 7z >/dev/null 2>&1; then
+    7z x -so "$1" "$2" 2>/dev/null
+  else
+    echo "error: neither unzip nor 7z is available to read $1" >&2
+    exit 1
+  fi
+}
+
+zip_extract() {
+  # $1 archive, $2 destination directory, rest: paths inside the archive
+  local archive=$1 dest=$2
+  shift 2
+  if command -v unzip >/dev/null 2>&1; then
+    unzip -q "$archive" "$@" -d "$dest"
+  elif command -v 7z >/dev/null 2>&1; then
+    7z x -y "-o${dest}" "$archive" "$@" >/dev/null
+  else
+    echo "error: neither unzip nor 7z is available to unpack $archive" >&2
+    exit 1
+  fi
+}
+
 tmp_dir=$(mktemp -d)
 trap 'rm -rf "$tmp_dir"' EXIT
 
@@ -107,7 +147,7 @@ cd - >/dev/null
 # the transfer was intact: whoever could replace the asset could replace the
 # checksum with it. The pin is the independent anchor -- it changes only in a
 # commit here, where a reviewer sees it next to the version bump.
-pinned_sha=$(node -p "(require('$repo_root/package.json')['x-markdown-org'].extractorSha256 || {})['$rust_target'] || ''")
+pinned_sha=$(read_package_field "(require('./package.json')['x-markdown-org'].extractorSha256 || {})['$rust_target'] || ''")
 actual_sha=$(sha_of_file "$archive_path")
 if [ -z "$pinned_sha" ]; then
   echo "error: no pinned sha256 for target '$rust_target' in package.json" >&2
@@ -131,10 +171,10 @@ case "$archive_ext" in
     inner_hash=$(tar -xOzf "$archive_path" "${stem}/${binary}" | sha_cmd | awk '{print $1}')
     ;;
   zip)
-    # `unzip -p` streams a file's bytes to stdout; pair with sha_cmd
+    # zip_stream writes a member's bytes to stdout; pair with sha_cmd
     # reading stdin (no -- needed, both sha256sum and shasum accept stdin
     # when called with no file args).
-    inner_hash=$(unzip -p "$archive_path" "${stem}/${binary}" | sha_cmd | awk '{print $1}')
+    inner_hash=$(zip_stream "$archive_path" "${stem}/${binary}" | sha_cmd | awk '{print $1}')
     ;;
 esac
 
@@ -168,8 +208,8 @@ case "$archive_ext" in
       "${stem}/${binary}" "${stem}/LICENSE" "${stem}/THIRD-PARTY-LICENSES.txt"
     ;;
   zip)
-    unzip -q "$archive_path" \
-      "${stem}/${binary}" "${stem}/LICENSE" "${stem}/THIRD-PARTY-LICENSES.txt" -d "$tmp_dir"
+    zip_extract "$archive_path" "$tmp_dir" \
+      "${stem}/${binary}" "${stem}/LICENSE" "${stem}/THIRD-PARTY-LICENSES.txt"
     ;;
 esac
 

@@ -510,7 +510,7 @@
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -b",
-    "typecheck": "tsc -b --noEmit",
+    "typecheck": "tsc -b",
     "watch": "tsc -b --watch",
     "test": "npm run compile && mocha --config .mocharc.unit.json",
     "test:watch": "npm run compile && node ./scripts/test-watch.js",
