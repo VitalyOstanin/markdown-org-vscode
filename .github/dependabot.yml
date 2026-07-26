@@ -34,3 +34,20 @@ updates:
     commit-message:
       prefix: 'chore'
       include: 'scope'
+    ignore:
+      # Pinned to the exact `engines.vscode` minimum on purpose: the API
+      # surface the code compiles against has to be the one the manifest
+      # promises. A caret range once had it building against 1.120 while
+      # claiming 1.85. Bump it only together with `engines.vscode`.
+      - dependency-name: '@types/vscode'
+      # Must match the Node line the extension is built and tested on
+      # (`.nvmrc`, `engines.node`). Minor and patch bumps are welcome.
+      - dependency-name: '@types/node'
+        update-types:
+          - 'version-update:semver-major'
+      # TypeScript 7.0 ships no in-process compiler API, so typescript-eslint
+      # refuses to run; see TODO.md. Only 7.0.x is held back -- a 7.1 PR is
+      # the signal to re-check.
+      - dependency-name: 'typescript'
+        versions:
+          - '7.0.x'

@@ -402,6 +402,9 @@ node10`, which TypeScript 7 removes, was replaced by `node16` in both
       build that takes seven seconds. Not worth it here.
     - Revisit when typescript-eslint ships TS 7 support: bump `typescript`,
       re-run `npm run typecheck`, both test suites and a VSIX build.
+    - Dependabot holds back `7.0.x` only (`.github/dependabot.yml`), so the
+      first 7.1 release still arrives as a pull request -- that PR is the
+      signal to redo the trial.
 
 - [x] Ship third-party notices for the bundled extractor
     - The VSIX distributes `markdown-org-extract` as a statically linked
