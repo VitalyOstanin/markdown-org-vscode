@@ -238,10 +238,6 @@
       CHANGELOG section, in the same shape as every other release.
     - The gap itself is closed: `validate-tag` now fails when the CHANGELOG has
       no section for the tagged version.
-- [ ] Generate an SBOM (CycloneDX or SPDX) and attach it to GitHub Releases
-    - Currently low-value: the VSIX bundles minimal production deps and the user base is individual.
-    - Becomes worth doing once production-deps surface grows or corporate adoption picks up (CRA/EO 14028 readiness, Dependency-Track / Trivy ingestion).
-    - Implementation sketch: add a step to `.github/workflows/release.yml` that runs `npx @cyclonedx/cyclonedx-npm --output-file sbom.cdx.json` after the VSIX is built and attaches `sbom.cdx.json` to the GitHub Release alongside the `.vsix`.
 
 ## Documentation
 
