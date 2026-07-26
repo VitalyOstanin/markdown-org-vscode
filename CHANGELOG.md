@@ -65,7 +65,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The compact agenda header now actually places the title on the control row.
   The rule that was meant to move it had no effect on a block container, so the
   layout only shrank the type -- the header still spent a line on the title, in
-  the one case where the setting exists to reclaim it.
+  the one case where the setting exists to reclaim it. A narrow panel keeps that
+  layout too: the header row no longer wraps the controls back onto a line of
+  their own when the title and the controls do not both fit, they share the row
+  and the controls wrap within it.
 - Agenda webview escaping now covers quotes. Values interpolated into quoted
   HTML attributes (`data-file`, `data-priority`, `title`, ...) went through an
   escape that left `"` and `'` untouched, so a task file whose name contained a

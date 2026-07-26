@@ -730,7 +730,13 @@ export const AGENDA_STYLES = `
                nothing, which is how an earlier version only looked compact. */
             display: flex;
             align-items: center;
-            flex-wrap: wrap;
+            /* No wrap here on purpose: wrapping would put the nav block back on
+               its own line whenever the hero plus the nav's flex-basis exceed
+               the panel width -- undoing the layout on exactly the narrow
+               panels the mode is for. The wrapping happens one level down,
+               inside the nav block, where it costs height but keeps the title
+               on the control row. */
+            flex-wrap: nowrap;
             gap: var(--space-2) var(--space-4);
             padding: var(--space-2) var(--space-5);
             margin-bottom: var(--space-2);
@@ -738,7 +744,9 @@ export const AGENDA_STYLES = `
         body.compact-header .nav-bar {
             /* Mode segment and controls share one row instead of stacking, and
                the block takes whatever width the hero leaves. "min-width: 0"
-               lets it shrink below its content instead of forcing a wrap. */
+               lets it shrink below its content instead of forcing a wrap. The
+               basis is what it wants, not what it demands: the parent does not
+               wrap, so a narrower panel shrinks it instead. */
             flex: 1 1 20rem;
             min-width: 0;
             flex-direction: row;
