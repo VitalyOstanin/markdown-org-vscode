@@ -1,4 +1,4 @@
-import { Task } from '../types';
+import type { Task } from '../types';
 
 /**
  * Tasks-view card model: the summary counts and the ordered priority groups

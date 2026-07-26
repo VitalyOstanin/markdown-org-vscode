@@ -1,7 +1,7 @@
 import * as assert from 'node:assert';
 import { suite, test } from 'mocha';
 import { buildMonthDayIndex } from '../../utils/agendaMonthCells';
-import { DayAgenda, TaskWithOffset } from '../../types';
+import type { DayAgenda, TaskWithOffset } from '../../types';
 
 // The month calendar renders these counts as per-day chips. The webview
 // embeds buildMonthDayIndex via `.toString()`, so these tests transitively

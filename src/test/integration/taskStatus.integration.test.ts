@@ -1,5 +1,5 @@
-import * as assert from 'node:assert';
 import * as vscode from 'vscode';
+import * as assert from 'node:assert';
 import { suite, test } from 'mocha';
 
 suite('Task Status Integration Tests', () => {

@@ -1,16 +1,13 @@
 import * as vscode from 'vscode';
-import { HEADING_REGEX, matchTimestampLine, TimestampLineMatch } from '../orgPatterns';
+import type { TimestampLineMatch } from '../orgPatterns';
+import { HEADING_REGEX, matchTimestampLine } from '../orgPatterns';
 import { formatDurationHM } from '../utils';
 import { buildOrgTimestamp } from '../utils/orgTimestamp';
 import { incrementTimestamp, getWeekdayName } from '../utils/incrementTimestamp';
 import { buildHeading } from '../utils/buildHeading';
 import { normalizeTaskType } from '../utils/normalizeTaskType';
-import {
-    getTimestampPartAt,
-    getClockTimestampPartAt,
-    TimestampPart,
-    ClockTimestampPart
-} from '../utils/timestampParts';
+import type { TimestampPart, ClockTimestampPart } from '../utils/timestampParts';
+import { getTimestampPartAt, getClockTimestampPartAt } from '../utils/timestampParts';
 import { cycleTimestampKeyword, normaliseBracket } from '../utils/toggleTimestampType';
 import { collectSiblingKeywords } from '../utils/headingScan';
 import { notifyWarn, notifyStatus } from '../utils/notify';

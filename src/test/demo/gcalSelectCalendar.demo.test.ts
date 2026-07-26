@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
-import { suite, test } from 'mocha';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
+import { suite, test } from 'mocha';
 import { selectCalendar } from '../../commands/gcalSync';
 import {
     sleep,

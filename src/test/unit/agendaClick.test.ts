@@ -1,7 +1,8 @@
 import * as assert from 'node:assert';
 import { suite, test } from 'mocha';
 import { JSDOM } from 'jsdom';
-import { resolveTaskClickIntent, sanitizeTaskLine, ClickTargetLike } from '../../utils/agendaClick';
+import type { ClickTargetLike } from '../../utils/agendaClick';
+import { resolveTaskClickIntent, sanitizeTaskLine } from '../../utils/agendaClick';
 
 // jsdom is the only practical way to exercise the agenda webview's
 // click-vs-selection behaviour without spinning up a full VS Code instance

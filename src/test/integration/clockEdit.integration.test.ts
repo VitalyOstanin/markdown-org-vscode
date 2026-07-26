@@ -1,5 +1,5 @@
-import * as assert from 'node:assert';
 import * as vscode from 'vscode';
+import * as assert from 'node:assert';
 import * as path from 'node:path';
 
 suite('CLOCK Timestamp Editing Integration Tests', () => {

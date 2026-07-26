@@ -1,4 +1,4 @@
-import { DayAgenda, TaskWithOffset } from '../types';
+import type { DayAgenda, TaskWithOffset } from '../types';
 
 /**
  * Day-view card model: the summary counts and the ordered sections the Day

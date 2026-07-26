@@ -1,6 +1,6 @@
+import * as vscode from 'vscode';
 import * as assert from 'node:assert';
 import { setTimeout as sleep } from 'node:timers/promises';
-import * as vscode from 'vscode';
 import { suite, test, teardown } from 'mocha';
 import { BRACKET_POLICY_CODE, DIAGNOSTIC_SOURCE } from '../../diagnostics/timestampBrackets';
 

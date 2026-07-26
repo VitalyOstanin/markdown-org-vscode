@@ -1,9 +1,9 @@
+import * as vscode from 'vscode';
 import * as assert from 'node:assert';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import * as vscode from 'vscode';
 import { suite, before, beforeEach, after, test } from 'mocha';
 import { extractor } from '../../utils/extractor';
 import { bundledBinaryName, findBundledBinary } from '../../utils/bundledBinary';

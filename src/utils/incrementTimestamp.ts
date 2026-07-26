@@ -1,5 +1,5 @@
 import { buildOrgTimestamp } from './orgTimestamp';
-import { TimestampPart } from './timestampParts';
+import type { TimestampPart } from './timestampParts';
 import { DAY_NAMES_SHORT_RU, DAY_NAMES_SHORT_EN, DAY_NAMES_FULL_RU, DAY_NAMES_FULL_EN } from './dayNames';
 
 /**

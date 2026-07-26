@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { randomBytes } from 'node:crypto';
-import { AgendaData, FileTag } from '../types';
+import type { AgendaData, FileTag } from '../types';
 import { isMeaningfulSelection, resolveTaskClickIntent, sanitizeTaskLine } from '../utils/agendaClick';
 import { escapeHtml } from '../utils/agendaEscapeHtml';
 import { DEFAULT_AGENDA_FONT_STACK, sanitizeFontFamily } from '../utils/agendaFontFamily';
@@ -26,20 +26,17 @@ import { resolveHeroModel } from '../utils/agendaHero';
 import { computeDaySummary, buildDaySections } from '../utils/agendaDaySummary';
 import { buildTaskGroups, computeTasksSummary } from '../utils/agendaTaskGroups';
 import { buildMonthDayIndex } from '../utils/agendaMonthCells';
-import { AgendaHeaderMode, nextHeaderMode, normalizeHeaderMode, resolveHeaderLayout } from '../utils/agendaHeaderMode';
-import {
-    AGENDA_STRINGS,
-    AgendaStrings,
-    UiLanguage,
-    formatString,
-    pluralIndex,
-    resolveUiLanguage
-} from '../utils/agendaI18n';
-import { AgendaHistory, AgendaViewState } from '../utils/agendaHistory';
-import { AgendaClientBootstrap, AgendaClientDeps, agendaClientMain } from '../webview/agendaClient';
-import { AGENDA_STYLES } from './agendaStyles';
+import type { AgendaHeaderMode } from '../utils/agendaHeaderMode';
+import { nextHeaderMode, normalizeHeaderMode, resolveHeaderLayout } from '../utils/agendaHeaderMode';
+import type { AgendaStrings, UiLanguage } from '../utils/agendaI18n';
+import { AGENDA_STRINGS, formatString, pluralIndex, resolveUiLanguage } from '../utils/agendaI18n';
+import type { AgendaViewState } from '../utils/agendaHistory';
+import { AgendaHistory } from '../utils/agendaHistory';
+import type { AgendaClientBootstrap, AgendaClientDeps } from '../webview/agendaClient';
+import { agendaClientMain } from '../webview/agendaClient';
 import { formatError, notifyError, notifyWarn } from '../utils/notify';
 import { logDiagnostic } from '../utils/logChannel';
+import { AGENDA_STYLES } from './agendaStyles';
 
 const REFRESH_DEBOUNCE_MS = 500;
 // Window of time after createWebviewPanel within which the webview is expected

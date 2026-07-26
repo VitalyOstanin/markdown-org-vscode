@@ -1,14 +1,14 @@
+import * as vscode from 'vscode';
 import * as assert from 'node:assert';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
-import * as vscode from 'vscode';
 import * as sinon from 'sinon';
 import { suite, before, beforeEach, afterEach, after, test } from 'mocha';
 import { exec } from '../../utils/exec';
 import { extractor } from '../../utils/extractor';
 import { AgendaPanel } from '../../views/agendaPanel';
-import { waitForAgendaRender, waitUntil } from './_helpers';
 import { makeExtractorFake } from '../_execFake';
+import { waitForAgendaRender, waitUntil } from './_helpers';
 
 suite('Agenda Style Integration Tests', () => {
     const testWorkspaceDir = path.join(__dirname, '../../test-workspace');

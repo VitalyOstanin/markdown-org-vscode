@@ -1,5 +1,6 @@
 import type { TextDocument } from 'vscode';
-import { HEADING_REGEX, TimestampLineKeyword } from '../orgPatterns';
+import type { TimestampLineKeyword } from '../orgPatterns';
+import { HEADING_REGEX } from '../orgPatterns';
 
 /**
  * Cheap recogniser for "what keyword does this line declare?". Avoids the

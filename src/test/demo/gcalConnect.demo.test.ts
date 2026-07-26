@@ -1,8 +1,8 @@
 import * as vscode from 'vscode';
-import { suite, test } from 'mocha';
 import * as path from 'node:path';
 import * as fs from 'node:fs/promises';
 import * as http from 'node:http';
+import { suite, test } from 'mocha';
 import * as sinon from 'sinon';
 import { connectGcal } from '../../commands/gcalSync';
 import {

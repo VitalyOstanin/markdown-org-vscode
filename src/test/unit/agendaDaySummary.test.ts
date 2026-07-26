@@ -2,7 +2,7 @@ import * as assert from 'node:assert';
 import { suite, test } from 'mocha';
 import { buildDaySections, computeDaySummary } from '../../utils/agendaDaySummary';
 import { AGENDA_STRINGS } from '../../utils/agendaI18n';
-import { DayAgenda, TaskWithOffset } from '../../types';
+import type { DayAgenda, TaskWithOffset } from '../../types';
 
 // Section titles are handed in rather than baked into the helper, so the day
 // card speaks the configured UI language (see agendaI18n.ts).

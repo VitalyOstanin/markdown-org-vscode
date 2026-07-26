@@ -2,7 +2,7 @@ import * as assert from 'node:assert';
 import { suite, test } from 'mocha';
 import { buildTaskGroups, computeTasksSummary } from '../../utils/agendaTaskGroups';
 import { AGENDA_STRINGS } from '../../utils/agendaI18n';
-import { Task } from '../../types';
+import type { Task } from '../../types';
 
 // Group titles are handed in rather than baked into the helper, so the tasks
 // card speaks the configured UI language (see agendaI18n.ts).

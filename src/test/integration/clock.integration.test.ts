@@ -1,8 +1,8 @@
+import * as vscode from 'vscode';
 import * as assert from 'node:assert';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { setTimeout as sleep } from 'node:timers/promises';
-import * as vscode from 'vscode';
 
 suite('CLOCK Integration Tests', () => {
     let testFilePath: string;

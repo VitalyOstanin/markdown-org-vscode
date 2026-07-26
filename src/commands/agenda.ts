@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { AgendaPanel } from '../views/agendaPanel';
-import { AgendaData, FileTag } from '../types';
+import type { AgendaData, FileTag } from '../types';
 import { normalizeAgendaTaskTypes } from '../utils/normalizeTaskType';
 import { toIsoDate } from '../utils';
 import { exec } from '../utils/exec';

@@ -1,6 +1,6 @@
 import * as assert from 'node:assert';
 import { buildMonthDayIndex } from '../../utils/agendaMonthCells';
-import { DayAgenda } from '../../types';
+import type { DayAgenda } from '../../types';
 
 suite('Month View Calendar', () => {
     suite('isHoliday', () => {

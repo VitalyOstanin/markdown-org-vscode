@@ -1,7 +1,8 @@
 import * as assert from 'node:assert';
 import { suite, test } from 'mocha';
 import { incrementTimestamp } from '../../utils/incrementTimestamp';
-import { getTimestampPartAt, TimestampPart } from '../../utils/timestampParts';
+import type { TimestampPart } from '../../utils/timestampParts';
+import { getTimestampPartAt } from '../../utils/timestampParts';
 
 /**
  * Behaviour of `incrementTimestamp` -- the Shift+Up / Shift+Down engine for a

@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { AgendaData, DayAgenda, FileTag, Task } from '../types';
+import type { AgendaData, DayAgenda, FileTag, Task } from '../types';
 
 function isPositivePattern(pattern: string): boolean {
     return pattern.length > 0 && !pattern.startsWith('!');

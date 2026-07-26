@@ -114,6 +114,21 @@ npm run format          # Prettier
 npm run format:check
 ```
 
+Three conventions in the config are worth knowing before a new file is written,
+because `--fix` will rewrite the imports otherwise:
+
+- Node built-ins carry the `node:` prefix (`no-restricted-imports` names every
+  bare specifier).
+- Type-only imports are spelled `import type` on their own line
+  (`@typescript-eslint/consistent-type-imports`). That keeps a value import
+  visible, which matters for the modules inlined into the agenda page: only the
+  function source travels, so a value import there becomes an undefined
+  `exports.NAME` read in the page.
+- Imports are ordered `vscode`, Node built-ins, packages, then local paths
+  (`import-x/order`). `import-x` also fails the build on cycles, duplicate
+  imports and self-imports; `no-unresolved` stays off, since `npm run typecheck`
+  already resolves every specifier.
+
 ## Debug
 
 1. Open project in VS Code

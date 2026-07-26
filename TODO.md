@@ -315,13 +315,25 @@
       (~216, a large share of them indexed access in tests).
     - Take them one at a time, starting with `exactOptionalPropertyTypes`.
 
-- [ ] Consider `eslint-plugin-import-x`
-    - Import cycles, import order and duplicate imports are unchecked. The
-      project has a specific reason to care: the modules inlined into the
-      webview via `.toString()` must stay import-free, and today that rule
-      lives only in comments at the top of each of them.
-    - Deferred because it adds a dev dependency and a rule set to tune; module
-      resolution itself is already checked by `npm run typecheck`.
+- [x] Adopt `eslint-plugin-import-x`
+    - Added with `eslint-import-resolver-typescript` (without a resolver
+      `no-cycle` cannot follow an extensionless relative specifier to its `.ts`
+      file). Rules on: `no-cycle`, `no-duplicates`, `no-self-import`,
+      `no-useless-path-segments`, and `order`. `no-unresolved` stays off --
+      `npm run typecheck` already resolves every specifier against the same
+      tsconfig, and the rule would only repeat it more slowly.
+    - `order` is configured to pull `vscode` ahead of the Node built-ins, which
+      is how the host modules were already written; the sweep reordered 39
+      import lines that had drifted from it.
+    - The inlined-module rule this item was really about is enforced elsewhere,
+      and better: the emitted page is asserted to contain no `exports.` read at
+      all (`src/test/integration/agenda.integration.test.ts`), which catches the
+      actual failure -- a helper body reading its module -- rather than the
+      import statement that may or may not cause it. Alongside it,
+      `@typescript-eslint/consistent-type-imports` now forces the erasable case
+      to be spelled `import type` on its own line, so a value import in one of
+      those modules stands out in review instead of hiding in a mixed
+      declaration.
 
 - [x] Move `src/` onto the `node:` import prefix
     - Built-in modules used to be imported both ways: 133 bare specifiers

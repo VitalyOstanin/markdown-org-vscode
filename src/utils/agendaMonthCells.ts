@@ -1,4 +1,4 @@
-import { DayAgenda } from '../types';
+import type { DayAgenda } from '../types';
 
 /**
  * Month-calendar cell model: how much work each date carries.

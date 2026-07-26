@@ -1,10 +1,10 @@
 import type { Task } from '../../types';
+import { isCancelled } from '../normalizeTaskType';
+import { formatError } from '../formatError';
 import type { FetchFn } from './oauth';
 import type { AccessTokenProvider } from './accessToken';
 import type { MapOptions } from './eventMapping';
 import { isSyncable, mapTaskToEvent } from './eventMapping';
-import { isCancelled } from '../normalizeTaskType';
-import { formatError } from '../formatError';
 import { taskIdToEventId } from './eventId';
 import { insertEvent, patchEvent, deleteEvent } from './calendarClient';
 import type { RunHandle } from './mutex';

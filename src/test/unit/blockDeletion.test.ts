@@ -1,5 +1,6 @@
 import * as assert from 'node:assert';
-import { computeBlockDeletionCoords, MinDocument } from '../../utils/blockDeletion';
+import type { MinDocument } from '../../utils/blockDeletion';
+import { computeBlockDeletionCoords } from '../../utils/blockDeletion';
 
 function fakeDocument(lineCount: number, lengths: Record<number, number> = {}): MinDocument {
     return {

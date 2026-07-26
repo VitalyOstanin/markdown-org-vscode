@@ -8,15 +8,15 @@
 // (`exec.execFile` + `resolveExtractorPath`). The connected state is supplied
 // by handing the command a context whose `secrets` already hold a refresh
 // token + client secret, exactly as the integration tests do.
+import * as vscode from 'vscode';
 import * as path from 'node:path';
 import * as os from 'node:os';
 import * as fs from 'node:fs';
-import * as vscode from 'vscode';
-import * as sinon from 'sinon';
 import { setTimeout as sleep } from 'node:timers/promises';
+import type * as cp from 'node:child_process';
+import * as sinon from 'sinon';
 import { exec } from '../../utils/exec';
 import { extractor } from '../../utils/extractor';
-import type * as cp from 'node:child_process';
 import type { ExecFileCallback } from '../_execFake';
 
 /** A Response-like object matching what oauth.postToken and calendarClient read. */

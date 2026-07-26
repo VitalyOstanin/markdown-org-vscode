@@ -1,6 +1,8 @@
 import * as vscode from 'vscode';
-import { validateLines, BracketViolation } from './bracketPolicy';
-import { debounce, DebouncedFunction } from '../utils/debounce';
+import type { DebouncedFunction } from '../utils/debounce';
+import { debounce } from '../utils/debounce';
+import type { BracketViolation } from './bracketPolicy';
+import { validateLines } from './bracketPolicy';
 
 /**
  * Debounce window for re-validating a document after an edit. Without it the

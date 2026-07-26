@@ -1,5 +1,5 @@
-import * as assert from 'node:assert';
 import * as vscode from 'vscode';
+import * as assert from 'node:assert';
 import { suite, test, teardown } from 'mocha';
 
 // Regression coverage for issue #41: `Shift+Up` in a SCHEDULED/DEADLINE line

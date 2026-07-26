@@ -1,5 +1,5 @@
-import * as assert from 'node:assert';
 import * as vscode from 'vscode';
+import * as assert from 'node:assert';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { suite, before, after, beforeEach, test } from 'mocha';

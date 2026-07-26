@@ -1,5 +1,5 @@
-import * as assert from 'node:assert';
 import * as vscode from 'vscode';
+import * as assert from 'node:assert';
 
 /**
  * These tests exercise insertClockTable end-to-end. Each test opens a fresh

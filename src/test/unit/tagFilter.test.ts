@@ -1,6 +1,6 @@
 import * as assert from 'node:assert';
 import { filterTasksByTag } from '../../utils/tagFilter';
-import { FileTag, Task, DayAgenda } from '../../types';
+import type { FileTag, Task, DayAgenda } from '../../types';
 
 const TAGS: FileTag[] = [
     { name: 'ALL', pattern: '' },

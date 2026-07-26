@@ -1,6 +1,8 @@
 import js from '@eslint/js';
 import tseslint from 'typescript-eslint';
 import prettier from 'eslint-config-prettier';
+import importX from 'eslint-plugin-import-x';
+import { createTypeScriptImportResolver } from 'eslint-import-resolver-typescript';
 
 // Node globals used by the CommonJS scripts and the .mjs configs. Declared by
 // hand rather than pulling in the `globals` package for seven names.
@@ -93,7 +95,44 @@ export default tseslint.config(
             // outgrew its body, or one about to grow back into it; worth
             // seeing, not worth failing a build over.
             '@typescript-eslint/require-await': 'warn',
-            radix: ['error', 'always']
+            radix: ['error', 'always'],
+            // A type-only import erases at emit; a value import does not. The
+            // distinction is load-bearing here, because the helpers inlined
+            // into the agenda page travel as bare function sources: a value
+            // import in one of those modules becomes an `exports.NAME` read
+            // that is undefined in the page. Spelling the harmless case
+            // `import type` leaves any real import visible in review -- on its
+            // own line, which is why the fix keeps type and value imports in
+            // separate declarations rather than inlining `type` markers into a
+            // mixed one.
+            '@typescript-eslint/consistent-type-imports': 'error'
+        }
+    },
+    // Import hygiene. `no-unresolved` stays off: `npm run typecheck` already
+    // resolves every specifier against the same tsconfig, and the rule would
+    // only duplicate it more slowly.
+    {
+        files: ['**/*.ts'],
+        plugins: { 'import-x': importX },
+        settings: {
+            'import-x/resolver-next': [createTypeScriptImportResolver()]
+        },
+        rules: {
+            // `vscode` is pulled ahead of the Node built-ins on purpose: the
+            // host modules have always opened with it, and it reads as what the
+            // file is -- extension code -- before anything else.
+            'import-x/order': [
+                'error',
+                {
+                    groups: ['builtin', 'external', 'internal', 'parent', 'sibling', 'index'],
+                    pathGroups: [{ pattern: 'vscode', group: 'builtin', position: 'before' }],
+                    pathGroupsExcludedImportTypes: ['builtin']
+                }
+            ],
+            'import-x/no-cycle': 'error',
+            'import-x/no-duplicates': 'error',
+            'import-x/no-self-import': 'error',
+            'import-x/no-useless-path-segments': 'error'
         }
     },
     // Plain scripts and configs: same baseline rules, no type-aware ones (they

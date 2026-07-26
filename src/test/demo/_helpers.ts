@@ -1,8 +1,8 @@
+import * as vscode from 'vscode';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { spawn } from 'node:child_process';
 import { setTimeout as sleep } from 'node:timers/promises';
-import * as vscode from 'vscode';
 
 export { sleep };
 

@@ -1,6 +1,7 @@
 import * as assert from 'node:assert';
 import { cycleTimestampKeyword, normaliseBracket, CYCLE_ORDER } from '../../utils/toggleTimestampType';
-import { matchTimestampLine, TimestampLineKeyword } from '../../orgPatterns';
+import type { TimestampLineKeyword } from '../../orgPatterns';
+import { matchTimestampLine } from '../../orgPatterns';
 
 function matchOrThrow(line: string) {
     const hit = matchTimestampLine(line);

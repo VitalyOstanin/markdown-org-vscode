@@ -1,6 +1,7 @@
 import * as assert from 'node:assert';
 import { suite, test } from 'mocha';
-import { rememberScroll, recallScroll, ScrollMemory } from '../../utils/agendaScroll';
+import type { ScrollMemory } from '../../utils/agendaScroll';
+import { rememberScroll, recallScroll } from '../../utils/agendaScroll';
 
 // These helpers are inlined into the agenda webview JS via `.toString()`,
 // so unit-testing them in plain Node transitively covers the round-trip

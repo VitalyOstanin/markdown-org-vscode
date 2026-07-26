@@ -2,7 +2,7 @@ import * as assert from 'node:assert';
 import { suite, test } from 'mocha';
 import { resolveTaskFlag } from '../../utils/agendaTaskFlag';
 import { isCancelled } from '../../utils/normalizeTaskType';
-import { Task } from '../../types';
+import type { Task } from '../../types';
 
 function task(over: Partial<Task>): Task {
     return { heading: 'h', file: 'f', line: 1, ...over } as Task;

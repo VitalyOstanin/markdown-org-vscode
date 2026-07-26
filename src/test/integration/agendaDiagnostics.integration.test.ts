@@ -1,7 +1,7 @@
+import * as vscode from 'vscode';
 import * as assert from 'node:assert';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
-import * as vscode from 'vscode';
 import * as sinon from 'sinon';
 import { suite, before, beforeEach, afterEach, after, test } from 'mocha';
 import { exec } from '../../utils/exec';

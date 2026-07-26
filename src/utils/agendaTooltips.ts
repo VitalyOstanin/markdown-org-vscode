@@ -12,7 +12,7 @@
  * strings and the injected `fill`; the `AgendaStrings` import is a type, erased
  * at compile time). Unknown inputs return '' (no tooltip) rather than guessing.
  */
-import { AgendaStrings } from './agendaI18n';
+import type { AgendaStrings } from './agendaI18n';
 
 export type TooltipStrings = AgendaStrings['tooltips'];
 
