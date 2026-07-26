@@ -44,17 +44,31 @@ export function parseRetryAfterMs(value: string | null | undefined, nowMs: numbe
  * Backoff delay (ms) before retry number `attempt` (1-based). Honours a
  * server-provided `Retry-After` (in ms) when present, otherwise uses
  * exponential backoff `base * 2^(attempt-1)`. Always clamped to `capMs`.
+ *
+ * The delay is spread by `random`: several VS Code windows share the account,
+ * not the lock (which covers one workspace directory), so a common 429 would
+ * otherwise have all of them wake up at the same millisecond and retry in
+ * lockstep. The exponential value is treated as an upper bound and the wait
+ * lands anywhere in its upper half; a `Retry-After` is only ever extended,
+ * since the server named the earliest time it will accept.
  */
 export function computeRetryDelayMs(
     attempt: number,
     retryAfterMs: number | undefined,
     baseMs: number = RETRY_BASE_MS,
-    capMs: number = RETRY_CAP_MS
+    capMs: number = RETRY_CAP_MS,
+    random: () => number = Math.random
 ): number {
     if (retryAfterMs !== undefined) {
-        return Math.min(retryAfterMs, capMs);
+        return Math.min(retryAfterMs + baseMs * random(), capMs);
     }
-    return Math.min(baseMs * 2 ** (attempt - 1), capMs);
+    const full = Math.min(baseMs * 2 ** (attempt - 1), capMs);
+    return full / 2 + (full / 2) * random();
+}
+
+/** Cooperative cancellation flag, the same shape the sync engine passes around. */
+export interface CallOptions {
+    signal?: { aborted: boolean };
 }
 
 const defaultSleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
@@ -65,12 +79,38 @@ export function setRetrySleepForTests(fn?: (ms: number) => Promise<void>): void 
     sleepImpl = fn ?? defaultSleep;
 }
 
+/**
+ * Sleep, then report whether the wait was cancelled. Split into short steps so
+ * an abort raised while the run is in its backoff takes effect right away: the
+ * watchdog sets the flag exactly when another window is about to steal the
+ * lock, and sleeping the remaining seconds out is time spent writing to a
+ * calendar this run no longer holds the lease for.
+ */
+async function sleepUnlessAborted(ms: number, signal?: { aborted: boolean }): Promise<boolean> {
+    if (!signal) {
+        await sleepImpl(ms);
+        return true;
+    }
+    const step = 100;
+    let waited = 0;
+    while (waited < ms) {
+        if (signal.aborted) {
+            return false;
+        }
+        const chunk = Math.min(step, ms - waited);
+        await sleepImpl(chunk);
+        waited += chunk;
+    }
+    return !signal.aborted;
+}
+
 async function call(
     fetchFn: FetchFn,
     getToken: AccessTokenProvider,
     method: string,
     path: string,
-    body?: unknown
+    body?: unknown,
+    opts: CallOptions = {}
 ): Promise<{ status: number; json: Record<string, unknown> }> {
     const send = async (forceRefresh: boolean) => {
         const token = await getToken(forceRefresh ? { forceRefresh: true } : undefined);
@@ -83,24 +123,55 @@ async function call(
             body: body !== undefined ? JSON.stringify(body) : undefined
         });
         const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
-        const retryAfter =
-            (res as { headers?: { get?: (name: string) => string | null } }).headers?.get?.('retry-after') ?? null;
+        const retryAfter = res.headers.get('retry-after');
         return { status: res.status, json, retryAfter };
     };
 
-    let refreshed = false;
+    // Two separate things, previously one variable: whether the 401 branch has
+    // already been taken (it is allowed once), and whether the *next* send
+    // should force a token refresh. Conflated, a single 401 made every later
+    // retry -- including the transient 429/5xx ones -- hit the token endpoint
+    // again, up to three needless refreshes per API call.
+    let refreshedOnce = false;
+    let forceRefreshNext = false;
     let retries = 0;
     for (;;) {
-        const r = await send(refreshed);
-        if (r.status === 401 && !refreshed) {
+        let r: Awaited<ReturnType<typeof send>>;
+        try {
+            r = await send(forceRefreshNext);
+        } catch (err) {
+            // No response at all: a dropped connection, a DNS or TLS failure, an
+            // unreachable token endpoint. That is the most common transient
+            // failure there is, and it used to bypass the retry loop entirely --
+            // the loop only ever looked at status codes, so the rarer 5xx was
+            // retried while this was handed straight to the caller, turning a
+            // blip into a whole sync of failed tasks.
+            if (retries >= MAX_RETRIES || opts.signal?.aborted) {
+                throw err;
+            }
+            retries++;
+            if (!(await sleepUnlessAborted(computeRetryDelayMs(retries, undefined), opts.signal))) {
+                throw new Error('calendar request aborted while waiting to retry', { cause: err });
+            }
+            forceRefreshNext = false;
+            continue;
+        }
+        forceRefreshNext = false;
+        if (r.status === 401 && !refreshedOnce) {
             // Token revoked or clock skew: one forced refresh + retry (spec error table).
-            refreshed = true;
+            refreshedOnce = true;
+            forceRefreshNext = true;
             continue;
         }
         if (isTransientStatus(r.status) && retries < MAX_RETRIES) {
+            if (opts.signal?.aborted) {
+                throw new Error('calendar request aborted');
+            }
             retries++;
             const delay = computeRetryDelayMs(retries, parseRetryAfterMs(r.retryAfter, Date.now()));
-            await sleepImpl(delay);
+            if (!(await sleepUnlessAborted(delay, opts.signal))) {
+                throw new Error('calendar request aborted');
+            }
             continue;
         }
         return { status: r.status, json: r.json };
@@ -114,9 +185,10 @@ function fail(ctx: string, status: number, json: Record<string, unknown>): never
 
 export async function listWritableCalendars(
     fetchFn: FetchFn,
-    getToken: AccessTokenProvider
+    getToken: AccessTokenProvider,
+    opts: CallOptions = {}
 ): Promise<CalendarSummary[]> {
-    const { status, json } = await call(fetchFn, getToken, 'GET', '/users/me/calendarList');
+    const { status, json } = await call(fetchFn, getToken, 'GET', '/users/me/calendarList', undefined, opts);
     if (status < 200 || status >= 300) {
         fail('list calendars', status, json);
     }
@@ -163,14 +235,16 @@ export async function insertEvent(
     fetchFn: FetchFn,
     getToken: AccessTokenProvider,
     calendarId: string,
-    event: GcalEventResource
+    event: GcalEventResource,
+    opts: CallOptions = {}
 ): Promise<InsertResult> {
     const { status, json } = await call(
         fetchFn,
         getToken,
         'POST',
         `/calendars/${encodeURIComponent(calendarId)}/events`,
-        event
+        event,
+        opts
     );
     if (status === 409) {
         return { status: 'conflict' };
@@ -186,14 +260,16 @@ export async function patchEvent(
     getToken: AccessTokenProvider,
     calendarId: string,
     eventId: string,
-    event: GcalEventResource
+    event: GcalEventResource,
+    opts: CallOptions = {}
 ): Promise<void> {
     const { status, json } = await call(
         fetchFn,
         getToken,
         'PATCH',
         `/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`,
-        event
+        event,
+        opts
     );
     if (status < 200 || status >= 300) {
         fail('update event', status, json);
@@ -204,13 +280,16 @@ export async function deleteEvent(
     fetchFn: FetchFn,
     getToken: AccessTokenProvider,
     calendarId: string,
-    eventId: string
+    eventId: string,
+    opts: CallOptions = {}
 ): Promise<void> {
     const { status, json } = await call(
         fetchFn,
         getToken,
         'DELETE',
-        `/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`
+        `/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`,
+        undefined,
+        opts
     );
     // 404/410: event already gone -- treat as success (idempotent delete).
     if (status === 404 || status === 410 || (status >= 200 && status < 300)) {

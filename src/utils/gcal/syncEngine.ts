@@ -4,6 +4,7 @@ import type { AccessTokenProvider } from './accessToken';
 import type { MapOptions } from './eventMapping';
 import { isSyncable, mapTaskToEvent } from './eventMapping';
 import { isCancelled } from '../normalizeTaskType';
+import { formatError } from '../formatError';
 import { taskIdToEventId } from './eventId';
 import { insertEvent, patchEvent, deleteEvent } from './calendarClient';
 import type { RunHandle } from './mutex';
@@ -31,6 +32,15 @@ export interface SyncDeps {
     mapOptions: (task: Task) => MapOptions;
     onDone: 'delete' | 'keep';
     signal?: RunHandle;
+    /**
+     * Wall-clock time (ms since epoch) after which the run stops and returns
+     * what it has. Each call can spend up to ~24s in retries and the tasks are
+     * walked one by one, so a rate-limited run would otherwise hold the lock
+     * for an unbounded stretch. Absent means "no budget".
+     */
+    deadlineAt?: number;
+    /** Clock, overridable in tests. */
+    now?: () => number;
 }
 
 /** Actions worth listing per task. `skipped` is intentionally absent: those
@@ -58,7 +68,25 @@ export interface SyncSummary {
     failed: number;
     /** Per-task log of everything except `skipped`, in processing order. */
     changes: SyncChange[];
+    /**
+     * Set when the run gave up before walking every task, holding the failure
+     * that ended it. Unset on a run that went through to the end (whether or
+     * not individual tasks failed).
+     */
+    stoppedEarly?: string;
 }
+
+/**
+ * How many failures in a row end the run.
+ *
+ * A failure that repeats for every task is not about the tasks: revoked access,
+ * a deleted calendar, a rate limit, a network that is down. Since every call
+ * retries with backoff, continuing costs up to four requests per remaining task
+ * against an API that has already refused -- minutes of traffic for a run that
+ * cannot succeed. Three in a row is past the point where per-task breakage
+ * (a heading that moved, one malformed event) explains it.
+ */
+const CONSECUTIVE_FAILURES_BEFORE_STOP = 3;
 
 function linkedEventId(props: Record<string, string>): string | undefined {
     if (props.ID) {
@@ -93,8 +121,15 @@ export async function runSync(deps: SyncDeps): Promise<SyncSummary> {
     // Order across files is irrelevant: edits and Google calls are independent.
     const ordered = [...deps.tasks].sort((a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : b.line - a.line));
 
+    let consecutiveFailures = 0;
+    const now = deps.now ?? Date.now;
+
     for (const task of ordered) {
         if (deps.signal?.aborted) {
+            break;
+        }
+        if (deps.deadlineAt !== undefined && now() > deps.deadlineAt) {
+            summary.stoppedEarly = 'time budget for this run was used up';
             break;
         }
         const props: Record<string, string> = { ...(task.properties ?? {}) };
@@ -102,6 +137,7 @@ export async function runSync(deps: SyncDeps): Promise<SyncSummary> {
         // SCHEDULED/DEADLINE timestamp (so isSyncable is true), but its linked
         // event must be deleted unconditionally -- unlike DONE, this does not
         // depend on deps.onDone (which only governs DONE).
+        let failedThisTask = false;
         const wantDelete =
             !isSyncable(task) || isCancelled(task.task_type) || (task.task_type === 'DONE' && deps.onDone === 'delete');
 
@@ -109,7 +145,7 @@ export async function runSync(deps: SyncDeps): Promise<SyncSummary> {
             if (wantDelete) {
                 const eid = linkedEventId(props);
                 if (eid) {
-                    await deleteEvent(deps.fetchFn, deps.getToken, deps.calendarId, eid);
+                    await deleteEvent(deps.fetchFn, deps.getToken, deps.calendarId, eid, { signal: deps.signal });
                     summary.deleted++;
                     note('deleted', task);
                 } else {
@@ -137,9 +173,9 @@ export async function runSync(deps: SyncDeps): Promise<SyncSummary> {
             const event = mapTaskToEvent(task, orgId, deps.mapOptions(task));
             event.id = eventId;
 
-            const res = await insertEvent(deps.fetchFn, deps.getToken, deps.calendarId, event);
+            const res = await insertEvent(deps.fetchFn, deps.getToken, deps.calendarId, event, { signal: deps.signal });
             if (res.status === 'conflict') {
-                await patchEvent(deps.fetchFn, deps.getToken, deps.calendarId, eventId, event);
+                await patchEvent(deps.fetchFn, deps.getToken, deps.calendarId, eventId, event, { signal: deps.signal });
                 summary.updated++;
                 note('updated', task);
             } else {
@@ -155,8 +191,22 @@ export async function runSync(deps: SyncDeps): Promise<SyncSummary> {
                 await deps.writer.write(task.file, task.line, task.heading, props);
             }
         } catch (e) {
+            const reason = formatError(e);
             summary.failed++;
-            note('failed', task, e instanceof Error ? e.message : String(e));
+            note('failed', task, reason);
+            failedThisTask = true;
+            consecutiveFailures++;
+            if (consecutiveFailures >= CONSECUTIVE_FAILURES_BEFORE_STOP) {
+                summary.stoppedEarly = reason;
+                break;
+            }
+        } finally {
+            // `finally`, not the tail of `try`: the body leaves through several
+            // `continue`s (nothing to do, write-back deferred), and those are
+            // successes too -- the counter has to reset for them as well.
+            if (!failedThisTask) {
+                consecutiveFailures = 0;
+            }
         }
     }
 

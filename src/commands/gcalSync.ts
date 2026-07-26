@@ -6,6 +6,7 @@ import { startLoopbackServer } from '../utils/gcal/loopback';
 import { runConnect, runDisconnect } from '../utils/gcal/connect';
 import { createAccessTokenProvider } from '../utils/gcal/accessToken';
 import { defaultDbusRun } from '../utils/gcal/dbus';
+import { currentConfigTarget } from '../utils/configTarget';
 import {
     listGoaGoogleAccounts,
     resolveGoaAccount,
@@ -31,8 +32,9 @@ import { EXTRACTOR_MAX_BUFFER_BYTES, EXTRACTOR_TIMEOUT_MS, extractor } from '../
 import { exec } from '../utils/exec';
 import { buildExecError } from '../utils/execError';
 import type { Task } from '../types';
-import { notifyInfo, notifyWarn } from '../utils/notify';
+import { formatError, notifyInfo, notifyWarn } from '../utils/notify';
 import { debounce, type DebouncedFunction } from '../utils/debounce';
+import { timestampedLine } from '../utils/logLine';
 
 const CONNECT_TIMEOUT_MS = 5 * 60 * 1000;
 
@@ -41,6 +43,17 @@ function clientIdSetting(): string {
 }
 
 const DEFAULT_CALENDAR_NAME = 'markdown-org';
+// Consecutive failed lock heartbeats after which the run gives up. The lease
+// TTL is 30 s and the heartbeat runs every 5 s, so three in a row means half
+// the TTL has passed with no renewal -- the point where another window is
+// about to consider the lock stale.
+const LOCK_HEARTBEAT_FAILURES_BEFORE_ABORT = 3;
+// Wall-clock budget for one sync run. A rate-limited API turns every call into
+// up to four requests with backoff, and the tasks are walked one at a time, so
+// without a ceiling a bad day holds the lock (and the progress notification)
+// for as long as the queue lasts. Five minutes is far above a healthy run --
+// those finish in seconds -- and far below "the rest of the session".
+const SYNC_RUN_BUDGET_MS = 5 * 60_000;
 
 /** The configured sync calendar name, falling back to DEFAULT_CALENDAR_NAME. */
 function calendarNameSetting(cfg: vscode.WorkspaceConfiguration): string {
@@ -64,10 +77,7 @@ async function resolveProviderAndAccounts(
             // not be masked as "no account". Under 'auto' it is graceful
             // degradation to OAuth.
             if (setting === 'goa') {
-                throw new Error(
-                    `failed to query GNOME Online Accounts: ${e instanceof Error ? e.message : String(e)}`,
-                    { cause: e }
-                );
+                throw new Error(`failed to query GNOME Online Accounts: ${formatError(e)}`, { cause: e });
             }
             accounts = [];
         }
@@ -249,10 +259,7 @@ export async function selectCalendar(context: vscode.ExtensionContext): Promise<
     }
     const calendarId = chosen.id || (await ensureCalendar(fetch, getToken, { name: calendarName }));
 
-    const target =
-        (vscode.workspace.workspaceFolders?.length ?? 0) > 0
-            ? vscode.ConfigurationTarget.Workspace
-            : vscode.ConfigurationTarget.Global;
+    const target = currentConfigTarget();
     await cfg.update('gcalSync.calendarId', calendarId, target);
     await notifyInfo(`Calendar set: ${chosen.id ? chosen.label : calendarName}`);
 }
@@ -293,6 +300,11 @@ function getSyncChannel(): vscode.OutputChannel {
         syncChannel = vscode.window.createOutputChannel('Markdown Org: Calendar Sync');
     }
     return syncChannel;
+}
+
+/** Append one timestamped line to the sync channel (creating it if needed). */
+function syncLog(message: string): void {
+    getSyncChannel().appendLine(timestampedLine(message));
 }
 
 function truncateHeading(heading: string): string {
@@ -359,9 +371,12 @@ async function reportSyncSummary(summary: SyncSummary, trigger: SyncTrigger): Pr
         `${summary.skipped} skipped, ${summary.deferred} deferred, ${summary.failed} failed`;
 
     const channel = getSyncChannel();
-    channel.appendLine(`[${new Date().toLocaleTimeString()}] sync (${trigger}): ${counts}`);
+    syncLog(`sync (${trigger}): ${counts}`);
     for (const c of summary.changes) {
         channel.appendLine(channelLine(c));
+    }
+    if (summary.stoppedEarly) {
+        syncLog(`sync (${trigger}) stopped early after repeated failures: ${summary.stoppedEarly}`);
     }
 
     // Background on-save runs stay silent unless something failed: a toast on
@@ -383,6 +398,11 @@ async function reportSyncSummary(summary: SyncSummary, trigger: SyncTrigger): Pr
     const segments = [`Calendar sync — ${compactCounts(summary)}`, ...shown];
     if (more > 0) {
         segments.push(`…and ${more} more`);
+    }
+    if (summary.stoppedEarly) {
+        // Without this the toast reads as a finished run that happened to have
+        // a few failures, when in fact the remaining tasks were never tried.
+        segments.push('stopped early after repeated failures');
     }
 
     const DETAILS = 'Show details';
@@ -543,7 +563,26 @@ export async function syncNow(context: vscode.ExtensionContext, opts: { trigger?
         () =>
             getSingleFlight().run(async (signal) => {
                 const lockPath = await lockPathFor(context, workspaceDir);
-                const lock = await acquireLock({ path: lockPath });
+                // A lease that stops being renewed is not a cosmetic problem:
+                // once it goes stale another window takes the lock and starts a
+                // second pass writing the same files and the same calendar. So
+                // the first failure is reported, and a run whose lease is
+                // clearly gone aborts itself through the cooperative signal the
+                // engine already checks.
+                const lock = await acquireLock({
+                    path: lockPath,
+                    onHeartbeatError: (error, consecutiveFailures) => {
+                        if (consecutiveFailures === 1) {
+                            syncLog(`lock heartbeat failed: ${formatError(error)}`);
+                        }
+                        if (consecutiveFailures >= LOCK_HEARTBEAT_FAILURES_BEFORE_ABORT) {
+                            syncLog(
+                                `lock lease lost after ${consecutiveFailures} failed heartbeats; aborting this sync`
+                            );
+                            signal.aborted = true;
+                        }
+                    }
+                });
                 if (!lock) {
                     await notifyWarn('another Google Calendar sync is already running');
                     return;
@@ -569,7 +608,8 @@ export async function syncNow(context: vscode.ExtensionContext, opts: { trigger?
                             relPath: path.relative(workspaceDir, t.file) || t.file
                         }),
                         onDone,
-                        signal
+                        signal,
+                        deadlineAt: Date.now() + SYNC_RUN_BUDGET_MS
                     };
                     summary = await runSync(deps);
                 } finally {
@@ -606,10 +646,8 @@ export function registerGcalSaveTrigger(context: vscode.ExtensionContext): void 
                 // the details channel and surface a warning toast, otherwise an
                 // on-save sync that can never succeed fails invisibly.
                 void syncNow(context, { trigger: 'onSave' }).catch((e: unknown) => {
-                    const reason = e instanceof Error ? e.message : String(e);
-                    getSyncChannel().appendLine(
-                        `[${new Date().toLocaleTimeString()}] sync (onSave) failed before run: ${reason}`
-                    );
+                    const reason = formatError(e);
+                    syncLog(`sync (onSave) failed before run: ${reason}`);
                     void notifyWarn(`Calendar sync (on save) failed: ${reason}`);
                 });
             }, delay);

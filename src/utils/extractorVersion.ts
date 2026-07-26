@@ -1,0 +1,51 @@
+/**
+ * Version handling for the external `markdown-org-extract` binary.
+ *
+ * The extension bundles a pinned build, but `markdown-org.extractorPath` can
+ * point at any binary on the machine. An older one still answers the calls the
+ * agenda makes -- it simply omits fields added later (`timestamp_repeater` in
+ * 0.10.0, `timestamp_next` in 0.11.0), and the panel then renders as if the
+ * task had no repeater and no next occurrence. Nothing distinguishes that from
+ * a task that genuinely has neither, which is why the version is checked and
+ * reported rather than inferred from missing data.
+ *
+ * Pure and vscode-free so it can be unit-tested; the wiring lives in
+ * `extractor.ts`.
+ */
+
+/** `markdown-org-extract 0.11.0` -> `0.11.0`. Undefined when unrecognised. */
+export function parseExtractorVersion(stdout: string): string | undefined {
+    const m = /(\d+)\.(\d+)\.(\d+)/.exec(stdout ?? '');
+    return m ? `${m[1]}.${m[2]}.${m[3]}` : undefined;
+}
+
+/**
+ * Compare two `MAJOR.MINOR.PATCH` strings. Returns a negative number when `a`
+ * precedes `b`, zero when equal, positive otherwise. Pre-release suffixes are
+ * not part of the extractor's versioning scheme and are ignored.
+ */
+export function compareVersions(a: string, b: string): number {
+    const parts = (v: string): number[] => {
+        const m = /(\d+)\.(\d+)\.(\d+)/.exec(v);
+        return m ? [Number(m[1]), Number(m[2]), Number(m[3])] : [0, 0, 0];
+    };
+    const [aMajor, aMinor, aPatch] = parts(a);
+    const [bMajor, bMinor, bPatch] = parts(b);
+    return aMajor - bMajor || aMinor - bMinor || aPatch - bPatch;
+}
+
+/**
+ * The warning shown for a binary older than the pinned version, or undefined
+ * when there is nothing to say (unparseable output, or a version at or above
+ * the pin -- a newer binary is expected to stay compatible).
+ */
+export function extractorVersionWarning(actual: string | undefined, required: string): string | undefined {
+    if (!actual || compareVersions(actual, required) >= 0) {
+        return undefined;
+    }
+    return (
+        `markdown-org.extractorPath points at markdown-org-extract ${actual}, ` +
+        `older than the ${required} this version expects. Repeat tooltips and the ` +
+        'next-occurrence date may be missing or wrong; clear the setting to use the bundled binary.'
+    );
+}

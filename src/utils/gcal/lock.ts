@@ -39,6 +39,13 @@ interface LockData {
 
 export interface Lock {
     release(): Promise<void>;
+    /**
+     * How many heartbeat writes have failed in a row. Non-zero means the lease
+     * is no longer being renewed: after `ttlMs` another process considers the
+     * lock stale and takes it, while this run is still writing. A long-running
+     * caller should check this and stop.
+     */
+    failedHeartbeats(): number;
 }
 
 export interface AcquireOptions {
@@ -48,6 +55,13 @@ export interface AcquireOptions {
     now?: () => number;
     pid?: number;
     hostname?: string;
+    /**
+     * Called on every failed heartbeat write with the reason and the number of
+     * consecutive failures, so the caller can report it and decide when to
+     * abandon the run. Silence used to be the only behaviour: the lease simply
+     * stopped being renewed.
+     */
+    onHeartbeatError?: (error: unknown, consecutiveFailures: number) => void;
 }
 
 async function tryCreate(path: string, data: LockData): Promise<boolean> {
@@ -64,11 +78,29 @@ async function tryCreate(path: string, data: LockData): Promise<boolean> {
     }
 }
 
-async function readLock(path: string): Promise<LockData | undefined> {
+/**
+ * Read the lock file.
+ *
+ * The three outcomes are kept apart on purpose. "missing" is a free lock;
+ * "unreadable" is an I/O failure or a corrupt file, and treating that as a free
+ * lock is how a transient read error turns into two syncs writing the same
+ * files at once. Only "held" carries data.
+ */
+type LockRead = { kind: 'held'; data: LockData } | { kind: 'missing' } | { kind: 'unreadable' };
+
+async function readLock(path: string): Promise<LockRead> {
+    let raw: string;
     try {
-        return JSON.parse(await readFile(path, 'utf8')) as LockData;
+        raw = await readFile(path, 'utf8');
+    } catch (e) {
+        return (e as NodeJS.ErrnoException).code === 'ENOENT' ? { kind: 'missing' } : { kind: 'unreadable' };
+    }
+    try {
+        return { kind: 'held', data: JSON.parse(raw) as LockData };
     } catch {
-        return undefined;
+        // Present but not parseable: someone's partially-written or corrupt
+        // file. Not ours to steal on this pass.
+        return { kind: 'unreadable' };
     }
 }
 
@@ -89,7 +121,11 @@ export async function acquireLock(opts: AcquireOptions): Promise<Lock | null> {
     let created = await tryCreate(opts.path, data);
     if (!created) {
         const existing = await readLock(opts.path);
-        const stale = !existing || now() - existing.heartbeatAt > ttl;
+        if (existing.kind === 'unreadable') {
+            // Cannot tell whether it is alive; assume it is.
+            return null;
+        }
+        const stale = existing.kind === 'missing' || now() - existing.data.heartbeatAt > ttl;
         if (!stale) {
             return null;
         }
@@ -105,23 +141,44 @@ export async function acquireLock(opts: AcquireOptions): Promise<Lock | null> {
     }
 
     let timer: ReturnType<typeof setInterval> | undefined;
+    let consecutiveFailures = 0;
     if (hbMs > 0) {
         timer = setInterval(() => {
             // Atomic replace (temp file + rename), never a truncating write:
             // a concurrent readLock must not observe a partially-written file
             // and mistake a live lock for a stale one.
-            void atomicWrite(opts.path, JSON.stringify({ ...data, heartbeatAt: now() })).catch(() => {});
+            void atomicWrite(opts.path, JSON.stringify({ ...data, heartbeatAt: now() })).then(
+                () => {
+                    consecutiveFailures = 0;
+                },
+                (err: unknown) => {
+                    consecutiveFailures++;
+                    try {
+                        opts.onHeartbeatError?.(err, consecutiveFailures);
+                    } catch {
+                        // The callback belongs to the caller and this chain is
+                        // fire-and-forget, so a throw from it would become an
+                        // unhandled rejection -- which this extension registers
+                        // no handler for, meaning it would surface nowhere at
+                        // all. The failure is still counted above, which is
+                        // what `failedHeartbeats()` reports.
+                    }
+                }
+            );
         }, hbMs);
         timer.unref?.();
     }
 
     return {
+        failedHeartbeats(): number {
+            return consecutiveFailures;
+        },
         async release(): Promise<void> {
             if (timer) {
                 clearInterval(timer);
             }
             const cur = await readLock(opts.path);
-            if (cur?.nonce === nonce) {
+            if (cur.kind === 'held' && cur.data.nonce === nonce) {
                 try {
                     await unlink(opts.path);
                 } catch {

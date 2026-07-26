@@ -56,7 +56,7 @@ export async function busctlCall(run: DbusRun, spec: DbusCallSpec): Promise<unkn
     if (!parsed || !Array.isArray(parsed.data)) {
         throw new Error(`busctl ${spec.method}: unexpected output`);
     }
-    return parsed.data;
+    return parsed.data as unknown[];
 }
 
 /** Fallback for the scalar GetAccessToken (s,i) via `gdbus call`. GVariant text

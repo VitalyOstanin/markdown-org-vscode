@@ -2,8 +2,10 @@ import * as vscode from 'vscode';
 import * as path from 'path';
 import * as fs from 'fs';
 import { exec } from './exec';
-import { notifyError } from './notify';
+import { notifyError, notifyWarn } from './notify';
 import { findBundledBinary } from './bundledBinary';
+import { extractorVersionWarning, parseExtractorVersion } from './extractorVersion';
+import { logDiagnostic } from './logChannel';
 
 export const EXTRACTOR_TIMEOUT_MS = 30_000;
 export const EXTRACTOR_MAX_BUFFER_BYTES = 10 * 1024 * 1024;
@@ -20,7 +22,11 @@ async function lookupInPath(name: string): Promise<boolean> {
         await new Promise<void>((resolve, reject) => {
             exec.execFile(whichBin, [name], { timeout: WHICH_TIMEOUT_MS }, (error) => {
                 if (error) {
-                    reject(error);
+                    // `ExecFileException` is an interface, not a subclass of
+                    // Error, so it is wrapped: the rejection reason should be a
+                    // real Error even though the only consumer is the `catch`
+                    // below, which discards it.
+                    reject(error instanceof Error ? error : new Error(error.message));
                 } else {
                     resolve();
                 }
@@ -30,6 +36,61 @@ async function lookupInPath(name: string): Promise<boolean> {
         return false;
     }
     return true;
+}
+
+/** Paths already checked, so the warning is shown once per session per binary. */
+const versionCheckedPaths = new Set<string>();
+
+/** `<binary> --version`, or undefined when the call fails. */
+function readExtractorVersion(command: string): Promise<string | undefined> {
+    return new Promise((resolve) => {
+        exec.execFile(command, ['--version'], { timeout: WHICH_TIMEOUT_MS, encoding: 'utf-8' }, (error, stdout) => {
+            resolve(error ? undefined : parseExtractorVersion(stdout));
+        });
+    });
+}
+
+/**
+ * Warn once when a user-configured binary is older than the version this
+ * release expects. Only the configured path is checked: the bundled one is
+ * fetched against the same pin and verified in CI.
+ *
+ * Failure to run `--version` is treated as "unknown version" and stays silent
+ * except for a line in the output channel -- a binary that cannot report its
+ * version may still be a working extractor, and the calls that matter report
+ * their own errors.
+ */
+async function warnIfExtractorOutdated(command: string): Promise<void> {
+    if (versionCheckedPaths.has(command)) {
+        return;
+    }
+    versionCheckedPaths.add(command);
+    const required = requiredExtractorVersion();
+    if (!required) {
+        return;
+    }
+    const actual = await readExtractorVersion(command);
+    if (!actual) {
+        logDiagnostic(`Could not read the version of the configured extractor '${command}'.`);
+        return;
+    }
+    const warning = extractorVersionWarning(actual, required);
+    if (warning) {
+        notifyWarn(warning);
+    }
+}
+
+/** The pinned extractor version from the manifest (`x-markdown-org`). */
+function requiredExtractorVersion(): string | undefined {
+    try {
+        const manifestPath = path.resolve(__dirname, '..', '..', 'package.json');
+        const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8')) as {
+            'x-markdown-org'?: { extractorVersion?: string };
+        };
+        return manifest['x-markdown-org']?.extractorVersion;
+    } catch {
+        return undefined;
+    }
 }
 
 async function doResolveExtractorPath(): Promise<string | undefined> {
@@ -50,6 +111,7 @@ async function doResolveExtractorPath(): Promise<string | undefined> {
                 );
                 return undefined;
             }
+            await warnIfExtractorOutdated(customPath);
             return customPath;
         }
         if (!(await lookupInPath(customPath))) {
@@ -59,13 +121,15 @@ async function doResolveExtractorPath(): Promise<string | undefined> {
             );
             return undefined;
         }
+        await warnIfExtractorOutdated(customPath);
         return customPath;
     }
 
     // Priority 2: binary shipped inside the VSIX. This file compiles to
     // `<extensionPath>/out/utils/extractor.js`, so `../..` from `__dirname`
     // points at the extension root where `bin/` lives. Falls through when
-    // running from a dev checkout without `npm run prepare-bin` first.
+    // running from a dev checkout that has not fetched the binary
+    // (`scripts/download-extractor.sh <target>`).
     const extensionPath = path.resolve(__dirname, '..', '..');
     const bundled = findBundledBinary(extensionPath, process.platform);
     if (bundled !== undefined) {

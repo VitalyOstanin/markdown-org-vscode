@@ -8,8 +8,12 @@
 // Google recurring event is a fixed grid with no such notion, so the prefix
 // does not affect the RRULE and is ignored here.
 
-// prefix (ignored) + value + unit. Anchored so trailing junk is rejected.
-const REPEATER_RE = /^[.+]+(\d+)(wd|[dwmyh])$/;
+// prefix (ignored) + value + unit, matching the extractor's own grammar
+// (`parse_repeater`): the prefix is exactly one of `+`, `++`, `.+`, the step is
+// a positive integer, and the unit is lower-case. A wider pattern here would
+// accept strings the extractor never emits and rejects on its own side
+// (`+++1d`, `+0d`, `+1H`).
+const REPEATER_RE = /^(?:\+\+|\.\+|\+)([1-9]\d*)(wd|[dwmyh])$/;
 
 const UNIT_TO_FREQ: Record<string, string> = {
     d: 'DAILY',
