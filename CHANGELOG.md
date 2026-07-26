@@ -2,34 +2,368 @@
 
 All notable changes to the "Markdown Org" extension will be documented in this file.
 
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
 ## [Unreleased]
+
+## [0.12.0] - 2026-07-26
 
 ### Added
 
-- Selectable agenda visual style: the setting `markdown-org.agendaStyle`
-  (`monospace` | `native` | `hybrid` | `table`, default `table`) plus an
-  in-panel style menu and the `Markdown Org: Cycle Agenda Style` command. The
-  style applies to all agenda modes (day/week/month/tasks), including the month
-  calendar.
-- `markdown-org.agendaFontFamily` to override the proportional font used by the
-  `native` and `hybrid` styles. Empty (default) uses the system UI stack; the
-  `monospace` style ignores it.
-- `table` agenda style: a compact list where each task carries a status dot, a
-  large time, and a per-task type-flag column (deadline / scheduled / repeat /
-  cancelled). Available from the style menu, the `Cycle Agenda Style` command,
-  and the `markdown-org.agendaStyle` setting.
-- A chip in the agenda control row cycles `markdown-org.agendaHeaderMode`
-  (`auto` | `full` | `compact`) and names the layout currently on; the same step
-  is in the Command Palette as `Cycle Agenda Header Layout`. The setting is
-  worth changing exactly when the panel is too short to spare a trip to the
-  settings editor.
+- `markdown-org.uiLanguage` (`auto` | `en` | `ru`, default `auto`): language of
+  the agenda interface -- mode buttons, navigation, section and group titles,
+  summary counts, and tooltips. `auto` follows `markdown-org.dateLocale` first,
+  then the VS Code display language, then English, so a `ru-RU` date locale now
+  also gives a Russian interface. Dates keep following `dateLocale`.
+- `markdown-org.agendaFontFamily` to override the proportional agenda font.
+  Empty (default) uses `'Adwaita Sans', 'Noto Sans', system-ui, sans-serif`.
+- `markdown-org.agendaHeaderMode` (`auto` | `full` | `compact`, default `auto`):
+  a compact agenda header that puts the weekday or month title on the control
+  row and tightens the spacing, for panels short enough that the full header --
+  about a fifth of the height -- crowds out the tasks below it. `auto` decides by
+  what the full header actually costs: it goes compact once that header would
+  take a fifth of the panel and back once it would take under 0.15 of it, and
+  follows the panel as it is resized. The two other values pin the layout. No
+  control is hidden in either layout. A chip in the control row cycles the three
+  values and names the current one; the same step is in the Command Palette as
+  `Cycle Agenda Header Layout`. The layout is worth changing exactly when the
+  panel is too short to spare a trip to the settings editor.
+- Hotkeys for the two agenda views that had none, so all four are reachable from
+  the keyboard: `Ctrl+K Ctrl+K Ctrl+Y` (Day) and `Ctrl+K Ctrl+K Ctrl+L` (Tasks).
+  Like Week and Month, they work both in a Markdown editor and while the agenda
+  panel has focus.
+- Agenda view history with `Markdown Org: Go Back in Agenda` (`Alt+Shift+-`) and
+  `Markdown Org: Go Forward in Agenda` (`Alt+Shift+=`), which replay the mode and
+  anchor date of the views you opened. Both are ordinary keybindings scoped to
+  the agenda panel, so they show up in Keyboard Shortcuts and can be rebound.
+  The control row carries the pair as buttons as well, each naming its chord in
+  the tooltip: the two commands were reachable only by a chord nothing in the
+  panel mentioned.
+
+### Fixed
+
+- The agenda now tells the extractor which day is "today" (`--current-date`)
+  instead of leaving it to the extractor's own timezone default of
+  `Europe/Moscow`. Only the window anchor was being passed, so users whose
+  calendar day differs from Moscow's at the moment of the call saw the
+  neighbouring day's agenda: tasks moved to overdue a day early or lingered in
+  upcoming, and the next occurrence of a repeating task was named one day off.
+- Numbers on the agenda follow the date locale's numbering system, like the
+  dates beside them. The year in the header subtitle, the day numbers and count
+  chips of the month grid, and the card summary counts were printed as raw
+  numbers, so a locale with non-Latin digits (for example `ar-EG`) mixed the two
+  systems within one line.
+- An agenda left open across midnight now moves to the new day. The refresh kept
+  the anchor the panel was opened with, so a day view still showed yesterday, a
+  week view the previous week on the Sunday-to-Monday step, and a month view the
+  previous month on the 31st. A panel the user had navigated elsewhere keeps its
+  anchor and is only refreshed.
+- CLOCK lines with unusual spacing around `=>` or after `CLOCK:` are counted in
+  the clocktable. The extractor already accepted them, so the same file could
+  produce two different totals depending on which of the two read it.
+- The compact agenda header now actually places the title on the control row.
+  The rule that was meant to move it had no effect on a block container, so the
+  layout only shrank the type -- the header still spent a line on the title, in
+  the one case where the setting exists to reclaim it.
+- Agenda webview escaping now covers quotes. Values interpolated into quoted
+  HTML attributes (`data-file`, `data-priority`, `title`, ...) went through an
+  escape that left `"` and `'` untouched, so a task file whose name contained a
+  double quote could close its attribute and inject another one -- a duplicate
+  `data-line` wins over the real one when the tag is parsed, sending a click to
+  a different location. The escape is now a string replacement covering
+  `& < > " '`, which also removes a DOM round-trip performed 10-12 times per
+  rendered task line.
+- The anchor date posted by the webview is validated as a real `YYYY-MM-DD`
+  calendar day before it reaches the extractor's `--date` argument.
+- Month navigation no longer skips short months. Prev/Next shifted the anchor
+  date itself, so from the 31st the step landed past a 30-day month and February
+  was unreachable from the 29th onward; the anchor is now taken to day 1 of the
+  target month.
+- Google Calendar sync survives transient failures instead of reporting a broken
+  sync: 429 and 5xx responses are retried with capped exponential backoff that
+  honours `Retry-After`. Per-task failure reasons are written to the sync
+  channel rather than dropped, the sync-on-save handler no longer swallows
+  errors raised before the sync starts, and the cross-process lock rewrites its
+  heartbeat atomically (temp file plus rename) so a concurrent reader cannot see
+  a truncated lock file and take the lock from a running sync.
+- An invalid `markdown-org.dateLocale` no longer empties the agenda. A tag
+  `Intl` refuses (`ru_RU` for `ru-RU`) threw during rendering and left a blank
+  panel with no message; the value is now checked once, falls back to `en-US`,
+  and is reported in a warning that names the rejected setting.
+- A failure inside the agenda page is now reported instead of showing an empty
+  panel: the webview forwards render errors (and any uncaught error or rejected
+  promise) to the extension, which surfaces one message per panel. Previously
+  such a failure was only visible in the webview developer console.
+- The week view no longer throws when the extractor returns something other
+  than a list of days; it renders empty, like the other views already did.
+- A failure to open the panel is reported as such instead of as
+  "Failed to load agenda", which pointed at the extractor.
+- The reason holidays could not be loaded is written to the "Markdown Org"
+  output channel. The agenda still renders without them (an older extractor has
+  no `--holidays`), but a broken binary is no longer indistinguishable from an
+  old one.
+- Clicking a task in the agenda opens it once again. The click handler was
+  attached to the (permanent) content element on every render, so each refresh
+  -- one per save of a watched `.md` file -- stacked another handler, and a
+  single click then opened the same task once per accumulated render.
+- `markdown-org.agendaFontFamily` is validated before it is written into the
+  agenda stylesheet: only a plain font stack is accepted, anything carrying CSS
+  syntax (braces, semicolons, `url(...)`, comments) is ignored in favour of the
+  default. Changing the setting now re-renders an open agenda instead of taking
+  effect only in the next panel, and its description names the actual default
+  stack.
 
 ### Changed
 
-- The agenda webview now defaults to the `table` style (a compact list with a
-  status dot, a large time, and a per-task type-flag column). To keep the
-  previous monospaced look, set `markdown-org.agendaStyle` to `monospace`; the
-  `hybrid` and `native` styles remain available too.
+- Dates the agenda writes itself now follow `markdown-org.dateLocale` instead of
+  always using a day-first `DD.MM.YYYY`: the offset column and the flag tooltips
+  show `08/12/2026` for `en-US` and `12.08.2026` for `ru-RU`, matching the day
+  headers and the hero title, which already went through the locale.
+- Changing `markdown-org.dateLocale` with the agenda open now also changes the
+  dates. Only the labels followed before, leaving a half-translated panel until
+  the panel was reopened.
+- `markdown-org.uiLanguage: auto` now reaches its second step. The date locale
+  is consulted only when you actually set it, so a Russian VS Code with default
+  settings gets a Russian agenda -- previously the setting's own `en-US` default
+  matched first and the display language never applied.
+- Documented what the UI language covers: the agenda panel. Notification
+  messages the extension raises through VS Code stay in English.
+- README screenshots and demo recordings were recaptured against the current
+  interface, and now ship in two editor themes -- Monokai and Solarized Light.
+  Each one is embedded through `<picture>` with `prefers-color-scheme`, so a
+  renderer that honours the media query (GitHub does) serves the set matching
+  the reader's own colour scheme; elsewhere the light variant is the fallback.
+  The recording scripts take the theme as an argument and record both by
+  default.
+- The VSIX no longer carries the demo GIFs. In two themes they come to about
+  20 MB, shipped four times over (one package per platform) to save a network
+  fetch in a single place -- the in-editor Extensions preview. Every README
+  embed loads from GitHub anyway: packaging rewrites image sources to absolute
+  URLs. The package is back to 2.77 MB.
+- Bundled extractor bumped from 0.10.0 to 0.11.0, which resolves the next
+  still-upcoming occurrence of a repeating task (`timestamp_next`). The repeat
+  tooltip now names that date, instead of the stored timestamp, which for an
+  overdue task lies in the past. Where the extractor emits no resolved
+  occurrence -- the Tasks view, which carries no dates at all, or an older
+  extractor -- the tooltip names the task's own date ("dated 12.08.2026")
+  rather than passing it off as the next one. For an hourly repeater the
+  resolved occurrence is a whole day, so the tooltip shows the date without a
+  clock time.
+- Removed what was left of the multi-preset agenda: the `data-agenda-style` hook
+  on the body and every selector scoped to it, the hidden `todo:` label, the
+  stacked time-info cell (and the whole `buildTimeInfo` computation that filled
+  it for every task row), and the today arrows in the day header. Rules that
+  could never apply are gone with them, so the stylesheet now says once what the
+  agenda looks like.
+- Redesigned the agenda: one compact list style where each task carries a status
+  dot, a large time, and a type-flag column (deadline / scheduled / repeat /
+  cancelled). The Day and Tasks views are cards -- a sticky summary bar plus
+  section panels with count chips (by time of day, and by priority in Tasks) --
+  and the month calendar shows per-day task counts (red when a day holds
+  something overdue) instead of a binary dot.
+- The sticky top bar groups Prev / Today / Next as a secondary segment next to
+  the mode switch, and day headers pin below it while their tasks scroll.
+  Clicking a week day header opens that day in Day view.
+- The hero date in the agenda header is capitalised regardless of how the
+  locale spells the weekday.
+- Every clickable surface of the agenda is now a button, not a `<div>` with a
+  click handler: the tag dropdown rows and the month cells join the mode
+  segment, so they take keyboard focus and respond to Enter/Space. One focus
+  ring covers all of them -- the mode segment had none at all.
+- The two count chips that are the same component now look the same: the month
+  cell's task load and the card section count shared no shape (20px/0.78em
+  against 22px/0.8em) and only one of them explained its number. Both take the
+  shared size and both carry a tooltip; the month cell itself carries the same
+  "open this day" tooltip the week day header always had.
+- Corner radii and font sizes in the agenda stylesheet come from token scales
+  (`--radius-sm/-md/-pill`, `--font-xs..-xl`) like the spacing scale already
+  did, replacing four ad-hoc radii and ten nearly identical font steps. The tag
+  dropdown panel picks up the rounding and shadow it was missing under its
+  rounded trigger.
+- `Markdown Org: Agenda: Go Back` and `... Go Forward` are now
+  `Markdown Org: Go Back in Agenda` / `Go Forward in Agenda`: the Command
+  Palette showed the category twice.
+- Documented in the README which VS Code default chords the extension's
+  bindings deliberately shadow, and where.
+- The agenda is proportional throughout: the previous monospaced grid is gone,
+  and numeric columns line up via `tabular-nums` instead of a mono font. All
+  colors still come from VS Code theme tokens, so light / dark / high-contrast
+  themes are followed.
+
+### Internal
+
+- The three settings that name an executable or a directory --
+  `markdown-org.extractorPath`, `markdown-org.maintainFilePath` and
+  `markdown-org.workspaceDir` -- are declared as
+  `restrictedConfigurations`, so a workspace opened in Restricted Mode cannot
+  supply them. `extractorPath` is a path the extension spawns; a repository
+  carrying a `.vscode/settings.json` could point it at a binary of its own and
+  have opening the agenda run it.
+- The release archive of the bundled extractor is pinned by SHA-256
+  (`x-markdown-org.extractorSha256`, one digest per platform target) and
+  `scripts/download-extractor.sh` refuses to install an archive that does not
+  match. The script already compared the archive against the `.sha256` file
+  published beside it, which detects a corrupted download but not a replaced
+  asset -- both come from the same release page. A digest recorded in this
+  repository is an independent anchor.
+- A Google Calendar sync run now has a time budget of five minutes and reports
+  in the sync channel when it stops early, instead of walking the whole task
+  list however long that takes: a large workspace behind a rate-limited account
+  spent the backoff waits of every task in one run. Retries also cover the case
+  where there is no response at all -- a dropped connection, a DNS or TLS
+  failure -- which used to bypass the retry loop that only ever looked at status
+  codes. The backoff is spread by a random factor, since several windows share
+  the account but not the lock and a common 429 had them retry in lockstep, and
+  a wait in progress is interrupted when the run loses its lock rather than
+  sleeping the remaining seconds out.
+- `tsconfig.webview.json` is excluded from the VSIX. Only the host `tsconfig.json`
+  was, so the second project's configuration shipped to every user.
+- `.vscode/launch.json` and `.vscode/tasks.json` are in the repository, so F5
+  starts an Extension Development Host with both TypeScript projects built
+  first. `DEVELOPMENT.md` described the flow but the configuration it needs was
+  never committed.
+- The integration suites wait on a shared set of conditions
+  (`src/test/integration/_helpers.ts`) instead of each file re-implementing its
+  own polling, and the agenda client memoises the date titles it formats: the
+  month grid asked `Intl` for the same 35 strings on every render.
+- The VSIX now carries the licence notices of the crates linked into the
+  bundled extractor, as `bin/THIRD-PARTY-LICENSES.markdown-org-extract.txt`.
+  The binary is statically linked and around a hundred crates end up inside
+  it; several of their licences (BSD-2-Clause, BSD-3-Clause/WHATWG, the
+  Unicode ones, plain MIT) require the notice to travel with a binary
+  redistribution, and only the extractor's own `LICENSE` was shipped. The
+  notice file is generated in `markdown-org-extract` from its dependency
+  graph and rides in its release archives from 0.11.1 on;
+  `scripts/download-extractor.sh` unpacks it next to the binary and the
+  release smoke test requires the path. The pinned extractor version moves
+  from 0.11.0 to 0.11.1 (no behaviour change in the binary).
+- The release workflow now runs the same tests as CI. It never downloaded the
+  bundled extractor, so the suite that checks the binary runs and matches the
+  pinned version skipped itself on the one path that publishes; it also has the
+  VS Code build cache CI has. Both cache keys carry an ISO week, because the
+  downloaded build is `stable` and nothing hashed changes when it moves.
+- Every `actions/checkout` sets `persist-credentials: false`. No job runs git
+  operations after checkout, so leaving the token in `.git/config` only exposed
+  it to later steps -- including the publish job, whose token can write to the
+  repository and whose `ovsx` CLI is fetched at run time. That CLI is now pinned
+  to 1.0.2 (was 0.10.12; the 1.0.0 release carried dependency bumps only).
+- The integration coverage gate now measures the host code only. The webview
+  client sat in the denominator at 20% of lines and 0% of functions -- the file
+  being read for inlining, not executed -- pinning 13% of the total at a number
+  no test could move. With it excluded the same run reports 80% of lines instead
+  of 72%, and the floors were raised from 70/68/73 to 78/68/73.
+- Documentation corrections: the "Shadowed VS Code chords" table named the wrong
+  default for two rows (`Ctrl+K Ctrl+P` shadows Show All Editors By Appearance,
+  not Copy Path; `Ctrl+K Ctrl+M` shadows Toggle Maximize Editor Group, not
+  Change Language Mode) and did not mention the `Ctrl+K Ctrl+K` prefix or that
+  Cycle Tag Filter takes it in every editor; the `src/` tree in DEVELOPMENT.md
+  listed a directory removed with the old test runner and omitted two that
+  exist; ADR-0012 was missing its `Status` section.
+- Two ADRs recorded: [ADR-0015](docs/adr/0015-pin-today-with-current-date.md)
+  (pin "today" with `--current-date`), which supersedes ADR-0007, whose stated
+  contract with the extractor did not hold.
+- The agenda webview client moved out of the HTML template literal into
+  `src/webview/agendaClient.ts`, a TypeScript project of its own (`lib: dom`,
+  referenced from the host `tsconfig.json`; `npm run compile` is now `tsc -b`).
+  The ~780 lines that ran in the page were previously invisible to `tsc`, ESLint
+  and Prettier; they are now checked like the rest of the source. The helpers
+  inlined next to the client are type-checked against the contract it is written
+  against, so a changed signature fails the build instead of the page. See
+  [ADR-0012](docs/adr/0012-webview-client-as-a-typed-project.md).
+- Two decisions this release rests on are written down as ADRs:
+  [ADR-0013](docs/adr/0013-agenda-ui-language-own-dictionary.md) (the agenda's
+  own UI language setting and dictionary instead of `vscode.l10n`, because the
+  panel follows the date locale rather than the editor display language) and
+  [ADR-0014](docs/adr/0014-single-agenda-style.md) (one agenda look, no style
+  switcher).
+- Coverage thresholds now actually gate. The CI coverage job was
+  `continue-on-error`, so a drop through a floor was invisible; only the Codecov
+  uploads stay non-blocking now. The unit profile excludes modules that cannot
+  load without a VS Code host (they used to sit in the denominator as permanent
+  zeros, holding the floor down to 48%; it is 95% lines / 92% branches / 96%
+  functions now), and the integration run -- which covers those modules -- got a
+  gate of its own, since `@vscode/test-cli` emits lcov but has no threshold
+  option (`scripts/check-lcov-thresholds.js`).
+- Google Calendar sync stops writing when it no longer holds the lock. A failed
+  lock heartbeat used to be swallowed, so the lease quietly stopped being
+  renewed and, once it went stale, a second window could take the lock and run
+  a parallel pass over the same files and the same calendar. Failures are now
+  reported to the sync channel and abort the run after three in a row; a lock
+  file that cannot be read (as opposed to one that is absent) is no longer
+  treated as free.
+- One transient retry no longer drags a token refresh along: after a 401, every
+  later 429/5xx retry of the same call was forcing a fresh token, up to three
+  needless round trips to the token endpoint.
+- A `markdown-org.extractorPath` pointing at an extractor older than the one
+  this release expects is now reported once, naming both versions. An old
+  binary answers every call the agenda makes and simply omits fields added
+  later, so the panel rendered as if those tasks had no repeater and no next
+  occurrence -- indistinguishable from tasks that genuinely have neither. A
+  binary that cannot report its version is not treated as outdated.
+- The CLOCK table accepts exactly what the extractor accepts: a negative
+  duration (`=> -2:00`), a minutes field of 60 or more and anything past the
+  10000-hour bound are dropped instead of being summed. The two projects read
+  the same lines off disk and used to disagree on the total for one file.
+- README: the repeater documentation matches the shipped behaviour. `+Nh` in
+  the agenda means "every day, N ignored" (the agenda is a day grid), while
+  Google Calendar sync maps it to `FREQ=HOURLY;INTERVAL=N`; and the sync
+  limitation "repeaters collapse to one event" is gone -- they became real
+  recurring events in 0.11.0, with `+Nwd` (N > 1) the one shape that stays
+  one-shot.
+- The VSIX now carries the bundled extractor's own MIT notice next to the
+  binary (`bin/LICENSE.markdown-org-extract`), checked by the release smoke
+  test. `markdown-org-extract` is a separate work with its own copyright line,
+  so the extension's `LICENSE.txt` does not cover it. Aggregated notices for
+  the crates linked into that binary are tracked in `TODO.md`.
+- Dependencies: `npm audit` reports no vulnerabilities (eight advisories in the
+  dev tree, seven of them high, were closed by updates plus one `overrides`
+  entry). `@types/vscode` is pinned to the exact `engines.vscode` minimum, so
+  the API surface the code compiles against is the one the manifest promises --
+  a caret range had it building against 1.120 while claiming 1.85. The build
+  and test runtime moves to Node 24, the active LTS line (this affects
+  development only; the extension runs on VS Code's own Node). ESLint,
+  Prettier, typescript-eslint, sinon, c8, vsce and both `@vscode/test-*`
+  packages updated; the audit steps in CI now scan the dev tree, which is the
+  entire dependency surface -- there are no production dependencies, so the
+  previous `--omit=dev` scan passed by construction.
+- The build moved off `moduleResolution: node10`, deprecated and slated for
+  removal in TypeScript 7, to `node16` in both projects; the emitted output is
+  still CommonJS, as the extension host requires. `noImplicitOverride` is on.
+- Type-aware linting is on (`recommendedTypeChecked` with the project service),
+  so rules that need type information -- floating promises, misused promises,
+  unnecessary assertions -- actually run; they were silently skipped before.
+  `eslint .` now also covers the `.js`/`.mjs` scripts and configs, which were
+  outside the lint scope entirely, and `eqeqeq` is enforced.
+- CI now fetches the bundled extractor before the tests, so the suite that
+  checks the binary runs and that its version matches
+  `x-markdown-org.extractorVersion` stops skipping itself. It had been skipping
+  in every CI run (four "pending") while passing on developer machines, which
+  is exactly where a version mismatch would have gone unnoticed.
+- CI hardening: `id-token: write` (CI) and `contents: write` (release) are
+  scoped to the single job that needs each, instead of being granted to every
+  job -- including those that run `npm ci` and unpack a downloaded binary. The
+  `workflow_dispatch` tag input reaches shell scripts through the environment
+  rather than `${{ }}` interpolation. The VS Code build used by the integration
+  tests is cached (~295 MB, previously re-downloaded four times per run), and
+  the runner is checked for `xvfb-run` instead of discovering its absence as an
+  Electron display error. npm is now covered by Dependabot; it had only the
+  weekly report workflows, which print to a log and open nothing.
+- `--ozone-platform=x11` is passed to the test VS Code on Linux only, matching
+  the environment the test wrapper sets; Ozone does not exist on macOS or
+  Windows.
+- The agenda integration suite waits for the panel to render instead of sleeping
+  a fixed 300 ms after each command: fewer flakes on a loaded machine and the
+  suite runs in about half the time.
+- New contract test: every command declared in `contributes.commands` must be
+  registered at runtime, so a manifest entry with no `registerCommand` fails the
+  build instead of showing up as "command not found" in the palette.
+- Documentation brought back in step with the code: the month-calendar notes
+  describe the count chip and theme tokens rather than the removed dot and
+  hardcoded hex colours, `DEVELOPMENT.md` describes `src/` by directory (the
+  hand-listed file tree had gone stale) and states that the integration runner
+  starts `xvfb-run` itself on any Linux session, and two broken links (one in
+  this file, one in ADR-0004) now point at existing anchors.
 
 ## [0.11.1] - 2026-07-18
 
@@ -251,7 +585,7 @@ All notable changes to the "Markdown Org" extension will be documented in this f
 ### Changed
 
 - `markdown-org.extractorPath` default changed from `"markdown-org-extract"` to `""` (empty). An empty value now means "use the bundled binary, fall back to PATH"; existing absolute or custom-name overrides keep their previous behaviour. The Settings page description has been rewritten to match.
-- README's Quick Start no longer requires a separate `cargo install`. The "Dependencies" section now documents the bundled binary and points the override scenarios to [`markdown-org.extractorPath`](#markdown-orgextractorpath).
+- README's Quick Start no longer requires a separate `cargo install`. The "Dependencies" section now documents the bundled binary and points the override scenarios to [`markdown-org.extractorPath`](README.md#markdown-orgextractorpath).
 
 ### Internal
 
@@ -318,7 +652,7 @@ All notable changes to the "Markdown Org" extension will be documented in this f
 
 ### Internal
 
-- Hardened the release/CI surface end-to-end against a long-form project-check review (100+ findings, all closed):
+- Hardened the release/CI surface end-to-end against a long-form audit (100+ findings, all closed):
     - Annotated tags are now required for publish, the GitHub Release body is populated from `CHANGELOG.md`, and a VSIX smoke-test runs in the release workflow before the artifact is uploaded.
     - `.vscodeignore` now drops test runtime artifacts (`coverage/`, `.husky/`, `.c8rc.json`) so they cannot leak into the Marketplace VSIX.
     - macOS and Windows CI runners pinned to fixed images (`macos-15`, `windows-2025`, `ubuntu-24.04`); a weekly scheduled `npm audit` job and a Dependabot group for `github-actions` updates were added.
@@ -489,3 +823,27 @@ All notable changes to the "Markdown Org" extension will be documented in this f
 ### Dependencies
 
 - Requires [markdown-org-extract](https://crates.io/crates/markdown-org-extract) utility
+
+[Unreleased]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.11.1...v0.12.0
+[0.11.1]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.11.0...v0.11.1
+[0.11.0]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.10.0...v0.11.0
+[0.10.0]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.9.0...v0.10.0
+[0.9.0]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.8.0...v0.9.0
+[0.8.0]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.7.0...v0.8.0
+[0.7.0]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.6.1...v0.7.0
+[0.6.1]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.6.0...v0.6.1
+[0.6.0]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.5.1...v0.6.0
+[0.5.1]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.5.0...v0.5.1
+[0.5.0]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.4.2...v0.5.0
+[0.4.2]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.4.1...v0.4.2
+[0.4.1]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.4.0...v0.4.1
+[0.4.0]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.3.1...v0.4.0
+[0.3.1]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.2.4...v0.3.0
+[0.2.4]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.2.3...v0.2.4
+[0.2.3]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.2.2...v0.2.3
+[0.2.2]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.2.1...v0.2.2
+[0.2.1]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/VitalyOstanin/markdown-org-vscode/releases/tag/v0.1.0
