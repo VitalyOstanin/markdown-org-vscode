@@ -110,6 +110,7 @@ export const AGENDA_STYLES = `
         .nav-btn:focus-visible,
         .seg-item:focus-visible,
         .tag-menu-btn:focus-visible,
+        .chip-btn:focus-visible,
         .tag-menu-item:focus-visible,
         .calendar-day:focus-visible {
             outline: 1px solid var(--vscode-focusBorder);
@@ -240,9 +241,11 @@ export const AGENDA_STYLES = `
         .tag-menu {
             position: relative;
         }
-        /* The Tag chip mirrors the rounded date-nav "pill" so the control row
-           reads as one consistent set of affordances. */
-        .tag-menu-btn {
+        /* The Tag chip and the header-layout chip are the same component and
+           mirror the rounded date-nav "pill", so the control row reads as one
+           consistent set of affordances. */
+        .tag-menu-btn,
+        .chip-btn {
             background: var(--vscode-button-secondaryBackground);
             color: var(--vscode-button-secondaryForeground);
             border: 1px solid var(--vscode-panel-border);
@@ -254,7 +257,8 @@ export const AGENDA_STYLES = `
             line-height: 1.3;
             transition: background 0.1s ease;
         }
-        .tag-menu-btn:hover {
+        .tag-menu-btn:hover,
+        .chip-btn:hover {
             background: var(--vscode-button-secondaryHoverBackground);
         }
         /* The dropdown panel repeats the trigger's rounding and floats over the

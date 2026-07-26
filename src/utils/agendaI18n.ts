@@ -63,6 +63,14 @@ export interface AgendaStrings {
     tagAllTitle: string;
     /** `{0}` is the tag name. */
     tagFilterTitle: string;
+    /**
+     * Header-layout button: the collapsed label (`{0}` = the current mode's
+     * name), the tooltip (`{0}` = current mode, `{1}` = what one click gives),
+     * and the three mode names.
+     */
+    headerModeButton: string;
+    headerModeTitle: string;
+    headerModes: { auto: string; full: string; compact: string };
     /** Day-card section titles. */
     sections: { scheduled: string; allday: string; overdue: string };
     /** Tasks-card priority group titles. */
@@ -115,6 +123,9 @@ const EN: AgendaStrings = {
     tagAll: 'ALL',
     tagAllTitle: 'Show tasks from every file',
     tagFilterTitle: 'Filter to files tagged {0}',
+    headerModeButton: 'Header: {0}',
+    headerModeTitle: 'Agenda header: {0} (click for {1})',
+    headerModes: { auto: 'Auto', full: 'Full', compact: 'Compact' },
     sections: { scheduled: 'Scheduled today', allday: 'All-day & upcoming', overdue: 'Overdue' },
     groups: { a: 'Priority A', b: 'Priority B', c: 'Priority C', none: 'No priority' },
     summary: { tasks: ['task', 'tasks'], overdue: 'overdue', done: 'done', priorityA: 'priority A' },
@@ -156,6 +167,9 @@ const RU: AgendaStrings = {
     tagAll: 'ВСЕ',
     tagAllTitle: 'Показывать задачи из всех файлов',
     tagFilterTitle: 'Только файлы с меткой {0}',
+    headerModeButton: 'Шапка: {0}',
+    headerModeTitle: 'Шапка агенды: {0} (нажмите, чтобы включить «{1}»)',
+    headerModes: { auto: 'Авто', full: 'Полная', compact: 'Компактная' },
     sections: {
         scheduled: 'Запланировано на сегодня',
         allday: 'Без времени и предстоящие',

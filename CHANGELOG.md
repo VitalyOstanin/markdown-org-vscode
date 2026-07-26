@@ -18,6 +18,11 @@ All notable changes to the "Markdown Org" extension will be documented in this f
   large time, and a per-task type-flag column (deadline / scheduled / repeat /
   cancelled). Available from the style menu, the `Cycle Agenda Style` command,
   and the `markdown-org.agendaStyle` setting.
+- A chip in the agenda control row cycles `markdown-org.agendaHeaderMode`
+  (`auto` | `full` | `compact`) and names the layout currently on; the same step
+  is in the Command Palette as `Cycle Agenda Header Layout`. The setting is
+  worth changing exactly when the panel is too short to spare a trip to the
+  settings editor.
 
 ### Changed
 

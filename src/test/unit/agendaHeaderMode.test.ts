@@ -1,6 +1,11 @@
 import * as assert from 'assert';
 import { suite, test } from 'mocha';
-import { COMPACT_HEADER_MAX_HEIGHT, normalizeHeaderMode, resolveHeaderLayout } from '../../utils/agendaHeaderMode';
+import {
+    COMPACT_HEADER_MAX_HEIGHT,
+    nextHeaderMode,
+    normalizeHeaderMode,
+    resolveHeaderLayout
+} from '../../utils/agendaHeaderMode';
 
 // `markdown-org.agendaHeaderMode` picks the agenda header layout. The resolver
 // is inlined into the webview, where it decides a single class on <body>, so a
@@ -111,5 +116,42 @@ suite('resolveHeaderLayout', () => {
     test('the fallback threshold is overridable for callers that measure differently', () => {
         assert.strictEqual(resolveHeaderLayout('auto', 700, { threshold: 800 }), 'compact');
         assert.strictEqual(resolveHeaderLayout('auto', 700, { threshold: 600 }), 'full');
+    });
+});
+
+// The button in the agenda control row and the "Cycle Agenda Header Layout"
+// command both step through this. It runs inside the webview as well, where
+// only the function's own source travels.
+suite('nextHeaderMode', () => {
+    test('steps auto -> full -> compact -> auto', () => {
+        assert.strictEqual(nextHeaderMode('auto'), 'full');
+        assert.strictEqual(nextHeaderMode('full'), 'compact');
+        assert.strictEqual(nextHeaderMode('compact'), 'auto');
+    });
+
+    test('an unset or unknown value is treated as auto', () => {
+        // Same inputs normalizeHeaderMode maps to 'auto', so the cycle starts
+        // where the settings editor says it does.
+        for (const value of [undefined, '', 'tiny', 'AUTO']) {
+            assert.strictEqual(normalizeHeaderMode(value), 'auto');
+            assert.strictEqual(nextHeaderMode(value), 'full', `value: ${String(value)}`);
+        }
+    });
+
+    test('three steps return to where they started, from any value', () => {
+        for (const start of ['auto', 'full', 'compact']) {
+            assert.strictEqual(nextHeaderMode(nextHeaderMode(nextHeaderMode(start))), start);
+        }
+    });
+
+    test('the source carries no call to a sibling helper', () => {
+        // It is inlined into the page by `.toString()`, which brings no module
+        // bindings along: a call to normalizeHeaderMode would be an undefined
+        // name there and the page would die on load. The duplicated
+        // normalisation above is what the two previous tests pin.
+        assert.ok(
+            !nextHeaderMode.toString().includes('normalizeHeaderMode'),
+            'nextHeaderMode is inlined into the webview and must not call another module-level function'
+        );
     });
 });

@@ -172,6 +172,11 @@
         "category": "Markdown Org"
       },
       {
+        "command": "markdown-org.cycleAgendaHeaderMode",
+        "title": "Cycle Agenda Header Layout",
+        "category": "Markdown Org"
+      },
+      {
         "command": "markdown-org.gcalSync.connect",
         "title": "Connect Google Calendar",
         "category": "Markdown Org"

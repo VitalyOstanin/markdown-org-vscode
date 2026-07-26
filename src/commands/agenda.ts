@@ -8,6 +8,7 @@ import { filterTasksByTag } from '../utils/tagFilter';
 import { EXTRACTOR_MAX_BUFFER_BYTES, EXTRACTOR_TIMEOUT_MS, extractor } from '../utils/extractor';
 import { formatError, notifyError, notifyInfo, notifyWarn } from '../utils/notify';
 import { buildTagCycle, computeNextTag, resolveRequestedTag } from '../utils/cycleTag';
+import { nextHeaderMode } from '../utils/agendaHeaderMode';
 import { buildExecError } from '../utils/execError';
 import { currentConfigTarget } from '../utils/configTarget';
 import { getCachedHolidays } from '../utils/holidaysCache';
@@ -178,6 +179,20 @@ export async function cycleTag(_context: vscode.ExtensionContext) {
     notifyInfo(`Tag filter: ${nextTag}`);
 
     AgendaPanel.refresh();
+}
+
+/**
+ * Advance `markdown-org.agendaHeaderMode` one step: auto -> full -> compact.
+ *
+ * No toast, unlike {@link cycleTag}: the panel button carries the current mode
+ * as its label and the header reflows on the spot, so the outcome is on screen
+ * either way -- and a message on every click of a layout toggle is noise. The
+ * setting change reaches an open panel through the configuration listener.
+ */
+export async function cycleAgendaHeaderMode() {
+    const config = vscode.workspace.getConfiguration('markdown-org');
+    const next = nextHeaderMode(config.get<string>('agendaHeaderMode'));
+    await config.update('agendaHeaderMode', next, currentConfigTarget());
 }
 
 /**

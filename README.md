@@ -364,15 +364,16 @@ for `Set TODO` (the `Shift+Up`/`Shift+Down` bindings are unchanged).
 
 ### Agenda Commands
 
-| Command                              | Hotkey                 | Description                                              |
-| ------------------------------------ | ---------------------- | -------------------------------------------------------- |
-| `Markdown Org: Show Agenda (Day)`    | `Ctrl+K Ctrl+K Ctrl+Y` | Show today's tasks                                       |
-| `Markdown Org: Show Agenda (Week)`   | `Ctrl+K Ctrl+W`        | Show this week's tasks                                   |
-| `Markdown Org: Show Agenda (Month)`  | `Ctrl+K Ctrl+M`        | Show this month's tasks                                  |
-| `Markdown Org: Show Tasks`           | `Ctrl+K Ctrl+K Ctrl+L` | Show all TODO tasks grouped by priority                  |
-| `Markdown Org: Go Back in Agenda`    | `Alt+Shift+-`          | Return to the previously shown agenda view               |
-| `Markdown Org: Go Forward in Agenda` | `Alt+Shift+=`          | Step forward again after going back                      |
-| `Markdown Org: Cycle Tag Filter`     | `Ctrl+K Ctrl+K Ctrl+T` | Cycle the active file tag filter (e.g. ALL/WORK/PRIVATE) |
+| Command                                    | Hotkey                 | Description                                              |
+| ------------------------------------------ | ---------------------- | -------------------------------------------------------- |
+| `Markdown Org: Show Agenda (Day)`          | `Ctrl+K Ctrl+K Ctrl+Y` | Show today's tasks                                       |
+| `Markdown Org: Show Agenda (Week)`         | `Ctrl+K Ctrl+W`        | Show this week's tasks                                   |
+| `Markdown Org: Show Agenda (Month)`        | `Ctrl+K Ctrl+M`        | Show this month's tasks                                  |
+| `Markdown Org: Show Tasks`                 | `Ctrl+K Ctrl+K Ctrl+L` | Show all TODO tasks grouped by priority                  |
+| `Markdown Org: Go Back in Agenda`          | `Alt+Shift+-`          | Return to the previously shown agenda view               |
+| `Markdown Org: Go Forward in Agenda`       | `Alt+Shift+=`          | Step forward again after going back                      |
+| `Markdown Org: Cycle Tag Filter`           | `Ctrl+K Ctrl+K Ctrl+T` | Cycle the active file tag filter (e.g. ALL/WORK/PRIVATE) |
+| `Markdown Org: Cycle Agenda Header Layout` | --                     | Step the header layout: auto -> full -> compact          |
 
 All four view commands work both in a Markdown editor and while the agenda panel has focus, so you can switch views from the panel with the keyboard as well as with the mode buttons.
 
@@ -616,7 +617,9 @@ All agenda colors are driven by VS Code theme tokens, so the panel follows the a
 
 Layout of the agenda header. The full header takes about a fifth of a short panel: a control row plus a hero line carrying a large weekday or month title. The compact layout puts that title on the control row and tightens the type and spacing; every control stays where it was, nothing is hidden.
 
-`auto` picks compact when the panel is 520 px tall or less -- the case where the header crowds out the tasks it introduces -- and follows the panel as it is resized. `full` and `compact` pin the layout regardless of size. Changing the setting reflows an open agenda; no reopen needed.
+`auto` picks compact once the full header would take a fifth of the panel -- the case where it crowds out the tasks it introduces -- and returns to full once it would take under 0.15 of it, following the panel as it is resized. The two thresholds differ so that dragging the editor split across the boundary does not flip the layout back and forth. Until the header has been measured (the very first paint) `auto` falls back to a panel height of 520 px. `full` and `compact` pin the layout regardless of size.
+
+The chip in the agenda control row cycles the three values (`auto` -> `full` -> `compact`) and names the current one; `Markdown Org: Cycle Agenda Header Layout` does the same from the Command Palette. Changing the setting by any route reflows an open agenda; no reopen needed.
 
 ### `markdown-org.clockRoundMinutes`
 

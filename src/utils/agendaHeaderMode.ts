@@ -53,6 +53,31 @@ export function normalizeHeaderMode(value: string | undefined): AgendaHeaderMode
 }
 
 /**
+ * The next value of `markdown-org.agendaHeaderMode` when the panel button or
+ * the command cycles it: `auto` -> `full` -> `compact` -> `auto`.
+ *
+ * A cycle rather than a two-way toggle, because `auto` is the default and a
+ * toggle between the two pinned layouts would make it unreachable from the
+ * panel -- a user who pinned one would have to go back to the settings editor
+ * to get the automatic behaviour again.
+ *
+ * The normalisation is spelled out rather than delegated to
+ * {@link normalizeHeaderMode} for the reason given inside
+ * {@link resolveHeaderLayout}: this function is inlined into the webview by
+ * `.toString()`, where a call to a sibling helper is an undefined name. The
+ * unit tests hold the two to the same answers.
+ */
+export function nextHeaderMode(value: string | undefined): AgendaHeaderMode {
+    if (value === 'full') {
+        return 'compact';
+    }
+    if (value === 'compact') {
+        return 'auto';
+    }
+    return 'full';
+}
+
+/**
  * The layout to render: `auto` resolves against the panel, the other two are
  * returned as they are. A non-finite or non-positive height (a panel that has
  * not been laid out yet) resolves to `full`, so the panel never opens compact

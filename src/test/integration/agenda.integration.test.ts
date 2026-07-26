@@ -379,6 +379,42 @@ suite('Agenda Show Integration Tests', () => {
         }
     });
 
+    // The control row carries a chip that cycles the same setting, and the
+    // command behind it is what the chip posts back -- so the palette and the
+    // click leave the same value behind. Without the chip the setting is only
+    // reachable from the settings editor, which is the most awkward place to
+    // go from a panel too short to show its tasks.
+    test('the header-layout chip and its command cycle auto -> full -> compact', async function () {
+        this.timeout(20000);
+        const config = vscode.workspace.getConfiguration('markdown-org');
+        try {
+            await config.update('agendaHeaderMode', 'auto', vscode.ConfigurationTarget.Workspace);
+            await vscode.commands.executeCommand('markdown-org.showAgendaDay', '2025-12-09');
+            await waitForAgendaRender('day');
+            const panel = (AgendaPanel as unknown as { currentPanel?: { webview: vscode.Webview } }).currentPanel;
+            assert.ok(panel, 'expected AgendaPanel to be open after showAgendaDay');
+            assert.ok(
+                panel.webview.html.includes("command: 'cycleHeaderMode'"),
+                'expected the control row to carry a chip that posts cycleHeaderMode'
+            );
+
+            await vscode.commands.executeCommand('markdown-org.cycleAgendaHeaderMode');
+            await waitForHeaderLayout('full');
+            assert.strictEqual(vscode.workspace.getConfiguration('markdown-org').get('agendaHeaderMode'), 'full');
+
+            await vscode.commands.executeCommand('markdown-org.cycleAgendaHeaderMode');
+            await waitForHeaderLayout('compact');
+            assert.strictEqual(vscode.workspace.getConfiguration('markdown-org').get('agendaHeaderMode'), 'compact');
+
+            // Third step returns to auto, which is what keeps the automatic
+            // behaviour reachable from the panel.
+            await vscode.commands.executeCommand('markdown-org.cycleAgendaHeaderMode');
+            assert.strictEqual(vscode.workspace.getConfiguration('markdown-org').get('agendaHeaderMode'), 'auto');
+        } finally {
+            await config.update('agendaHeaderMode', undefined, vscode.ConfigurationTarget.Workspace);
+        }
+    });
+
     // CANCELLED/CANCELED styling. The per-task status class is computed
     // client-side inside the inlined `renderTask` function, so the generated
     // webview HTML carries the renderTask SOURCE plus the AGENDA_STYLES CSS,

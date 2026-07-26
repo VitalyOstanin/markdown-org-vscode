@@ -231,6 +231,8 @@ export interface AgendaClientDeps {
     buildMonthDayIndex: (days: DayAgenda[]) => MonthDayIndex;
     formatString: (template: string, ...values: string[]) => string;
     pluralIndex: (n: number, lang: string) => number;
+    /** Cycle behind the header-layout button: auto -> full -> compact. */
+    nextHeaderMode: (value: string | undefined) => 'auto' | 'full' | 'compact';
     resolveHeaderLayout: (
         mode: string | undefined,
         viewportHeight: number,
@@ -319,6 +321,7 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         formatString,
         pluralIndex,
         formatIsoDate,
+        nextHeaderMode,
         resolveHeaderLayout,
         formatNumber
     } = deps;
@@ -569,11 +572,14 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
                 scrollToWeekFocus();
             }
         } else if (message.command === 'headerMode') {
-            // The setting changed while the panel was open. Only the <body>
-            // class depends on it, so this reflows the header in place instead
-            // of re-rendering the agenda: no scroll jump, no data round-trip.
+            // The setting changed while the panel was open -- from the settings
+            // editor, the command, or the button in the control row. Only the
+            // <body> class and that button's label depend on it, so this
+            // reflows the header in place instead of re-rendering the agenda:
+            // no scroll jump, no data round-trip.
             headerMode = message.headerMode ?? 'auto';
             applyHeaderLayout();
+            refreshHeaderModeButton();
         } else if (message.command === 'getRenderedInfo') {
             // Integration-test query: snapshot the rendered DOM so the host can
             // verify that renderAgenda produced the expected day-headers for the
@@ -1334,6 +1340,52 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         });
     }
 
+    /**
+     * The header-layout button: it names the current mode and cycles it
+     * (auto -> full -> compact) on click. The setting exists for a panel too
+     * short for the full header, which is exactly when reaching for the
+     * settings editor is most awkward; the tooltip names what one click gives,
+     * so the cycle is legible without trying it.
+     */
+    function renderHeaderModeButton(): string {
+        const mode: 'auto' | 'full' | 'compact' =
+            headerMode === 'full' || headerMode === 'compact' ? headerMode : 'auto';
+        const next = nextHeaderMode(mode);
+        const label = formatString(UI.headerModeButton, UI.headerModes[mode]);
+        const title = formatString(UI.headerModeTitle, UI.headerModes[mode], UI.headerModes[next]);
+        return (
+            '<button class="chip-btn" id="headerModeBtn" title="' +
+            escapeHtml(title) +
+            '" aria-label="' +
+            escapeHtml(title) +
+            '">' +
+            escapeHtml(label) +
+            '</button>'
+        );
+    }
+
+    /**
+     * Re-label the header-layout button in place after the setting changed.
+     * Rebuilding the whole nav-bar would work too, but it also rebuilds the
+     * hero title and the tag dropdown, and the layout change is meant to be a
+     * reflow rather than a re-render.
+     */
+    function refreshHeaderModeButton(): void {
+        const btn = document.getElementById('headerModeBtn');
+        if (!btn) {
+            return;
+        }
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = renderHeaderModeButton();
+        const fresh = wrapper.firstElementChild;
+        if (fresh) {
+            btn.textContent = fresh.textContent;
+            const title = fresh.getAttribute('title') ?? '';
+            btn.setAttribute('title', title);
+            btn.setAttribute('aria-label', title);
+        }
+    }
+
     function attachModeSwitchListeners(): void {
         document.querySelectorAll('.seg-item').forEach((btn) => {
             btn.addEventListener('click', () => {
@@ -1353,8 +1405,9 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         }
         const modeSwitchHtml = renderModeSwitch();
         const tagHtml = renderTagMenu();
-        // The Tag picker sits at the right edge of the control row.
-        const chipsHtml = '<span class="nav-spacer"></span>' + tagHtml;
+        // The header-layout button and the Tag picker sit at the right edge of
+        // the control row.
+        const chipsHtml = '<span class="nav-spacer"></span>' + renderHeaderModeButton() + tagHtml;
 
         // View history (Back/Forward over {mode, date} states). It has keyboard
         // shortcuts, but every other navigation in the panel is a visible
@@ -1464,6 +1517,9 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         });
         document.getElementById('btn-history-forward')?.addEventListener('click', () => {
             vscode.postMessage({ command: 'historyForward' });
+        });
+        document.getElementById('headerModeBtn')?.addEventListener('click', () => {
+            vscode.postMessage({ command: 'cycleHeaderMode' });
         });
 
         attachModeSwitchListeners();

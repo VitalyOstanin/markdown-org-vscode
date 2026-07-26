@@ -26,7 +26,7 @@ import { resolveHeroModel } from '../utils/agendaHero';
 import { computeDaySummary, buildDaySections } from '../utils/agendaDaySummary';
 import { buildTaskGroups, computeTasksSummary } from '../utils/agendaTaskGroups';
 import { buildMonthDayIndex } from '../utils/agendaMonthCells';
-import { AgendaHeaderMode, normalizeHeaderMode, resolveHeaderLayout } from '../utils/agendaHeaderMode';
+import { AgendaHeaderMode, nextHeaderMode, normalizeHeaderMode, resolveHeaderLayout } from '../utils/agendaHeaderMode';
 import {
     AGENDA_STRINGS,
     AgendaStrings,
@@ -685,6 +685,11 @@ export class AgendaPanel {
             if (typeof message.tag === 'string') {
                 await vscode.commands.executeCommand('markdown-org.setTag', message.tag);
             }
+        } else if (message.command === 'cycleHeaderMode') {
+            // The button in the control row writes the setting through the same
+            // command the palette offers, so both routes leave the same value
+            // behind; the configuration listener then reflows the open panel.
+            await vscode.commands.executeCommand('markdown-org.cycleAgendaHeaderMode');
         } else if (message.command === 'switchMode') {
             const targetCommand = agendaModeCommand(message.mode);
             if (targetCommand) {
@@ -899,6 +904,7 @@ export class AgendaPanel {
         formatString,
         pluralIndex,
         formatIsoDate,
+        nextHeaderMode,
         resolveHeaderLayout,
         formatNumber
     } satisfies AgendaClientDeps;
