@@ -11,22 +11,7 @@
 // `vscode-test`. The wrapper itself takes no flags.
 
 const { spawn, spawnSync } = require('node:child_process');
-const path = require('node:path');
-
-// Resolve the `vscode-test` binary from node_modules without going through
-// require.resolve / `exports`: `@vscode/test-cli` does not list
-// `out/bin.mjs` or `package.json` in its exports map, so the standard
-// resolver refuses both. The path is stable enough to hardcode against
-// the local installation tree.
-function resolveVscodeTestBin() {
-    const fs = require('node:fs');
-    const repoRoot = path.join(__dirname, '..');
-    const candidate = path.join(repoRoot, 'node_modules', '@vscode', 'test-cli', 'out', 'bin.mjs');
-    if (!fs.existsSync(candidate)) {
-        throw new Error(`@vscode/test-cli binary not found at ${candidate}; run \`npm install\` first`);
-    }
-    return candidate;
-}
+const { x11ChildEnv, resolveVscodeTestBin } = require('./lib/x11-harness');
 
 const VSCODE_TEST_BIN = resolveVscodeTestBin();
 
@@ -47,24 +32,6 @@ function findXvfbRun() {
     return 'xvfb-run';
 }
 
-// Force the Electron-based test VS Code onto xvfb's virtual X server.
-// `xvfb-run` only sets $DISPLAY (X11); it does NOT touch Wayland. On a
-// Wayland session Electron auto-selects the Wayland backend from
-// XDG_SESSION_TYPE and, even with WAYLAND_DISPLAY unset, falls back to the
-// default `wayland-0` socket -- connecting to the real compositor and
-// popping a live window on the developer's screen despite xvfb. Pin the
-// session type and backend to X11 so the auto-detection picks xvfb's X
-// server. The decisive lever is the explicit `--ozone-platform=x11` launch
-// arg in `.vscode-test.mjs`; these env vars are belt-and-suspenders.
-function xvfbChildEnv() {
-    const env = { ...process.env };
-    delete env.WAYLAND_DISPLAY;
-    env.XDG_SESSION_TYPE = 'x11';
-    env.GDK_BACKEND = 'x11';
-    env.ELECTRON_OZONE_PLATFORM_HINT = 'x11';
-    return env;
-}
-
 function main() {
     const xvfbRun = findXvfbRun();
     const nodeBin = process.execPath;
@@ -76,29 +43,24 @@ function main() {
     if (xvfbRun) {
         command = xvfbRun;
         args = ['-a', '--server-args=-screen 0 1280x720x24', nodeBin, VSCODE_TEST_BIN, ...forwarded];
-        spawnEnv = xvfbChildEnv();
+        // xvfb-run only sets $DISPLAY; the Wayland hints have to go, or
+        // Electron connects to the real compositor anyway. See x11ChildEnv.
+        spawnEnv = x11ChildEnv();
     } else if (process.platform === 'linux') {
-        // No xvfb-run on Linux. Running the test VS Code on the real
-        // $DISPLAY pops a live window on the developer's screen mid-run.
-        // Refuse to fall back to the real display -- the only exception is
-        // CI, where the runner is headless and has no real display to
-        // disturb. Locally this is a hard error: install xvfb instead.
-        if (process.env.CI) {
-            console.warn(
-                '[run-integration-tests] xvfb-run not found in PATH; CI detected, ' +
-                    'running the test VS Code directly (headless runner).'
-            );
-            command = nodeBin;
-            args = [VSCODE_TEST_BIN, ...forwarded];
-        } else {
-            console.error(
-                '[run-integration-tests] xvfb-run not found in PATH. Refusing to run ' +
-                    'the test VS Code on your real $DISPLAY. Install xvfb ' +
-                    '(e.g. `apt install xvfb`) and retry. Direct display fallback is ' +
-                    'allowed only in CI (set CI=1 to force it).'
-            );
-            process.exit(1);
-        }
+        // No xvfb-run on Linux: refuse, everywhere. Locally, running the test
+        // VS Code on the real $DISPLAY pops a live window mid-run. On a
+        // headless runner it does not start at all -- and the failure arrives
+        // from inside Electron ("cannot open display"), which hides the actual
+        // cause. There used to be a CI fallback here; it only ever traded this
+        // clear message for that obscure one. `CI` is also a poor switch: any
+        // non-empty value, `CI=0` included, would have taken the branch.
+        console.error(
+            '[run-integration-tests] xvfb-run not found in PATH. The integration ' +
+                'tests need it on Linux -- both to keep the test VS Code off your ' +
+                'real display and to have a display at all on a headless machine. ' +
+                'Install xvfb (e.g. `apt install xvfb`) and retry.'
+        );
+        process.exit(1);
     } else {
         // Non-Linux (macOS, Windows): xvfb does not exist on these
         // platforms, so the test host manages its own display.

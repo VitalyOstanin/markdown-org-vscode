@@ -13,6 +13,15 @@ function demoEntry(label, file, workspaceName) {
         files: `out/test/demo/${file}`,
         extensionDevelopmentPath: here,
         workspaceFolder,
+        // Pin Electron to X11 so the recording actually lands on the driver's
+        // Xvfb display. On a Wayland session Electron auto-selects the Wayland
+        // backend and connects to the real compositor -- the demo window then
+        // opens on the developer's own screen and the Xvfb capture records an
+        // empty desktop (xdotool also finds no window there). This launch arg
+        // is the decisive lever; the drivers additionally scrub the Wayland
+        // hints out of the child environment. Same treatment as
+        // `.vscode-test.mjs` for the integration suite.
+        launchArgs: process.platform === 'linux' ? ['--ozone-platform=x11'] : [],
         mocha: {
             ui: 'tdd',
             color: true,

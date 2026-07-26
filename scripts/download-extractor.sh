@@ -13,6 +13,11 @@
 #
 # Idempotent: if `bin/<binary>` is already present and its sha256 matches
 # the upstream `.sha256`, the script returns without re-downloading.
+#
+# Alongside the binary it installs the extractor's own LICENSE and the
+# third-party notices its archive carries (extractor 0.11.1 and later):
+#   bin/LICENSE.markdown-org-extract
+#   bin/THIRD-PARTY-LICENSES.markdown-org-extract.txt
 
 set -euo pipefail
 
@@ -97,6 +102,27 @@ cd "$tmp_dir"
 sha_cmd -c "${asset}.sha256"
 cd - >/dev/null
 
+# Then against the hash pinned in this repository. The upstream .sha256 sits
+# next to the archive in the same release, so on its own it proves only that
+# the transfer was intact: whoever could replace the asset could replace the
+# checksum with it. The pin is the independent anchor -- it changes only in a
+# commit here, where a reviewer sees it next to the version bump.
+pinned_sha=$(node -p "(require('$repo_root/package.json')['x-markdown-org'].extractorSha256 || {})['$rust_target'] || ''")
+actual_sha=$(sha_of_file "$archive_path")
+if [ -z "$pinned_sha" ]; then
+  echo "error: no pinned sha256 for target '$rust_target' in package.json" >&2
+  echo "       add x-markdown-org.extractorSha256['$rust_target'] = $actual_sha" >&2
+  echo "       (after checking that this is the archive you meant to ship)" >&2
+  exit 1
+fi
+if [ "$pinned_sha" != "$actual_sha" ]; then
+  echo "error: ${asset} does not match the sha256 pinned in package.json" >&2
+  echo "       pinned:   $pinned_sha" >&2
+  echo "       download: $actual_sha" >&2
+  echo "       Either the release assets changed, or the pin was not updated with extractorVersion." >&2
+  exit 1
+fi
+
 # Idempotency: if the previously-extracted binary's hash matches the new
 # archive's binary hash, skip the unpacking. We hash the binary inside the
 # archive without writing it out twice.
@@ -112,7 +138,12 @@ case "$archive_ext" in
     ;;
 esac
 
-if [ -f "$final_binary" ]; then
+notice_file="${bin_dir}/THIRD-PARTY-LICENSES.markdown-org-extract.txt"
+
+# The licence notices have to be present too, or a checkout that fetched the
+# binary before this script started shipping them would stay without one.
+if [ -f "$final_binary" ] && [ -f "${bin_dir}/LICENSE.markdown-org-extract" ] &&
+  [ -f "$notice_file" ]; then
   existing_hash=$(sha_of_file "$final_binary")
   if [ "$existing_hash" = "$inner_hash" ]; then
     echo "bin/${binary} already up to date (sha256: ${inner_hash})"
@@ -120,18 +151,31 @@ if [ -f "$final_binary" ]; then
   fi
 fi
 
-# Extract just the binary -- README.md and LICENSE in the archive are not
-# bundled in the VSIX, the extension already has its own.
+# Extract the binary, the extractor's own LICENSE, and the notices of the
+# crates linked into it. The extension's LICENSE.txt covers the extension;
+# markdown-org-extract is a separate work with its own copyright line, and MIT
+# asks for that notice to travel with the copies being distributed -- which is
+# what the VSIX does with the binary. The binary is statically linked, so the
+# same obligation applies to its own dependencies; the extractor generates
+# THIRD-PARTY-LICENSES.txt from its dependency graph and ships it in the
+# archive (its ADR-0024), which is why this is a download rather than a copy
+# kept here: a hand-maintained list would go stale the moment the pin below
+# moves. README.md from the archive is not shipped: it duplicates
+# documentation the extension already links to.
 case "$archive_ext" in
   tar.gz)
-    tar -xzf "$archive_path" -C "$tmp_dir" "${stem}/${binary}"
+    tar -xzf "$archive_path" -C "$tmp_dir" \
+      "${stem}/${binary}" "${stem}/LICENSE" "${stem}/THIRD-PARTY-LICENSES.txt"
     ;;
   zip)
-    unzip -q "$archive_path" "${stem}/${binary}" -d "$tmp_dir"
+    unzip -q "$archive_path" \
+      "${stem}/${binary}" "${stem}/LICENSE" "${stem}/THIRD-PARTY-LICENSES.txt" -d "$tmp_dir"
     ;;
 esac
 
 mv "${tmp_dir}/${stem}/${binary}" "$final_binary"
+mv "${tmp_dir}/${stem}/LICENSE" "${bin_dir}/LICENSE.markdown-org-extract"
+mv "${tmp_dir}/${stem}/THIRD-PARTY-LICENSES.txt" "$notice_file"
 # tar preserves the +x bit from the source filesystem (Linux runner builds
 # the binary with executable mode), but be defensive in case the archive
 # was repacked. No-op on Windows where zip does not carry POSIX modes.

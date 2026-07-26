@@ -25,6 +25,12 @@ jobs:
     continue-on-error: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # No git operations after checkout, so the job never needs the
+          # token afterwards. Left at the v7 default (true) it stays in
+          # .git/config for every later step, including code fetched at
+          # run time.
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -36,13 +42,11 @@ jobs:
         # Skip lifecycle scripts to avoid running anything before audit.
         run: npm ci --ignore-scripts
 
-      - name: npm audit (production deps)
-        # Production deps are what ship inside the VSIX, so a moderate
-        # finding here is the more pressing signal.
-        run: npm audit --omit=dev --audit-level=moderate
+      # There are no `dependencies`, so an `--omit=dev` scan is empty by
+      # construction; the dev tree is the whole audit surface here.
+      - name: npm audit (dev tree)
+        run: npm audit --audit-level=moderate
 
-      - name: npm audit (all deps)
-        # Full report including devDependencies. Kept as a separate
-        # step so a moderate dev-only advisory does not mask the
-        # production scan above.
+      - name: npm audit (full report)
+        # Everything, including low severity, for the run log.
         run: npm audit || true

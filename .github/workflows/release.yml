@@ -16,8 +16,11 @@ on:
         type: boolean
         default: false
 
+# Least privilege: only the publishing job needs write access. The test and
+# package jobs run `npm ci` and unpack a downloaded binary, i.e. third-party
+# code, and must not hold a token that can write to the repository.
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
@@ -35,6 +38,11 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # No git operations after checkout, so the job never needs the
+          # token afterwards. Left at the v7 default (true) it stays in
+          # .git/config for every later step, including code fetched at
+          # run time.
+          persist-credentials: false
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
       - name: Setup Node.js
@@ -52,6 +60,43 @@ jobs:
       - name: Compile
         run: npm run compile
 
+      # Same reason as in ci.yml: without bin/ the bundled-extractor suite
+      # skips itself, and it is the only check that the binary runs and
+      # reports `x-markdown-org.extractorVersion`. Leaving it out here made
+      # those tests silently absent on the one path that publishes.
+      - name: Download bundled extractor binary
+        shell: bash
+        env:
+          RUNNER: ${{ matrix.os }}
+        run: |
+          set -euo pipefail
+          case "$RUNNER" in
+            ubuntu-*)  target=linux-x64 ;;
+            macos-*)   target=darwin-arm64 ;;
+            windows-*) target=win32-x64 ;;
+            *) echo "::error::no extractor target mapped for runner $RUNNER"; exit 1 ;;
+          esac
+          bash scripts/download-extractor.sh "$target"
+
+      # The downloaded build is `stable`, which .vscode-test.mjs does not pin
+      # and which moves roughly monthly -- nothing in the hashed files changes
+      # when it does. Without a moving component the entry is restored by
+      # prefix but never re-saved under the primary key, so the cache keeps
+      # serving a build the tests no longer run on.
+      - name: Cache key component for the VS Code build
+        id: vscode-week
+        shell: bash
+        run: echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache VS Code test build
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .vscode-test
+          key: ${{ runner.os }}-vscode-test-${{ steps.vscode-week.outputs.week }}-${{ hashFiles('.vscode-test.mjs', 'package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-vscode-test-${{ steps.vscode-week.outputs.week }}-
+            ${{ runner.os }}-vscode-test-
+
       - name: Run unit tests
         run: npm test
 
@@ -66,6 +111,11 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # No git operations after checkout, so the job never needs the
+          # token afterwards. Left at the v7 default (true) it stays in
+          # .git/config for every later step, including code fetched at
+          # run time.
+          persist-credentials: false
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
           # Need the full tag object (not just the commit it points at) to
           # verify that the tag is annotated rather than lightweight.
@@ -73,9 +123,14 @@ jobs:
           fetch-depth: 0
 
       - name: Verify tag is annotated
+        # `inputs.tag` is passed through the environment, not interpolated into
+        # the script: `${{ }}` is textual substitution performed before the
+        # shell runs, so a crafted input would be executed as a command.
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG_NAME="${{ inputs.tag }}"
+            TAG_NAME="$INPUT_TAG"
           else
             TAG_NAME="${GITHUB_REF_NAME}"
           fi
@@ -90,9 +145,11 @@ jobs:
           fi
 
       - name: Verify tag matches package.json version
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG_VERSION="${{ inputs.tag }}"
+            TAG_VERSION="$INPUT_TAG"
             TAG_VERSION="${TAG_VERSION#v}"
           else
             TAG_VERSION="${GITHUB_REF_NAME#v}"
@@ -100,6 +157,27 @@ jobs:
           PKG_VERSION="$(node -p 'require("./package.json").version')"
           if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
             echo "::error::Tag v$TAG_VERSION does not match package.json version $PKG_VERSION"
+            exit 1
+          fi
+
+      # The release body is extracted from the CHANGELOG section of this
+      # version. A missing section used to surface only at publish time, as a
+      # warning, and the release went out with a placeholder body instead of
+      # its notes (v0.11.1). Fail here, before anything is built.
+      - name: Verify CHANGELOG has a section for this version
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG_VERSION="$INPUT_TAG"
+            TAG_VERSION="${TAG_VERSION#v}"
+          else
+            TAG_VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          if ! grep -q "^## \[$TAG_VERSION\]" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no '## [$TAG_VERSION]' section."
+            echo "::error::The release notes are taken from it, so add the section"
+            echo "::error::(renaming '## [Unreleased]') and re-tag that commit."
             exit 1
           fi
 
@@ -118,6 +196,11 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # No git operations after checkout, so the job never needs the
+          # token afterwards. Left at the v7 default (true) it stays in
+          # .git/config for every later step, including code fetched at
+          # run time.
+          persist-credentials: false
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
       - name: Setup Node.js
@@ -175,6 +258,8 @@ jobs:
               extension/package.json \
               extension/out/extension.js \
               extension/LICENSE.txt \
+              extension/bin/LICENSE.markdown-org-extract \
+              extension/bin/THIRD-PARTY-LICENSES.markdown-org-extract.txt \
               extension/readme.md \
               extension/changelog.md \
               "$BUNDLED_BIN"; do
@@ -219,9 +304,18 @@ jobs:
     needs: package
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    permissions:
+      # Needed by softprops/action-gh-release to create the release and
+      # attach the VSIX files.
+      contents: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # No git operations after checkout, so the job never needs the
+          # token afterwards. Left at the v7 default (true) it stays in
+          # .git/config for every later step, including code fetched at
+          # run time.
+          persist-credentials: false
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
 
       - name: Download VSIX artifacts
@@ -232,9 +326,11 @@ jobs:
 
       - name: Extract release notes from CHANGELOG.md
         id: changelog
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG_NAME="${{ inputs.tag }}"
+            TAG_NAME="$INPUT_TAG"
           else
             TAG_NAME="${GITHUB_REF_NAME}"
           fi
@@ -286,5 +382,5 @@ jobs:
           # needed.
           for vsix in markdown-org-vscode-*.vsix; do
             echo "Publishing $vsix to Open VSX..."
-            npx -y ovsx@0.10.12 publish "$vsix" --skip-duplicate -p "$OVSX_PAT"
+            npx -y ovsx@1.0.2 publish "$vsix" --skip-duplicate -p "$OVSX_PAT"
           done

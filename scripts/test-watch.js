@@ -24,7 +24,11 @@ function spawnChild(name, command, args) {
     return child;
 }
 
+// Declared before cleanup() so the signal handlers can reach them; assigned
+// once below. (prefer-const cannot see the split, hence the disable.)
+// eslint-disable-next-line prefer-const
 let tsc;
+// eslint-disable-next-line prefer-const
 let mocha;
 let shuttingDown = false;
 
@@ -50,7 +54,7 @@ process.on('SIGTERM', () => {
     process.exit(143);
 });
 
-tsc = spawnChild('tsc', 'npx', ['tsc', '-w', '-p', './']);
+tsc = spawnChild('tsc', 'npx', ['tsc', '-b', '--watch']);
 mocha = spawnChild('mocha', 'npx', ['mocha', '--config', '.mocharc.unit.json', '--watch', '--watch-files', 'out']);
 
 tsc.on('exit', (code, signal) => {

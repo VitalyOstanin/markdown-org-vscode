@@ -4,7 +4,13 @@
 // Авто-снимок статичных PNG-скриншотов расширения через Xvfb + integration test.
 //
 // Использование:
-//   node scripts/screenshot-demo.js
+//   node scripts/screenshot-demo.js            # обе темы: dark и light
+//   node scripts/screenshot-demo.js dark       # только тёмная (Monokai)
+//   node scripts/screenshot-demo.js light      # только светлая (Solarized Light)
+//
+// Тема прогона уезжает в тест через MARKDOWN_ORG_DEMO_THEME; тест сам
+// применяет её и добавляет к имени файла суффикс -dark / -light, так что
+// README может отдавать читателю набор под его цветовую схему.
 //
 // Логика:
 //   1. Скомпилировать TS (тот же шаг, что в record-demo.js).
@@ -21,107 +27,75 @@
 const { spawn, spawnSync } = require('node:child_process');
 const path = require('node:path');
 const fs = require('node:fs');
+const { x11ChildEnv, which, waitForDisplay, resolveVscodeTestBin, stopProcess } = require('./lib/x11-harness');
 
 const repoRoot = path.join(__dirname, '..');
 const mediaDir = path.join(repoRoot, 'media');
 fs.mkdirSync(mediaDir, { recursive: true });
 
-function sleep(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function which(cmd) {
-    return (
-        spawnSync('sh', ['-c', `command -v ${cmd}`], {
-            stdio: ['ignore', 'pipe', 'ignore']
-        }).status === 0
-    );
-}
-
-async function waitForDisplay(display, timeoutMs = 5000) {
-    const start = Date.now();
-    while (Date.now() - start < timeoutMs) {
-        const r = spawnSync('xdpyinfo', ['-display', display], {
-            stdio: ['ignore', 'ignore', 'ignore']
-        });
-        if (r.status === 0) return true;
-        await sleep(150);
-    }
-    return false;
-}
-
-function resolveVscodeTestBin() {
-    const candidate = path.join(repoRoot, 'node_modules', '@vscode', 'test-cli', 'out', 'bin.mjs');
-    if (!fs.existsSync(candidate)) {
-        throw new Error(`@vscode/test-cli not found at ${candidate}; run npm install`);
-    }
-    return candidate;
-}
-
-async function stopProcess(child) {
-    if (!child || child.exitCode !== null) return;
-    try {
-        child.kill('SIGTERM');
-    } catch {
-        /* ignore */
-    }
-    await new Promise((resolve) => {
-        const timer = setTimeout(() => {
-            try {
-                child.kill('SIGKILL');
-            } catch {
-                /* ignore */
-            }
-            resolve();
-        }, 4000);
-        child.on('exit', () => {
-            clearTimeout(timer);
-            resolve();
-        });
-    });
-}
-
-// Seed the demo workspace's settings.json BEFORE VS Code starts. `colorTheme`
-// is one of the settings VS Code only honours at window load -- updating it
-// from inside the test via `config.update(...)` writes the file but does not
-// repaint the running window. Seeding the file up front guarantees the
-// theme is live by the time `captureScreenshot()` snaps the first PNG.
+// Write the demo workspace's .vscode/settings.json before VS Code starts, so
+// the values are in place at window load. What belongs in here is decided at
+// the call site (see captureTheme).
 function seedWorkspaceSettings(workspaceDir, settings) {
     const vscodeDir = path.join(workspaceDir, '.vscode');
     fs.mkdirSync(vscodeDir, { recursive: true });
     fs.writeFileSync(path.join(vscodeDir, 'settings.json'), JSON.stringify(settings, null, 4) + '\n', 'utf-8');
 }
 
+const THEMES = ['dark', 'light'];
+
 async function main() {
-    for (const cmd of ['Xvfb', 'ffmpeg', 'xdpyinfo']) {
+    for (const cmd of ['Xvfb', 'ffmpeg', 'xdpyinfo', 'xdotool']) {
         if (!which(cmd)) {
             console.error(`[screenshot-demo] missing required binary: ${cmd}`);
             process.exit(2);
         }
     }
 
-    const workspaceDir = path.join(repoRoot, 'test-workspace-demo-screenshots');
-    fs.mkdirSync(workspaceDir, { recursive: true });
-    // Seed only the settings that are safe to apply at cold-start. The
-    // colour theme is intentionally NOT seeded here: when VS Code reads
-    // workbench.colorTheme from settings.json before the theme-monokai
-    // extension is activated, it falls back to the bundled vs-dark and
-    // never switches. The test installs the theme at runtime via the
-    // workspace config API instead, which fires after extension load.
-    seedWorkspaceSettings(workspaceDir, {
-        'markdown-org.weekdayLocale': 'en',
-        'workbench.activityBar.location': 'hidden',
-        'markdown-org.workspaceDir': workspaceDir
-    });
+    const requested = process.argv.slice(2);
+    const unknown = requested.filter((t) => !THEMES.includes(t));
+    if (unknown.length) {
+        console.error(`[screenshot-demo] unknown theme(s): ${unknown.join(', ')} (expected ${THEMES.join(' | ')})`);
+        process.exit(2);
+    }
+    const themes = requested.length ? requested : THEMES;
 
-    console.log('[screenshot-demo] compiling sources (tsc -p .)');
-    const tscResult = spawnSync(process.execPath, [require.resolve('typescript/bin/tsc'), '-p', '.'], {
+    console.log('[screenshot-demo] compiling sources (tsc -b)');
+    const tscResult = spawnSync(process.execPath, [require.resolve('typescript/bin/tsc'), '-b'], {
         cwd: repoRoot,
         stdio: 'inherit'
     });
     if (tscResult.status !== 0) {
         throw new Error(`tsc exited with code ${tscResult.status ?? 1}`);
     }
+
+    for (const theme of themes) {
+        await captureTheme(theme);
+    }
+
+    console.log('\n[screenshot-demo] PNGs written to media/:');
+    for (const entry of fs.readdirSync(mediaDir).sort()) {
+        if (!entry.endsWith('.png')) continue;
+        const size = fs.statSync(path.join(mediaDir, entry)).size;
+        console.log(`  ${entry.padEnd(28)} ${(size / 1024).toFixed(1)} KiB`);
+    }
+}
+
+async function captureTheme(theme) {
+    console.log(`\n[screenshot-demo] === theme: ${theme} ===`);
+    const workspaceDir = path.join(repoRoot, 'test-workspace-demo-screenshots');
+    fs.mkdirSync(workspaceDir, { recursive: true });
+    // Seed only the settings that are safe to apply at cold-start. The colour
+    // theme is deliberately not among them: applyDemoTheme() sets it at
+    // runtime and waits for onDidChangeActiveColorTheme, which is what
+    // guarantees the window has finished recolouring before the first PNG is
+    // taken. A seeded value gives no such signal, and the run would have to
+    // guess how long the repaint takes.
+    seedWorkspaceSettings(workspaceDir, {
+        'markdown-org.weekdayLocale': 'en',
+        'workbench.activityBar.location': 'hidden',
+        'markdown-org.workspaceDir': workspaceDir
+    });
 
     const display = process.env.SCREENSHOT_DEMO_DISPLAY || ':99';
     const geometry = '1280x720';
@@ -144,12 +118,12 @@ async function main() {
         [vscodeTestBin, '--config', path.join(repoRoot, '.vscode-test.demo.mjs'), '--label', 'demo-screenshots'],
         {
             stdio: 'inherit',
-            env: {
-                ...process.env,
+            env: x11ChildEnv({
                 DISPLAY: display,
                 MARKDOWN_ORG_SCREENSHOT_DIR: mediaDir,
-                MARKDOWN_ORG_SCREENSHOT_GEOMETRY: geometry
-            }
+                MARKDOWN_ORG_SCREENSHOT_GEOMETRY: geometry,
+                MARKDOWN_ORG_DEMO_THEME: theme
+            })
         }
     );
 
@@ -160,14 +134,7 @@ async function main() {
     await stopProcess(xvfb);
 
     if (testCode !== 0) {
-        throw new Error(`test runner exited with code ${testCode}`);
-    }
-
-    console.log('\n[screenshot-demo] PNGs written to media/:');
-    for (const entry of fs.readdirSync(mediaDir).sort()) {
-        if (!entry.endsWith('.png')) continue;
-        const size = fs.statSync(path.join(mediaDir, entry)).size;
-        console.log(`  ${entry.padEnd(28)} ${(size / 1024).toFixed(1)} KiB`);
+        throw new Error(`test runner exited with code ${testCode} (theme ${theme})`);
     }
 }
 

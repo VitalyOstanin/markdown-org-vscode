@@ -6,12 +6,12 @@ on:
   pull_request:
     branches: [master]
 
+# Least privilege by default: only the coverage job raises its own
+# permissions (Codecov OIDC). Granted here, `id-token: write` would let any
+# step in any job -- including third-party code pulled by `npm ci` -- mint a
+# signed token carrying this repository's identity.
 permissions:
   contents: read
-  # Codecov OIDC: required so the codecov-action can exchange a short-lived
-  # GitHub-issued JWT for an upload credential -- no long-lived
-  # CODECOV_TOKEN secret needed.
-  id-token: write
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -24,6 +24,12 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # No git operations after checkout, so the job never needs the
+          # token afterwards. Left at the v7 default (true) it stays in
+          # .git/config for every later step, including code fetched at
+          # run time.
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -59,6 +65,12 @@ jobs:
         os: [ubuntu-24.04, macos-15, windows-2025]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # No git operations after checkout, so the job never needs the
+          # token afterwards. Left at the v7 default (true) it stays in
+          # .git/config for every later step, including code fetched at
+          # run time.
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -72,6 +84,58 @@ jobs:
       - name: Compile
         run: npm run compile
 
+      # Without bin/ the bundled-extractor suite skips itself -- and it is the
+      # only check that the binary runs at all and that its version matches
+      # `x-markdown-org.extractorVersion`. It used to be downloaded solely in
+      # the release job, i.e. after the tests, so those four tests were
+      # "pending" in every CI run while passing on developer machines.
+      - name: Download bundled extractor binary
+        shell: bash
+        env:
+          RUNNER: ${{ matrix.os }}
+        run: |
+          set -euo pipefail
+          case "$RUNNER" in
+            ubuntu-*)  target=linux-x64 ;;
+            macos-*)   target=darwin-arm64 ;;
+            windows-*) target=win32-x64 ;;
+            *) echo "::error::no extractor target mapped for runner $RUNNER"; exit 1 ;;
+          esac
+          bash scripts/download-extractor.sh "$target"
+
+      # The integration runner requires xvfb-run on Linux. It ships with the
+      # ubuntu runner image today, but nothing pins that; without this check a
+      # future image change would surface as an Electron display error rather
+      # than as the missing dependency.
+      - name: Verify xvfb-run is available (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          if ! command -v xvfb-run >/dev/null 2>&1; then
+            echo "::error::xvfb-run missing from the runner image; install xvfb before the integration tests"
+            exit 1
+          fi
+
+      # The VS Code build the integration tests drive is ~295 MB and is
+      # re-downloaded on every job otherwise (four times per CI run).
+      # The downloaded build is `stable`, which .vscode-test.mjs does not pin
+      # and which moves roughly monthly -- nothing in the hashed files changes
+      # when it does. Without a moving component the entry is restored by
+      # prefix but never re-saved under the primary key, so the cache keeps
+      # serving a build the tests no longer run on.
+      - name: Cache key component for the VS Code build
+        id: vscode-week
+        shell: bash
+        run: echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache VS Code test build
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .vscode-test
+          key: ${{ runner.os }}-vscode-test-${{ steps.vscode-week.outputs.week }}-${{ hashFiles('.vscode-test.mjs', 'package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-vscode-test-${{ steps.vscode-week.outputs.week }}-
+            ${{ runner.os }}-vscode-test-
+
       - name: Run unit tests
         run: npm test
 
@@ -79,15 +143,28 @@ jobs:
         run: npm run test:integration
 
   coverage:
-    name: Coverage (non-blocking)
+    name: Coverage
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    # Coverage thresholds are floors set just below current values -- regressions
-    # should be visible, not block merges. Codecov outages are also expected
-    # not to fail the build.
-    continue-on-error: true
+    permissions:
+      contents: read
+      # Codecov OIDC: the codecov-action exchanges a short-lived
+      # GitHub-issued JWT for an upload credential, so no long-lived
+      # CODECOV_TOKEN secret is needed. Scoped to this job alone.
+      id-token: write
+    # The thresholds themselves DO block: they are floors just below the current
+    # values, and dropping through one is a regression the build should catch.
+    # (They used to be advisory, which made them invisible.) What stays
+    # non-blocking is the upload -- a Codecov outage is not a release blocker,
+    # so those steps carry their own `continue-on-error`.
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # No git operations after checkout, so the job never needs the
+          # token afterwards. Left at the v7 default (true) it stays in
+          # .git/config for every later step, including code fetched at
+          # run time.
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -98,11 +175,34 @@ jobs:
       - name: Install dependencies
         run: npm ci --ignore-scripts
 
+      - name: Download bundled extractor binary
+        run: bash scripts/download-extractor.sh linux-x64
+
+      # The downloaded build is `stable`, which .vscode-test.mjs does not pin
+      # and which moves roughly monthly -- nothing in the hashed files changes
+      # when it does. Without a moving component the entry is restored by
+      # prefix but never re-saved under the primary key, so the cache keeps
+      # serving a build the tests no longer run on.
+      - name: Cache key component for the VS Code build
+        id: vscode-week
+        shell: bash
+        run: echo "week=$(date -u +%G-%V)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache VS Code test build
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .vscode-test
+          key: ${{ runner.os }}-vscode-test-${{ steps.vscode-week.outputs.week }}-${{ hashFiles('.vscode-test.mjs', 'package.json') }}
+          restore-keys: |
+            ${{ runner.os }}-vscode-test-${{ steps.vscode-week.outputs.week }}-
+            ${{ runner.os }}-vscode-test-
+
       - name: Run unit tests with coverage
         run: npm run test:coverage
 
       - name: Upload unit coverage to Codecov
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        continue-on-error: true
         with:
           # OIDC removes the need for a long-lived CODECOV_TOKEN secret --
           # the action exchanges a short-lived GitHub-issued JWT for an
@@ -115,15 +215,21 @@ jobs:
           fail_ci_if_error: false
 
       - name: Run integration tests with coverage
-        # The wrapper auto-wraps the VS Code Extension Host with xvfb-run
-        # when it's available (Ubuntu runners ship it preinstalled); on
-        # other platforms it falls through to the real display. Coverage
-        # data is gathered via V8 natively, remapped through source maps
-        # to TypeScript sources by @vscode/test-cli before lcov is emitted.
+        # The wrapper starts the VS Code Extension Host under xvfb-run
+        # (present in the Ubuntu runner image; the test job checks for it).
+        # Coverage data is gathered via V8 natively and remapped through source
+        # maps to TypeScript sources by @vscode/test-cli before lcov is emitted.
         run: npm run test:integration:coverage
+
+      # @vscode/test-cli has no threshold option: it only emits lcov. Without
+      # this gate the layer that covers the panel and the commands -- most of
+      # the code -- could regress unnoticed.
+      - name: Check integration coverage thresholds
+        run: npm run coverage:check:integration
 
       - name: Upload integration coverage to Codecov
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v7.0.0
+        continue-on-error: true
         with:
           use_oidc: true
           files: ./coverage/integration/lcov.info
@@ -138,6 +244,12 @@ jobs:
     continue-on-error: true
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # No git operations after checkout, so the job never needs the
+          # token afterwards. Left at the v7 default (true) it stays in
+          # .git/config for every later step, including code fetched at
+          # run time.
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -149,7 +261,10 @@ jobs:
         # Skip lifecycle scripts to avoid running anything before audit.
         run: npm ci --ignore-scripts
 
-      - name: npm audit (production deps)
-        # `--omit=dev` keeps the report focused on what ships to users; dev-only
-        # advisories rarely turn into runtime exposure.
-        run: npm audit --omit=dev --audit-level=moderate
+      # The project has no `dependencies` at all -- everything shipped inside
+      # the VSIX is the extension's own compiled output plus the extractor
+      # binary -- so `--omit=dev` is empty by construction and always passes.
+      # The dev tree is the one that actually runs code here and on developer
+      # machines, so that is what gets audited.
+      - name: npm audit (dev tree)
+        run: npm audit --audit-level=high

@@ -4,10 +4,14 @@
 // Автозапись демо-видео расширения через Xvfb + ffmpeg + integration test.
 //
 // Использование:
-//   node scripts/record-demo.js <scenario>
-//   node scripts/record-demo.js all
+//   node scripts/record-demo.js <scenario> [theme]
+//   node scripts/record-demo.js all              # все сценарии, обе темы
+//   node scripts/record-demo.js agenda light     # один сценарий, светлая тема
 //
 // scenario ∈ { task-status, timestamps, clock, agenda, gcal-connect, gcal-select, gcal-sync }.
+// theme ∈ { dark, light }; без аргумента снимаются обе. Тема уезжает в тест
+// через MARKDOWN_ORG_DEMO_THEME (dark = Monokai, light = Solarized Light) и
+// задаёт суффикс имени файла: demo-<scenario>-<theme>.{mp4,gif}.
 //
 // Логика одного прогона:
 //   1. Запустить Xvfb на DISPLAY :99 в разрешении RECORD_GEOMETRY (см. ниже).
@@ -23,12 +27,17 @@ const { spawn, spawnSync } = require('node:child_process');
 const path = require('node:path');
 const fs = require('node:fs');
 const os = require('node:os');
+const { x11ChildEnv, sleep, which, waitForDisplay, resolveVscodeTestBin, stopProcess } = require('./lib/x11-harness');
 
 const repoRoot = path.join(__dirname, '..');
 const mediaDir = path.join(repoRoot, 'media');
 fs.mkdirSync(mediaDir, { recursive: true });
 
 const SCENARIOS = ['task-status', 'timestamps', 'clock', 'agenda', 'gcal-connect', 'gcal-select', 'gcal-sync'];
+
+// Each scenario is recorded once per theme; the name of the theme is both the
+// value handed to the test and the suffix of the resulting mp4/gif.
+const THEMES = ['dark', 'light'];
 
 // Resolution of the Xvfb screen the recording runs on. Kept in one place so
 // that the value flows into ffmpeg's video_size, the env that
@@ -53,8 +62,8 @@ const SCENARIO_WORKSPACES = {
 // workspaces are listed in .gitignore, so each run regenerates the file --
 // without seeding it here, a fresh clone would record demos without the
 // zoom level / hidden activity bar / English weekdays the GIFs are tuned for.
-// The colour theme is intentionally not seeded; see the note in
-// scripts/screenshot-demo.js for the cold-start reason.
+// The colour theme is intentionally not seeded; applyDemoTheme() applies it at
+// runtime and waits for the repaint (see src/test/demo/_helpers.ts).
 function seedWorkspaceSettings(workspaceDir, scenario) {
     const settings = {
         'markdown-org.weekdayLocale': 'en',
@@ -72,81 +81,16 @@ function seedWorkspaceSettings(workspaceDir, scenario) {
     fs.writeFileSync(path.join(vscodeDir, 'settings.json'), JSON.stringify(settings, null, 4) + '\n', 'utf-8');
 }
 
-function sleep(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function which(cmd) {
-    return (
-        spawnSync('sh', ['-c', `command -v ${cmd}`], {
-            stdio: ['ignore', 'pipe', 'ignore']
-        }).status === 0
-    );
-}
-
-async function waitForDisplay(display, timeoutMs = 5000) {
-    const start = Date.now();
-    while (Date.now() - start < timeoutMs) {
-        const r = spawnSync('xdpyinfo', ['-display', display], {
-            stdio: ['ignore', 'ignore', 'ignore']
-        });
-        if (r.status === 0) return true;
-        await sleep(150);
-    }
-    return false;
-}
-
-function resolveVscodeTestBin() {
-    const candidate = path.join(repoRoot, 'node_modules', '@vscode', 'test-cli', 'out', 'bin.mjs');
-    if (!fs.existsSync(candidate)) {
-        throw new Error(`@vscode/test-cli not found at ${candidate}; run npm install`);
-    }
-    return candidate;
-}
-
-async function stopProcess(child, name) {
-    if (!child || child.exitCode !== null) return;
-    try {
-        // ffmpeg reads `q` from stdin to finalise output cleanly (so the moov
-        // atom is written). For Xvfb we just SIGTERM.
-        if (name === 'ffmpeg' && child.stdin && !child.stdin.destroyed) {
-            child.stdin.write('q');
-        } else {
-            child.kill('SIGTERM');
-        }
-    } catch {
-        try {
-            child.kill('SIGTERM');
-        } catch {
-            /* ignore */
-        }
-    }
-    await new Promise((resolve) => {
-        const timer = setTimeout(() => {
-            try {
-                child.kill('SIGKILL');
-            } catch {
-                /* ignore */
-            }
-            resolve();
-        }, 4000);
-        child.on('exit', () => {
-            clearTimeout(timer);
-            resolve();
-        });
-    });
-}
-
-async function recordOne(scenario, display) {
-    console.log(`\n[record-demo] === scenario: ${scenario} ===`);
+async function recordOne(scenario, display, theme) {
+    console.log(`\n[record-demo] === scenario: ${scenario} (${theme}) ===`);
 
     const vscodeTestBin = resolveVscodeTestBin();
 
-    const rawMp4 = path.join(mediaDir, `demo-${scenario}-raw.mp4`);
-    const finalMp4 = path.join(mediaDir, `demo-${scenario}.mp4`);
-    const finalGif = path.join(mediaDir, `demo-${scenario}.gif`);
-    const palettePng = path.join(mediaDir, `demo-${scenario}-palette.png`);
-    const markerPath = path.join(os.tmpdir(), `markdown-org-demo-${process.pid}-${scenario}.json`);
+    const rawMp4 = path.join(mediaDir, `demo-${scenario}-${theme}-raw.mp4`);
+    const finalMp4 = path.join(mediaDir, `demo-${scenario}-${theme}.mp4`);
+    const finalGif = path.join(mediaDir, `demo-${scenario}-${theme}.gif`);
+    const palettePng = path.join(mediaDir, `demo-${scenario}-${theme}-palette.png`);
+    const markerPath = path.join(os.tmpdir(), `markdown-org-demo-${process.pid}-${scenario}-${theme}.json`);
 
     for (const stale of [rawMp4, finalMp4, finalGif, palettePng, markerPath]) {
         fs.rmSync(stale, { force: true });
@@ -167,7 +111,7 @@ async function recordOne(scenario, display) {
 
     const ready = await waitForDisplay(display);
     if (!ready) {
-        await stopProcess(xvfb, 'xvfb');
+        await stopProcess(xvfb);
         throw new Error(`Xvfb did not come up on ${display}`);
     }
 
@@ -206,12 +150,12 @@ async function recordOne(scenario, display) {
         [vscodeTestBin, '--config', path.join(repoRoot, '.vscode-test.demo.mjs'), '--label', `demo-${scenario}`],
         {
             stdio: 'inherit',
-            env: {
-                ...process.env,
+            env: x11ChildEnv({
                 DISPLAY: display,
                 MARKDOWN_ORG_DEMO_MARKER: markerPath,
-                MARKDOWN_ORG_SCREENSHOT_GEOMETRY: RECORD_GEOMETRY
-            }
+                MARKDOWN_ORG_SCREENSHOT_GEOMETRY: RECORD_GEOMETRY,
+                MARKDOWN_ORG_DEMO_THEME: theme
+            })
         }
     );
 
@@ -219,8 +163,8 @@ async function recordOne(scenario, display) {
         test.on('exit', (code) => resolve(code ?? 1));
     });
 
-    await stopProcess(ffmpeg, 'ffmpeg');
-    await stopProcess(xvfb, 'xvfb');
+    await stopProcess(ffmpeg, { stdinQuit: true });
+    await stopProcess(xvfb);
 
     if (testCode !== 0) {
         throw new Error(`test runner exited with code ${testCode}`);
@@ -315,7 +259,7 @@ async function recordOne(scenario, display) {
     const mp4Size = fs.statSync(finalMp4).size;
     const gifSize = fs.statSync(finalGif).size;
     return {
-        scenario,
+        scenario: `${scenario} (${theme})`,
         mp4: finalMp4,
         gif: finalGif,
         mp4Mib: mp4Size / 1024 / 1024,
@@ -324,7 +268,7 @@ async function recordOne(scenario, display) {
 }
 
 async function main() {
-    for (const cmd of ['Xvfb', 'ffmpeg', 'xdpyinfo']) {
+    for (const cmd of ['Xvfb', 'ffmpeg', 'xdpyinfo', 'xdotool']) {
         if (!which(cmd)) {
             console.error(`[record-demo] missing required binary: ${cmd}`);
             process.exit(2);
@@ -333,7 +277,9 @@ async function main() {
 
     const arg = process.argv[2];
     if (!arg) {
-        console.error(`[record-demo] usage: node scripts/record-demo.js <${SCENARIOS.join('|')}|all>`);
+        console.error(
+            `[record-demo] usage: node scripts/record-demo.js <${SCENARIOS.join('|')}|all> [${THEMES.join('|')}]`
+        );
         process.exit(2);
     }
     const scenarios = arg === 'all' ? SCENARIOS : [arg];
@@ -343,12 +289,18 @@ async function main() {
             process.exit(2);
         }
     }
+    const themeArg = process.argv[3];
+    if (themeArg && !THEMES.includes(themeArg)) {
+        console.error(`[record-demo] unknown theme: ${themeArg} (expected ${THEMES.join(' | ')})`);
+        process.exit(2);
+    }
+    const themes = themeArg ? [themeArg] : THEMES;
 
     // Compile TS -> out/ once before any recording. .vscode-test.demo.mjs
     // points at out/test/demo/*.js, so a stale build silently replays the
     // previous seed instead of whatever the user just edited.
-    console.log('[record-demo] compiling sources (tsc -p .)');
-    const tscResult = spawnSync(process.execPath, [require.resolve('typescript/bin/tsc'), '-p', '.'], {
+    console.log('[record-demo] compiling sources (tsc -b)');
+    const tscResult = spawnSync(process.execPath, [require.resolve('typescript/bin/tsc'), '-b'], {
         cwd: repoRoot,
         stdio: 'inherit'
     });
@@ -359,8 +311,10 @@ async function main() {
     const display = process.env.RECORD_DEMO_DISPLAY || ':99';
     const results = [];
     for (const s of scenarios) {
-        const r = await recordOne(s, display);
-        results.push(r);
+        for (const theme of themes) {
+            const r = await recordOne(s, display, theme);
+            results.push(r);
+        }
     }
 
     console.log('\n[record-demo] all done. summary:');

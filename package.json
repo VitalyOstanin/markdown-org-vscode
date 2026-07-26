@@ -21,7 +21,7 @@
   },
   "engines": {
     "vscode": "^1.85.0",
-    "node": ">=22"
+    "node": ">=24"
   },
   "categories": [
     "Visualization",
@@ -504,16 +504,17 @@
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
-    "compile": "tsc -p ./",
-    "typecheck": "tsc --noEmit -p ./",
-    "watch": "tsc -watch -p ./",
+    "compile": "tsc -b",
+    "typecheck": "tsc -b --noEmit",
+    "watch": "tsc -b --watch",
     "test": "npm run compile && mocha --config .mocharc.unit.json",
     "test:watch": "npm run compile && node ./scripts/test-watch.js",
     "test:coverage": "npm run compile && c8 mocha --config .mocharc.unit.json",
     "test:integration": "npm run compile && node ./scripts/run-integration-tests.js",
     "test:integration:coverage": "npm run compile && node ./scripts/run-integration-tests.js --coverage --coverage-output=./coverage/integration",
-    "lint": "eslint src",
-    "lint:fix": "eslint src --fix",
+    "coverage:check:integration": "node ./scripts/check-lcov-thresholds.js ./coverage/integration/lcov.info --lines=78 --functions=68 --branches=73",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "package": "vsce package",
@@ -522,30 +523,37 @@
   "overrides": {
     "diff": "^9.0.0",
     "serialize-javascript": "^7.0.5",
-    "qs": "^6.15.2"
+    "qs": "^6.15.2",
+    "brace-expansion": "^5.0.8"
   },
   "x-markdown-org": {
-    "extractorVersion": "0.10.0"
+    "extractorVersion": "0.11.1",
+    "extractorSha256": {
+      "x86_64-unknown-linux-gnu": "5095947c9bf2529f38661e9c947a0337e2d6117d025206bea8196896b746e305",
+      "x86_64-apple-darwin": "49996beef9b3f5e832c10fc99792080250325ce30f4ac41ec46d2fa28da82a6d",
+      "aarch64-apple-darwin": "2f952f53b9b8c45b10098b2aba84637f3d51be5a04bcd29411dab9e455bd2deb",
+      "x86_64-pc-windows-msvc": "cdb67cc3d4a13600d56585d63ae0ff944da497b199c50b236ccd42cfccda35a7"
+    }
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@types/jsdom": "^28.0.3",
     "@types/mocha": "^10.0.10",
-    "@types/node": "^22.0.0",
-    "@types/sinon": "^21.0.1",
-    "@types/vscode": "^1.85.0",
-    "@vscode/test-cli": "^0.0.12",
-    "@vscode/test-electron": "^2.5.2",
-    "@vscode/vsce": "^3.9.1",
-    "c8": "^11.0.0",
-    "eslint": "^10.4.0",
+    "@types/node": "^24.0.0",
+    "@types/sinon": "^22.0.0",
+    "@types/vscode": "1.85.0",
+    "@vscode/test-cli": "^0.0.15",
+    "@vscode/test-electron": "^3.1.0",
+    "@vscode/vsce": "^3.9.2",
+    "c8": "^12.0.0",
+    "eslint": "^10.8.0",
     "eslint-config-prettier": "^10.1.8",
     "husky": "^9.1.7",
     "jsdom": "^29.1.1",
     "mocha": "^11.7.6",
-    "prettier": "^3.8.3",
-    "sinon": "^22.0.0",
+    "prettier": "^3.9.6",
+    "sinon": "^22.1.0",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.60.0"
+    "typescript-eslint": "^8.65.0"
   }
 }

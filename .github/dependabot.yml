@@ -11,3 +11,26 @@ updates:
     commit-message:
       prefix: 'ci'
       include: 'scope'
+
+  # npm was previously left to the weekly `outdated` / `security` workflows,
+  # which only print a report into a run log: no PR, no issue, nothing that
+  # fails. A vulnerable dependency was therefore only found by someone opening
+  # that log. Dependabot turns both ordinary and security updates into PRs.
+  - package-ecosystem: 'npm'
+    directory: '/'
+    schedule:
+      interval: 'weekly'
+    groups:
+      # One PR per week for the routine bumps; security updates are opened
+      # separately by Dependabot regardless of grouping.
+      npm-development:
+        dependency-type: 'development'
+        patterns:
+          - '*'
+      npm-production:
+        dependency-type: 'production'
+        patterns:
+          - '*'
+    commit-message:
+      prefix: 'chore'
+      include: 'scope'

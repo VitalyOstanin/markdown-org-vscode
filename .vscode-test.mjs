@@ -20,11 +20,14 @@ export default defineConfig({
             files: 'out/test/integration/**/*.integration.test.js',
             extensionDevelopmentPath: here,
             workspaceFolder: testWorkspace,
-            // Pin the test VS Code to the X11/Ozone backend. On a Wayland
-            // session Electron would otherwise auto-select Wayland and open a
-            // real window even under xvfb (which only provides an X server).
-            // Forcing x11 keeps the test host on xvfb's virtual display.
-            launchArgs: ['--ozone-platform=x11'],
+            // Pin the test VS Code to the X11/Ozone backend -- on Linux only.
+            // On a Wayland session Electron would otherwise auto-select
+            // Wayland and open a real window even under xvfb (which only
+            // provides an X server); forcing x11 keeps the test host on
+            // xvfb's virtual display. Ozone does not exist on macOS or
+            // Windows, so the flag is not passed there (it matches the
+            // wrapper, which sets its X11 env vars on the Linux path only).
+            launchArgs: process.platform === 'linux' ? ['--ozone-platform=x11'] : [],
             mocha: {
                 ui: 'tdd',
                 color: true,
@@ -40,7 +43,15 @@ export default defineConfig({
         // when our compiled output lives in `out/` rather than `src/`, so
         // we keep the loaded-only view until the upstream behaviour is
         // pinned down.
-        exclude: ['**/*.test.js', '**/*.integration.test.js', '**/*.d.ts', '**/*.map'],
+        // `out/webview/**` is excluded for the same reason the unit profile
+        // excludes it: that code runs inside the page, where the host's V8
+        // coverage does not reach. What the report showed for it was the file
+        // being read for inlining -- 20% of lines, 0% of functions -- 13% of
+        // the denominator pinned at a number no test can move. Leaving it in
+        // both flattered the gate (a real drop elsewhere hid behind it) and
+        // punished the client for growing. See TODO.md for how that code is
+        // meant to be covered instead.
+        exclude: ['**/*.test.js', '**/*.integration.test.js', '**/*.d.ts', '**/*.map', '**/webview/**'],
         reporter: ['lcov', 'text-summary']
         // NOTE: `output` is intentionally not set here. As of
         // @vscode/test-cli 0.0.12, the config-file `coverage.output` field

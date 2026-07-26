@@ -1,0 +1,16 @@
+{
+  // Extension Development Host for F5, as DEVELOPMENT.md describes. The
+  // preLaunchTask builds both TypeScript projects (`tsc -b`), so the webview
+  // client is never stale in the debugged window.
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run Extension",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": ["--extensionDevelopmentPath=${workspaceFolder}"],
+      "outFiles": ["${workspaceFolder}/out/**/*.js"],
+      "preLaunchTask": "npm: compile"
+    }
+  ]
+}
