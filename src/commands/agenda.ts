@@ -7,9 +7,11 @@ import { exec } from '../utils/exec';
 import { filterTasksByTag } from '../utils/tagFilter';
 import { EXTRACTOR_MAX_BUFFER_BYTES, EXTRACTOR_TIMEOUT_MS, extractor } from '../utils/extractor';
 import { formatError, notifyError, notifyInfo, notifyWarn } from '../utils/notify';
-import { buildTagCycle, computeNextTag } from '../utils/cycleTag';
+import { buildTagCycle, computeNextTag, resolveRequestedTag } from '../utils/cycleTag';
 import { buildExecError } from '../utils/execError';
+import { currentConfigTarget } from '../utils/configTarget';
 import { getCachedHolidays } from '../utils/holidaysCache';
+import { logDiagnostic } from '../utils/logChannel';
 
 /**
  * Open the agenda webview for the given mode (day/week/month/tasks).
@@ -17,7 +19,7 @@ import { getCachedHolidays } from '../utils/holidaysCache';
  * Disabled in untrusted workspaces.
  */
 export async function showAgenda(
-    context: vscode.ExtensionContext,
+    _context: vscode.ExtensionContext,
     mode: 'day' | 'week' | 'month' | 'tasks',
     initialDate?: string
 ) {
@@ -48,13 +50,47 @@ export async function showAgenda(
                 const result = await execCommand(extractorPath, ['--holidays', y.toString()]);
                 return JSON.parse(result) as string[];
             });
-        } catch {
+        } catch (error) {
             // Graceful degradation: missing/older extractor binaries do not
-            // expose --holidays. The agenda must still render, so we silently
-            // fall back to "no holidays" rather than surfacing an error every
-            // time the panel refreshes. The cache itself does not memoise
-            // failures, so the next agenda open will retry the extractor.
+            // expose --holidays. The agenda must still render, so we fall back
+            // to "no holidays" rather than surfacing an error every time the
+            // panel refreshes. The cache itself does not memoise failures, so
+            // the next agenda open will retry the extractor.
+            //
+            // The reason still goes to the log channel: an unsupported option
+            // and a broken binary (timeout, unparsable output) both land here,
+            // and without a record "holidays are not highlighted" is
+            // indistinguishable from "the extractor is failing".
+            logDiagnostic(`holidays for ${year} unavailable: ${formatError(error)}`);
             return [];
+        }
+    };
+
+    /**
+     * Run the extractor and turn its output into what a render needs, or
+     * report the failure and return `undefined`.
+     */
+    const loadPayload = async (
+        args: string[],
+        anchor: string | undefined
+    ): Promise<{ data: AgendaData; currentTag: string; holidays: string[] } | undefined> => {
+        try {
+            const result = await execCommand(extractorPath, args);
+            // Parse boundary: the extractor JSON arrives untyped. Normalize
+            // every task's `task_type` to the known keyword set here so the
+            // `Task.task_type: TaskStatus | undefined` contract holds for all
+            // downstream code; unknown future keywords degrade to `undefined`.
+            const rawData = normalizeAgendaTaskTypes(JSON.parse(result) as AgendaData);
+            const config = vscode.workspace.getConfiguration('markdown-org');
+            const currentTag = config.get<string>('currentTag', 'ALL');
+            const fileTags = config.get<FileTag[]>('fileTags', []);
+            const data = filterTasksByTag(rawData, currentTag, fileTags);
+            const year = anchor ? parseInt(anchor.split('-')[0], 10) : new Date().getFullYear();
+
+            return { data, currentTag, holidays: await getHolidays(year) };
+        } catch (error) {
+            notifyError(`Failed to load agenda: ${formatError(error)}`);
+            return undefined;
         }
     };
 
@@ -76,37 +112,39 @@ export async function showAgenda(
             args.push('--tasks');
         } else {
             args.push('--agenda', mode);
+            // Two different things, hence two flags. `--date` is the window
+            // anchor and follows Prev/Next; `--current-date` is "today" and
+            // always the host's local date. Without the latter the extractor
+            // derives today from its own `--tz` default (Europe/Moscow), so a
+            // user in another zone sees the neighbouring day's overdue and
+            // upcoming buckets and a repeater hint one day off.
             args.push('--date', shiftedToday);
+            args.push('--current-date', toIsoDate(new Date()));
+        }
+
+        // Loading and rendering are reported separately: a panel that fails to
+        // open is not an extractor problem, and calling it "Failed to load
+        // agenda" sends the user looking in the wrong place. Loading lives in
+        // its own function so its results stay `const` instead of being hoisted
+        // as uninitialized `let`s just to outlive the try block.
+        const loaded = await loadPayload(args, shiftedToday);
+        if (!loaded) {
+            return;
         }
 
         try {
-            const result = await execCommand(extractorPath, args);
-            // Parse boundary: the extractor JSON arrives untyped. Normalize
-            // every task's `task_type` to the known keyword set here so the
-            // `Task.task_type: TaskStatus | undefined` contract holds for all
-            // downstream code; unknown future keywords degrade to `undefined`.
-            const rawData = normalizeAgendaTaskTypes(JSON.parse(result) as AgendaData);
-            const config = vscode.workspace.getConfiguration('markdown-org');
-            const currentTag = config.get<string>('currentTag', 'ALL');
-            const fileTags = config.get<FileTag[]>('fileTags', []);
-            const data = filterTasksByTag(rawData, currentTag, fileTags);
-
-            const year = shiftedToday ? parseInt(shiftedToday.split('-')[0], 10) : new Date().getFullYear();
-            const holidays = await getHolidays(year);
-
-            AgendaPanel.render(
-                context,
-                data,
+            AgendaPanel.render({
+                data: loaded.data,
                 mode,
                 shiftedToday,
-                loadData,
+                refreshCallback: loadData,
                 userInitiated,
-                currentTag,
-                holidays,
+                currentTag: loaded.currentTag,
+                holidays: loaded.holidays,
                 navigation
-            );
+            });
         } catch (error) {
-            notifyError(`Failed to load agenda: ${formatError(error)}`);
+            notifyError(`Failed to render agenda: ${formatError(error)}`);
         }
     };
 
@@ -135,12 +173,25 @@ export async function cycleTag(_context: vscode.ExtensionContext) {
 
     const nextTag = computeNextTag(currentTag, tagNames);
 
-    const target =
-        (vscode.workspace.workspaceFolders?.length ?? 0) > 0
-            ? vscode.ConfigurationTarget.Workspace
-            : vscode.ConfigurationTarget.Global;
+    const target = currentConfigTarget();
     await config.update('currentTag', nextTag, target);
     notifyInfo(`Tag filter: ${nextTag}`);
+
+    AgendaPanel.refresh();
+}
+
+/**
+ * Apply a specific file-tag filter chosen directly from the agenda's tag
+ * dropdown. Unlike {@link cycleTag} this jumps straight to the picked tag; a
+ * request stale against the current `markdown-org.fileTags` resolves to "ALL"
+ * (see {@link resolveRequestedTag}). No toast: the dropdown selection is
+ * already explicit feedback, and one on every pick would be noise.
+ */
+export async function setTag(_context: vscode.ExtensionContext, requestedTag: string) {
+    const config = vscode.workspace.getConfiguration('markdown-org');
+    const tagNames = config.get<FileTag[]>('fileTags', []).map((t) => t.name);
+    const target = currentConfigTarget();
+    await config.update('currentTag', resolveRequestedTag(requestedTag, tagNames), target);
 
     AgendaPanel.refresh();
 }

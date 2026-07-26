@@ -1,18 +1,23 @@
 {
   "compilerOptions": {
-    "module": "commonjs",
-    "moduleResolution": "node10",
-    "ignoreDeprecations": "6.0",
+    "module": "node16",
+    "moduleResolution": "node16",
     "target": "ES2022",
     "outDir": "out",
     "lib": ["ES2022"],
     "sourceMap": true,
     "rootDir": "src",
     "strict": true,
+    // Free today (zero errors) and keeps an override honest once class
+    // hierarchies grow. exactOptionalPropertyTypes and noUncheckedIndexedAccess
+    // are tracked in TODO.md -- they need code changes.
+    "noImplicitOverride": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
-    "types": ["node", "mocha"]
+    "types": ["node", "mocha"],
+    "tsBuildInfoFile": "out/.tsbuildinfo-host"
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", ".vscode-test", "out"]
+  "exclude": ["node_modules", ".vscode-test", "out", "src/webview", "src/types.ts", "src/utils/agendaI18n.ts"],
+  "references": [{ "path": "./tsconfig.webview.json" }]
 }

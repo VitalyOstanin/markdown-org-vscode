@@ -7,7 +7,8 @@ import {
     insertScheduledTimestamp,
     insertDeadlineTimestamp
 } from './commands/taskStatus';
-import { showAgenda, cycleTag } from './commands/agenda';
+import { showAgenda, cycleTag, setTag } from './commands/agenda';
+import { AgendaPanel } from './views/agendaPanel';
 import { adjustTimestamp, toggleTimestampActive } from './commands/timestampEdit';
 import { moveToArchive, promoteToMaintain } from './commands/moveHeading';
 import { insertClockStart, insertClockFinish } from './commands/clock';
@@ -17,12 +18,13 @@ import { notifyError } from './utils/notify';
 import { withErrorReporting } from './utils/orgCommandWrap';
 import { registerBracketDiagnostics } from './diagnostics/timestampBrackets';
 import { registerTimestampAdjustableContext } from './commands/timestampAdjustableContext';
-import { AGENDA_STYLES_LIST, normalizeAgendaStyle } from './utils/agendaStyle';
 
 function registerOrgCommand<A extends unknown[]>(
     context: vscode.ExtensionContext,
     name: string,
-    handler: (...args: A) => unknown | Promise<unknown>
+    // `unknown` already covers a returned promise; spelling both out is
+    // redundant (and flagged as such by no-redundant-type-constituents).
+    handler: (...args: A) => unknown
 ): void {
     const wrapped = withErrorReporting(name, (msg) => notifyError(msg), handler);
     context.subscriptions.push(vscode.commands.registerCommand(name, wrapped));
@@ -43,26 +45,26 @@ export function activate(context: vscode.ExtensionContext) {
     registerOrgCommand(context, 'markdown-org.showAgendaWeek', (date?: string) => showAgenda(context, 'week', date));
     registerOrgCommand(context, 'markdown-org.showAgendaMonth', (date?: string) => showAgenda(context, 'month', date));
     registerOrgCommand(context, 'markdown-org.showTasks', (date?: string) => showAgenda(context, 'tasks', date));
+    // Agenda view history (browser-style Back/Forward over {mode, date} states).
+    // Alt+Shift+- / Alt+Shift+= reach these through contributed keybindings gated
+    // on `markdown-org.agendaFocused`; the webview does not capture the chords
+    // itself (see the note in agendaClient.ts), so they stay reassignable.
+    registerOrgCommand(context, 'markdown-org.agendaBack', () => AgendaPanel.goBack());
+    registerOrgCommand(context, 'markdown-org.agendaForward', () => AgendaPanel.goForward());
     registerOrgCommand(context, 'markdown-org.timestampUp', () => adjustTimestamp(1));
     registerOrgCommand(context, 'markdown-org.timestampDown', () => adjustTimestamp(-1));
     registerOrgCommand(context, 'markdown-org.toggleTimestampActive', () => toggleTimestampActive());
     registerOrgCommand(context, 'markdown-org.moveToArchive', () => moveToArchive());
     registerOrgCommand(context, 'markdown-org.promoteToMaintain', () => promoteToMaintain());
     registerOrgCommand(context, 'markdown-org.cycleTag', () => cycleTag(context));
+    // Internal: invoked by the agenda tag dropdown with the picked tag. Not in
+    // package.json contributes.commands, so it stays out of the command palette
+    // (it is meaningless without the tag argument).
+    registerOrgCommand(context, 'markdown-org.setTag', (tag?: string) => setTag(context, tag ?? 'ALL'));
     registerOrgCommand(context, 'markdown-org.gcalSync.connect', () => connectGcal(context));
     registerOrgCommand(context, 'markdown-org.gcalSync.disconnect', () => disconnectGcal(context));
     registerOrgCommand(context, 'markdown-org.gcalSync.selectCalendar', () => selectCalendar(context));
     registerOrgCommand(context, 'markdown-org.gcalSync.syncNow', () => syncNow(context));
-
-    context.subscriptions.push(
-        vscode.commands.registerCommand('markdown-org.cycleAgendaStyle', async () => {
-            const cfg = vscode.workspace.getConfiguration('markdown-org');
-            const order = AGENDA_STYLES_LIST;
-            const current = normalizeAgendaStyle(cfg.get<string>('agendaStyle'));
-            const next = order[(order.indexOf(current) + 1) % order.length];
-            await cfg.update('agendaStyle', next, vscode.ConfigurationTarget.Global);
-        })
-    );
 
     registerBracketDiagnostics(context);
     registerTimestampAdjustableContext(context);

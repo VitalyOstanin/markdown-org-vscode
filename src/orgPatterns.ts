@@ -1,5 +1,11 @@
+// Whitespace acceptance mirrors markdown-org-extract's `CLOCK_RE` (clock.rs):
+// `CLOCK:\s*` before the first timestamp and `\s*=>\s*` around the duration
+// arrow. Both projects read the same lines off disk, so a line one of them
+// counts and the other silently skips would make `total_clock_time` and the
+// clocktable built here disagree about the same file. The extension always
+// writes the canonical single-space form; this is about what it accepts.
 export const CLOCK_REGEX =
-    /^(?<indent>\s*)`CLOCK: (?<startOpenBracket>[[<])(?<startYear>\d{4})-(?<startMonth>\d{2})-(?<startDay>\d{2}) (?<startBody>[^\]>]+)(?<startCloseBracket>[\]>])(?:--(?<endOpenBracket>[[<])(?<endYear>\d{4})-(?<endMonth>\d{2})-(?<endDay>\d{2}) (?<endBody>[^\]>]+)(?<endCloseBracket>[\]>]) => +(?<durationHours>-?\d+):(?<durationMinutes>-?\d+))?`$/;
+    /^(?<indent>\s*)`CLOCK:\s*(?<startOpenBracket>[[<])(?<startYear>\d{4})-(?<startMonth>\d{2})-(?<startDay>\d{2}) (?<startBody>[^\]>]+)(?<startCloseBracket>[\]>])(?:--(?<endOpenBracket>[[<])(?<endYear>\d{4})-(?<endMonth>\d{2})-(?<endDay>\d{2}) (?<endBody>[^\]>]+)(?<endCloseBracket>[\]>])\s*=>\s*(?<durationHours>-?\d+):(?<durationMinutes>-?\d+))?`$/;
 
 // Strict per-keyword bracket policy from ADR-0014:
 //   SCHEDULED, DEADLINE -> active <...>

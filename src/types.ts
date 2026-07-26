@@ -41,6 +41,13 @@ export interface Task {
     // form; unrepresentable repeaters (e.g. `+2wd`) leave the event one-shot
     // (see utils/gcal/rrule.ts).
     timestamp_repeater?: string;
+    // Resolved next still-upcoming occurrence date (`YYYY-MM-DD`) of a
+    // repeating task, computed by markdown-org-extract relative to "now"
+    // (extractor ADR-0023). Present only in the day/week/month agenda modes
+    // and only for tasks with a repeater; absent in `tasks` mode, for
+    // non-repeating tasks, and from an older extractor. The agenda repeat
+    // tooltip prefers it so "next" never names a past occurrence.
+    timestamp_next?: string;
     // Per-task key/value pairs parsed by markdown-org-extract from an
     // `org-properties` fenced code block. Absent when the task has no such
     // block. Optional and additive on the wire (extractor ADR-0015), so an

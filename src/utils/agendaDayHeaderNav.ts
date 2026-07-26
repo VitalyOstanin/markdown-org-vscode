@@ -21,7 +21,9 @@ export interface DayHeaderRootLike {
  * heading. This wires a click on that heading to `onNavigate(date)` (the
  * webview passes its `navigateToDay`, which reopens the agenda in Day mode
  * for that date), tags the heading with `day-header-link` so the CSS can show
- * a pointer affordance, and adds a `title` tooltip explaining the drill-down.
+ * a pointer affordance, and adds the caller-supplied `title` tooltip
+ * explaining the drill-down (the wording comes from the active UI language,
+ * see agendaI18n.ts).
  *
  * Only week mode is wired: Day mode's single header would just reopen the
  * same day, Month uses `.calendar-day` cells, and Tasks headers carry no
@@ -35,7 +37,8 @@ export interface DayHeaderRootLike {
 export function wireDayHeaderNavigation(
     root: DayHeaderRootLike,
     mode: string,
-    onNavigate: (date: string) => void
+    onNavigate: (date: string) => void,
+    title: string
 ): number {
     if (mode !== 'week') {
         return 0;
@@ -49,7 +52,7 @@ export function wireDayHeaderNavigation(
             continue;
         }
         el.classList.add('day-header-link');
-        el.setAttribute('title', 'Open this day in Day view');
+        el.setAttribute('title', title);
         el.addEventListener('click', function () {
             onNavigate(date);
         });

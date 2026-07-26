@@ -1,23 +1,26 @@
 /**
  * Static CSS for the agenda webview, kept vscode-free so a unit test can
- * assert invariants across all three visual-style presets (monospace /
- * native / hybrid, selected via `body[data-agenda-style]`):
+ * assert invariants over it:
  *
- *  - Theming (#11): every colour resolves through a `var(--vscode-*)` token
+ *  - Theming: every colour resolves through a `var(--vscode-*)` token
  *    (or a `color-mix()` of them) with no hardcoded HEX, so the panel follows
  *    the active VS Code theme -- light, dark, or high contrast.
- *  - Spacing scale (#20): all padding/margin/gap come from a single
- *    4/8/12/16/20 token scale (`--space-1..5`, declared once in `:root`), and
- *    font-size is expressed in one unit (em, relative to the webview's own
- *    `var(--vscode-font-size)`). Fixed grid-column widths, the indicator dot
- *    size and border widths are markup sizes and stay in px.
+ *  - Spacing scale: all padding/margin/gap come from a single
+ *    4/8/12/16/20 token scale (`--space-1..5`, declared once in `:root`).
+ *    Fixed grid-column widths, the indicator dot size and border widths are
+ *    markup sizes and stay in px.
+ *  - Shape and type scales: every `border-radius` comes from
+ *    `--radius-sm/-md/-pill` and every `font-size` from `--font-xs..-xl`, both
+ *    declared once in `:root`, so a chip cannot drift a step away from the
+ *    identical chip elsewhere. The dots' `50%` and the `.status` `font-size: 0`
+ *    are shapes, not steps of those scales.
  *
  * Injected by `AgendaPanel.getHtmlContent` inside a nonce'd `<style>` tag; the
- * nonce lives on the tag, these rules are static. The DOM emitted by
- * `renderTask` is identical across presets (`.task-line[data-status]
- * [data-priority][data-type]` with `.status`/`.priority`/`.heading`/`.offset`
- * children) -- everything that differs between monospace, native and hybrid
- * (the `[#A]` brackets, badge pills, column widths) lives entirely here.
+ * nonce lives on the tag, these rules are static. `renderTask` emits
+ * `.task-line[data-status][data-priority][data-type]` with `.status` /
+ * `.time-plain` / `.flag` / `.priority` / `.heading` / `.offset` children;
+ * their whole appearance -- column widths, the status dot, the type glyph, the
+ * priority chip -- lives here rather than in the renderer.
  */
 export const AGENDA_STYLES = `
         :root {
@@ -28,10 +31,35 @@ export const AGENDA_STYLES = `
             --space-3: 12px;
             --space-4: 16px;
             --space-5: 20px;
+            /* Corner radii (#38): three shapes only -- a small chip (the
+               priority cookie), a control or cell, and a full pill (count
+               badges). The 50% used by the status/day dots is a circle from
+               their fixed px size, not a step of this scale. */
+            --radius-sm: 3px;
+            --radius-md: 6px;
+            --radius-pill: 999px;
+            /* Type scale (#38): five steps, all relative to the webview's own
+               font size, so the panel keeps a readable hierarchy instead of the
+               ten nearly identical sizes it grew. xs = badges and chips,
+               sm = section captions and muted subtitles, md = body rows and
+               controls, lg = day numbers and weekday names, xl = the hero. */
+            --font-xs: 0.78em;
+            --font-sm: 0.85em;
+            --font-md: 1em;
+            --font-lg: 1.1em;
+            --font-xl: 1.5em;
             /* Height of the sticky nav-bar header, measured at runtime by
                syncHeaderOffset. Day-headers stick just below it (top /
                scroll-margin-top). 0px until the first measurement. */
             --agenda-header-h: 0px;
+            /* Accent palette: the theme's semantic colours softened toward the
+               editor foreground, which is what gives the panel its muted look.
+               Declared once here -- the same mix used to be spelled out at
+               every use site, so a tweak meant editing a dozen rules. */
+            --accent-red: color-mix(in srgb, var(--vscode-charts-red) 72%, var(--vscode-editor-foreground) 28%);
+            --accent-yellow: color-mix(in srgb, var(--vscode-charts-yellow) 78%, var(--vscode-editor-foreground) 22%);
+            --accent-blue: color-mix(in srgb, var(--vscode-charts-blue) 65%, var(--vscode-editor-foreground) 35%);
+            --accent-blue-strong: color-mix(in srgb, var(--vscode-charts-blue) 82%, var(--vscode-editor-foreground) 18%);
         }
         body {
             padding: var(--space-5);
@@ -41,7 +69,6 @@ export const AGENDA_STYLES = `
             font-size: var(--vscode-font-size);
             line-height: 1.6;
         }
-        /* ---- common structure (all presets) ---- */
         /* Sticky header: the control row and the current-date line stay pinned
            to the top while the agenda scrolls. The negative margins cancel the
            body's padding so the header spans edge-to-edge and its background
@@ -56,145 +83,253 @@ export const AGENDA_STYLES = `
             margin: calc(-1 * var(--space-5)) calc(-1 * var(--space-5)) var(--space-4);
             padding: var(--space-5) var(--space-5) var(--space-2);
         }
+        /* Nav "A" control block: two stacked rows -- the mode segment on top,
+           then the date-nav + tag chips. Separate rows keep the underline
+           segment off the same baseline as the boxed nav buttons. The compact
+           header deliberately overrides this to a single row (see the
+           body.compact-header .nav-bar rule below), trading that separation
+           for the vertical space a short panel needs. */
         .nav-bar {
             display: flex;
-            gap: var(--space-2);
+            flex-direction: column;
+            gap: var(--space-3);
             margin-bottom: var(--space-2);
-            align-items: center;
         }
-        /* Prev/Today/Next: a lightened secondary segment (matches .mode-switch),
-           not the accent-coloured primary buttons they used to be. */
+        .seg-row {
+            display: flex;
+        }
+        .control-row {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+        }
+        /* One focus ring for every interactive surface of the panel (#38). The
+           nav pill, the mode segment, the tag chip, its dropdown rows and the
+           month cells sit in the same panel and are reached by the same Tab
+           key, so they cannot look different under keyboard focus. */
+        .nav-btn:focus-visible,
+        .seg-item:focus-visible,
+        .tag-menu-btn:focus-visible,
+        .tag-menu-item:focus-visible,
+        .calendar-day:focus-visible {
+            outline: 1px solid var(--vscode-focusBorder);
+            outline-offset: -2px;
+        }
+        /* Today's cell already carries an inset accent ring at -2px; the focus
+           ring moves further in so focusing today stays visible. */
+        .calendar-day:focus-visible {
+            outline-offset: -4px;
+        }
+        /* Prev/Today/Next: one rounded segmented control (a "pill"). The group
+           owns the border, corner rounding and background; each segment is a
+           flat cell divided from its neighbour by a single hairline. Prev/Next
+           arrows get a fixed square-ish cell with a slightly larger glyph so
+           the control reads as [ ‹ | Today | › ]. */
         .date-nav {
             display: inline-flex;
+            align-items: stretch;
+            background: var(--vscode-button-secondaryBackground);
+            border: 1px solid var(--vscode-panel-border);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+        }
+        /* View history sits next to the date navigation and looks the same, so
+           the two read as one control area; the gap keeps "back in history"
+           from being mistaken for "previous day". */
+        .history-nav {
+            margin-right: var(--space-3);
         }
         .nav-btn {
-            background: var(--vscode-button-secondaryBackground);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: transparent;
             color: var(--vscode-button-secondaryForeground);
-            border: 1px solid var(--vscode-panel-border);
-            padding: var(--space-1) var(--space-2);
+            border: none;
+            padding: var(--space-1) var(--space-3);
             cursor: pointer;
             font-family: inherit;
-            font-size: 1em;
+            font-size: var(--font-md);
+            line-height: 1.3;
+            transition: background 0.1s ease, color 0.1s ease;
         }
         .nav-btn + .nav-btn {
-            border-left: none;
+            border-left: 1px solid var(--vscode-panel-border);
         }
         .nav-btn:hover {
             background: var(--vscode-button-secondaryHoverBackground);
         }
-        .mode-switch {
-            display: inline-flex;
-            margin-right: var(--space-2);
+        .nav-btn:active {
+            background: color-mix(in srgb, var(--vscode-button-secondaryHoverBackground) 85%, var(--vscode-foreground));
         }
-        .mode-btn {
-            background: var(--vscode-button-secondaryBackground);
-            color: var(--vscode-button-secondaryForeground);
-            border: 1px solid var(--vscode-panel-border);
-            padding: var(--space-1) var(--space-2);
+        /* Prev/Next arrow cells: square-ish, centred, a touch larger and muted
+           until hovered so "Today" stays the visual anchor of the group. */
+        .nav-btn-arrow {
+            min-width: 2.1em;
+            padding-left: var(--space-2);
+            padding-right: var(--space-2);
+            font-size: var(--font-lg);
+            color: var(--vscode-descriptionForeground);
+        }
+        .nav-btn-arrow:hover {
+            color: var(--vscode-foreground);
+        }
+        /* Mode segment (Nav "A"): text items with an accent underline on the
+           active view instead of button chrome. */
+        .mode-seg {
+            display: inline-flex;
+            gap: var(--space-4);
+        }
+        .seg-item {
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            padding: 0 0 var(--space-1) 0;
             cursor: pointer;
             font-family: inherit;
-            font-size: 1em;
+            font-size: var(--font-md);
+            color: var(--vscode-descriptionForeground);
         }
-        .mode-btn + .mode-btn {
-            border-left: none;
+        .seg-item:hover {
+            color: var(--vscode-foreground);
         }
-        .mode-btn:hover {
-            background: var(--vscode-button-secondaryHoverBackground);
-        }
-        .mode-btn.active {
-            background: var(--vscode-button-background);
-            color: var(--vscode-button-foreground);
-            border-color: var(--vscode-button-background);
+        .seg-item.active {
+            color: var(--vscode-foreground);
             font-weight: bold;
+            border-bottom-color: var(--vscode-textLink-foreground);
         }
-        .current-date {
+        /* Pushes the tag/style chips to the right edge of the control row so
+           the two dropdowns read as one paired chip group. */
+        .nav-spacer {
+            margin-left: auto;
+        }
+        /* Hero title block (Nav "A"): a large weekday/month title, a muted date
+           subtitle, and an optional TODAY badge. Replaces the old single-line
+           current-date. */
+        .agenda-hero {
+            margin-bottom: var(--space-3);
+        }
+        .hero-title {
             color: var(--vscode-textLink-foreground);
             font-weight: bold;
-            font-size: 1.05em;
-            margin: 0;
+            font-size: var(--font-xl);
+            line-height: 1.15;
+            /* Intl lower-cases weekday and month names in some locales
+               ("суббота", "июль"); the hero opens the view, so it reads as a
+               heading -- capitalised, like the day-headers below it. */
+            text-transform: capitalize;
         }
-        .tag-indicator {
-            color: var(--vscode-charts-yellow);
+        .hero-sub {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            margin-top: var(--space-1);
+            color: var(--vscode-descriptionForeground);
+            font-size: var(--font-sm);
+        }
+        .hero-badge {
+            border-radius: var(--radius-pill);
+            padding: 0 var(--space-2);
+            font-size: var(--font-xs);
             font-weight: bold;
-            margin-left: auto;
-            cursor: pointer;
-        }
-        .tag-indicator:hover {
+            letter-spacing: 0.05em;
             color: var(--vscode-textLink-activeForeground);
+            background: color-mix(in srgb, var(--vscode-button-background) 28%, transparent);
+            border: 1px solid color-mix(in srgb, var(--vscode-button-background) 55%, transparent);
         }
-        .style-menu {
+        .tag-menu {
             position: relative;
         }
-        .style-menu-btn {
+        /* The Tag chip mirrors the rounded date-nav "pill" so the control row
+           reads as one consistent set of affordances. */
+        .tag-menu-btn {
             background: var(--vscode-button-secondaryBackground);
             color: var(--vscode-button-secondaryForeground);
             border: 1px solid var(--vscode-panel-border);
-            padding: var(--space-1) var(--space-2);
+            border-radius: var(--radius-md);
+            padding: var(--space-1) var(--space-3);
             cursor: pointer;
             font-family: inherit;
-            font-size: 1em;
+            font-size: var(--font-md);
+            line-height: 1.3;
+            transition: background 0.1s ease;
         }
-        .style-menu-btn:hover {
+        .tag-menu-btn:hover {
             background: var(--vscode-button-secondaryHoverBackground);
         }
-        .style-menu-list {
+        /* The dropdown panel repeats the trigger's rounding and floats over the
+           content on the theme's widget shadow, so the pair reads as one
+           control instead of a flat rectangle under a rounded button. */
+        .tag-menu-list {
             position: absolute;
             right: 0;
             top: 100%;
             background: var(--vscode-editorWidget-background);
             border: 1px solid var(--vscode-panel-border);
+            border-radius: var(--radius-md);
+            box-shadow: 0 2px 8px var(--vscode-widget-shadow);
+            overflow: hidden;
             z-index: 10;
             display: none;
             min-width: 120px;
         }
-        .style-menu.open .style-menu-list {
+        .tag-menu.open .tag-menu-list {
             display: block;
         }
         /* Non-selectable caption at the top of the style dropdown. */
-        .style-menu-label {
+        .tag-menu-label {
             padding: var(--space-1) var(--space-3);
             color: var(--vscode-descriptionForeground);
-            font-size: 0.9em;
+            font-size: var(--font-sm);
             cursor: default;
         }
-        .style-menu-item {
+        /* A dropdown row is a <button> (that is what gives it Tab focus and
+           Enter/Space), stripped back to a plain list row. */
+        .tag-menu-item {
             display: flex;
+            width: 100%;
             align-items: center;
             gap: var(--space-2);
             padding: var(--space-1) var(--space-3);
             cursor: pointer;
+            background: none;
+            border: none;
+            font-family: inherit;
+            font-size: inherit;
+            text-align: left;
             color: var(--vscode-foreground);
         }
         /* Leading checkmark column: reserved on every row (visibility, not
            display) so the labels stay aligned; shown only on the active row. */
-        .style-menu-check {
+        .tag-menu-check {
             visibility: hidden;
             color: var(--vscode-textLink-foreground);
         }
-        .style-menu-item.active .style-menu-check {
+        .tag-menu-item.active .tag-menu-check {
             visibility: visible;
         }
-        .style-menu-item:hover {
+        .tag-menu-item:hover {
             background: var(--vscode-list-hoverBackground);
         }
-        .style-menu-item.active {
+        .tag-menu-item.active {
             color: var(--vscode-textLink-foreground);
             font-weight: bold;
         }
         .day-header {
             color: var(--vscode-textLink-foreground);
-            font-weight: bold;
+            font-weight: normal;
             /* Top spacing is padding, not margin, so it belongs to the header
                box and is filled by the background below -- a sticky header with
                a transparent top margin would let tasks show through the gap. */
             margin: 0;
             padding: var(--space-5) 0 var(--space-1) 0;
-            display: grid;
-            /* 3-column day header (see formatDayHeader): weekday | day | month+year.
-               Content-sized columns keep the parts tight together -- fixed widths
-               left large gaps after short weekdays (e.g. "среда"). */
-            grid-template-columns: max-content max-content 1fr;
-            column-gap: 1ch;
+            /* weekday | day | month+year (see formatDayHeader), laid out as a
+               baseline row so the parts stay tight together regardless of how
+               long the weekday name is. */
+            display: flex;
+            align-items: baseline;
+            gap: var(--space-2);
+            border-bottom: 1px solid var(--vscode-panel-border);
             /* Sticky section header: each day's heading pins just below the
                sticky nav-bar (--agenda-header-h, measured by syncHeaderOffset)
                while that day's tasks scroll under it. The background hides the
@@ -202,7 +337,11 @@ export const AGENDA_STYLES = `
                parking today's header behind the nav-bar. Flat sibling headers
                cover the previous day's header as the next day scrolls up. */
             position: sticky;
-            top: var(--agenda-header-h);
+            /* Pin 1px into the header's underside so a sub-pixel rounding seam
+               between the header's bottom and the header offset never leaves a
+               hairline of scrolling task text visible; the header (higher
+               z-index, opaque) hides the 1px overlap. */
+            top: calc(var(--agenda-header-h) - 1px);
             scroll-margin-top: var(--agenda-header-h);
             z-index: 5;
             background: var(--vscode-editor-background);
@@ -219,233 +358,148 @@ export const AGENDA_STYLES = `
         }
         .task-line {
             display: grid;
-            /* 6-column task line (see renderTask): todo: | time | status | priority | heading | date.
-               When adding/removing a column, update renderTask in lockstep -- the grid does not
-               span-collapse, so a missing span shifts every column right of it. Per-preset column
-               widths are overridden below (monospace keeps this default). */
-            grid-template-columns: auto 140px 60px 60px 1fr 90px;
+            /* dot | big time | flag | priority | heading | offset (see
+               renderTask). When adding or removing a column, update renderTask
+               in lockstep -- the grid does not span-collapse, so a missing span
+               shifts every column right of it.
+               Offset is auto-sized (not the mockup's fixed 52px, which fit its
+               short "-2д"): the real column shows a full DD.MM.YYYY date, so a
+               fixed width overflowed it past the grid edge and forced a
+               horizontal scrollbar. auto sizes it to the date; the 1fr heading
+               absorbs the rest. */
+            grid-template-columns: 14px 56px 18px 18px 1fr auto;
             gap: var(--space-2);
             margin: var(--space-1) 0;
             cursor: pointer;
-            font-size: 1.1em;
+            align-items: center;
+            /* The row runs at the base font size (the mockup's 13px) to stay
+               compact. */
+            font-size: var(--font-md);
         }
         .task-line:hover {
             background: var(--vscode-list-hoverBackground);
         }
-        /* timeInfo cell -- forced vertical stack so a SCHEDULED time and
-           a DEADLINE marker always render as two stacked lines, regardless
-           of font width. This replaced an older "DEADLINE ⌃" caret that
-           relied on CSS wrap inside a fixed-width cell and broke on narrow
-           monospace fonts (caret pointed at unrelated content above). */
-        .time-info-cell {
-            display: flex;
-            flex-direction: column;
-            line-height: 1.2;
-        }
-        /* .flag holds the table-only type glyph; hidden (and thus out of the
-           grid) in every preset except table, so their column counts are
-           unaffected by the extra renderTask cell. */
-        .flag { display: none; }
-        /* .time-plain is the table-only clean HH:MM cell; hidden (out of the
-           grid) in every other preset so their column counts are unaffected. */
-        .time-plain { display: none; }
-        .todo-label { color: var(--vscode-charts-red); }
-        .status[data-status="todo"] { color: var(--vscode-charts-red); font-weight: bold; }
-        .status[data-status="done"] { color: var(--vscode-charts-green); font-weight: bold; }
-        .status[data-status="cancelled"] { color: var(--vscode-disabledForeground); text-decoration: line-through; font-weight: bold; }
-        .priority[data-priority="a"] { color: var(--vscode-charts-red); font-weight: bold; }
-        .priority[data-priority="b"] { color: var(--vscode-charts-yellow); font-weight: bold; }
-        .priority[data-priority="c"] { color: var(--vscode-charts-blue); font-weight: bold; }
-        /* Heading tint by priority -- same hue AND weight as the marker
-           (full font match). Loses to [data-type="deadline"] (DEADLINE wins
-           by design -- it's the louder signal). */
-        .task-line[data-priority="a"] .heading { color: var(--vscode-charts-red); font-weight: bold; }
-        .task-line[data-priority="b"] .heading { color: var(--vscode-charts-yellow); font-weight: bold; }
-        .task-line[data-priority="c"] .heading { color: var(--vscode-charts-blue); font-weight: bold; }
-        .task-line[data-type="deadline"] .heading { color: var(--vscode-charts-red); font-weight: bold; }
         .offset[data-dir="overdue"] { color: var(--vscode-descriptionForeground); text-align: right; }
         .offset[data-dir="upcoming"] { color: var(--vscode-textLink-foreground); text-align: right; font-weight: bold; }
+        /* ============ month calendar ============
+           Same visual language as the cards and the nav pill: rounded cells on
+           a hairline border, colour reserved for meaning (today, holidays, task
+           load) rather than for chrome. Task load is a count chip in the corner
+           -- how many tasks the day holds, red when any of them are overdue. */
         .calendar {
             display: grid;
             grid-template-columns: repeat(7, 1fr);
             gap: var(--space-1);
-            margin: var(--space-5) 0;
+            margin: var(--space-3) 0 var(--space-5) 0;
             max-width: 800px;
         }
         .calendar-header {
             text-align: center;
+            padding: var(--space-1) var(--space-2) var(--space-2) var(--space-2);
+            color: var(--vscode-descriptionForeground);
+            font-size: var(--font-sm);
             font-weight: bold;
-            color: var(--vscode-textLink-foreground);
-            padding: var(--space-2);
-            background: var(--vscode-editorWidget-background);
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
         }
+        /* A calendar cell drills down into the Day view, so it is a <button>
+           like the mode segment; the button chrome is stripped back to the
+           bordered cell. */
         .calendar-day {
             aspect-ratio: 1;
+            display: block;
+            width: 100%;
             border: 1px solid var(--vscode-panel-border);
+            border-radius: var(--radius-md);
             padding: var(--space-2);
             cursor: pointer;
-            background: var(--vscode-editorWidget-background);
+            background: transparent;
+            color: inherit;
+            font-family: inherit;
+            font-size: inherit;
+            text-align: left;
             position: relative;
+            transition: background 0.1s ease, border-color 0.1s ease;
+        }
+        .calendar-day:hover {
+            background: var(--vscode-list-hoverBackground);
         }
         /* weekend/holiday/today are subtle background tints with no exact theme
-           token, so they are mixed from a semantic colour over the day's base
+           token, so they are mixed from a semantic colour over the editor
            background -- this tracks the active theme instead of a fixed hue. */
         .calendar-day.weekend {
-            background: color-mix(in srgb, var(--vscode-foreground) 8%, var(--vscode-editorWidget-background));
+            background: color-mix(in srgb, var(--vscode-foreground) 5%, transparent);
         }
         .calendar-day.holiday {
-            background: color-mix(in srgb, var(--vscode-charts-red) 14%, var(--vscode-editorWidget-background));
+            background: color-mix(in srgb, var(--vscode-charts-red) 12%, transparent);
         }
-        .calendar-day.has-tasks {
-            border-color: var(--vscode-focusBorder);
+        /* A day with work keeps a plain border -- the chip already marks it --
+           and only lifts its day number out of the muted default. */
+        .calendar-day.has-tasks .day-number {
+            color: var(--vscode-editor-foreground);
             font-weight: bold;
         }
+        /* Today: an accent ring drawn with an inset outline, so the 1px border
+           and the cell size stay identical to every other cell (a 2px border
+           shifted the grid by a pixel). */
         .calendar-day.today {
-            border: 2px solid var(--vscode-focusBorder);
-            background: color-mix(in srgb, var(--vscode-charts-blue) 18%, var(--vscode-editor-background));
+            border-color: var(--vscode-focusBorder);
+            outline: 1px solid var(--vscode-focusBorder);
+            outline-offset: -2px;
+        }
+        .calendar-day.today .day-number {
+            color: var(--vscode-textLink-activeForeground);
+            font-weight: bold;
         }
         .calendar-day.other-month {
-            opacity: 0.3;
+            opacity: 0.35;
         }
         .day-number {
-            font-size: 1.05em;
+            font-size: var(--font-lg);
+            color: var(--vscode-descriptionForeground);
+            font-variant-numeric: tabular-nums;
         }
-        .task-indicator {
+        /* Count chip, declared once for both places that use it: the month
+           cell's task load and the card section heads. They are the same
+           component, so they share one shape and one size (#38); only the
+           placement below differs. */
+        .task-count,
+        .day-section-count {
+            min-width: 22px;
+            text-align: center;
+            border-radius: var(--radius-pill);
+            padding: 0 var(--space-1);
+            font-size: var(--font-xs);
+            color: var(--vscode-badge-foreground);
+            background: var(--vscode-badge-background);
+        }
+        /* Task-load chip: pinned into the cell's bottom-right corner. */
+        .task-count {
             position: absolute;
             bottom: var(--space-1);
             right: var(--space-1);
-            width: 6px;
-            height: 6px;
-            background: var(--vscode-charts-blue);
-            border-radius: 50%;
         }
-        /* ============ preset: monospace (reproduces the pre-#/style-menu look) ============ */
-        body[data-agenda-style="monospace"] {
-            font-family: var(--markdown-org-agenda-mono-font);
-        }
-        [data-agenda-style="monospace"] .priority[data-priority="a"]::before,
-        [data-agenda-style="monospace"] .priority[data-priority="b"]::before,
-        [data-agenda-style="monospace"] .priority[data-priority="c"]::before {
-            content: "[#";
-        }
-        [data-agenda-style="monospace"] .priority[data-priority="a"]::after,
-        [data-agenda-style="monospace"] .priority[data-priority="b"]::after,
-        [data-agenda-style="monospace"] .priority[data-priority="c"]::after {
-            content: "]";
-        }
-        /* ============ preset: native ============ */
-        body[data-agenda-style="native"] {
-            font-family: var(--markdown-org-agenda-font);
-        }
-        body[data-agenda-style="native"] .task-line {
-            grid-template-columns: auto auto auto 1fr auto;
-            align-items: center;
-        }
-        body[data-agenda-style="native"] .todo-label {
-            display: none;
-        }
-        body[data-agenda-style="native"] .status {
-            font-size: 0.72em;
-            font-weight: 700;
-            padding: 0 var(--space-2);
-            border-radius: 10px;
-            text-align: center;
-        }
-        body[data-agenda-style="native"] .status[data-status="todo"] {
-            background: color-mix(in srgb, var(--vscode-charts-red) 16%, transparent);
-        }
-        body[data-agenda-style="native"] .status[data-status="done"] {
-            background: color-mix(in srgb, var(--vscode-charts-green) 16%, transparent);
-        }
-        body[data-agenda-style="native"] .priority {
-            font-size: 0.8em;
-            width: 1.4em;
-            text-align: center;
-            border-radius: 3px;
+        .task-count-overdue {
             color: var(--vscode-editor-background);
+            background: var(--accent-red);
         }
-        body[data-agenda-style="native"] .priority[data-priority="a"] { background: var(--vscode-charts-red); }
-        body[data-agenda-style="native"] .priority[data-priority="b"] { background: var(--vscode-charts-yellow); }
-        body[data-agenda-style="native"] .priority[data-priority="c"] { background: var(--vscode-charts-blue); }
-        body[data-agenda-style="native"] .priority:empty {
-            visibility: hidden;
-        }
-        /* ============ preset: hybrid ============ */
-        body[data-agenda-style="hybrid"] {
+        /* ============ task rows and day headers ============ */
+        body {
             font-family: var(--markdown-org-agenda-font);
         }
-        body[data-agenda-style="hybrid"] .task-line {
-            grid-template-columns: auto 64px 1.6em 1fr 56px;
-            align-items: center;
-        }
-        body[data-agenda-style="hybrid"] .todo-label {
-            display: none;
-        }
-        body[data-agenda-style="hybrid"] .status {
-            font-size: 0.72em;
-            font-weight: 700;
-            padding: 0 var(--space-2);
-            border-radius: 10px;
-            text-align: center;
-        }
-        body[data-agenda-style="hybrid"] .status[data-status="todo"] {
-            background: color-mix(in srgb, var(--vscode-charts-red) 16%, transparent);
-        }
-        body[data-agenda-style="hybrid"] .status[data-status="done"] {
-            background: color-mix(in srgb, var(--vscode-charts-green) 16%, transparent);
-        }
-        body[data-agenda-style="hybrid"] .priority {
-            font-size: 0.8em;
-            width: 1.4em;
-            text-align: center;
-            border-radius: 3px;
-            color: var(--vscode-editor-background);
-        }
-        body[data-agenda-style="hybrid"] .priority[data-priority="a"] { background: var(--vscode-charts-red); }
-        body[data-agenda-style="hybrid"] .priority[data-priority="b"] { background: var(--vscode-charts-yellow); }
-        body[data-agenda-style="hybrid"] .priority[data-priority="c"] { background: var(--vscode-charts-blue); }
-        body[data-agenda-style="hybrid"] .priority:empty {
-            visibility: hidden;
-        }
-        body[data-agenda-style="hybrid"] .time-info-cell,
-        body[data-agenda-style="hybrid"] .offset {
-            font-family: var(--markdown-org-agenda-mono-font);
-            font-variant-numeric: tabular-nums;
-        }
-        /* ============ preset: table (D2+, default) ============ */
-        body[data-agenda-style="table"] {
-            font-family: var(--markdown-org-agenda-font);
-        }
-        /* markdown-org.agendaTableAllMono: render every table element in the
-           monospace family, not just the time/offset numerics. */
-        body[data-agenda-style="table"][data-table-mono="true"] {
-            font-family: var(--markdown-org-agenda-mono-font);
-        }
-        /* Table day header (per mockup): blue dot + weekday in blue, a muted
-           date, and a thin rule underneath. The day-of-week arrows that mark
-           "today" in the other presets are hidden here. */
-        body[data-agenda-style="table"] .day-header {
-            display: flex;
-            align-items: baseline;
-            gap: var(--space-2);
-            /* margin -> padding for the same sticky reason as the base rule;
-               position/top/background are inherited from .day-header above. */
-            margin: 0;
-            padding: var(--space-5) 0 var(--space-1) 0;
-            border-bottom: 1px solid var(--vscode-panel-border);
-            font-weight: normal;
-        }
-        body[data-agenda-style="table"] .day-header .day-weekday {
+        /* Day header (per mockup): blue dot + weekday in blue, a muted date,
+           and a thin rule underneath. */
+        .day-header .day-weekday {
             /* Day-of-week: only slightly larger than the body text, saturated
                blue and bold (smaller than the mockup's 1.15em). */
-            font-size: 1.05em;
+            font-size: var(--font-lg);
             font-weight: 700;
             /* ru locale lowercases weekday names ("понедельник"); the mockup
                capitalises the first letter. */
             text-transform: capitalize;
-            color: color-mix(in srgb, var(--vscode-charts-blue) 82%, var(--vscode-editor-foreground) 18%);
+            color: var(--accent-blue-strong);
         }
-        body[data-agenda-style="table"] .day-header .day-weekday::before {
+        .day-header .day-weekday::before {
             content: "";
             display: inline-block;
             width: 8px;
@@ -455,36 +509,20 @@ export const AGENDA_STYLES = `
             vertical-align: middle;
             margin-right: var(--space-2);
         }
-        body[data-agenda-style="table"] .day-header .day-num,
-        body[data-agenda-style="table"] .day-header .day-rest {
+        .day-header .day-num,
+        .day-header .day-rest {
             color: var(--vscode-descriptionForeground);
             font-weight: normal;
         }
-        body[data-agenda-style="table"] .day-nav { display: none; }
-        body[data-agenda-style="table"] .task-line {
-            /* dot | big time | flag | priority | heading | offset.
-               Offset is auto-sized (not the mockup's fixed 52px, which fit its
-               short "-2д"): the real column shows a full DD.MM.YYYY date, so a
-               fixed width overflowed it past the grid edge and forced a
-               horizontal scrollbar. auto sizes it to the date; the 1fr heading
-               absorbs the rest. */
-            grid-template-columns: 14px 56px 18px 18px 1fr auto;
-            align-items: center;
-            /* Table runs at the base font size (mockup's 13px), not the 1.1em
-               the other presets use -- keeps the row compact and makes the
-               1.23em time resolve to the mockup's 16px. */
-            font-size: 1em;
-        }
-        body[data-agenda-style="table"] .todo-label { display: none; }
-        /* Visual order (DOM order stays shared across presets): dot first. */
-        body[data-agenda-style="table"] .status { order: 1; }
-        body[data-agenda-style="table"] .time-plain { order: 2; }
-        body[data-agenda-style="table"] .flag { order: 3; }
-        body[data-agenda-style="table"] .priority { order: 4; }
-        body[data-agenda-style="table"] .heading { order: 5; }
-        body[data-agenda-style="table"] .offset { order: 6; }
+        /* Visual order within the row: dot first. */
+        .status { order: 1; }
+        .time-plain { order: 2; }
+        .flag { order: 3; }
+        .priority { order: 4; }
+        .heading { order: 5; }
+        .offset { order: 6; }
         /* status rendered as a coloured dot, not text */
-        body[data-agenda-style="table"] .status {
+        .status {
             font-size: 0;
             justify-self: center;
         }
@@ -492,22 +530,19 @@ export const AGENDA_STYLES = `
            danger (red) for a DEADLINE or any overdue task, done (green),
            cancelled (grey), else normal (blue -- today or future). The base
            rule paints the normal case; the others override by data-attention. */
-        body[data-agenda-style="table"] .status::before {
+        .status::before {
             content: "";
             display: block;
             width: 8px;
             height: 8px;
             border-radius: 50%;
-            background: color-mix(in srgb, var(--vscode-charts-blue) 65%, var(--vscode-editor-foreground) 35%);
+            background: var(--accent-blue);
         }
-        body[data-agenda-style="table"] .status[data-attention="danger"]::before { background: color-mix(in srgb, var(--vscode-charts-red) 72%, var(--vscode-editor-foreground) 28%); }
-        body[data-agenda-style="table"] .status[data-attention="done"]::before { background: var(--vscode-charts-green); }
-        body[data-agenda-style="table"] .status[data-attention="cancelled"]::before { background: var(--vscode-disabledForeground); }
-        /* big time: table uses the clean .time-plain (HH:MM only) and hides
-           the buildTimeInfo cell, whose dot-trails / stacked DEADLINE label /
-           relative "Sched.Nx" text would break the single-line grid. */
-        body[data-agenda-style="table"] .time-info-cell { display: none; }
-        body[data-agenda-style="table"] .time-plain {
+        .status[data-attention="danger"]::before { background: var(--accent-red); }
+        .status[data-attention="done"]::before { background: var(--vscode-charts-green); }
+        .status[data-attention="cancelled"]::before { background: var(--vscode-disabledForeground); }
+        /* big time: a clean HH:MM cell. */
+        .time-plain {
             display: block;
             /* mockup renders the time in the same sans as the rest (not mono);
                tabular-nums keeps the digits column-aligned. */
@@ -515,60 +550,222 @@ export const AGENDA_STYLES = `
             font-variant-numeric: tabular-nums;
             /* Time sits at the heading size (not the mockup's larger 1.23em);
                it stands out by weight and the blue colour alone. */
-            font-size: 1em;
+            font-size: var(--font-md);
             font-weight: 600;
             text-align: right;
             /* Softer, lighter blue than raw charts-blue -- matches the muted
                accent in the mockup -- by blending the theme accent toward the
                foreground. */
-            color: color-mix(in srgb, var(--vscode-charts-blue) 65%, var(--vscode-editor-foreground) 35%);
+            color: var(--accent-blue);
         }
         /* time column shows an em-dash placeholder when a task has no clock
            time, so the big-time column never collapses to blank (per mockup). */
-        body[data-agenda-style="table"] .time-plain:empty::before {
+        .time-plain:empty::before {
             content: "—";
             color: var(--vscode-disabledForeground);
             font-weight: normal;
         }
+        /* ...except in the date-less Tasks card, where most rows have no clock
+           time and a full column of em-dashes reads as noise. The cell keeps
+           its width, so the columns stay aligned with the timed rows. */
+        .day-card[data-card="tasks"] .time-plain:empty::before {
+            content: "";
+        }
         /* flag column */
-        body[data-agenda-style="table"] .flag {
+        .flag {
             display: block;
             text-align: center;
         }
         /* Flag colours match the mockup's muted palette (deadline red, the same
            softened blue as the time, an amber repeat) by blending each theme
            accent toward the foreground; cancelled stays the theme's muted grey. */
-        body[data-agenda-style="table"] .flag[data-flag="deadline"]::before { content: "⚑"; color: color-mix(in srgb, var(--vscode-charts-red) 72%, var(--vscode-editor-foreground) 28%); }
-        body[data-agenda-style="table"] .flag[data-flag="scheduled"]::before { content: "◷"; color: color-mix(in srgb, var(--vscode-charts-blue) 65%, var(--vscode-editor-foreground) 35%); }
-        body[data-agenda-style="table"] .flag[data-flag="repeat"]::before { content: "↻"; color: color-mix(in srgb, var(--vscode-charts-yellow) 78%, var(--vscode-editor-foreground) 22%); }
-        body[data-agenda-style="table"] .flag[data-flag="cancelled"]::before { content: "⊘"; color: var(--vscode-disabledForeground); }
-        /* priority chip (mirrors hybrid) */
-        body[data-agenda-style="table"] .priority {
-            font-size: 0.8em;
+        .flag[data-flag="deadline"]::before { content: "⚑"; color: var(--accent-red); }
+        .flag[data-flag="scheduled"]::before { content: "◷"; color: var(--accent-blue); }
+        .flag[data-flag="repeat"]::before { content: "↻"; color: var(--accent-yellow); }
+        .flag[data-flag="cancelled"]::before { content: "⊘"; color: var(--vscode-disabledForeground); }
+        /* priority chip */
+        .priority {
+            font-size: var(--font-xs);
             width: 1.4em;
             text-align: center;
-            border-radius: 3px;
+            border-radius: var(--radius-sm);
             color: var(--vscode-editor-background);
         }
-        body[data-agenda-style="table"] .priority[data-priority="a"] { background: color-mix(in srgb, var(--vscode-charts-red) 72%, var(--vscode-editor-foreground) 28%); }
-        body[data-agenda-style="table"] .priority[data-priority="b"] { background: color-mix(in srgb, var(--vscode-charts-yellow) 78%, var(--vscode-editor-foreground) 22%); }
-        body[data-agenda-style="table"] .priority[data-priority="c"] { background: color-mix(in srgb, var(--vscode-charts-blue) 65%, var(--vscode-editor-foreground) 35%); }
-        body[data-agenda-style="table"] .priority:empty { visibility: hidden; }
-        body[data-agenda-style="table"] .offset {
+        .priority[data-priority="a"] { background: var(--accent-red); }
+        .priority[data-priority="b"] { background: var(--accent-yellow); }
+        .priority[data-priority="c"] { background: var(--accent-blue); }
+        .priority:empty { visibility: hidden; }
+        .offset {
             font-family: var(--markdown-org-agenda-font);
             font-variant-numeric: tabular-nums;
         }
-        /* Table headings stay neutral and regular: colour lives in the flag,
-           the priority chip and the offset -- not the heading (per the mockup).
-           Overrides the priority/deadline heading tint+bold from the shared
-           block; higher specificity than those .task-line[...] .heading rules. */
-        body[data-agenda-style="table"] .task-line .heading {
+        /* Headings stay neutral and regular: colour lives in the flag, the
+           priority chip and the offset -- not the heading (per the mockup). */
+        .task-line .heading {
             color: var(--vscode-editor-foreground);
             font-weight: normal;
         }
-        body[data-agenda-style="table"] .task-line[data-status="done"] .heading,
-        body[data-agenda-style="table"] .task-line[data-status="cancelled"] .heading {
+        .task-line[data-status="done"] .heading,
+        .task-line[data-status="cancelled"] .heading {
             color: var(--vscode-disabledForeground);
             text-decoration: line-through;
+        }
+        /* ============ agenda card (Day and Tasks views) ============
+           A card is a sticky summary bar plus stacked section panels. The Day
+           view fills it with schedule buckets (Scheduled today / All-day &
+           upcoming / Overdue, marked data-card="day"); the date-less Tasks view
+           fills it with priority groups (data-card="tasks"). The task rows
+           inside stay standard .task-line elements, so the table styling and
+           the click handling carry over unchanged in both. The class names keep
+           their historic day- prefix -- they are shared markup hooks, not a
+           statement that the card is a single day. */
+        .day-card {
+            margin-top: var(--space-2);
+        }
+        /* Summary bar reuses the sticky .day-header shell and its data-date (the
+           day-view anchor-date contract) but shows counts, not the date. The
+           leading "body" prefix lifts specificity to (0,2,1) so it matches --
+           and, being later in the sheet, beats -- the .day-header rule, and
+           resets its layout to a flex row of stats. */
+        body .day-card .day-summary {
+            display: flex;
+            align-items: baseline;
+            gap: var(--space-2);
+            grid-template-columns: none;
+            padding: var(--space-3) 0 var(--space-2) 0;
+            border-bottom: 1px solid var(--vscode-panel-border);
+            color: var(--vscode-descriptionForeground);
+            font-weight: normal;
+        }
+        .day-summary-stat b {
+            color: var(--vscode-editor-foreground);
+            font-weight: bold;
+        }
+        .day-summary-sep {
+            color: var(--vscode-descriptionForeground);
+            opacity: 0.6;
+        }
+        .day-summary-overdue b {
+            color: var(--accent-red);
+        }
+        .day-summary-done b {
+            color: var(--vscode-charts-green);
+        }
+        /* Tasks card: the [#A] count is the backlog's "needs attention" figure,
+           so it takes the same red as the priority-A chip. */
+        .day-summary-high b {
+            color: var(--accent-red);
+        }
+        .day-section {
+            margin-bottom: var(--space-4);
+        }
+        .day-section-head {
+            display: flex;
+            align-items: center;
+            gap: var(--space-2);
+            padding: var(--space-3) 0 var(--space-1) 0;
+            border-bottom: 1px solid var(--vscode-panel-border);
+        }
+        .day-section-name {
+            font-weight: bold;
+            font-size: var(--font-sm);
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            color: var(--vscode-descriptionForeground);
+        }
+        /* Count chip (shape and colours declared with .task-count above):
+           pushed to the right of the section head. */
+        .day-section-count {
+            margin-left: auto;
+        }
+        /* Overdue panel: red-tinted name and a red count chip so the backlog at
+           the bottom stays visually distinct from the day's active work. */
+        .day-section-overdue .day-section-name {
+            color: var(--accent-red);
+        }
+        .day-section-overdue .day-section-count {
+            color: var(--vscode-editor-background);
+            background: var(--accent-red);
+        }
+        /* Tasks-card priority panels: the count chip repeats the priority chip
+           palette of the rows below it (A red, B amber, C blue), so the group
+           colour and the per-row cookie read as the same signal. The
+           unprioritised backlog keeps the neutral theme badge. */
+        .day-section-pa .day-section-count {
+            color: var(--vscode-editor-background);
+            background: var(--accent-red);
+        }
+        .day-section-pb .day-section-count {
+            color: var(--vscode-editor-background);
+            background: var(--accent-yellow);
+        }
+        .day-section-pc .day-section-count {
+            color: var(--vscode-editor-background);
+            background: var(--accent-blue);
+        }
+        .day-section-body {
+            margin-top: var(--space-1);
+        }
+        .day-empty {
+            padding: var(--space-4) 0;
+            color: var(--vscode-descriptionForeground);
+        }
+        /* ============ compact header ============
+           markdown-org.agendaHeaderMode: the class is set on <body> by the
+           page (auto follows the panel height). The full header spends about a
+           fifth of a short panel on chrome; this pulls the hero title onto the
+           control row, drops the subtitle to inline text and tightens the
+           padding, keeping every control exactly where it was. Nothing here
+           changes the header's structure -- only its size -- so the sticky
+           day-header offset keeps working: the header's ResizeObserver
+           re-measures --agenda-header-h when the class flips. */
+        body.compact-header .agenda-header {
+            /* The header is a block in the full layout, so the hero and the nav
+               block each own a line. Turning it into a flex row is what puts
+               them side by side; "order" on a child of a block parent does
+               nothing, which is how an earlier version only looked compact. */
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: var(--space-2) var(--space-4);
+            padding: var(--space-2) var(--space-5);
+            margin-bottom: var(--space-2);
+        }
+        body.compact-header .nav-bar {
+            /* Mode segment and controls share one row instead of stacking, and
+               the block takes whatever width the hero leaves. "min-width: 0"
+               lets it shrink below its content instead of forcing a wrap. */
+            flex: 1 1 20rem;
+            min-width: 0;
+            flex-direction: row;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: var(--space-3);
+            margin-bottom: 0;
+        }
+        body.compact-header .control-row {
+            flex: 1 1 auto;
+        }
+        body.compact-header .agenda-hero {
+            /* The hero rides along the control row rather than owning a line:
+               it keeps its intrinsic width and wraps its own two parts. */
+            flex: 0 1 auto;
+            min-width: 0;
+            display: flex;
+            align-items: baseline;
+            flex-wrap: wrap;
+            gap: var(--space-2);
+            margin-bottom: 0;
+        }
+        body.compact-header .hero-title {
+            font-size: var(--font-lg);
+            line-height: 1.3;
+        }
+        body.compact-header .hero-sub {
+            margin-top: 0;
+            font-size: var(--font-xs);
+        }
+        body.compact-header .day-header {
+            padding-top: var(--space-3);
         }
     `;

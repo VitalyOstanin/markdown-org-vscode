@@ -38,17 +38,32 @@ export function formatDayHeaderParts(dateStr: string, locale: string): DayHeader
     const [year, month, day] = dateStr.split('-').map(Number);
     const date = new Date(year, month - 1, day);
 
-    const dayMonthParts = new Intl.DateTimeFormat(locale, {
-        day: 'numeric',
-        month: 'long'
-    }).formatToParts(date);
+    // A malformed tag (`ru_RU` for `ru-RU`) makes Intl throw a RangeError, not
+    // degrade. The host already validates the setting (utils/dateLocale.ts),
+    // but this function is inlined into the webview and formats every header,
+    // so it degrades on its own rather than taking the render down: an empty
+    // string means "the runtime's default locale".
+    //
+    // The bad tag is caught on the formatter that is needed anyway, not on a
+    // throwaway probe object: this runs once per day header, so a month view
+    // built one extra Intl.DateTimeFormat per cell purely to validate.
+    let safeLocale = locale;
+    let dayMonthFormat: Intl.DateTimeFormat;
+    try {
+        dayMonthFormat = new Intl.DateTimeFormat(locale || undefined, { day: 'numeric', month: 'long' });
+    } catch {
+        safeLocale = '';
+        dayMonthFormat = new Intl.DateTimeFormat(undefined, { day: 'numeric', month: 'long' });
+    }
+
+    const dayMonthParts = dayMonthFormat.formatToParts(date);
     const dayValue = dayMonthParts.find((p) => p.type === 'day')?.value ?? '';
     const monthValue = dayMonthParts.find((p) => p.type === 'month')?.value ?? '';
 
     return {
-        weekday: date.toLocaleDateString(locale, { weekday: 'long' }),
+        weekday: date.toLocaleDateString(safeLocale || undefined, { weekday: 'long' }),
         day: dayValue,
         month: monthValue,
-        year: date.toLocaleDateString(locale, { year: 'numeric' })
+        year: date.toLocaleDateString(safeLocale || undefined, { year: 'numeric' })
     };
 }

@@ -1,25 +1,47 @@
 import * as vscode from 'vscode';
 import { randomBytes } from 'crypto';
-import { AgendaData } from '../types';
+import { AgendaData, FileTag } from '../types';
 import { isMeaningfulSelection, resolveTaskClickIntent, sanitizeTaskLine } from '../utils/agendaClick';
+import { escapeHtml } from '../utils/agendaEscapeHtml';
+import { DEFAULT_AGENDA_FONT_STACK, sanitizeFontFamily } from '../utils/agendaFontFamily';
+import { agendaModeCommand } from '../utils/agendaModeCommand';
 import { rememberScroll, recallScroll } from '../utils/agendaScroll';
 import { resolveHeadingClass } from '../utils/agendaHeadingTint';
-import { buildTimeInfo } from '../utils/agendaTimeInfo';
 import { resolveTaskFlag } from '../utils/agendaTaskFlag';
 import { resolveAttentionLevel } from '../utils/agendaAttention';
 import { resolveAgendaWatchBase } from '../utils/agendaWatchPattern';
-import { toIsoDate } from '../utils/isoDate';
+import { isIsoDate, toIsoDate } from '../utils/isoDate';
+import { resolveDayRolloverAnchor } from '../utils/dayRolloverAnchor';
+import { formatNumber } from '../utils/formatNumber';
+import { formatIsoDate } from '../utils/formatIsoDate';
+import { explicitSettingValue } from '../utils/explicitSetting';
+import { resolveDateLocale } from '../utils/dateLocale';
 import { formatDayHeaderParts } from '../utils/agendaDayHeader';
 import { isCancelled } from '../utils/normalizeTaskType';
 import { shiftMonthAnchor } from '../utils/monthNav';
 import { wireDayHeaderNavigation } from '../utils/agendaDayHeaderNav';
 import { attentionTooltip, flagTooltip, priorityTooltip } from '../utils/agendaTooltips';
-import { DEFAULT_AGENDA_STYLE, normalizeAgendaStyle } from '../utils/agendaStyle';
+import { buildTagCycle } from '../utils/cycleTag';
+import { resolveHeroModel } from '../utils/agendaHero';
+import { computeDaySummary, buildDaySections } from '../utils/agendaDaySummary';
+import { buildTaskGroups, computeTasksSummary } from '../utils/agendaTaskGroups';
+import { buildMonthDayIndex } from '../utils/agendaMonthCells';
+import { AgendaHeaderMode, normalizeHeaderMode, resolveHeaderLayout } from '../utils/agendaHeaderMode';
+import {
+    AGENDA_STRINGS,
+    AgendaStrings,
+    UiLanguage,
+    formatString,
+    pluralIndex,
+    resolveUiLanguage
+} from '../utils/agendaI18n';
+import { AgendaHistory, AgendaViewState } from '../utils/agendaHistory';
+import { AgendaClientBootstrap, AgendaClientDeps, agendaClientMain } from '../webview/agendaClient';
 import { AGENDA_STYLES } from './agendaStyles';
-import { formatError, notifyError } from '../utils/notify';
+import { formatError, notifyError, notifyWarn } from '../utils/notify';
+import { logDiagnostic } from '../utils/logChannel';
 
 const REFRESH_DEBOUNCE_MS = 500;
-const CALENDAR_COLS = 7;
 // Window of time after createWebviewPanel within which the webview is expected
 // to send back its `ready` handshake. VS Code's webview host registers a
 // ServiceWorker on first use, and on a freshly opened window that registration
@@ -39,6 +61,61 @@ function generateNonce(): string {
     return randomBytes(16).toString('base64');
 }
 
+/**
+ * What the page can post back. The webview API hands the payload over as
+ * `any`, so this is the shape the handler narrows it to; each field is
+ * validated there before it is used.
+ */
+interface AgendaWebviewMessage {
+    command: string;
+    file?: string;
+    line?: number;
+    switchToDay?: boolean;
+    date?: string;
+    mode?: string;
+    tag?: string;
+    /** Set on `renderError`: what the page failed at. */
+    message?: string;
+}
+
+/** Everything an `init` message needs, so a panel can be (re)populated from it. */
+interface AgendaRenderArgs {
+    data: AgendaData;
+    mode: string;
+    locale: string;
+    currentTag: string | undefined;
+    availableTags: string[];
+    holidays: string[] | undefined;
+    firstDayOfWeek: FirstDayOfWeek;
+    headerMode: AgendaHeaderMode;
+}
+
+/**
+ * What a caller supplies to {@link AgendaPanel.render}; everything else in
+ * {@link AgendaRenderArgs} is read from the settings on each render.
+ *
+ * A named object rather than a positional list: the tail of the list is five
+ * optional values of which three are booleans and two are strings, so a call
+ * site said `render(data, mode, date, cb, true, undefined, [], false)` and only
+ * the signature told the reader which `true` was which.
+ */
+export interface AgendaRenderRequest {
+    data: AgendaData;
+    mode: string;
+    shiftedToday?: string;
+    refreshCallback?: (shiftedToday?: string, userInitiated?: boolean) => Promise<void>;
+    userInitiated?: boolean;
+    currentTag?: string;
+    holidays?: string[];
+    /**
+     * True when this render came from an explicit jump (Prev/Next/Today button
+     * or switch-mode), false for the initial open or a repeated Show Agenda
+     * command. The webview uses this to decide whether to scroll to today
+     * (jump) or keep the user's scroll (repeat).
+     */
+    navigation?: boolean;
+}
+
 export class AgendaPanel {
     private static currentPanel?: vscode.WebviewPanel;
     private static watcher?: vscode.FileSystemWatcher;
@@ -49,7 +126,25 @@ export class AgendaPanel {
     // after the Today button; offset elsewhere. Drives the extractor query,
     // the navbar label, and which date the navigation buttons step from.
     private static shiftedToday?: string;
+    // Browser-style navigation history of {mode, date} view states. record()
+    // is called on every render; goBack/goForward replay a past state. Cleared
+    // on dispose so a reopened panel starts fresh.
+    private static history = new AgendaHistory();
+    // How many history replays are in flight. Non-zero means the re-render they
+    // cause must not be recorded again (which would push a duplicate or, for a
+    // tasks replay whose date the view normalises, fork the stack).
+    //
+    // A counter rather than a flag because replays can overlap: VS Code does
+    // not serialise webview messages or command invocations, so two quick
+    // Back presses start two replays, and with a flag the first one to finish
+    // cleared it while the second was still running. That second render was
+    // then recorded, and recording drops the forward tail -- Forward silently
+    // stopped working.
+    private static historyReplayDepth = 0;
     private static dayCheckTimer?: NodeJS.Timeout;
+    // Watches the settings that are baked into the webview HTML (as opposed to
+    // those delivered by an update message). Lives as long as the panel.
+    private static configListener?: vscode.Disposable;
     // Tracks the ServiceWorker readiness handshake from the webview. The
     // webview sends `{command: 'ready'}` once acquireVsCodeApi() succeeds; if
     // it never arrives within WEBVIEW_READY_TIMEOUT_MS, we assume the host
@@ -58,14 +153,22 @@ export class AgendaPanel {
     private static panelReady = false;
     private static createRetries = 0;
     private static internalRetryInProgress = false;
-    private static lastCreateArgs?: {
-        data: AgendaData;
-        mode: string;
-        locale: string;
-        currentTag: string | undefined;
-        holidays: string[] | undefined;
-        firstDayOfWeek: FirstDayOfWeek;
-    };
+    private static lastCreateArgs?: AgendaRenderArgs;
+    // What the panel currently shows. Unlike `lastCreateArgs` -- which is a
+    // snapshot for the ServiceWorker-race retry and is dropped as soon as the
+    // webview reports ready -- this one lives as long as the panel and tracks
+    // every update, so the shell can be rebuilt and repopulated at any time.
+    private static lastRenderArgs?: AgendaRenderArgs;
+    // A header mode the page did not receive (postMessage resolved false),
+    // re-sent once the page reports ready again.
+    private static pendingHeaderMode?: AgendaHeaderMode;
+    // Last `dateLocale` value that was rejected, so the warning about it is
+    // shown once rather than on every refresh.
+    private static warnedLocale?: string;
+    // Whether a render failure inside the webview has already been reported for
+    // the open panel. A broken payload fails on every refresh, and the
+    // file-watcher refreshes on each save, so the report is once per panel.
+    private static reportedRenderError = false;
     // Test-only hooks for exercising the ServiceWorker-race retry path:
     // `_testReadyTimeoutMs` shortens the wait so a single integration test
     // runs in milliseconds instead of seconds; `_testSuppressReadies` counts
@@ -90,50 +193,67 @@ export class AgendaPanel {
         vscode.commands.executeCommand('setContext', 'markdown-org.agendaFocused', focused);
     }
 
+    /**
+     * Reload the agenda through the callback the command wired up, reporting a
+     * failure rather than leaving a rejected promise behind.
+     *
+     * The callers are a midnight timer, the file watcher and webview messages.
+     * None of them runs inside a command's error-reporting wrapper, so a
+     * rejection here would surface nowhere at all.
+     */
+    private static requestRefresh(shiftedToday?: string, userInitiated?: boolean): void {
+        AgendaPanel.refreshCallback?.(shiftedToday, userInitiated)?.catch((err) =>
+            notifyError(`agenda refresh failed: ${formatError(err)}`)
+        );
+    }
+
     private static scheduleNextDayCheck() {
+        // The date this timer is armed on -- "yesterday" by the time it fires.
+        // resolveDayRolloverAnchor compares the panel's anchor against it to
+        // tell a panel left on today from one the user navigated elsewhere.
+        const armedOn = toIsoDate(new Date());
         AgendaPanel.dayCheckTimer = setTimeout(() => {
-            AgendaPanel.refreshCallback?.();
+            const anchor = resolveDayRolloverAnchor(AgendaPanel.shiftedToday, armedOn, toIsoDate(new Date()));
+            AgendaPanel.requestRefresh(anchor, false);
             if (AgendaPanel.currentPanel) {
                 AgendaPanel.scheduleNextDayCheck();
             }
         }, msUntilNextLocalMidnight(new Date()));
     }
 
-    public static render(
-        _context: vscode.ExtensionContext,
-        data: AgendaData,
-        mode: string,
-        shiftedToday: string | undefined,
-        refreshCallback?: (shiftedToday?: string, userInitiated?: boolean) => Promise<void>,
-        userInitiated: boolean = true,
-        currentTag?: string,
-        holidays?: string[],
-        // True when this render came from an explicit jump (Prev/Next/Today
-        // button or switch-mode), false for the initial open or a repeated
-        // Show Agenda command. The webview uses this to decide whether to
-        // scroll to today (jump) or keep the user's scroll (repeat).
-        navigation: boolean = false
-    ) {
+    public static render(request: AgendaRenderRequest) {
+        const { data, mode, shiftedToday, refreshCallback, currentTag, holidays } = request;
+        const userInitiated = request.userInitiated ?? true;
+        const navigation = request.navigation ?? false;
         if (refreshCallback) {
             AgendaPanel.refreshCallback = refreshCallback;
         }
         AgendaPanel.shiftedToday = shiftedToday || toIsoDate(new Date());
+        // Record this view state in the navigation history, unless we are
+        // replaying an existing entry (Back/Forward) -- see historyReplayDepth.
+        if (AgendaPanel.historyReplayDepth === 0) {
+            AgendaPanel.history.record({ mode, date: AgendaPanel.shiftedToday });
+        }
         const config = vscode.workspace.getConfiguration('markdown-org');
-        const locale = config.get<string>('dateLocale', 'en-US');
-        const firstDayOfWeek = config.get<FirstDayOfWeek>('firstDayOfWeek', 'monday');
+        const args: AgendaRenderArgs = {
+            data,
+            mode,
+            locale: AgendaPanel.resolveLocaleSetting(config.get<string>('dateLocale')),
+            currentTag,
+            // The tag dropdown lists the same rotation cycleTag walks: the
+            // implicit "ALL" plus the configured fileTags names (dedup-safe).
+            // Recomputed on every render so a settings edit is reflected
+            // without reopening.
+            availableTags: buildTagCycle(config.get<FileTag[]>('fileTags', []).map((t) => t.name)),
+            holidays,
+            firstDayOfWeek: config.get<FirstDayOfWeek>('firstDayOfWeek', 'monday'),
+            headerMode: normalizeHeaderMode(config.get<string>('agendaHeaderMode'))
+        };
 
         if (AgendaPanel.currentPanel) {
-            AgendaPanel.updateExistingPanel(
-                data,
-                mode,
-                shiftedToday,
-                currentTag,
-                firstDayOfWeek,
-                userInitiated,
-                navigation
-            );
+            AgendaPanel.updateExistingPanel(args, { shiftedToday, userInitiated, navigation });
         } else {
-            AgendaPanel.createNewPanel(data, mode, locale, currentTag, holidays, firstDayOfWeek);
+            AgendaPanel.createNewPanel(args);
         }
 
         if (!AgendaPanel.watcher && refreshCallback) {
@@ -145,54 +265,121 @@ export class AgendaPanel {
         }
     }
 
+    /**
+     * The date locale to render with, warning once per bad value.
+     *
+     * `markdown-org.dateLocale` is a free-form string, and an invalid tag is not
+     * a soft failure -- `Intl` throws on it. Checking here, before the value
+     * reaches the webview, keeps a typo from emptying the panel; the warning is
+     * shown once per distinct value so a refresh loop cannot spam it.
+     */
+    private static resolveLocaleSetting(configured: string | undefined): string {
+        const { locale, rejected } = resolveDateLocale(configured);
+        if (rejected && rejected !== AgendaPanel.warnedLocale) {
+            AgendaPanel.warnedLocale = rejected;
+            notifyWarn(`markdown-org.dateLocale "${rejected}" is not a valid locale; using ${locale}`);
+        }
+        return locale;
+    }
+
+    /**
+     * The UI language and its dictionary for the current settings. Read fresh
+     * on every render so a `markdown-org.uiLanguage` (or `dateLocale`) change
+     * reaches the panel on the next Show Agenda, without reopening it.
+     */
+    private static uiStrings(): { language: UiLanguage; strings: AgendaStrings } {
+        const config = vscode.workspace.getConfiguration('markdown-org');
+        // `inspect`, not `get`: the date locale only gets a vote here when the
+        // user actually chose one. `get` would fold in the `en-US` default and
+        // make the first step always match, leaving the editor-language step
+        // unreachable -- a Russian VS Code with untouched settings then showed
+        // an English agenda, contradicting what `uiLanguage: auto` promises.
+        const explicitLocale = explicitSettingValue(config.inspect<string>('dateLocale')) ?? '';
+        const language = resolveUiLanguage(
+            config.get<string>('uiLanguage', 'auto'),
+            explicitLocale,
+            vscode.env.language
+        );
+        return { language, strings: AGENDA_STRINGS[language] };
+    }
+
+    /**
+     * Proportional font stack for the agenda, from `markdown-org.agendaFontFamily`
+     * with the built-in default for an empty or rejected value.
+     */
+    private static agendaFontStack(): string {
+        const config = vscode.workspace.getConfiguration('markdown-org');
+        return sanitizeFontFamily(config.get<string>('agendaFontFamily')) || DEFAULT_AGENDA_FONT_STACK;
+    }
+
+    /** Localized tab title, e.g. `Agenda: Week` / `Агенда: Неделя`. */
+    private static panelTitleFor(mode: string, strings: AgendaStrings): string {
+        const label = strings.modes[mode as keyof AgendaStrings['modes']] ?? mode;
+        return formatString(strings.tabTitle, label);
+    }
+
     private static updateExistingPanel(
-        data: AgendaData,
-        mode: string,
-        shiftedToday: string | undefined,
-        currentTag: string | undefined,
-        firstDayOfWeek: FirstDayOfWeek,
-        userInitiated: boolean,
-        navigation: boolean
+        args: AgendaRenderArgs,
+        view: { shiftedToday: string | undefined; userInitiated: boolean; navigation: boolean }
     ) {
         const panel = AgendaPanel.currentPanel!;
-        if (userInitiated) {
+        if (view.userInitiated) {
             panel.reveal(vscode.ViewColumn.One);
         }
-        panel.title = `Agenda: ${mode}`;
+        // Keep the render snapshot in step with what the panel shows, so a
+        // shell rebuild replays the current payload rather than the one the
+        // panel was opened with. `holidays` is not part of an update message,
+        // so the value captured at creation is carried over.
+        if (AgendaPanel.lastRenderArgs) {
+            AgendaPanel.lastRenderArgs = {
+                ...args,
+                holidays: AgendaPanel.lastRenderArgs.holidays
+            };
+        }
+        const { language, strings } = AgendaPanel.uiStrings();
+        panel.title = AgendaPanel.panelTitleFor(args.mode, strings);
         panel.webview.postMessage({
-            type: 'update',
-            data,
-            mode,
-            shiftedToday,
-            currentTag,
-            firstDayOfWeek,
-            userInitiated,
-            navigation
+            command: 'update',
+            data: args.data,
+            mode: args.mode,
+            shiftedToday: view.shiftedToday,
+            currentTag: args.currentTag,
+            availableTags: args.availableTags,
+            firstDayOfWeek: args.firstDayOfWeek,
+            headerMode: args.headerMode,
+            userInitiated: view.userInitiated,
+            navigation: view.navigation,
+            // Re-sent on every update so a language change takes effect on the
+            // next render instead of requiring the panel to be reopened. The
+            // date locale rides along for the same reason: it is what most
+            // language changes actually come from (`uiLanguage: auto` follows
+            // it), so leaving it behind produced a half-translated panel --
+            // Russian section titles above English day headers.
+            locale: args.locale,
+            language,
+            strings
         });
     }
 
-    private static createNewPanel(
-        data: AgendaData,
-        mode: string,
-        locale: string,
-        currentTag: string | undefined,
-        holidays: string[] | undefined,
-        firstDayOfWeek: FirstDayOfWeek
-    ) {
+    private static createNewPanel(args: AgendaRenderArgs) {
         // Captured for the ServiceWorker-race retry path: if the webview never
         // reaches `ready`, the timeout below disposes the panel and re-enters
         // createNewPanel with these same arguments.
-        AgendaPanel.lastCreateArgs = { data, mode, locale, currentTag, holidays, firstDayOfWeek };
+        AgendaPanel.lastCreateArgs = args;
+        AgendaPanel.lastRenderArgs = args;
         AgendaPanel.panelReady = false;
+        AgendaPanel.reportedRenderError = false;
         AgendaPanel._createCount += 1;
         if (AgendaPanel.readyTimeout) {
             clearTimeout(AgendaPanel.readyTimeout);
             AgendaPanel.readyTimeout = undefined;
         }
 
+        const { language: uiLanguage, strings: uiStrings } = AgendaPanel.uiStrings();
+
         AgendaPanel.currentPanel = vscode.window.createWebviewPanel(
             'markdownOrgAgenda',
-            `Agenda: ${mode}`,
+            AgendaPanel.panelTitleFor(args.mode, uiStrings),
             vscode.ViewColumn.One,
             {
                 enableScripts: true,
@@ -212,32 +399,63 @@ export class AgendaPanel {
         });
 
         AgendaPanel.currentPanel.onDidDispose(() => AgendaPanel.handleDispose());
-        AgendaPanel.currentPanel.webview.onDidReceiveMessage((message) => AgendaPanel.handleWebviewMessage(message));
+        // The handler is async, so its promise is caught here rather than left
+        // to become an unhandled rejection: the commands it dispatches carry
+        // their own error reporting today, but that is an invariant of theirs,
+        // not of this call site.
+        // The webview API types the payload as `any`; it is narrowed here to the
+        // shape the handler declares, and every field it reads is validated
+        // there before use.
+        AgendaPanel.currentPanel.webview.onDidReceiveMessage((message: unknown) =>
+            AgendaPanel.handleWebviewMessage(message as AgendaWebviewMessage).catch((err) =>
+                notifyError(`agenda action failed: ${formatError(err)}`)
+            )
+        );
+
+        // The font stack is baked into the webview's <style> block, so unlike
+        // the language and the dictionary it cannot ride along on an update
+        // message -- the shell has to be rebuilt. Disposed together with the
+        // panel in handleDispose.
+        AgendaPanel.configListener?.dispose();
+        AgendaPanel.configListener = vscode.workspace.onDidChangeConfiguration((event) => {
+            if (event.affectsConfiguration('markdown-org.agendaFontFamily')) {
+                AgendaPanel.rebuildWebviewShell();
+            }
+            if (event.affectsConfiguration('markdown-org.agendaHeaderMode')) {
+                AgendaPanel.pushHeaderMode();
+            }
+        });
 
         const nonce = generateNonce();
         const cspSource = AgendaPanel.currentPanel.webview.cspSource;
-        AgendaPanel.currentPanel.webview.html = AgendaPanel.getHtmlContent(
-            data,
-            mode,
-            locale,
-            currentTag || 'ALL',
-            holidays || [],
-            nonce,
-            cspSource
-        );
+        AgendaPanel.currentPanel.webview.html = AgendaPanel.getHtmlContent(nonce, cspSource);
 
-        AgendaPanel.currentPanel.webview.postMessage({
-            command: 'init',
-            data,
-            mode,
-            locale,
-            shiftedToday: AgendaPanel.shiftedToday,
-            currentTag: currentTag || 'ALL',
-            holidays: holidays || [],
-            firstDayOfWeek
-        });
+        AgendaPanel.currentPanel.webview.postMessage(AgendaPanel.buildInitMessage(args, uiLanguage, uiStrings));
 
         AgendaPanel.armReadyTimeout();
+    }
+
+    /**
+     * The `init` payload for a snapshot. Shared by the two paths that populate
+     * a freshly built page -- opening a panel and rebuilding its shell -- so
+     * that a field added to the snapshot cannot reach one of them and not the
+     * other.
+     */
+    private static buildInitMessage(args: AgendaRenderArgs, language: UiLanguage, strings: AgendaStrings) {
+        return {
+            command: 'init',
+            data: args.data,
+            mode: args.mode,
+            locale: args.locale,
+            shiftedToday: AgendaPanel.shiftedToday,
+            currentTag: args.currentTag || 'ALL',
+            availableTags: args.availableTags,
+            holidays: args.holidays || [],
+            firstDayOfWeek: args.firstDayOfWeek,
+            headerMode: args.headerMode,
+            language,
+            strings
+        };
     }
 
     private static armReadyTimeout() {
@@ -263,14 +481,7 @@ export class AgendaPanel {
             AgendaPanel.createRetries += 1;
             AgendaPanel.internalRetryInProgress = true;
             AgendaPanel.currentPanel?.dispose();
-            AgendaPanel.createNewPanel(
-                args.data,
-                args.mode,
-                args.locale,
-                args.currentTag,
-                args.holidays,
-                args.firstDayOfWeek
-            );
+            AgendaPanel.createNewPanel(args);
         }, ms);
     }
 
@@ -282,6 +493,7 @@ export class AgendaPanel {
         AgendaPanel.panelReady = true;
         AgendaPanel.createRetries = 0;
         AgendaPanel.lastCreateArgs = undefined;
+        AgendaPanel.flushPendingHeaderMode();
         if (AgendaPanel.readyTimeout) {
             clearTimeout(AgendaPanel.readyTimeout);
             AgendaPanel.readyTimeout = undefined;
@@ -300,6 +512,9 @@ export class AgendaPanel {
         }
         AgendaPanel.setAgendaFocusedContext(false);
         AgendaPanel.currentPanel = undefined;
+        AgendaPanel.configListener?.dispose();
+        AgendaPanel.configListener = undefined;
+        AgendaPanel.history.clear();
         AgendaPanel.watcher?.dispose();
         AgendaPanel.watcher = undefined;
         AgendaPanel.refreshCallback = undefined;
@@ -324,54 +539,157 @@ export class AgendaPanel {
         AgendaPanel.panelReady = false;
         AgendaPanel.createRetries = 0;
         AgendaPanel.lastCreateArgs = undefined;
+        AgendaPanel.lastRenderArgs = undefined;
+        AgendaPanel.pendingHeaderMode = undefined;
+        AgendaPanel.reportedRenderError = false;
     }
 
-    private static async handleWebviewMessage(message: {
-        command: string;
-        file?: string;
-        line?: number;
-        switchToDay?: boolean;
-        date?: string;
-        mode?: string;
-        style?: string;
-    }) {
+    /**
+     * Rebuild the webview HTML of the open panel and replay the last payload
+     * into it. Used for settings that are part of the shell itself (the font
+     * stack), which an update message cannot carry.
+     */
+    private static rebuildWebviewShell() {
+        const panel = AgendaPanel.currentPanel;
+        const args = AgendaPanel.lastRenderArgs;
+        if (!panel || !args) {
+            return;
+        }
+        const { language, strings } = AgendaPanel.uiStrings();
+        // Replacing `html` reloads the webview, so the panel goes through the
+        // same ready handshake as a fresh one -- and therefore needs the same
+        // watchdog. Without it a shell that fails to come back up (the very
+        // ServiceWorker race the watchdog exists for) left an empty panel and
+        // no message at all. `lastCreateArgs` is what the retry path replays
+        // from, and it was cleared by the first `ready`, so it is restored from
+        // the render snapshot here.
+        AgendaPanel.panelReady = false;
+        AgendaPanel.reportedRenderError = false;
+        AgendaPanel.lastCreateArgs = args;
+        panel.webview.html = AgendaPanel.getHtmlContent(generateNonce(), panel.webview.cspSource);
+        panel.webview.postMessage(AgendaPanel.buildInitMessage(args, language, strings));
+        AgendaPanel.armReadyTimeout();
+    }
+
+    /**
+     * Send the current `markdown-org.agendaHeaderMode` to the open panel. Unlike
+     * the font stack this is not baked into the shell -- the page keeps the mode
+     * in a variable and only toggles a class on <body> -- so the change needs
+     * neither a rebuild nor a re-render. The render snapshot is updated too, so
+     * a later shell rebuild replays the new mode.
+     */
+    private static pushHeaderMode() {
+        const panel = AgendaPanel.currentPanel;
+        if (!panel) {
+            return;
+        }
+        const config = vscode.workspace.getConfiguration('markdown-org');
+        const headerMode = normalizeHeaderMode(config.get<string>('agendaHeaderMode'));
+        if (AgendaPanel.lastRenderArgs) {
+            AgendaPanel.lastRenderArgs = { ...AgendaPanel.lastRenderArgs, headerMode };
+        }
+        if (AgendaPanel.lastCreateArgs) {
+            AgendaPanel.lastCreateArgs = { ...AgendaPanel.lastCreateArgs, headerMode };
+        }
+        // `postMessage` resolves to false when the message was not delivered --
+        // the page is reloading after an `html` swap, say, which is a real race
+        // because the font stack and the header mode arrive from the same
+        // configuration listener. Dropping that result silently left the panel
+        // on the old layout with nothing to show for it, so the mode is queued
+        // and re-sent on the next `ready`.
+        void Promise.resolve(panel.webview.postMessage({ command: 'headerMode', headerMode })).then((delivered) => {
+            if (!delivered) {
+                AgendaPanel.pendingHeaderMode = headerMode;
+                logDiagnostic(`agenda headerMode "${headerMode}" not delivered; queued for the next page load`);
+            }
+        });
+    }
+
+    /** Re-send a header mode the page never received (see {@link pushHeaderMode}). */
+    private static flushPendingHeaderMode() {
+        const headerMode = AgendaPanel.pendingHeaderMode;
+        const panel = AgendaPanel.currentPanel;
+        if (!headerMode || !panel) {
+            return;
+        }
+        AgendaPanel.pendingHeaderMode = undefined;
+        void panel.webview.postMessage({ command: 'headerMode', headerMode });
+    }
+
+    private static async handleWebviewMessage(message: AgendaWebviewMessage) {
         if (message.command === 'ready') {
             AgendaPanel.handleReady();
+            return;
+        }
+        if (message.command === 'renderError') {
+            // The webview caught something the page could not recover from.
+            // Without this the failure showed as an empty panel: the ready
+            // handshake has already fired by then (it reports that the script
+            // started, not that it rendered), so the retry watchdog treats the
+            // panel as healthy.
+            //
+            // The toast is once per panel -- a bad payload fails again on every
+            // file-watcher refresh -- but the reason always goes to the log, so
+            // a second, different failure in the same panel is still readable
+            // afterwards instead of being dropped on the floor.
+            const reason = message.message ?? 'unknown error';
+            logDiagnostic(`agenda failed to render: ${reason}`);
+            if (!AgendaPanel.reportedRenderError) {
+                AgendaPanel.reportedRenderError = true;
+                notifyError(`agenda failed to render: ${reason}`);
+            }
+            return;
+        }
+        if (message.command === 'pageWarning') {
+            // Something the page's global listeners caught that is not a failed
+            // render: a rejected background promise, a script error outside the
+            // message handler. Logged, never toasted -- and, crucially, it does
+            // not consume the one toast a real render failure gets.
+            logDiagnostic(`agenda page: ${message.message ?? 'unknown error'}`);
             return;
         }
         if (message.command === 'openTask') {
             if (typeof message.file !== 'string' || typeof message.line !== 'number') {
                 return;
             }
+            // The path is deliberately not restricted to the workspace: the
+            // agenda sweeps `markdown-org.workspaceDir`, which may sit outside
+            // any workspace folder, and opening such a file is a supported case
+            // (covered by an integration test). What made the path worth
+            // distrusting was attribute injection through `data-file`, and that
+            // is closed by escaping quotes -- see agendaEscapeHtml.ts.
             await AgendaPanel.openTaskInEditor(message.file, message.line);
         } else if (message.command === 'navigate') {
+            // The anchor ends up in the extractor's `--date` argument, so it is
+            // checked against the one shape the CLI accepts instead of being
+            // forwarded verbatim. Both webview senders always supply a date.
+            if (!isIsoDate(message.date)) {
+                return;
+            }
             if (message.switchToDay) {
-                AgendaPanel.currentPanel?.dispose();
+                // Week-view day-header drill-down into Day view. Reuse the open
+                // panel (showAgendaDay renders into it via an update message)
+                // instead of dispose+recreate: tearing the webview down and
+                // building a fresh one flashes an empty panel mid-switch. This
+                // mirrors the smooth segment mode-switch (switchMode below),
+                // which also reuses the panel.
                 await vscode.commands.executeCommand('markdown-org.showAgendaDay', message.date);
             } else {
-                AgendaPanel.refreshCallback?.(message.date, true);
+                AgendaPanel.requestRefresh(message.date, true);
             }
-        } else if (message.command === 'cycleTag') {
-            await vscode.commands.executeCommand('markdown-org.cycleTag');
+        } else if (message.command === 'historyBack') {
+            await AgendaPanel.goBack();
+        } else if (message.command === 'historyForward') {
+            await AgendaPanel.goForward();
+        } else if (message.command === 'setTag') {
+            if (typeof message.tag === 'string') {
+                await vscode.commands.executeCommand('markdown-org.setTag', message.tag);
+            }
         } else if (message.command === 'switchMode') {
-            const targetCommand =
-                message.mode === 'day'
-                    ? 'markdown-org.showAgendaDay'
-                    : message.mode === 'week'
-                      ? 'markdown-org.showAgendaWeek'
-                      : message.mode === 'month'
-                        ? 'markdown-org.showAgendaMonth'
-                        : message.mode === 'tasks'
-                          ? 'markdown-org.showTasks'
-                          : null;
+            const targetCommand = agendaModeCommand(message.mode);
             if (targetCommand) {
                 await vscode.commands.executeCommand(targetCommand, AgendaPanel.shiftedToday);
             }
-        } else if (message.command === 'setAgendaStyle') {
-            const style = normalizeAgendaStyle(message.style);
-            await vscode.workspace
-                .getConfiguration('markdown-org')
-                .update('agendaStyle', style, vscode.ConfigurationTarget.Global);
         }
     }
 
@@ -411,7 +729,7 @@ export class AgendaPanel {
                 clearTimeout(AgendaPanel.debounceTimer);
             }
             AgendaPanel.debounceTimer = setTimeout(() => {
-                AgendaPanel.refreshCallback?.();
+                AgendaPanel.requestRefresh();
             }, REFRESH_DEBOUNCE_MS);
         };
 
@@ -427,20 +745,46 @@ export class AgendaPanel {
      * expected dates for a given anchor; production code never queries
      * this. Returns null when no panel is open.
      */
-    public static queryRenderedInfoForTesting(
-        timeoutMs: number = 2000
-    ): Promise<{ dayHeaders: string[]; mode: string; flags: string[] } | null> {
+    public static queryRenderedInfoForTesting(timeoutMs: number = 2000): Promise<{
+        dayHeaders: string[];
+        mode: string;
+        flags: string[];
+        sections: string[];
+        headerLayout: string;
+        heroSharesControlRow: boolean;
+        heroSub: string;
+        dayNumbers: string[];
+    } | null> {
         const panel = AgendaPanel.currentPanel;
         if (!panel) {
             return Promise.resolve(null);
         }
         return new Promise((resolve, reject) => {
             const sub = panel.webview.onDidReceiveMessage(
-                (m: { command: string; dayHeaders?: string[]; mode?: string; flags?: string[] }) => {
+                (m: {
+                    command: string;
+                    dayHeaders?: string[];
+                    mode?: string;
+                    flags?: string[];
+                    sections?: string[];
+                    headerLayout?: string;
+                    heroSharesControlRow?: boolean;
+                    heroSub?: string;
+                    dayNumbers?: string[];
+                }) => {
                     if (m.command === 'renderedInfo') {
                         clearTimeout(timer);
                         sub.dispose();
-                        resolve({ dayHeaders: m.dayHeaders ?? [], mode: m.mode ?? '', flags: m.flags ?? [] });
+                        resolve({
+                            dayHeaders: m.dayHeaders ?? [],
+                            mode: m.mode ?? '',
+                            flags: m.flags ?? [],
+                            sections: m.sections ?? [],
+                            headerLayout: m.headerLayout ?? '',
+                            heroSharesControlRow: m.heroSharesControlRow ?? false,
+                            heroSub: m.heroSub ?? '',
+                            dayNumbers: m.dayNumbers ?? []
+                        });
                     }
                 }
             );
@@ -475,89 +819,116 @@ export class AgendaPanel {
 
     /** Reload data into the panel without re-focusing it. Re-reads settings (including tag filter). */
     public static refresh() {
-        if (AgendaPanel.refreshCallback) {
-            AgendaPanel.refreshCallback(AgendaPanel.shiftedToday, false);
+        AgendaPanel.requestRefresh(AgendaPanel.shiftedToday, false);
+    }
+
+    /** Navigate one step back through the agenda's view history (no-op at the start). */
+    public static async goBack(): Promise<void> {
+        const state = AgendaPanel.history.back();
+        if (state) {
+            await AgendaPanel.replayHistoryState(state);
         }
     }
 
-    private static getHtmlContent(
-        data: AgendaData,
-        mode: string,
-        locale: string,
-        currentTag: string,
-        holidays: string[],
-        nonce: string,
-        cspSource: string
-    ): string {
-        // Inline the click-handling helpers into the webview script. The
-        // same functions are unit-tested in agendaClick.test.ts (jsdom),
-        // so those tests transitively cover the webview behaviour.
-        const selectionGuardSource = isMeaningfulSelection.toString();
-        const clickIntentSource = resolveTaskClickIntent.toString();
-        // Defense-in-depth: sanitize task.line before interpolating it into
-        // the data-line HTML attribute. Unit-tested in agendaClick.test.ts.
-        const sanitizeTaskLineSource = sanitizeTaskLine.toString();
-        // Same approach for the scroll-memory helpers that restore the
-        // user's last scroll on Prev/Next round-trips (e.g. Next Week then
-        // Prev Week back to the same week); unit-tested in
-        // agendaScroll.test.ts.
-        const rememberScrollSource = rememberScroll.toString();
-        const recallScrollSource = recallScroll.toString();
-        // Heading tint resolver (DEADLINE > priority > default);
-        // unit-tested in agendaHeadingTint.test.ts.
-        const resolveHeadingClassSource = resolveHeadingClass.toString();
-        // timeInfo cell builder (time / DEADLINE / relative day labels);
-        // unit-tested in agendaTimeInfo.test.ts. The two-line layout of
-        // time over DEADLINE is forced by the flex-column .time-info-cell
-        // class below, so the rendering is stable across fonts and sizes.
-        const buildTimeInfoSource = buildTimeInfo.toString();
-        // Local-date formatter shared with host code; unit-tested in
-        // isoDate.test.ts.
-        const toIsoDateSource = toIsoDate.toString();
-        // Day-header parts (weekday/day/month/year) extracted by token type
-        // via Intl.DateTimeFormat#formatToParts; unit-tested in
-        // agendaDayHeader.test.ts. Replaces positional parsing that swapped
-        // day/month on en-US and dropped the month on ja-JP.
-        const formatDayHeaderPartsSource = formatDayHeaderParts.toString();
-        // Cancelled-spelling check (CANCELLED / CANCELED) shared with host code;
-        // unit-tested in normalizeTaskType.test.ts. Inlined so the webview uses
-        // the exact same spelling list as the regex/toggle/normalizer and cannot
-        // drift if a spelling is ever added.
-        const isCancelledSource = isCancelled.toString();
-        const resolveTaskFlagSource = resolveTaskFlag.toString();
-        const resolveAttentionLevelSource = resolveAttentionLevel.toString();
-        // Month-anchor shift that avoids the short-month rollover (Jan 31 +1 ->
-        // February, not March); unit-tested in monthNav.test.ts.
-        const shiftMonthAnchorSource = shiftMonthAnchor.toString();
-        // Week-view day-header drill-down: clicking a weekday opens that day's
-        // Day view. Unit-tested in agendaDayHeaderNav.test.ts (jsdom).
-        const wireDayHeaderNavigationSource = wireDayHeaderNavigation.toString();
-        // Hover-tooltip text for the terse flag / status-dot / priority glyphs;
-        // unit-tested in agendaTooltips.test.ts.
-        const flagTooltipSource = flagTooltip.toString();
-        const attentionTooltipSource = attentionTooltip.toString();
-        const priorityTooltipSource = priorityTooltip.toString();
-        const styleConfig = vscode.workspace.getConfiguration('markdown-org');
-        const agendaStyle = normalizeAgendaStyle(styleConfig.get<string>('agendaStyle'));
-        const agendaFontRaw = (styleConfig.get<string>('agendaFontFamily') || '').trim();
-        // Default matches the design-companion mockup, which renders in Adwaita
-        // Sans: its "-apple-system, 'Segoe UI', system-ui, sans-serif" stack
-        // resolves via fontconfig to Adwaita Sans for Latin *and* Cyrillic.
-        // Naming the face explicitly is what makes it identical to the mockup
-        // and sidesteps the old Electron fallback that picked a serif for
-        // Cyrillic when only generic families were given. Falls back to Noto
-        // Sans / system-ui / sans-serif where Adwaita Sans is absent.
-        const uiFontStack = "'Adwaita Sans', 'Noto Sans', system-ui, sans-serif";
-        const agendaFont = agendaFontRaw.length > 0 ? agendaFontRaw : uiFontStack;
-        // Monospace family used by the monospace preset and by the tabular
-        // time/offset cells of hybrid/table; configurable, with a Courier
-        // fallback matching the previous hardcoded stack.
-        const monoFontRaw = (styleConfig.get<string>('agendaMonospaceFontFamily') || '').trim();
-        const monoStack = "'Courier New', ui-monospace, monospace";
-        const agendaMonoFont = monoFontRaw.length > 0 ? monoFontRaw : monoStack;
-        // When true, the table style renders every element in the monospace
-        // family (not just the time/offset numerics).
-        const tableAllMono = styleConfig.get<boolean>('agendaTableAllMono', false) === true;
+    /** Navigate one step forward through the agenda's view history (no-op at the end). */
+    public static async goForward(): Promise<void> {
+        const state = AgendaPanel.history.forward();
+        if (state) {
+            await AgendaPanel.replayHistoryState(state);
+        }
+    }
+
+    /**
+     * Re-render a past view state by re-invoking the matching show command with
+     * its anchor date, mirroring the segment mode-switch path (panel reuse, no
+     * dispose). The replay depth is held for the duration so the re-render does
+     * not re-record the state, and so overlapping replays do not uncover each
+     * other.
+     */
+    private static async replayHistoryState(state: AgendaViewState): Promise<void> {
+        const command = agendaModeCommand(state.mode);
+        if (!command) {
+            return;
+        }
+        AgendaPanel.historyReplayDepth += 1;
+        try {
+            await vscode.commands.executeCommand(command, state.date);
+        } finally {
+            AgendaPanel.historyReplayDepth -= 1;
+        }
+    }
+
+    /**
+     * The pure helpers whose source is inlined into the page next to the client.
+     *
+     * They are emitted as top-level function declarations and then handed to
+     * `agendaClientMain` by name, so the ones that call each other (e.g.
+     * `resolveTaskClickIntent` calling `isMeaningfulSelection`) still resolve
+     * through the page's global scope. Each is unit-tested in `src/test/unit/`,
+     * which is what transitively covers the webview behaviour.
+     *
+     * `satisfies AgendaClientDeps` is the load-bearing part: it type-checks these
+     * real functions against the contract the client is written against, so a
+     * changed signature fails the build instead of the page. The keys double as
+     * the names emitted into the page, hence the shorthand spelling.
+     */
+    private static readonly INLINED_HELPERS = {
+        isMeaningfulSelection,
+        resolveTaskClickIntent,
+        sanitizeTaskLine,
+        escapeHtml,
+        rememberScroll,
+        recallScroll,
+        resolveHeadingClass,
+        toIsoDate,
+        formatDayHeaderParts,
+        isCancelled,
+        resolveTaskFlag,
+        resolveAttentionLevel,
+        shiftMonthAnchor,
+        wireDayHeaderNavigation,
+        flagTooltip,
+        attentionTooltip,
+        priorityTooltip,
+        resolveHeroModel,
+        computeDaySummary,
+        buildDaySections,
+        computeTasksSummary,
+        buildTaskGroups,
+        buildMonthDayIndex,
+        formatString,
+        pluralIndex,
+        formatIsoDate,
+        resolveHeaderLayout,
+        formatNumber
+    } satisfies AgendaClientDeps;
+
+    /**
+     * The `<script>` body: every inlined helper, then a call into the client
+     * with the bootstrap dictionary and those same helpers.
+     *
+     * `<` is escaped inside the JSON literal so no dictionary string can
+     * terminate the enclosing `<script>` block.
+     */
+    private static webviewScript(): string {
+        const helpers = Object.values(AgendaPanel.INLINED_HELPERS)
+            .map((fn) => fn.toString())
+            .join('\n\n');
+        const depsLiteral = '{ ' + Object.keys(AgendaPanel.INLINED_HELPERS).join(', ') + ' }';
+        const boot: AgendaClientBootstrap = AgendaPanel.uiStrings();
+        const bootLiteral = JSON.stringify(boot).replace(/</g, '\\u003c');
+        return `${helpers}\n\n(${agendaClientMain.toString()})(${bootLiteral}, ${depsLiteral});`;
+    }
+
+    // The webview shell only needs the CSP nonce and source; the agenda state
+    // (data/mode/locale/tag/holidays) is delivered separately via the 'init'
+    // postMessage, so it is not threaded through the HTML.
+    private static getHtmlContent(nonce: string, cspSource: string): string {
+        // The setting lands inside a CSS declaration, so it is validated rather
+        // than trimmed: sanitizeFontFamily returns '' both for "not set" and for
+        // anything that is not a plain font stack, and both fall back to the
+        // built-in default. Unit-tested in agendaFontFamily.test.ts.
+        const agendaFont = AgendaPanel.agendaFontStack();
         return `<!DOCTYPE html>
 <html>
 <head>
@@ -570,583 +941,18 @@ export class AgendaPanel {
            browser default serif. A nonce'd rule is allowed and does apply. */
         :root {
             --markdown-org-agenda-font: ${agendaFont};
-            --markdown-org-agenda-mono-font: ${agendaMonoFont};
         }
         ${AGENDA_STYLES}
     </style>
 </head>
-<body data-agenda-style="${agendaStyle}" data-table-mono="${tableAllMono}">
+<body>
     <div class="agenda-header" id="agenda-header">
+        <div class="agenda-hero" id="current-date"></div>
         <div class="nav-bar" id="nav-bar"></div>
-        <div class="current-date" id="current-date"></div>
     </div>
     <div id="content"></div>
     <script nonce="${nonce}">
-        ${selectionGuardSource}
-        ${clickIntentSource}
-        ${sanitizeTaskLineSource}
-        ${rememberScrollSource}
-        ${recallScrollSource}
-        ${resolveHeadingClassSource}
-        ${buildTimeInfoSource}
-        ${toIsoDateSource}
-        ${formatDayHeaderPartsSource}
-        ${isCancelledSource}
-        ${resolveTaskFlagSource}
-        ${resolveAttentionLevelSource}
-        ${shiftMonthAnchorSource}
-        ${wireDayHeaderNavigationSource}
-        ${flagTooltipSource}
-        ${attentionTooltipSource}
-        ${priorityTooltipSource}
-        const vscode = acquireVsCodeApi();
-        // Handshake for the ServiceWorker-race retry path on the extension
-        // side: tells AgendaPanel.armReadyTimeout the webview script is alive
-        // so the timeout-triggered dispose+recreate does not fire.
-        vscode.postMessage({ command: 'ready' });
-        let initialData = [];
-        let initialMode = '';
-        let locale = '';
-        // The anchor date the panel is built around: today plus any
-        // Prev/Next offset. Equals today on first open and after the Today
-        // button; can move forward/backward via navigation. Drives the
-        // navbar label, Prev/Next stepping, and the month-calendar target.
-        let shiftedToday = '';
-        let currentTag = '';
-        let holidays = [];
-        let firstDayOfWeek = 'monday';
-        // Per-anchor scroll memory. Saved on every navigate() before the
-        // postMessage and restored on navigation=true updates so that a
-        // round-trip (Next then Prev, or Prev then Next) returns the user
-        // to where they were instead of snapping back to today's header.
-        const scrollHistory = {};
-        // Style metadata shared by the picker button, the dropdown and the
-        // per-item tooltips. Kept in one place so the button label, the active
-        // checkmark and the hover descriptions cannot drift apart.
-        const agendaStyleMeta = [
-            { id: 'monospace', label: 'Monospace', desc: 'Fixed-width columns; everything in a monospace font.' },
-            { id: 'native', label: 'Native', desc: 'Proportional font with badge-style priorities.' },
-            { id: 'hybrid', label: 'Hybrid', desc: 'Proportional text with monospace time and offset columns.' },
-            { id: 'table', label: 'Table', desc: 'Compact table with a per-task type-flag column (default).' }
-        ];
-        // The default the host resolves to when the setting is unset/invalid,
-        // injected so the picker fallback tracks DEFAULT_AGENDA_STYLE instead
-        // of a hardcoded literal that silently goes stale when the default moves.
-        const defaultAgendaStyle = ${JSON.stringify(DEFAULT_AGENDA_STYLE)};
-        function agendaStyleLabel(id) {
-            for (let i = 0; i < agendaStyleMeta.length; i++) {
-                if (agendaStyleMeta[i].id === id) return agendaStyleMeta[i].label;
-            }
-            return id;
-        }
-        // Publish the sticky nav-bar's live height as --agenda-header-h so the
-        // sticky day-headers pin directly below it (their top / scroll-margin-top
-        // read this var). Re-measured after every render and on resize because
-        // the header wraps differently by width, mode and font.
-        function syncHeaderOffset() {
-            const header = document.getElementById('agenda-header');
-            const h = header ? header.offsetHeight : 0;
-            document.documentElement.style.setProperty('--agenda-header-h', h + 'px');
-        }
-        window.addEventListener('resize', syncHeaderOffset);
-
-        window.addEventListener('message', event => {
-            const message = event.data;
-            if (message.command === 'init') {
-                initialData = message.data;
-                initialMode = message.mode;
-                locale = message.locale;
-                shiftedToday = message.shiftedToday;
-                currentTag = message.currentTag;
-                holidays = message.holidays;
-                if (message.firstDayOfWeek) {
-                    firstDayOfWeek = message.firstDayOfWeek;
-                }
-                renderNavBar();
-                syncHeaderOffset();
-                if (initialMode === 'month') {
-                    document.getElementById('content').innerHTML = renderMonthCalendar(initialData);
-                    attachCalendarListeners();
-                } else if (initialMode === 'day' || initialMode === 'week') {
-                    document.getElementById('content').innerHTML = renderAgenda(initialData);
-                    attachTaskListeners();
-                    wireDayHeaderNavigation(document, initialMode, navigateToDay);
-                } else if (initialMode === 'tasks') {
-                    document.getElementById('content').innerHTML = renderTasks(initialData);
-                    attachTaskListeners();
-                }
-                scrollToWeekFocus();
-            } else if (message.type === 'update') {
-                if (message.shiftedToday) {
-                    shiftedToday = message.shiftedToday;
-                }
-                if (message.currentTag) {
-                    currentTag = message.currentTag;
-                }
-                if (message.mode) {
-                    initialMode = message.mode;
-                }
-                if (message.firstDayOfWeek) {
-                    firstDayOfWeek = message.firstDayOfWeek;
-                }
-                initialData = message.data;
-                const userInitiated = message.userInitiated === true;
-                const navigation = message.navigation === true;
-                const scrollPos = window.scrollY;
-                const wasOnCurrentWeek = currentWeekIsVisible();
-                renderNavBar();
-                syncHeaderOffset();
-                if (initialMode === 'month') {
-                    document.getElementById('content').innerHTML = renderMonthCalendar(initialData);
-                    attachCalendarListeners();
-                } else if (initialMode === 'day' || initialMode === 'week') {
-                    document.getElementById('content').innerHTML = renderAgenda(initialData);
-                    attachTaskListeners();
-                    wireDayHeaderNavigation(document, initialMode, navigateToDay);
-                } else if (initialMode === 'tasks') {
-                    document.getElementById('content').innerHTML = renderTasks(initialData);
-                    attachTaskListeners();
-                }
-                if (!userInitiated) {
-                    // File-watcher / cycleTag refresh -- keep scroll.
-                    window.scrollTo(0, scrollPos);
-                } else if (initialMode !== 'week') {
-                    // Day / month / tasks have no per-day scroll anchor.
-                } else if (navigation) {
-                    // Prev/Next/Today. If we've been on this anchor before
-                    // (round-trip case), restore the user's last scroll
-                    // there; otherwise focus the week as usual.
-                    const remembered = recallScroll(scrollHistory, shiftedToday);
-                    if (remembered !== null) {
-                        window.scrollTo(0, remembered);
-                    } else {
-                        scrollToWeekFocus();
-                    }
-                } else if (wasOnCurrentWeek && currentWeekIsVisible()) {
-                    // Repeated Show Agenda (Week) on the same current week --
-                    // keep the user's place.
-                    window.scrollTo(0, scrollPos);
-                } else {
-                    scrollToWeekFocus();
-                }
-            } else if (message.command === 'getRenderedInfo') {
-                // Integration-test query: snapshot the rendered DOM so the
-                // host can verify that renderAgenda produced the expected
-                // day-headers for the given anchor date. Production code
-                // never sends this query, so it has no effect on normal use.
-                const headers = Array.from(document.querySelectorAll('.day-header'))
-                    .map(el => el.getAttribute('data-date'))
-                    .filter(d => d !== null);
-                const flags = Array.from(document.querySelectorAll('.flag')).map(el => el.getAttribute('data-flag'));
-                vscode.postMessage({ command: 'renderedInfo', dayHeaders: headers, mode: initialMode, flags });
-            }
-        });
-        
-        function parseLocalDate(str) {
-            const [y, m, d] = str.split('-').map(Number);
-            return new Date(y, m - 1, d);
-        }
-
-        function isHoliday(date) {
-            return holidays.includes(date);
-        }
-        
-        function navigateToDay(date) {
-            vscode.postMessage({ command: 'navigate', date: date, switchToDay: true });
-        }
-
-        function setAgendaStyle(style) {
-            document.body.dataset.agendaStyle = style;
-            // Keep the menu's active marker in sync with the live choice; the
-            // menu is rendered once on open, so without this it would keep
-            // highlighting the style that was active at open time. The active
-            // checkmark rides on the same .active class via CSS.
-            document.querySelectorAll('.style-menu-item').forEach(function (el) {
-                el.classList.toggle('active', el.getAttribute('data-style') === style);
-            });
-            // Reflect the new choice on the collapsed button so the current
-            // style is legible without opening the menu.
-            const btn = document.getElementById('styleMenuBtn');
-            if (btn) {
-                btn.textContent = 'Aa ' + agendaStyleLabel(style) + ' ▾';
-            }
-            vscode.postMessage({ command: 'setAgendaStyle', style: style });
-        }
-
-        function toggleStyleMenu(ev) {
-            ev.stopPropagation();
-            document.getElementById('styleMenu').classList.toggle('open');
-        }
-        document.addEventListener('click', function () {
-            const m = document.getElementById('styleMenu');
-            if (m) m.classList.remove('open');
-        });
-        
-        function attachCalendarListeners() {
-            document.querySelectorAll('.calendar-day').forEach(el => {
-                const date = el.getAttribute('data-date');
-                if (date) {
-                    el.addEventListener('click', () => navigateToDay(date));
-                }
-            });
-        }
-        
-        function attachTaskListeners() {
-            document.getElementById('content').addEventListener('click', (e) => {
-                // Source of truth: src/utils/agendaClick.ts -- jsdom tested.
-                const intent = resolveTaskClickIntent(e, window.getSelection());
-                if (intent) {
-                    vscode.postMessage({
-                        command: 'openTask',
-                        file: intent.file,
-                        line: intent.line
-                    });
-                }
-            });
-        }
-        
-        function renderAgenda(days) {
-            const today = toIsoDate(new Date());
-            // Array-of-fragments + join instead of string += because V8 keeps
-            // re-allocating on each concat for long agendas (a full Month view
-            // can emit ~30 days * 4 buckets * N tasks). Output is identical.
-            const parts = [];
-            days.forEach(day => {
-                const isToday = day.date === today;
-                const headerCls = 'day-header' + (isToday ? ' day-header-today' : '');
-                parts.push('<div class="' + headerCls + '" data-date="' + escapeHtml(day.date) + '">' + formatDayHeader(day.date, isToday) + '</div>');
-                (day.overdue || []).forEach(task => parts.push(renderTask(task, task.days_offset, 'overdue')));
-                (day.scheduled_timed || []).forEach(task => parts.push(renderTask(task, task.days_offset)));
-                (day.scheduled_no_time || []).forEach(task => parts.push(renderTask(task, task.days_offset)));
-                (day.upcoming || []).forEach(task => parts.push(renderTask(task, task.days_offset, 'upcoming')));
-            });
-            return parts.join('');
-        }
-
-        // The week view scrolls to today's header when today is in the
-        // visible range; when the user navigates to another week (Prev/Next
-        // moved them off the current week), it starts at the top instead of
-        // landing them mid-week on the day-of-week that happens to share
-        // shiftedToday. Day/month/tasks have no equivalent per-day anchor.
-        function currentWeekIsVisible() {
-            return !!document.querySelector('.day-header[data-date="' + toIsoDate(new Date()) + '"]');
-        }
-        function scrollToWeekFocus() {
-            if (initialMode !== 'week') return;
-            requestAnimationFrame(() => {
-                const target = document.querySelector('.day-header[data-date="' + toIsoDate(new Date()) + '"]');
-                if (target) {
-                    target.scrollIntoView({ block: 'start', behavior: 'auto' });
-                } else {
-                    window.scrollTo(0, 0);
-                }
-            });
-        }
-        
-        function renderTasks(tasks) {
-            const priorities = ['A', 'B', 'C', ''];
-            const parts = [];
-            priorities.forEach(priority => {
-                const filtered = tasks.filter(t => (t.priority || '') === priority);
-                if (filtered.length === 0) return;
-                const header = priority ? 'Priority [#' + priority + ']' : 'No priority';
-                parts.push('<div class="day-header"><span>' + escapeHtml(header) + '</span></div>');
-                filtered.forEach(task => parts.push(renderTask(task)));
-            });
-            return parts.join('');
-        }
-        
-        function formatDayHeader(date, isToday) {
-            const { weekday, day, month, year } = formatDayHeaderParts(date, locale);
-            const arrowL = isToday ? '<span class="day-nav" title="Today">❯ </span>' : '';
-            const arrowR = isToday ? '<span class="day-nav" title="Today"> ❮</span>' : '';
-            return '<span class="day-weekday">' + arrowL + weekday + '</span><span class="day-num" style="text-align: right">' + day + '</span><span class="day-rest">' + month + ' ' + year + arrowR + '</span>';
-        }
-        
-        function renderTask(task, daysOffset, taskType) {
-            const timeInfo = getTimeInfo(task, daysOffset);
-            const status = task.task_type || '';
-            const priorityLetter = task.priority || '';
-            const statusKind = status === 'TODO' ? 'todo'
-                : status === 'DONE' ? 'done'
-                : isCancelled(status) ? 'cancelled'
-                : '';
-            const flag = resolveTaskFlag(task, isCancelled);
-            const attention = resolveAttentionLevel(task, daysOffset, taskType, isCancelled);
-
-            const dateDisplay = (daysOffset !== undefined && daysOffset !== 0 && task.timestamp_date)
-                ? formatDateForTitle(task.timestamp_date)
-                : '';
-            const dateDir = taskType === 'upcoming' ? 'upcoming' : 'overdue';
-            // Source of truth: src/utils/agendaHeadingTint.ts -- unit tested.
-            // typeAttr feeds the [data-type="deadline"] preset selector that
-            // paints the heading red for a DEADLINE task; resolveHeadingClass
-            // still owns the DEADLINE > priority > default precedence rule.
-            const typeAttr = resolveHeadingClass(task).indexOf('deadline') !== -1 ? 'deadline' : 'scheduled';
-
-            return '<div class="task-line"' +
-                ' data-status="' + statusKind + '"' +
-                ' data-priority="' + escapeHtml(priorityLetter.toLowerCase()) + '"' +
-                ' data-type="' + typeAttr + '"' +
-                ' data-file="' + escapeHtml(task.file) + '"' +
-                ' data-line="' + sanitizeTaskLine(task.line) + '">' +
-                '<span class="todo-label">todo:</span>' +
-                '<span class="time-info-cell">' + timeInfo + '</span>' +
-                // .time-plain: table-only clean HH:MM (or empty). The table
-                // style hides .time-info-cell (whose buildTimeInfo output carries
-                // monospace dot-trails, a stacked DEADLINE label, and relative
-                // "Sched.Nx" text) and shows this instead, so the big-time column
-                // stays a single clean line; other styles keep .time-plain hidden.
-                '<span class="time-plain">' + escapeHtml(task.timestamp_time || '') + '</span>' +
-                '<span class="status" data-status="' + statusKind + '" data-attention="' + attention + '" title="' + escapeHtml(attentionTooltip(attention)) + '">' + escapeHtml(status) + '</span>' +
-                // .flag: table-only type glyph (deadline/scheduled/repeat/cancelled);
-                // display:none in other presets, so it occupies no grid cell there.
-                '<span class="flag" data-flag="' + flag + '" title="' + escapeHtml(flagTooltip(flag)) + '"></span>' +
-                '<span class="priority" data-priority="' + escapeHtml(priorityLetter.toLowerCase()) + '" title="' + escapeHtml(priorityTooltip(priorityLetter)) + '">' +
-                    escapeHtml(priorityLetter) +
-                '</span>' +
-                '<span class="heading">' + escapeHtml(task.heading) + '</span>' +
-                '<span class="offset" data-dir="' + dateDir + '">' + dateDisplay + '</span>' +
-                '</div>';
-        }
-        
-        function formatDateForTitle(dateStr) {
-            const d = parseLocalDate(dateStr);
-            const day = String(d.getDate()).padStart(2, '0');
-            const month = String(d.getMonth() + 1).padStart(2, '0');
-            const year = d.getFullYear();
-            return day + '.' + month + '.' + year;
-        }
-        
-        function getTimeInfo(task, daysOffset) {
-            // Body is inlined from src/utils/agendaTimeInfo.ts via .toString();
-            // see buildTimeInfoSource in getHtmlContent. The wrapper exists
-            // to bind the in-webview escapeHtml closure to the shared
-            // implementation.
-            return buildTimeInfo(task, daysOffset, escapeHtml);
-        }
-
-        function resolveFirstDayOffset() {
-            // 0 = Sunday-first, 1 = Monday-first (only these two supported in UI).
-            if (firstDayOfWeek === 'sunday') return 0;
-            if (firstDayOfWeek === 'monday') return 1;
-            try {
-                const info = new Intl.Locale(locale).weekInfo;
-                if (info && info.firstDay === 7) return 0;
-                if (info && info.firstDay >= 1 && info.firstDay <= 6) return 1;
-            } catch (e) { /* unsupported locale or API -- fall through */ }
-            return 1;
-        }
-
-        function buildWeekdayLabels(firstOffset) {
-            // Reference week starting Sun 2024-01-07 lets us pick weekday names by locale.
-            const labels = [];
-            for (let i = 0; i < 7; i++) {
-                const ref = new Date(2024, 0, 7 + ((i + firstOffset) % 7));
-                labels.push(ref.toLocaleDateString(locale, { weekday: 'short' }));
-            }
-            return labels;
-        }
-
-        function renderMonthCalendar(days) {
-            const daysMap = {};
-            (days || []).forEach(day => {
-                const taskCount = (day.scheduled_timed || []).length +
-                                (day.scheduled_no_time || []).length +
-                                (day.upcoming || []).length +
-                                (day.overdue || []).length;
-                daysMap[day.date] = taskCount > 0;
-            });
-
-            const target = shiftedToday ? parseLocalDate(shiftedToday) : new Date();
-            const year = target.getFullYear();
-            const month = target.getMonth();
-            const firstDayOfMonth = new Date(year, month, 1);
-            const lastDayOfMonth = new Date(year, month + 1, 0);
-
-            const firstOffset = resolveFirstDayOffset();
-            // JS getDay(): 0=Sun..6=Sat. Convert to leading-empty-cells count.
-            const startDay = (firstDayOfMonth.getDay() - firstOffset + 7) % 7;
-
-            const today = new Date();
-            const todayStr = toIsoDate(today);
-
-            let html = '<div class="calendar">';
-            buildWeekdayLabels(firstOffset).forEach(label => {
-                html += '<div class="calendar-header">' + escapeHtml(label) + '</div>';
-            });
-
-            const prevMonthLast = new Date(year, month, 0);
-            const prevMonthDays = prevMonthLast.getDate();
-            for (let i = startDay - 1; i >= 0; i--) {
-                const day = prevMonthDays - i;
-                const d = new Date(year, month - 1, day);
-                const dateStr = toIsoDate(d);
-                html += '<div class="calendar-day other-month" data-date="' + dateStr + '">' +
-                       '<div class="day-number">' + day + '</div></div>';
-            }
-
-            for (let day = 1; day <= lastDayOfMonth.getDate(); day++) {
-                const d = new Date(year, month, day);
-                const dateStr = toIsoDate(d);
-                const dayOfWeek = d.getDay();
-                const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
-                const isHol = isHoliday(dateStr);
-                const hasTasks = daysMap[dateStr];
-                const isToday = dateStr === todayStr;
-
-                let classes = 'calendar-day';
-                if (isWeekend) classes += ' weekend';
-                if (isHol) classes += ' holiday';
-                if (hasTasks) classes += ' has-tasks';
-                if (isToday) classes += ' today';
-
-                html += '<div class="' + classes + '" data-date="' + dateStr + '">' +
-                       '<div class="day-number">' + day + '</div>' +
-                       (hasTasks ? '<div class="task-indicator"></div>' : '') +
-                       '</div>';
-            }
-
-            // Pad trailing cells up to the next full week boundary -- gives 4/5/6 rows naturally.
-            const used = startDay + lastDayOfMonth.getDate();
-            const trailingCells = (${CALENDAR_COLS} - (used % ${CALENDAR_COLS})) % ${CALENDAR_COLS};
-            for (let i = 1; i <= trailingCells; i++) {
-                const d = new Date(year, month + 1, i);
-                const dateStr = toIsoDate(d);
-                html += '<div class="calendar-day other-month" data-date="' + dateStr + '">' +
-                       '<div class="day-number">' + i + '</div></div>';
-            }
-
-            html += '</div>';
-            return html;
-        }
-        
-        function escapeHtml(text) {
-            const div = document.createElement('div');
-            div.textContent = text;
-            return div.innerHTML;
-        }
-        
-        function navigate(offset) {
-            // Remember the scroll position for the current anchor before
-            // leaving it, so a later return to this anchor can restore it.
-            rememberScroll(scrollHistory, shiftedToday, window.scrollY);
-            const d = parseLocalDate(shiftedToday);
-            if (offset === 0) {
-                d.setTime(Date.now());
-            } else if (initialMode === 'day') {
-                d.setDate(d.getDate() + offset);
-            } else if (initialMode === 'week') {
-                d.setDate(d.getDate() + offset * 7);
-            }
-            const newDate = initialMode === 'month' && offset !== 0
-                ? toIsoDate(shiftMonthAnchor(d, offset))
-                : toIsoDate(d);
-            // Today is an explicit "snap to today" -- drop any remembered
-            // scroll for that anchor so the update handler falls back to
-            // scrollToWeekFocus() instead of restoring an old position.
-            if (offset === 0) {
-                delete scrollHistory[newDate];
-            }
-            vscode.postMessage({ command: 'navigate', date: newDate });
-        }
-        
-        function renderModeSwitch() {
-            const modes = [
-                { id: 'day', label: 'Day' },
-                { id: 'week', label: 'Week' },
-                { id: 'month', label: 'Month' },
-                { id: 'tasks', label: 'Tasks' }
-            ];
-            return '<span class="mode-switch">' +
-                modes.map(m =>
-                    '<button class="mode-btn' + (m.id === initialMode ? ' active' : '') +
-                    '" data-mode="' + m.id + '" title="Switch to ' + m.label + ' view">' + m.label + '</button>'
-                ).join('') +
-                '</span>';
-        }
-
-        function renderStyleMenu() {
-            const cur = document.body.dataset.agendaStyle || defaultAgendaStyle;
-            const btnLabel = 'Aa ' + agendaStyleLabel(cur) + ' ▾';
-            const label = '<div class="style-menu-label">Agenda style</div>';
-            const items = agendaStyleMeta.map(it =>
-                '<div class="style-menu-item' + (it.id === cur ? ' active' : '') +
-                '" data-style="' + it.id + '" title="' + escapeHtml(it.desc) + '">' +
-                '<span class="style-menu-check">✓</span>' +
-                '<span class="style-menu-name">' + escapeHtml(it.label) + '</span>' +
-                '</div>'
-            ).join('');
-            return '<div class="style-menu" id="styleMenu">' +
-                '<button class="style-menu-btn" id="styleMenuBtn" title="Agenda style">' + escapeHtml(btnLabel) + '</button>' +
-                '<div class="style-menu-list">' + label + items + '</div></div>';
-        }
-
-        function attachStyleMenuListeners() {
-            document.getElementById('styleMenuBtn').addEventListener('click', toggleStyleMenu);
-            document.querySelectorAll('.style-menu-item').forEach(el => {
-                el.addEventListener('click', () => {
-                    const style = el.getAttribute('data-style');
-                    if (style) setAgendaStyle(style);
-                });
-            });
-        }
-
-        function attachModeSwitchListeners() {
-            document.querySelectorAll('.mode-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const target = btn.getAttribute('data-mode');
-                    if (target && target !== initialMode) {
-                        vscode.postMessage({ command: 'switchMode', mode: target });
-                    }
-                });
-            });
-        }
-
-        function renderNavBar() {
-            const navBar = document.getElementById('nav-bar');
-            const dateEl = document.getElementById('current-date');
-            const modeSwitchHtml = renderModeSwitch();
-            const styleMenuHtml = renderStyleMenu();
-            const tagHtml =
-                '<span class="tag-indicator" id="tag-indicator" title="Click to cycle the file-tag filter">Tag: ' +
-                escapeHtml(currentTag) +
-                '</span>';
-
-            if (initialMode === 'tasks') {
-                navBar.innerHTML = modeSwitchHtml + tagHtml + styleMenuHtml;
-                dateEl.textContent = '';
-                dateEl.style.display = 'none';
-            } else {
-                const unit = initialMode === 'day' ? 'Day' : initialMode === 'week' ? 'Week' : 'Month';
-                navBar.innerHTML =
-                    modeSwitchHtml +
-                    '<span class="date-nav">' +
-                    '<button class="nav-btn" id="btn-prev" title="Previous ' + unit + '">← Prev ' + unit + '</button>' +
-                    '<button class="nav-btn" id="btn-today" title="Jump to today">Today</button>' +
-                    '<button class="nav-btn" id="btn-next" title="Next ' + unit + '">Next ' + unit + ' →</button>' +
-                    '</span>' +
-                    tagHtml +
-                    styleMenuHtml;
-
-                const d = parseLocalDate(shiftedToday);
-                const weekday = d.toLocaleDateString(locale, { weekday: 'long' });
-                const dayMonth = d.toLocaleDateString(locale, { day: 'numeric', month: 'long' });
-                const year = d.getFullYear();
-                dateEl.textContent = weekday + ', ' + dayMonth + ' ' + year;
-                dateEl.style.display = '';
-
-                document.getElementById('btn-prev').addEventListener('click', () => navigate(-1));
-                document.getElementById('btn-today').addEventListener('click', () => navigate(0));
-                document.getElementById('btn-next').addEventListener('click', () => navigate(1));
-            }
-
-            attachModeSwitchListeners();
-            attachStyleMenuListeners();
-            document.getElementById('tag-indicator').addEventListener('click', () => {
-                vscode.postMessage({ command: 'cycleTag' });
-            });
-        }
+${AgendaPanel.webviewScript()}
     </script>
 </body>
 </html>`;

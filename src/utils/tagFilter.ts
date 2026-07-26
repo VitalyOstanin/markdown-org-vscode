@@ -66,5 +66,5 @@ export function filterTasksByTag(data: AgendaData, tag: string, fileTags: FileTa
             upcoming: (day.upcoming ?? []).filter(filterFn)
         }));
     }
-    return (data as Task[]).filter(filterFn);
+    return data.filter(filterFn);
 }

@@ -178,11 +178,11 @@ function clockSpans(ts: RegExpMatchArray, lineOffset: number, prefix: 'start' | 
     const hourStart = weekdayEnd + 1;
     const minuteStart = hourStart + 3;
     return [
-        { part: `${prefix}-year` as ClockTimestampPart, start: base, end: base + 4 },
-        { part: `${prefix}-month` as ClockTimestampPart, start: base + 5, end: base + 7 },
-        { part: `${prefix}-day` as ClockTimestampPart, start: base + 8, end: base + 10 },
-        { part: `${prefix}-weekday` as ClockTimestampPart, start: weekdayStart, end: weekdayEnd },
-        { part: `${prefix}-hour` as ClockTimestampPart, start: hourStart, end: hourStart + 2 },
-        { part: `${prefix}-minute` as ClockTimestampPart, start: minuteStart, end: minuteStart + 2 }
+        { part: `${prefix}-year`, start: base, end: base + 4 },
+        { part: `${prefix}-month`, start: base + 5, end: base + 7 },
+        { part: `${prefix}-day`, start: base + 8, end: base + 10 },
+        { part: `${prefix}-weekday`, start: weekdayStart, end: weekdayEnd },
+        { part: `${prefix}-hour`, start: hourStart, end: hourStart + 2 },
+        { part: `${prefix}-minute`, start: minuteStart, end: minuteStart + 2 }
     ];
 }

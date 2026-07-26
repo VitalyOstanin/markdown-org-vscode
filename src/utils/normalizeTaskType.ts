@@ -43,7 +43,7 @@ export function computeToggledStatus(current: string | undefined, applied: TaskS
  * исходный объект (возвращает поверхностную копию с переписанным полем).
  */
 function normalizeTask<T extends Task>(task: T): T {
-    return { ...task, task_type: normalizeTaskType(task.task_type as string | undefined) };
+    return { ...task, task_type: normalizeTaskType(task.task_type) };
 }
 
 /**

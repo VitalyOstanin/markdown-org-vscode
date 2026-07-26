@@ -22,6 +22,17 @@ export function buildTagCycle(tagNames: readonly string[]): string[] {
     return [TAG_ALL, ...tagNames.filter((n) => n !== TAG_ALL)];
 }
 
+/**
+ * Resolve a tag the user picked directly from the tag dropdown against the
+ * live configuration. A requested tag still present in the cycle (the implicit
+ * "ALL" plus the configured tags) is honoured as-is; a stale request -- a tag
+ * removed from `fileTags` after the menu was rendered -- falls back to "ALL"
+ * rather than applying a filter the extractor no longer recognises.
+ */
+export function resolveRequestedTag(requested: string, tagNames: readonly string[]): string {
+    return buildTagCycle(tagNames).includes(requested) ? requested : TAG_ALL;
+}
+
 export function computeNextTag(currentTag: string, tagNames: readonly string[]): string {
     // An unknown current tag (e.g. left over after a settings edit) maps to -1
     // and deterministically falls back to "ALL" instead of jumping to the first
