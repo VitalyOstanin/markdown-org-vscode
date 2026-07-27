@@ -6,6 +6,7 @@ import * as path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { suite, test, suiteSetup, suiteTeardown } from 'mocha';
 import { collectGitStatus } from '../../utils/git/collectGitStatus';
+import { pathKey } from '../../utils/git/gitPathMatch';
 import { commitAgendaSources, pushAgendaSources } from '../../commands/gitActions';
 import { AGENDA_STRINGS } from '../../utils/agendaI18n';
 import { AgendaPanel } from '../../views/agendaPanel';
@@ -386,9 +387,13 @@ suite('agenda panel git chip', () => {
             .handleWebviewMessage;
         const file = path.join(__dirname, '..', '..', '..', 'package.json');
         await handle.call(AgendaPanel, { command: 'openSourceFile', file });
-        await waitUntil(
-            () => vscode.window.activeTextEditor?.document.uri.fsPath === fs.realpathSync.native(file),
-            'the source file to become the active editor'
-        );
+        // Through `pathKey`, not string equality: VS Code hands back the drive
+        // letter in lower case while `realpathSync.native` upper-cases it, and
+        // the two spell the same file.
+        const expected = pathKey(fs.realpathSync.native(file));
+        await waitUntil(() => {
+            const open = vscode.window.activeTextEditor?.document.uri.fsPath;
+            return open !== undefined && pathKey(open) === expected;
+        }, 'the source file to become the active editor');
     });
 });
