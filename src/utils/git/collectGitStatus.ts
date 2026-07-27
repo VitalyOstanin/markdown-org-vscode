@@ -66,12 +66,6 @@ export async function collectGitStatus(files: readonly string[]): Promise<Agenda
     return buildGitStatus(sources, snapshots);
 }
 
-/** Repositories currently known to the Git extension; used to wire listeners. */
-export async function gitRepositories(): Promise<readonly GitRepository[]> {
-    const api = await getGitApi();
-    return api ? api.repositories : [];
-}
-
 /** The API handle, for callers that need to subscribe to repository events. */
 export async function gitApiForEvents(): Promise<GitApi | null> {
     return getGitApi();

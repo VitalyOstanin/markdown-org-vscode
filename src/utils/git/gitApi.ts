@@ -94,12 +94,6 @@ function reportUnavailable(reason: string): void {
     logDiagnostic(`agenda git status unavailable: ${reason}`);
 }
 
-/** Test-only hook: drop the cached API so a stub can take its place. */
-export function __resetGitApiCacheForTesting(api?: GitApi | null): void {
-    cachedApi = api;
-    reportedUnavailable = false;
-}
-
 /**
  * Real path of `file`, with the original returned when it cannot be resolved.
  *

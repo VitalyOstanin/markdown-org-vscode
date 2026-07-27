@@ -6,7 +6,7 @@ import * as path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { suite, test, suiteSetup, suiteTeardown } from 'mocha';
 import { collectGitStatus } from '../../utils/git/collectGitStatus';
-import { commitAgendaSources } from '../../commands/gitActions';
+import { commitAgendaSources, pushAgendaSources } from '../../commands/gitActions';
 import { AGENDA_STRINGS } from '../../utils/agendaI18n';
 import { AgendaPanel } from '../../views/agendaPanel';
 import { waitForAgendaRender, waitUntil } from './_helpers';
@@ -153,6 +153,25 @@ suite('agenda git status against a real repository', () => {
         fs.rmSync(loose);
     });
 
+    test('a repeated source file is collected once', async function () {
+        this.timeout(30000);
+        const status = await collectGitStatus([linked('work.md'), linked('work.md'), linked('./work.md')]);
+        assert.ok(status);
+        assert.strictEqual(status.files.length, 1, JSON.stringify(status.files));
+    });
+
+    test('a file that no longer exists lands outside git rather than aborting the pass', async function () {
+        this.timeout(30000);
+        // realpath fails on it; the pass must keep going and place it in the
+        // outside-git group, because the agenda payload is a snapshot and a
+        // task can outlive its file.
+        const status = await collectGitStatus([linked('work.md'), path.join(workDir, 'vanished.md')]);
+        assert.ok(status);
+        assert.strictEqual(status.files.length, 2);
+        assert.strictEqual(status.outsideGitCount, 1);
+        assert.strictEqual(status.uncommittedCount, 1);
+    });
+
     test('the commit takes only the view files and leaves the rest of the tree alone', async function () {
         this.timeout(30000);
         const before = git(['status', '--porcelain']);
@@ -188,6 +207,117 @@ suite('agenda git status against a real repository', () => {
         assert.ok(last.includes('work.md'), last);
         assert.ok(!last.includes('unrelated.md'), `the commit swept in an unrelated file:\n${last}`);
     });
+
+    test('an empty commit message commits nothing', async function () {
+        this.timeout(30000);
+        const before = git(['rev-parse', 'HEAD']).trim();
+        const original = vscode.window.showInputBox;
+        (vscode.window as { showInputBox: unknown }).showInputBox = () => Promise.resolve('   ');
+        try {
+            await commitAgendaSources([linked('fresh.md')], AGENDA_STRINGS.en);
+        } finally {
+            (vscode.window as { showInputBox: unknown }).showInputBox = original;
+        }
+        assert.strictEqual(git(['rev-parse', 'HEAD']).trim(), before, 'HEAD moved on a blank message');
+        assert.ok(git(['status', '--porcelain']).includes('fresh.md'), 'fresh.md must still be pending');
+    });
+
+    test('a dismissed prompt commits nothing', async function () {
+        this.timeout(30000);
+        const before = git(['rev-parse', 'HEAD']).trim();
+        const original = vscode.window.showInputBox;
+        (vscode.window as { showInputBox: unknown }).showInputBox = () => Promise.resolve(undefined);
+        try {
+            await commitAgendaSources([linked('fresh.md')], AGENDA_STRINGS.en);
+        } finally {
+            (vscode.window as { showInputBox: unknown }).showInputBox = original;
+        }
+        assert.strictEqual(git(['rev-parse', 'HEAD']).trim(), before, 'HEAD moved on a dismissed prompt');
+    });
+
+    test('push sends the local commits to the upstream', async function () {
+        this.timeout(30000);
+        const remote = path.join(workDir, 'remote.git');
+        const remoteHead = (): string =>
+            execFileSync('git', ['--git-dir', remote, 'rev-parse', 'master'], { encoding: 'utf-8' }).trim();
+        const local = git(['rev-parse', 'HEAD']).trim();
+        assert.notStrictEqual(remoteHead(), local, 'precondition: the remote is behind');
+
+        await pushAgendaSources([linked('home.md')], AGENDA_STRINGS.en);
+        await waitUntil(() => remoteHead() === local, 'the remote to receive the local commits');
+    });
+
+    test('a branch with no upstream is not pushed without consent', async function () {
+        this.timeout(30000);
+        // A second repository, deliberately without a remote: its branch has no
+        // upstream, which is the case that asks before creating one.
+        const soloDir = path.join(workDir, 'solo-repo');
+        fs.mkdirSync(soloDir);
+        execFileSync('git', [...GIT_ID, 'init', '--initial-branch=master'], { cwd: soloDir, encoding: 'utf-8' });
+        fs.writeFileSync(path.join(soloDir, 'solo.md'), '# solo\n');
+        execFileSync('git', [...GIT_ID, 'add', '.'], { cwd: soloDir, encoding: 'utf-8' });
+        execFileSync('git', [...GIT_ID, 'commit', '-m', 'initial'], { cwd: soloDir, encoding: 'utf-8' });
+
+        let asked = 0;
+        const original = vscode.window.showWarningMessage;
+        // Declining the modal: the flow must leave the repository alone rather
+        // than guess a remote.
+        (vscode.window as { showWarningMessage: unknown }).showWarningMessage = () => {
+            asked += 1;
+            return Promise.resolve(undefined);
+        };
+        try {
+            await pushAgendaSources([path.join(soloDir, 'solo.md')], AGENDA_STRINGS.en);
+        } finally {
+            (vscode.window as { showWarningMessage: unknown }).showWarningMessage = original;
+        }
+        assert.strictEqual(asked, 1, 'the missing upstream must be asked about exactly once');
+        const remotes = execFileSync('git', ['remote'], { cwd: soloDir, encoding: 'utf-8' }).trim();
+        assert.strictEqual(remotes, '', 'declining must not create a remote');
+
+        // The same repository read as status: with no upstream there is
+        // nothing to diff against, so the unpushed side stays empty rather
+        // than reporting every commit of the branch.
+        const status = await collectGitStatus([path.join(soloDir, 'solo.md')]);
+        assert.ok(status);
+        assert.strictEqual(status.repos[0]?.upstream, undefined);
+        assert.strictEqual(status.unpushedCount, 0);
+        assert.strictEqual(status.unpushedCommits, 0);
+    });
+
+    test('a detached HEAD is refused rather than offered an upstream', async function () {
+        this.timeout(30000);
+        // Its own repository, detached before the Git extension ever opens it:
+        // a checkout inside an already-open repository would only reach the
+        // extension's state after an event this test would have to wait for.
+        const detachedDir = path.join(workDir, 'detached-repo');
+        fs.mkdirSync(detachedDir);
+        const run = (args: string[]): void => {
+            execFileSync('git', [...GIT_ID, ...args], { cwd: detachedDir, encoding: 'utf-8' });
+        };
+        run(['init', '--initial-branch=master']);
+        fs.writeFileSync(path.join(detachedDir, 'detached.md'), '# detached\n');
+        run(['add', '.']);
+        run(['commit', '-m', 'initial']);
+        run(['checkout', '--detach']);
+
+        let asked = 0;
+        const original = vscode.window.showWarningMessage;
+        (vscode.window as { showWarningMessage: unknown }).showWarningMessage = () => {
+            asked += 1;
+            return Promise.resolve(undefined);
+        };
+        try {
+            await pushAgendaSources([path.join(detachedDir, 'detached.md')], AGENDA_STRINGS.en);
+        } finally {
+            (vscode.window as { showWarningMessage: unknown }).showWarningMessage = original;
+        }
+        assert.strictEqual(asked, 0, 'a detached HEAD must not be offered an upstream');
+
+        const status = await collectGitStatus([path.join(detachedDir, 'detached.md')]);
+        assert.ok(status);
+        assert.strictEqual(status.repos[0]?.branch, undefined, 'a detached HEAD has no branch name');
+    });
 });
 
 /**
@@ -209,5 +339,44 @@ suite('agenda panel git chip', () => {
         }
         assert.ok(info, 'no panel open');
         assert.notStrictEqual(info.gitChip, '', 'the agenda header never received a git chip');
+    });
+
+    test('the dropdown buttons reach the commit and push flows', async function () {
+        this.timeout(30000);
+        await vscode.commands.executeCommand('markdown-org.showAgendaDay');
+        await waitForAgendaRender('day');
+
+        const handle = (AgendaPanel as unknown as { handleWebviewMessage(m: unknown): Promise<void> })
+            .handleWebviewMessage;
+        // Both prompts are dismissed, so the test workspace is never committed
+        // by its own suite. Whether a prompt appears at all depends on the
+        // workspace files being under git, which is not this test's subject:
+        // what is asserted is that the messages reach the flows and return.
+        const originalInput = vscode.window.showInputBox;
+        const originalWarn = vscode.window.showWarningMessage;
+        (vscode.window as { showInputBox: unknown }).showInputBox = () => Promise.resolve(undefined);
+        (vscode.window as { showWarningMessage: unknown }).showWarningMessage = () => Promise.resolve(undefined);
+        try {
+            await handle.call(AgendaPanel, { command: 'gitCommit' });
+            await handle.call(AgendaPanel, { command: 'gitPush' });
+        } finally {
+            (vscode.window as { showInputBox: unknown }).showInputBox = originalInput;
+            (vscode.window as { showWarningMessage: unknown }).showWarningMessage = originalWarn;
+        }
+    });
+
+    test('a source row opens its file', async function () {
+        this.timeout(30000);
+        await vscode.commands.executeCommand('markdown-org.showAgendaDay');
+        await waitForAgendaRender('day');
+
+        const handle = (AgendaPanel as unknown as { handleWebviewMessage(m: unknown): Promise<void> })
+            .handleWebviewMessage;
+        const file = path.join(__dirname, '..', '..', '..', 'package.json');
+        await handle.call(AgendaPanel, { command: 'openSourceFile', file });
+        await waitUntil(
+            () => vscode.window.activeTextEditor?.document.uri.fsPath === fs.realpathSync(file),
+            'the source file to become the active editor'
+        );
     });
 });
