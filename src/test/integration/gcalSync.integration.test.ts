@@ -356,7 +356,14 @@ suite('Google Calendar sync: makePropertiesWriter', () => {
 
     afterEach(async () => {
         await vscode.commands.executeCommand('workbench.action.closeAllEditors');
-        fs.rmSync(sandboxDir, { recursive: true, force: true });
+        // Retried and never fatal: on Windows a watcher can still hold a file
+        // here when the editors have just been closed, and a temp directory
+        // that outlives the run is not a test result.
+        try {
+            fs.rmSync(sandboxDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+        } catch {
+            /* the OS temp root is cleaned by the OS */
+        }
         await vscode.workspace
             .getConfiguration('workbench')
             .update('localHistory.enabled', undefined, vscode.ConfigurationTarget.Global);

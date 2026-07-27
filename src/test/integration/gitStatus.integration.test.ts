@@ -49,7 +49,11 @@ function linked(name: string): string {
 suite('agenda git status against a real repository', () => {
     suiteSetup(function () {
         this.timeout(30000);
-        workDir = fs.mkdtempSync(path.join(os.tmpdir(), 'markdown-org-git-'));
+        // `realpathSync.native` rather than the plain one: on Windows the temp
+        // directory arrives as an 8.3 short name (`RUNNER~1`), which the Git
+        // extension reports expanded -- comparing the two forms would fail on
+        // paths that name the same directory.
+        workDir = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), 'markdown-org-git-')));
         repoDir = path.join(workDir, 'real-repo');
         linkDir = path.join(workDir, 'linked-notes');
         fs.mkdirSync(repoDir);
@@ -97,7 +101,15 @@ suite('agenda git status against a real repository', () => {
     });
 
     suiteTeardown(() => {
-        fs.rmSync(workDir, { recursive: true, force: true });
+        // The Git extension keeps watching every repository it opened and the
+        // API of version 1 has no way to close one, so on Windows the files are
+        // still held here. Retry, and never fail the suite over cleanup: the
+        // directory is under the OS temp root either way.
+        try {
+            fs.rmSync(workDir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+        } catch {
+            /* a leftover temp directory is not a test result */
+        }
     });
 
     test('resolves a symlinked source file into the repository behind it', async function () {
@@ -107,7 +119,7 @@ suite('agenda git status against a real repository', () => {
         assert.strictEqual(status.repos.length, 1, 'the file must resolve to exactly one repository');
         // The repository sits outside the workspace folders, so it was opened
         // by the resolution chain rather than found among the open ones.
-        assert.strictEqual(fs.realpathSync(status.repos[0]!.root), fs.realpathSync(repoDir));
+        assert.strictEqual(fs.realpathSync.native(status.repos[0]!.root), fs.realpathSync.native(repoDir));
         assert.strictEqual(status.uncommittedCount, 1);
         // The page still shows the path the user gave, not the resolved one.
         assert.strictEqual(status.files[0]?.file, linked('work.md'));
@@ -375,7 +387,7 @@ suite('agenda panel git chip', () => {
         const file = path.join(__dirname, '..', '..', '..', 'package.json');
         await handle.call(AgendaPanel, { command: 'openSourceFile', file });
         await waitUntil(
-            () => vscode.window.activeTextEditor?.document.uri.fsPath === fs.realpathSync(file),
+            () => vscode.window.activeTextEditor?.document.uri.fsPath === fs.realpathSync.native(file),
             'the source file to become the active editor'
         );
     });
