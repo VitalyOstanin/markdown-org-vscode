@@ -11,7 +11,9 @@ import {
     applyDemoTheme,
     maximizeVscodeWindow,
     pressKey,
-    runCommandViaPalette
+    runCommandViaPalette,
+    initDemoRepository,
+    commitInDemoRepository
 } from './_helpers';
 
 /**
@@ -68,6 +70,15 @@ suite('Demo: Agenda', () => {
                 `\`DEADLINE: <${iso(5)}>\`\n`,
             'utf-8'
         );
+
+        // The header's git chip reports on the files behind the view, so the
+        // workspace gets a repository with something to report: personal.md
+        // committed but not pushed, planning.md edited and not committed.
+        await initDemoRepository(wsDir);
+        await fs.appendFile(personalFile, `\n## TODO Gym session\n\`SCHEDULED: <${iso(0)} 18:00>\`\n`, 'utf-8');
+        await commitInDemoRepository(wsDir, ['personal.md'], 'notes: block out the evening session');
+        // No timestamp on this one: it moves the chip, not the agenda.
+        await fs.appendFile(planningFile, '\n## TODO Draft the retrospective agenda\n', 'utf-8');
 
         // Point the extension at this workspace explicitly.
         const config = vscode.workspace.getConfiguration('markdown-org');

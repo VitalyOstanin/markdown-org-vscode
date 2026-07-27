@@ -101,6 +101,14 @@ async function recordOne(scenario, display, theme) {
         throw new Error(`no workspace mapping for scenario '${scenario}'`);
     }
     const workspaceDir = path.join(repoRoot, workspaceFolder);
+    // Start from an empty workspace, remote repository included. The agenda
+    // scenario turns its workspace into a git repository so the header chip has
+    // a status to show, and VS Code opens whatever repository is already there
+    // when the window starts -- a `.git` inherited from the previous run is
+    // refused by initDemoRepository (see src/test/demo/_helpers.ts). The wipe
+    // also drops markdown whose timestamps were written for another day.
+    fs.rmSync(workspaceDir, { recursive: true, force: true });
+    fs.rmSync(`${workspaceDir}-remote.git`, { recursive: true, force: true });
     fs.mkdirSync(workspaceDir, { recursive: true });
     seedWorkspaceSettings(workspaceDir, scenario);
 

@@ -222,6 +222,18 @@ The drivers check for their binaries up front (see
 [Requirements](#requirements)) and stop with a clear message when one is
 missing. Linux only: they start their own `Xvfb`.
 
+Every run starts from an empty demo workspace, remote repository included --
+the driver deletes both before VS Code launches. The agenda assets need a git
+repository to photograph (the header's status chip reports on the files behind
+the view), and the scenario builds one: an initial commit pushed to a bare
+remote next to the workspace, then one file committed on top and one edited and
+left alone, which is what puts a number next to each of the chip's two counters.
+That repository has to be absent when the window opens. VS Code binds to the
+`.git` it finds at startup, and a directory re-created underneath it leaves the
+Git extension answering from the state it started with -- a clean tree over a
+dirty one, which a finished PNG does not reveal. The seeding helper refuses to
+run when the workspace already holds a repository rather than let that through.
+
 ## Install from source
 
 Use the symlink approach to run the latest local checkout as an

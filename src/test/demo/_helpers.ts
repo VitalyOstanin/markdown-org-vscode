@@ -242,6 +242,12 @@ export async function captureScreenshot(name: string): Promise<void> {
                 '-y',
                 '-f',
                 'x11grab',
+                // Leave the pointer out of the frame. A still has nothing to
+                // point at, and an arrow parked over the page also documents
+                // where the run happened to leave it. The recorded scenarios
+                // keep their cursor -- there it is the thing being followed.
+                '-draw_mouse',
+                '0',
                 '-video_size',
                 geometry,
                 '-i',
@@ -258,6 +264,109 @@ export async function captureScreenshot(name: string): Promise<void> {
         });
         proc.on('error', reject);
     });
+}
+
+/**
+ * Run one git command in `cwd` and resolve with its stdout.
+ *
+ * The identity is passed per invocation and the two config files are pointed at
+ * `/dev/null`: a demo run must not read the developer's `~/.gitconfig` (a
+ * `commit.gpgsign` or a hook path there would break the seeding) and must not
+ * write to it either. On a machine with no identity configured at all -- a CI
+ * runner -- `git commit` would otherwise stop and ask for one.
+ */
+async function exists(target: string): Promise<boolean> {
+    try {
+        await fs.stat(target);
+        return true;
+    } catch {
+        return false;
+    }
+}
+
+async function runGit(cwd: string, args: string[]): Promise<string> {
+    const identity = [
+        '-c',
+        'user.name=Markdown Org Demo',
+        '-c',
+        'user.email=demo@example.invalid',
+        '-c',
+        'commit.gpgsign=false',
+        '-c',
+        'init.defaultBranch=main'
+    ];
+    return new Promise((resolve, reject) => {
+        const chunks: Buffer[] = [];
+        const errors: Buffer[] = [];
+        const proc = spawn('git', [...identity, ...args], {
+            cwd,
+            env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' },
+            stdio: ['ignore', 'pipe', 'pipe']
+        });
+        proc.stdout.on('data', (b) => chunks.push(b));
+        proc.stderr.on('data', (b) => errors.push(b));
+        proc.on('exit', (code) => {
+            if (code === 0) {
+                resolve(Buffer.concat(chunks).toString('utf-8').trim());
+            } else {
+                reject(
+                    new Error(`git ${args.join(' ')} exited with ${code}: ${Buffer.concat(errors).toString('utf-8')}`)
+                );
+            }
+        });
+        proc.on('error', reject);
+    });
+}
+
+/**
+ * Give a demo workspace a repository of its own, complete with a remote the
+ * branch can run ahead of.
+ *
+ * The agenda's git chip reports on the files behind the current view, so
+ * without this the demo workspaces -- which sit inside the extension's own
+ * checkout and are ignored there -- would only ever produce a "clean" chip.
+ * A repository at the workspace root is also what a reader recognises: their
+ * notes directory is the repository, not a subfolder of one.
+ *
+ * The workspace must arrive without a repository -- the drivers wipe it before
+ * every run. Re-creating a `.git` that VS Code already opened at startup does
+ * not work: the Git extension keeps the Repository object it built from the
+ * directory that was deleted, its watchers no longer fire, and it answers every
+ * status question with the empty state it started from. The chip would then
+ * report a clean tree over a dirty one, and the failure is invisible in the
+ * finished PNG, so it is refused here instead.
+ *
+ * The remote is a bare repository next to the workspace. Its name keeps the
+ * `test-workspace-demo` prefix, which is what the checkout's `.gitignore`
+ * matches -- neither directory can end up staged by accident.
+ */
+export async function initDemoRepository(wsDir: string): Promise<void> {
+    const remoteDir = `${wsDir}-remote.git`;
+    if (await exists(path.join(wsDir, '.git'))) {
+        throw new Error(
+            `${wsDir} already holds a git repository; the demo driver must start from an empty workspace ` +
+                '(a repository re-created under a running VS Code reports a stale, clean tree)'
+        );
+    }
+    // `.vscode/settings.json` is seeded by the driver and rewritten by VS Code
+    // during the run; keeping it out of the repository is what stops the chip
+    // from counting a file the demo never talks about.
+    await fs.writeFile(path.join(wsDir, '.gitignore'), '.vscode/\n', 'utf-8');
+    await runGit(wsDir, ['init']);
+    await runGit(wsDir, ['add', '-A']);
+    await runGit(wsDir, ['commit', '-m', 'notes: start the notebook']);
+    await runGit(wsDir, ['init', '--bare', remoteDir]);
+    await runGit(wsDir, ['remote', 'add', 'origin', remoteDir]);
+    await runGit(wsDir, ['push', '-u', 'origin', 'HEAD']);
+}
+
+/**
+ * Commit `files` in a demo repository, leaving the branch one commit ahead of
+ * its remote -- which is what puts them in the chip's "not pushed" group.
+ */
+export async function commitInDemoRepository(wsDir: string, files: string[], message: string): Promise<void> {
+    await runGit(wsDir, ['add', ...files]);
+    await runGit(wsDir, ['commit', '-m', message]);
 }
 
 export async function moveCursorTo(editor: vscode.TextEditor, line: number, column = 0): Promise<void> {
@@ -451,6 +560,32 @@ export async function pressKeyInPicker(sequence: string): Promise<void> {
             await sleep(200);
         }
     }
+}
+
+/**
+ * Click at a point of the demo screen.
+ *
+ * The only part of the agenda a keyboard cannot reach from the outside is a
+ * webview control: the panel owns its own focus tree, and tabbing into it from
+ * the host depends on how many focusable elements the current view happens to
+ * render. A coordinate on the fixed-size Xvfb screen is the stable address --
+ * see the call site for how the point is derived from the geometry rather than
+ * written down as a pixel pair.
+ */
+export async function clickAt(x: number, y: number): Promise<void> {
+    await ensureVscodeWindowFocused();
+    await moveMouseTo(x, y);
+    const click = await runXdotool(['click', '1']);
+    if (click.status !== 0) throw new Error('xdotool click failed');
+}
+
+/**
+ * Park the pointer somewhere. Screenshots include the cursor, so a click is
+ * usually followed by a move that takes the arrow off whatever it just opened.
+ */
+export async function moveMouseTo(x: number, y: number): Promise<void> {
+    const move = await runXdotool(['mousemove', '--sync', String(Math.round(x)), String(Math.round(y))]);
+    if (move.status !== 0) throw new Error('xdotool mousemove failed');
 }
 
 export async function pressKey(sequence: string): Promise<void> {

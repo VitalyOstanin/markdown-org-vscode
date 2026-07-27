@@ -42,6 +42,20 @@ function seedWorkspaceSettings(workspaceDir, settings) {
     fs.writeFileSync(path.join(vscodeDir, 'settings.json'), JSON.stringify(settings, null, 4) + '\n', 'utf-8');
 }
 
+// Start each run from an empty workspace, remote repository included.
+//
+// The demo workspace is a git repository (that is what gives the agenda header
+// a git status to report), and VS Code opens whatever repository is already
+// there when the window starts. A run that inherited the previous run's `.git`
+// would either be refused by initDemoRepository or -- worse, if it were not --
+// photograph a stale status. Wiping also drops the markdown left by the
+// previous run, whose timestamps were written against that run's date.
+function resetWorkspaceDir(workspaceDir) {
+    fs.rmSync(workspaceDir, { recursive: true, force: true });
+    fs.rmSync(`${workspaceDir}-remote.git`, { recursive: true, force: true });
+    fs.mkdirSync(workspaceDir, { recursive: true });
+}
+
 const THEMES = ['dark', 'light'];
 
 async function main() {
@@ -84,7 +98,7 @@ async function main() {
 async function captureTheme(theme) {
     console.log(`\n[screenshot-demo] === theme: ${theme} ===`);
     const workspaceDir = path.join(repoRoot, 'test-workspace-demo-screenshots');
-    fs.mkdirSync(workspaceDir, { recursive: true });
+    resetWorkspaceDir(workspaceDir);
     // Seed only the settings that are safe to apply at cold-start. The colour
     // theme is deliberately not among them: applyDemoTheme() sets it at
     // runtime and waits for onDidChangeActiveColorTheme, which is what

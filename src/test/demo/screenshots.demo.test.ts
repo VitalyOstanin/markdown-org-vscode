@@ -10,7 +10,10 @@ import {
     applyDemoTheme,
     captureScreenshot,
     maximizeVscodeWindow,
-    runCommandViaPalette
+    initDemoRepository,
+    commitInDemoRepository,
+    clickAt,
+    moveMouseTo
 } from './_helpers';
 
 /**
@@ -33,6 +36,18 @@ function clockEntry(start: Date, end: Date): string {
         padHoursWithSpace: true
     });
     return `\`CLOCK: ${startStr}--${endStr} => ${duration}\``;
+}
+
+/**
+ * Open an agenda view and let the panel finish drawing.
+ *
+ * The panel spawns the extractor, waits for its JSON, measures the header and
+ * only then lays the page out. 2.2 s covered that on an idle machine but not on
+ * a loaded one, where a light-theme run photographed an empty panel.
+ */
+async function showAgenda(view: 'Day' | 'Week' | 'Month'): Promise<void> {
+    await vscode.commands.executeCommand(`markdown-org.showAgenda${view}`);
+    await sleep(3500);
 }
 
 function atTime(base: Date, hour: number, minute: number): Date {
@@ -148,6 +163,21 @@ suite('Demo: Screenshots', () => {
             'utf-8'
         );
 
+        // Stage the three states the header chip distinguishes, so every agenda
+        // screenshot shows it carrying real numbers rather than a checkmark:
+        // personal.md is committed but not pushed, planning.md has an edit that
+        // was never committed, time-tracking.md is level with the remote.
+        await initDemoRepository(wsDir);
+        await fs.appendFile(
+            personalFile,
+            '\n## TODO Gym session\n' + `\`SCHEDULED: ${iso(0, { hour: 18, minute: 0 })}\`\n`,
+            'utf-8'
+        );
+        await commitInDemoRepository(wsDir, ['personal.md'], 'notes: block out the evening session');
+        // Deliberately left uncommitted. No timestamp, so the agenda views are
+        // unchanged by it -- only the chip and its file list react.
+        await fs.appendFile(planningFile, '\n## TODO Draft the retrospective agenda\n', 'utf-8');
+
         const config = vscode.workspace.getConfiguration('markdown-org');
         await config.update('workspaceDir', wsDir, vscode.ConfigurationTarget.Workspace);
 
@@ -169,21 +199,50 @@ suite('Demo: Screenshots', () => {
         await captureScreenshot('editor-markdown');
 
         // 2. Agenda Day.
-        await runCommandViaPalette('Markdown Org Show Agenda Day');
-        await sleep(2200);
+        //
+        // Views are switched by invoking the command, not by driving the
+        // Command Palette: no keystroke reaches these frames, so the palette
+        // would buy nothing and cost the one failure mode it has -- on a loaded
+        // machine the typed query can miss the palette that just opened, and
+        // the shot then shows an empty palette over the editor. The recorded
+        // scenarios still go through the palette, where the keystrokes are the
+        // point.
+        await showAgenda('Day');
         await captureScreenshot('agenda-day');
 
-        // 3. Agenda Week.
-        await runCommandViaPalette('Markdown Org Show Agenda Week');
-        await sleep(2200);
+        // 3. The git chip expanded: the counters in the header only say how
+        //    many, the list says which files and offers the commit / push
+        //    actions. The chip is the last control of the nav row, which is
+        //    right-aligned, so its address is the row's baseline (fixed by the
+        //    window chrome above it) and a short inset from the right edge --
+        //    written that way so a change of capture width does not move the
+        //    click off the button.
+        const [screenWidth, screenHeight] = (process.env.MARKDOWN_ORG_SCREENSHOT_GEOMETRY ?? '1280x720')
+            .split('x')
+            .map((n) => parseInt(n, 10));
+        const width = screenWidth ?? 1280;
+        const height = screenHeight ?? 720;
+        await clickAt(width - 40, 92);
+        await sleep(900);
+        await captureScreenshot('agenda-git');
+        // Any click outside collapses the dropdown; the empty lower half of the
+        // agenda body is the safest such point. The pointer is then parked on
+        // the status bar: anywhere inside the page it would leave a row
+        // highlighted or, in the month grid, raise the cell tooltip -- states
+        // the later shots would carry for no reason.
+        await clickAt(width / 2, 550);
+        await moveMouseTo(width / 2, height - 4);
+        await sleep(400);
+
+        // 4. Agenda Week.
+        await showAgenda('Week');
         await captureScreenshot('agenda-week');
 
-        // 4. Agenda Month.
-        await runCommandViaPalette('Markdown Org Show Agenda Month');
-        await sleep(2200);
+        // 5. Agenda Month.
+        await showAgenda('Month');
         await captureScreenshot('agenda-month');
 
-        // 5. Clocktable: the file already contains the rendered table, just
+        // 6. Clocktable: the file already contains the rendered table, just
         //    open it and scroll to the bottom so the table is centred in the
         //    viewport.
         const trackingDoc = await vscode.workspace.openTextDocument(trackingFile);
