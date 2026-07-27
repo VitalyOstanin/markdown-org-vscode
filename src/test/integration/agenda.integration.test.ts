@@ -595,10 +595,10 @@ suite('Agenda Show Integration Tests', () => {
         assert.ok(script.includes('countChip'), 'both chips must read their wording from the shared countChip strings');
     });
 
-    // History used to be keyboard-only, and the commands only show in the
-    // Command Palette while the agenda has focus -- so nothing in the interface
-    // said the feature existed.
-    test('the control row offers history buttons whose tooltips name the shortcut', async function () {
+    // The view history is reached through commands and keybindings only: the
+    // header carried a pair of arrows for it, and a second pair of arrows next
+    // to the date navigation read as "previous day" rather than "back".
+    test('the header carries no history buttons', async function () {
         this.timeout(10000);
         await vscode.commands.executeCommand('markdown-org.showAgendaWeek');
         await waitForAgendaRender('week');
@@ -606,15 +606,11 @@ suite('Agenda Show Integration Tests', () => {
         assert.ok(panel, 'expected AgendaPanel to be open after showAgendaWeek');
         const script = panel.webview.html;
 
-        assert.ok(script.includes('id="btn-history-back"'), 'expected a Back button in the control row');
-        assert.ok(script.includes('id="btn-history-forward"'), 'expected a Forward button in the control row');
-        assert.ok(script.includes('Alt+Shift+-'), 'the Back tooltip must name its chord');
-        assert.ok(script.includes('Alt+Shift+='), 'the Forward tooltip must name its chord');
-        assert.ok(script.includes("command: 'historyBack'"), 'the Back button must ask the host to navigate');
-        assert.ok(script.includes("command: 'historyForward'"), 'the Forward button must ask the host to navigate');
+        assert.ok(!script.includes('btn-history-back'), 'the Back button must be gone from the header');
+        assert.ok(!script.includes('btn-history-forward'), 'the Forward button must be gone from the header');
     });
 
-    test('the panel navigates history when the buttons report a click', async function () {
+    test('the panel navigates history through its commands', async function () {
         this.timeout(15000);
         // Two view states, so Back has somewhere to go.
         await vscode.commands.executeCommand('markdown-org.showAgendaWeek');
@@ -622,12 +618,10 @@ suite('Agenda Show Integration Tests', () => {
         await vscode.commands.executeCommand('markdown-org.showAgendaMonth');
         await waitForAgendaRender('month');
 
-        const handle = (AgendaPanel as unknown as { handleWebviewMessage(m: unknown): Promise<void> })
-            .handleWebviewMessage;
-        await handle.call(AgendaPanel, { command: 'historyBack' });
+        await vscode.commands.executeCommand('markdown-org.agendaBack');
         await waitForAgendaRender('week');
 
-        await handle.call(AgendaPanel, { command: 'historyForward' });
+        await vscode.commands.executeCommand('markdown-org.agendaForward');
         await waitForAgendaRender('month');
     });
 });

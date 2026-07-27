@@ -1,7 +1,10 @@
 /**
- * HTML for the agenda header: the mode segment, the view-history and date
- * navigation, the header-layout button, the file-tag dropdown and the hero
- * title.
+ * HTML for the agenda header: the mode segment, the date navigation, the
+ * header-layout button, the file-tag dropdown and the hero title.
+ *
+ * The view history (Back/Forward over `{mode, date}` states) has no buttons
+ * here: it is reached through the `markdown-org.agendaBack` /
+ * `markdown-org.agendaForward` commands and their keybindings.
  *
  * Same reason as agendaSummaryHtml.ts: these used to read the UI dictionary and
  * the live view state straight off the client's scope, which put them out of
@@ -132,31 +135,6 @@ export function renderHeaderModeButton(
 }
 
 /**
- * View history (Back/Forward over `{mode, date}` states). The feature has
- * keyboard shortcuts, but every other navigation in the panel is a visible
- * button, and the commands only appear in the Command Palette while the agenda
- * has focus -- so without these two it is unreachable unless you already know
- * it exists. The tooltips name the chords, which is where the user learns them.
- */
-export function renderHistoryNav(ctx: {
-    historyBack: string;
-    historyForward: string;
-    backChord: string;
-    forwardChord: string;
-    escapeHtml: EscapeHtml;
-    formatString: FormatString;
-}): string {
-    const back = ctx.escapeHtml(ctx.formatString(ctx.historyBack, ctx.backChord));
-    const forward = ctx.escapeHtml(ctx.formatString(ctx.historyForward, ctx.forwardChord));
-    return (
-        '<span class="date-nav history-nav">' +
-        `<button class="nav-btn nav-btn-arrow" id="btn-history-back" title="${back}" aria-label="${back}">⟨</button>` +
-        `<button class="nav-btn nav-btn-arrow" id="btn-history-forward" title="${forward}" aria-label="${forward}">⟩</button>` +
-        '</span>'
-    );
-}
-
-/**
  * Prev/Today/Next. The wording is per unit, not a "Previous {unit}" template:
  * in some languages the adjective agrees with the noun's gender (ru:
  * "Предыдущий день" / "Предыдущая неделя").
@@ -206,16 +184,10 @@ export function renderHeroHtml(
  * buttons; the compact layout folds the rows onto one through CSS alone, which
  * is why the markup here is the same in both.
  */
-export function renderNavBarHtml(parts: {
-    modeSwitch: string;
-    history: string;
-    dateNav: string;
-    chips: string;
-}): string {
+export function renderNavBarHtml(parts: { modeSwitch: string; dateNav: string; chips: string }): string {
     return (
         `<div class="seg-row">${parts.modeSwitch}</div>` +
         '<div class="control-row">' +
-        parts.history +
         parts.dateNav +
         '<span class="nav-spacer"></span>' +
         parts.chips +

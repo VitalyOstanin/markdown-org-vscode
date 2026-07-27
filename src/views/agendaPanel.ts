@@ -28,7 +28,6 @@ import {
     renderDateNav,
     renderHeaderModeButton,
     renderHeroHtml,
-    renderHistoryNav,
     renderModeSwitch,
     renderNavBarHtml,
     renderTagMenu,
@@ -709,10 +708,6 @@ export class AgendaPanel {
             } else {
                 AgendaPanel.requestRefresh(message.date, true);
             }
-        } else if (message.command === 'historyBack') {
-            await AgendaPanel.goBack();
-        } else if (message.command === 'historyForward') {
-            await AgendaPanel.goForward();
         } else if (message.command === 'setTag') {
             if (typeof message.tag === 'string') {
                 await vscode.commands.executeCommand('markdown-org.setTag', message.tag);
@@ -949,7 +944,6 @@ export class AgendaPanel {
         tagButtonText,
         renderTagMenu,
         renderHeaderModeButton,
-        renderHistoryNav,
         renderDateNav,
         renderHeroHtml,
         renderNavBarHtml,

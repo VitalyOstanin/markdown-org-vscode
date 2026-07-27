@@ -86,7 +86,7 @@ connect / select / sync demos and [ADR-0010](docs/adr/0010-google-calendar-sync.
 - **Timestamps** -- `CREATED`, `SCHEDULED`, `DEADLINE`, `CLOSED` with full date / time, in both active `<...>` and inactive `[...]` forms per [ADR-0005](docs/adr/0005-active-and-inactive-timestamps.md).
 - **Repeating tasks** -- Org-mode repeaters `+1d`, `+1w`, `+1m`, `.+1m`, `++1w`, and `+1wd` for workdays (skips weekends and Russian holidays).
 - **CLOCK entries** -- Time tracking with start / finish events and an aggregated CLOCK table per file.
-- **Agenda views** -- Day, Week, Month and Tasks. Day and Tasks are cards (a sticky summary bar plus sections by time of day or by priority), the week groups overdue, scheduled and upcoming tasks under sticky day headers, and the month calendar shows a per-day task count that turns red when a day holds something overdue. Views keep a browser-style history you can step through with Back / Forward.
+- **Agenda views** -- Day, Week, Month and Tasks. Day and Tasks are cards (a sticky summary bar plus sections by time of day or by priority), the week groups overdue, scheduled and upcoming tasks under sticky day headers, and the month calendar shows a per-day task count that turns red when a day holds something overdue. Views keep a browser-style history you can step through with the Back / Forward commands.
 - **Interface language** -- The agenda panel speaks English or Russian, following [`markdown-org.uiLanguage`](#markdown-orguilanguage); by default it follows the date locale, then the VS Code display language.
 - **Tag filtering** -- Filter agenda by file-name patterns (e.g. `WORK` / `PRIVATE`), toggled from the agenda or by hotkey.
 - **Live updates** -- Agenda refreshes automatically when underlying markdown files change.
@@ -377,7 +377,7 @@ for `Set TODO` (the `Shift+Up`/`Shift+Down` bindings are unchanged).
 
 All four view commands work both in a Markdown editor and while the agenda panel has focus, so you can switch views from the panel with the keyboard as well as with the mode buttons.
 
-The agenda keeps a browser-style history of the views you opened (mode plus anchor date). Back and Forward replay it; their hotkeys apply while the agenda panel has focus and can be rebound like any other keybinding.
+The agenda keeps a browser-style history of the views you opened (mode plus anchor date). Back and Forward replay it. They have no buttons in the header -- the two commands above are the way to reach them; their hotkeys apply while the agenda panel has focus and can be rebound like any other keybinding.
 
 **Day view:**
 

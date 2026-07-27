@@ -134,12 +134,6 @@ export const AGENDA_STYLES = `
             border-radius: var(--radius-md);
             overflow: hidden;
         }
-        /* View history sits next to the date navigation and looks the same, so
-           the two read as one control area; the gap keeps "back in history"
-           from being mistaken for "previous day". */
-        .history-nav {
-            margin-right: var(--space-3);
-        }
         .nav-btn {
             display: inline-flex;
             align-items: center;

@@ -44,13 +44,6 @@ export interface AgendaStrings {
     /** Label of the Today button, and its tooltip. */
     navToday: string;
     navTodayTitle: string;
-    /**
-     * Tooltips of the view-history buttons. `{0}` is the keyboard shortcut, so
-     * the panel is where the chord is discoverable -- it is otherwise only
-     * visible in the Command Palette, and only while the agenda has focus.
-     */
-    historyBack: string;
-    historyForward: string;
     /** Badge next to the hero date when the anchor is today. */
     todayBadge: string;
     /** Tooltip on a clickable week day-header. */
@@ -114,8 +107,6 @@ const EN: AgendaStrings = {
     navNext: { day: 'Next Day', week: 'Next Week', month: 'Next Month' },
     navToday: 'Today',
     navTodayTitle: 'Jump to today',
-    historyBack: 'Back ({0})',
-    historyForward: 'Forward ({0})',
     todayBadge: 'TODAY',
     openDayView: 'Open this day in Day view',
     tagCaption: 'File tag',
@@ -158,8 +149,6 @@ const RU: AgendaStrings = {
     navNext: { day: 'Следующий день', week: 'Следующая неделя', month: 'Следующий месяц' },
     navToday: 'Сегодня',
     navTodayTitle: 'Перейти к сегодняшнему дню',
-    historyBack: 'Назад ({0})',
-    historyForward: 'Вперёд ({0})',
     todayBadge: 'СЕГОДНЯ',
     openDayView: 'Открыть этот день в режиме дня',
     tagCaption: 'Метка файла',

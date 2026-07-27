@@ -336,14 +336,6 @@ export interface AgendaClientDeps {
             nextHeaderMode: (value: string | undefined) => 'auto' | 'full' | 'compact';
         }
     ) => string;
-    renderHistoryNav: (ctx: {
-        historyBack: string;
-        historyForward: string;
-        backChord: string;
-        forwardChord: string;
-        escapeHtml: (text: string | number | boolean | undefined | null) => string;
-        formatString: (template: string, ...values: string[]) => string;
-    }) => string;
     renderDateNav: (
         unit: 'day' | 'week' | 'month',
         ctx: {
@@ -358,7 +350,7 @@ export interface AgendaClientDeps {
         parts: { title: string; sub?: string; badge?: string },
         ctx: { escapeHtml: (text: string | number | boolean | undefined | null) => string }
     ) => string;
-    renderNavBarHtml: (parts: { modeSwitch: string; history: string; dateNav: string; chips: string }) => string;
+    renderNavBarHtml: (parts: { modeSwitch: string; dateNav: string; chips: string }) => string;
     buildMonthGrid: (anchorIso: string, firstOffset: number, todayIso: string) => MonthCellLike[];
     resolveFirstDayOffset: (firstDayOfWeek: string, locale: string) => number;
     buildWeekdayLabels: (firstOffset: number, locale: string) => string[];
@@ -520,7 +512,6 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         renderTagMenu,
         // Aliased: the client keeps a wrapper of this one, called from two places.
         renderHeaderModeButton: renderHeaderModeButtonHtml,
-        renderHistoryNav,
         renderDateNav,
         renderHeroHtml,
         renderNavBarHtml,
@@ -531,14 +522,6 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         renderTaskRow,
         renderCard
     } = deps;
-
-    /**
-     * Chords the view-history tooltips name. They mirror the `keybindings`
-     * contribution in package.json; nothing reads the user's remapping back, so
-     * a rebound chord shows its default here.
-     */
-    const HISTORY_BACK_CHORD = 'Alt+Shift+-';
-    const HISTORY_FORWARD_CHORD = 'Alt+Shift+=';
 
     // Active UI dictionary and language. Replaced by every init/update message,
     // so changing markdown-org.uiLanguage re-renders in the new language on the
@@ -1283,15 +1266,6 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
                 escapeHtml,
                 formatString
             });
-        const historyHtml = renderHistoryNav({
-            historyBack: UI.historyBack,
-            historyForward: UI.historyForward,
-            backChord: HISTORY_BACK_CHORD,
-            forwardChord: HISTORY_FORWARD_CHORD,
-            escapeHtml,
-            formatString
-        });
-
         // resolveHeroModel (inlined, unit-tested) decides the title shape and
         // whether the TODAY badge shows; Intl formatting of the actual text stays
         // here where the locale lives.
@@ -1337,7 +1311,6 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
                 escapeHtml,
                 formatString
             }),
-            history: historyHtml,
             dateNav: dateNavHtml,
             chips: chipsHtml
         });
@@ -1353,12 +1326,6 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
                 navigate(1);
             });
         }
-        document.getElementById('btn-history-back')?.addEventListener('click', () => {
-            vscode.postMessage({ command: 'historyBack' });
-        });
-        document.getElementById('btn-history-forward')?.addEventListener('click', () => {
-            vscode.postMessage({ command: 'historyForward' });
-        });
         document.getElementById('headerModeBtn')?.addEventListener('click', () => {
             vscode.postMessage({ command: 'cycleHeaderMode' });
         });

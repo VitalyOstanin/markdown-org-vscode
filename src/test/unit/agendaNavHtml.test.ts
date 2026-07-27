@@ -5,7 +5,6 @@ import {
     renderDateNav,
     renderHeaderModeButton,
     renderHeroHtml,
-    renderHistoryNav,
     renderModeSwitch,
     renderNavBarHtml,
     renderTagMenu,
@@ -163,30 +162,6 @@ suite('agendaNavHtml.renderHeaderModeButton', () => {
     });
 });
 
-suite('agendaNavHtml.renderHistoryNav', () => {
-    const ctx = {
-        historyBack: EN.historyBack,
-        historyForward: EN.historyForward,
-        backChord: 'Alt+Shift+-',
-        forwardChord: 'Alt+Shift+=',
-        escapeHtml,
-        formatString
-    };
-
-    test('the tooltips name the chords -- the panel is where they are discoverable', () => {
-        const doc = parse(renderHistoryNav(ctx));
-        assert.strictEqual(doc.querySelector('#btn-history-back')?.getAttribute('title'), 'Back (Alt+Shift+-)');
-        assert.strictEqual(doc.querySelector('#btn-history-forward')?.getAttribute('title'), 'Forward (Alt+Shift+=)');
-    });
-
-    test('both arrows carry an aria-label, the glyph alone says nothing', () => {
-        const doc = parse(renderHistoryNav(ctx));
-        for (const id of ['#btn-history-back', '#btn-history-forward']) {
-            assert.ok(doc.querySelector(id)?.getAttribute('aria-label'), `${id} must be labelled`);
-        }
-    });
-});
-
 suite('agendaNavHtml.renderDateNav', () => {
     const ctx = {
         navPrev: EN.navPrev,
@@ -249,7 +224,6 @@ suite('agendaNavHtml.renderHeroHtml', () => {
 suite('agendaNavHtml.renderNavBarHtml', () => {
     const parts = {
         modeSwitch: '<span class="mode-seg"></span>',
-        history: '<span class="history-nav"></span>',
         dateNav: '<span class="date-nav"></span>',
         chips: '<button class="chip-btn"></button>'
     };
@@ -257,14 +231,14 @@ suite('agendaNavHtml.renderNavBarHtml', () => {
     test('the mode segment sits on its own row, the rest on the control row', () => {
         const doc = parse(renderNavBarHtml(parts));
         assert.ok(doc.querySelector('.seg-row > .mode-seg'), 'mode segment belongs to the seg row');
-        assert.ok(doc.querySelector('.control-row > .history-nav'), 'history belongs to the control row');
+        assert.ok(doc.querySelector('.control-row > .date-nav'), 'date navigation belongs to the control row');
     });
 
     test('the spacer pushes the chips to the right edge', () => {
         const row = parse(renderNavBarHtml(parts)).querySelector('.control-row');
         assert.deepStrictEqual(
             [...(row?.children ?? [])].map((el) => el.className),
-            ['history-nav', 'date-nav', 'nav-spacer', 'chip-btn']
+            ['date-nav', 'nav-spacer', 'chip-btn']
         );
     });
 
@@ -272,7 +246,7 @@ suite('agendaNavHtml.renderNavBarHtml', () => {
         const row = parse(renderNavBarHtml({ ...parts, dateNav: '' })).querySelector('.control-row');
         assert.deepStrictEqual(
             [...(row?.children ?? [])].map((el) => el.className),
-            ['history-nav', 'nav-spacer', 'chip-btn']
+            ['nav-spacer', 'chip-btn']
         );
     });
 });

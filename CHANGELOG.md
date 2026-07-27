@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- The Back / Forward buttons for the agenda view history. The header held two
+  arrow pairs side by side -- history and date navigation -- and the unlabelled
+  first pair read as "previous day". The history itself is unchanged and stays
+  available as `Markdown Org: Go Back in Agenda` (`Alt+Shift+-`) and
+  `Markdown Org: Go Forward in Agenda` (`Alt+Shift+=`).
+
 ## [0.12.0] - 2026-07-26
 
 ### Added
