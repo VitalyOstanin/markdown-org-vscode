@@ -81,3 +81,49 @@ export interface FileTag {
     name: string;
     pattern: string;
 }
+
+/**
+ * Git status of the agenda's source files, as it crosses from the extension
+ * host into the page.
+ *
+ * Lives here for the same reason `Task` does: it is a payload contract between
+ * the two sides, and the webview is a separate TypeScript project that may not
+ * import host-only modules (they reach for `node:path`, which does not exist in
+ * a page). The model that produces these values is
+ * `src/utils/git/gitStatusModel.ts`.
+ */
+export interface GitFileState {
+    /** Path exactly as the extractor reported it; the page opens this one. */
+    file: string;
+    /** Path after `realpath`, present only when it differs from `file`. */
+    realPath?: string;
+    /** Path relative to the repository root, or the bare name outside git. */
+    label: string;
+    /** Root of the repository holding it; absent when it is outside git. */
+    repoRoot?: string;
+    uncommitted: boolean;
+    unpushed: boolean;
+}
+
+export interface GitRepoState {
+    root: string;
+    /** Directory name of the root, used as the label when several are shown. */
+    name: string;
+    branch?: string;
+    /** `origin/master`; absent when the branch has no upstream. */
+    upstream?: string;
+    aheadCommits?: number;
+}
+
+export interface AgendaGitStatus {
+    repos: GitRepoState[];
+    files: GitFileState[];
+    /** Source files with uncommitted changes. */
+    uncommittedCount: number;
+    /** Source files touched by unpushed commits. */
+    unpushedCount: number;
+    /** Source files that belong to no repository. */
+    outsideGitCount: number;
+    /** Commits ahead of upstream, summed over the repositories in the view. */
+    unpushedCommits: number;
+}

@@ -43,6 +43,7 @@ was decided, and the trade-offs that came with it.
 | 0013 | [Agenda UI language: own setting and dictionary](0013-agenda-ui-language-own-dictionary.md)                | Accepted                                                  |
 | 0014 | [One agenda style, no style switcher](0014-single-agenda-style.md)                                         | Accepted                                                  |
 | 0015 | [Pin "today" with `--current-date`, not `--date`](0015-pin-today-with-current-date.md)                     | Accepted                                                  |
+| 0016 | [Read the agenda's git status through the Git extension API](0016-git-status-via-git-extension-api.md)     | Accepted                                                  |
 
 ## Adding a new ADR
 

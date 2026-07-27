@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Git status of the agenda's source files, in the panel header. A chip next to
+  the tag filter counts the files of the current view that have uncommitted
+  changes (`●`) and the files touched by commits that are not in the upstream
+  (`↑`), and reads `✓ clean` when there is nothing pending. It expands to the
+  files themselves, grouped as not committed / not pushed / clean / outside git,
+  each row opening its file; the unpushed heading also names the commit count
+  and the branch pair (`master → origin/master`) when the view sits in a single
+  repository.
+- Commit and push from that dropdown. The commit stages only the changed source
+  files of the current view -- an unrelated edit elsewhere in the same
+  repository is left alone -- and asks for a message with `agenda: <date>`
+  pre-filled. Push sends the current branch to its upstream, asking first when
+  the branch has none.
+- Source files reached through a symlink are resolved to the repository behind
+  them, including repositories outside the open workspace folders (they are
+  opened on demand and appear in the Source Control view). No setting: the chip
+  appears when the files are under git and the built-in Git extension is
+  available, and is absent otherwise.
+
 ### Removed
 
 - The Back / Forward buttons for the agenda view history. The header held two

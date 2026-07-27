@@ -112,6 +112,8 @@ export const AGENDA_STYLES = `
         .tag-menu-btn:focus-visible,
         .chip-btn:focus-visible,
         .tag-menu-item:focus-visible,
+        .git-file:focus-visible,
+        .git-action:focus-visible,
         .calendar-day:focus-visible {
             outline: 1px solid var(--vscode-focusBorder);
             outline-offset: -2px;
@@ -312,6 +314,114 @@ export const AGENDA_STYLES = `
         .tag-menu-item.active {
             color: var(--vscode-textLink-foreground);
             font-weight: bold;
+        }
+        /* Git status of the agenda's source files. The chip is a .tag-menu-btn
+           (same shell, same open/close behaviour as the Tag dropdown) with the
+           counters laid out in a row. */
+        .git-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-2);
+        }
+        .git-chip-stat {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25em;
+        }
+        /* Pending work is the signal worth colouring; a clean tree stays in the
+           muted description colour so the header does not shout when there is
+           nothing to do. */
+        .git-chip-stat[data-kind='uncommitted'] {
+            color: var(--vscode-gitDecoration-modifiedResourceForeground);
+        }
+        .git-chip-stat[data-kind='unpushed'] {
+            color: var(--vscode-textLink-foreground);
+        }
+        .git-chip-stat[data-kind='clean'] {
+            color: var(--vscode-descriptionForeground);
+        }
+        /* The clean state spells itself out ("✓ clean") instead of leaving a
+           bare checkmark to be guessed at. It is not dropped in the compact
+           header: that layout is a size change, not a different header (see the
+           invariant in agendaStyles.test.ts), and the word is one short token
+           whose cost is a few pixels. */
+        .git-chip-word {
+            margin-left: 0.25em;
+        }
+        /* Wider than the tag list: these rows carry paths, not one-word tags. */
+        .git-menu-list {
+            min-width: 220px;
+            max-width: 420px;
+            max-height: 60vh;
+            overflow-y: auto;
+        }
+        .git-group + .git-group {
+            border-top: 1px solid var(--vscode-panel-border);
+        }
+        .git-group-title,
+        .git-repo-title {
+            padding: var(--space-1) var(--space-3);
+            color: var(--vscode-descriptionForeground);
+            font-size: var(--font-sm);
+            cursor: default;
+        }
+        .git-repo-title {
+            padding-left: var(--space-2);
+            font-style: italic;
+        }
+        .git-file {
+            display: flex;
+            width: 100%;
+            align-items: center;
+            gap: var(--space-2);
+            padding: var(--space-1) var(--space-3);
+            cursor: pointer;
+            background: none;
+            border: none;
+            font-family: inherit;
+            font-size: inherit;
+            text-align: left;
+            color: var(--vscode-foreground);
+        }
+        .git-file:hover {
+            background: var(--vscode-list-hoverBackground);
+        }
+        /* Fixed-width marker column so the file names line up across groups
+           whose markers differ in width. */
+        .git-file-mark {
+            flex: 0 0 auto;
+            width: 1em;
+            text-align: center;
+            color: var(--vscode-descriptionForeground);
+        }
+        /* A path is more useful truncated at the front: the tail (the file name)
+           is what distinguishes two rows. */
+        .git-file-name {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            direction: rtl;
+            text-align: left;
+        }
+        .git-actions {
+            display: flex;
+            gap: var(--space-2);
+            padding: var(--space-2) var(--space-3);
+            border-top: 1px solid var(--vscode-panel-border);
+        }
+        .git-action {
+            flex: 1 1 auto;
+            background: var(--vscode-button-background);
+            color: var(--vscode-button-foreground);
+            border: none;
+            border-radius: var(--radius-md);
+            padding: var(--space-1) var(--space-3);
+            cursor: pointer;
+            font-family: inherit;
+            font-size: var(--font-md);
+        }
+        .git-action:hover {
+            background: var(--vscode-button-hoverBackground);
         }
         .day-header {
             color: var(--vscode-textLink-foreground);

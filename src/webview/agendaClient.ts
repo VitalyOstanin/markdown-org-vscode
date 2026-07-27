@@ -18,8 +18,33 @@
  * the page.
  */
 
-import type { AgendaData, DayAgenda, Task, TaskWithOffset } from '../types';
+import type {
+    AgendaData,
+    AgendaGitStatus,
+    DayAgenda,
+    GitFileState,
+    GitRepoState,
+    Task,
+    TaskWithOffset
+} from '../types';
 import type { AgendaStrings } from '../utils/agendaI18n';
+/**
+ * What the git markup helpers take besides the status.
+ *
+ * Spelled out here rather than imported from `agendaGitHtml.ts`: that module
+ * belongs to the host project and reaches (transitively) for `node:path`, which
+ * a page does not have. The same reason every other helper signature in this
+ * file is written out structurally.
+ */
+interface GitHtmlContext {
+    git: AgendaStrings['git'];
+    locale: string;
+    uiLang: string;
+    escapeHtml: (text: string | number | boolean | undefined | null) => string;
+    formatString: (template: string, ...values: string[]) => string;
+    formatNumber: (value: number, locale: string) => string;
+    pluralIndex: (n: number, lang: string) => number;
+}
 
 /** Injected by the VS Code webview host; the page's only channel to the extension. */
 declare function acquireVsCodeApi(): { postMessage(message: unknown): void };
@@ -428,6 +453,32 @@ export interface AgendaClientDeps {
             ) => string;
         }
     ) => string;
+    /**
+     * The git chip and its dropdown. Only the two entry points are named here;
+     * the helpers they call are inlined alongside them (see INLINED_HELPERS)
+     * and reached through the page's global scope, exactly like the tag menu's.
+     */
+    renderGitMenu: (status: AgendaGitStatus, ctx: GitHtmlContext) => string;
+    gitChipStats: (status: AgendaGitStatus, ctx: GitHtmlContext) => string;
+    gitChipTitle: (status: AgendaGitStatus, ctx: GitHtmlContext) => string;
+    renderGitChip: (status: AgendaGitStatus, ctx: GitHtmlContext) => string;
+    gitCount: (n: number, forms: string[], ctx: GitHtmlContext) => string;
+    gitGroups: (status: AgendaGitStatus, ctx: GitHtmlContext) => string;
+    gitGroup: (
+        kind: string,
+        title: string,
+        files: readonly GitFileState[],
+        status: AgendaGitStatus,
+        ctx: GitHtmlContext
+    ) => string;
+    gitUnpushedGroupTitle: (fileCount: number, status: AgendaGitStatus, ctx: GitHtmlContext) => string;
+    gitFilesByRepository: (
+        files: readonly GitFileState[],
+        repos: readonly GitRepoState[],
+        ctx: GitHtmlContext
+    ) => string;
+    gitFileRows: (files: readonly GitFileState[], kind: string, ctx: GitHtmlContext) => string;
+    gitActions: (status: AgendaGitStatus, ctx: GitHtmlContext) => string;
 }
 
 /**
@@ -464,6 +515,9 @@ type HostMessage =
     | ({ command: 'init'; holidays?: string[] } & AgendaStatePayload)
     | ({ command: 'update'; userInitiated?: boolean; navigation?: boolean } & AgendaStatePayload)
     | { command: 'headerMode'; headerMode?: string }
+    // `null` is "there is no git here", which removes the chip; it is distinct
+    // from a status whose counters are zero, which shows the clean marker.
+    | { command: 'gitStatus'; status?: AgendaGitStatus | null }
     | { command: 'getRenderedInfo' };
 
 /**
@@ -520,7 +574,8 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         buildWeekdayLabels,
         renderMonthCalendar,
         renderTaskRow,
-        renderCard
+        renderCard,
+        renderGitMenu
     } = deps;
 
     // Active UI dictionary and language. Replaced by every init/update message,
@@ -555,6 +610,12 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
     // Prev, or Prev then Next) returns the user to where they were instead of
     // snapping back to today's header.
     const scrollHistory: ScrollMemory = {};
+
+    // Git status of the files this view was built from, or null when there is
+    // no git to report on -- which is also the state before the host's first
+    // `gitStatus` message, so the header renders without a chip until then
+    // rather than with an empty one.
+    let gitStatus: AgendaGitStatus | null = null;
 
     // Header layout: 'auto' | 'full' | 'compact' (markdown-org.agendaHeaderMode).
     // Only the resolved outcome reaches the DOM, as a class on <body>.
@@ -772,6 +833,12 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             headerMode = message.headerMode ?? 'auto';
             applyHeaderLayout();
             refreshHeaderModeButton();
+        } else if (message.command === 'gitStatus') {
+            // Repository events arrive on git's schedule, not the agenda's, so
+            // this replaces one node instead of re-rendering: a save must not
+            // move the task list or the user's scroll position.
+            gitStatus = message.status ?? null;
+            refreshGitMenu();
             // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- spelled out rather than a bare `else`, so the branch says which command it serves
         } else if (message.command === 'getRenderedInfo') {
             // Integration-test query: snapshot the rendered DOM so the host can
@@ -801,12 +868,17 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             // non-Latin digits must reach the page as such, and nothing but the
             // rendered text proves it.
             const heroSub = document.querySelector('.hero-sub span')?.textContent ?? '';
+            // The git chip arrives on its own message, after the render; its
+            // text is how a test sees that the whole path -- repository
+            // resolution, the status message, the markup -- reached the page.
+            const gitChip = document.getElementById('gitMenuBtn')?.textContent ?? '';
             const dayNumbers = [...document.querySelectorAll('.calendar-day .day-number')].map((el) => el.textContent);
             vscode.postMessage({
                 command: 'renderedInfo',
                 dayHeaders: headers,
                 heroSub,
                 dayNumbers,
+                gitChip,
                 mode: initialMode,
                 flags,
                 sections,
@@ -1203,6 +1275,78 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         });
     }
 
+    /** The git chip's markup for the current status, or nothing without git. */
+    function renderGitMenuHtml(): string {
+        if (!gitStatus) {
+            return '';
+        }
+        return renderGitMenu(gitStatus, {
+            git: UI.git,
+            locale,
+            uiLang,
+            escapeHtml,
+            formatString,
+            formatNumber,
+            pluralIndex
+        });
+    }
+
+    /**
+     * Swap the chip in place after a new status arrived.
+     *
+     * The node is replaced rather than patched because every part of it depends
+     * on the counters -- the stats, the groups, which action buttons exist. It
+     * is inserted at the end of the control row when it was not there before,
+     * which is the case on the first status after a panel opens.
+     */
+    function refreshGitMenu(): void {
+        const existing = document.getElementById('gitMenu');
+        const html = renderGitMenuHtml();
+        if (!html) {
+            existing?.remove();
+            return;
+        }
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = html;
+        const fresh = wrapper.firstElementChild;
+        if (!fresh) {
+            return;
+        }
+        if (existing) {
+            existing.replaceWith(fresh);
+        } else {
+            const controlRow = document.querySelector('.control-row');
+            if (!controlRow) {
+                return;
+            }
+            controlRow.append(fresh);
+        }
+        attachGitMenuListeners();
+    }
+
+    function attachGitMenuListeners(): void {
+        document.getElementById('gitMenuBtn')?.addEventListener('click', (ev) => {
+            toggleMenu(ev, 'gitMenu');
+        });
+        document.querySelectorAll('#gitMenu .git-file').forEach((el) => {
+            el.addEventListener('click', () => {
+                const file = el.getAttribute('data-file');
+                if (file) {
+                    vscode.postMessage({ command: 'openSourceFile', file: file });
+                }
+            });
+        });
+        // Both actions raise host UI (an input box, a modal) and the dropdown
+        // would otherwise stay open behind it; the click that reaches document
+        // closes it, so nothing extra is needed here beyond sending the intent.
+        document.getElementById('gitCommitBtn')?.addEventListener('click', () => {
+            vscode.postMessage({ command: 'gitCommit' });
+        });
+        document.getElementById('gitPushBtn')?.addEventListener('click', () => {
+            vscode.postMessage({ command: 'gitPush' });
+        });
+    }
+
     function renderHeaderModeButton(): string {
         return renderHeaderModeButtonHtml(headerMode, {
             headerModeButton: UI.headerModeButton,
@@ -1265,7 +1409,11 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
                 tagFilterTitle: UI.tagFilterTitle,
                 escapeHtml,
                 formatString
-            });
+            }) +
+            // Re-rendered with the rest of the header so a nav-bar rebuild does
+            // not drop a status that already arrived; `refreshGitMenu` then
+            // handles the updates that come between rebuilds.
+            renderGitMenuHtml();
         // resolveHeroModel (inlined, unit-tested) decides the title shape and
         // whether the TODAY badge shows; Intl formatting of the actual text stays
         // here where the locale lives.
@@ -1332,5 +1480,6 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
 
         attachModeSwitchListeners();
         attachTagMenuListeners();
+        attachGitMenuListeners();
     }
 }

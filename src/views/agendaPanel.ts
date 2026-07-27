@@ -41,6 +41,22 @@ import {
     resolveFirstDayOffset
 } from '../utils/agendaCalendarHtml';
 import { renderCard, renderTaskRow } from '../utils/agendaCardHtml';
+import {
+    gitActions,
+    gitChipStats,
+    gitChipTitle,
+    gitCount,
+    gitFileRows,
+    gitFilesByRepository,
+    gitGroup,
+    gitGroups,
+    gitUnpushedGroupTitle,
+    renderGitChip,
+    renderGitMenu
+} from '../utils/agendaGitHtml';
+import { agendaSourceFiles } from '../utils/git/agendaSourceFiles';
+import { collectGitStatus, gitApiForEvents } from '../utils/git/collectGitStatus';
+import { commitAgendaSources, pushAgendaSources } from '../commands/gitActions';
 import { isCancelled } from '../utils/normalizeTaskType';
 import { shiftMonthAnchor } from '../utils/monthNav';
 import { wireDayHeaderNavigation } from '../utils/agendaDayHeaderNav';
@@ -63,6 +79,13 @@ import { logDiagnostic } from '../utils/logChannel';
 import { AGENDA_STYLES } from './agendaStyles';
 
 const REFRESH_DEBOUNCE_MS = 500;
+/**
+ * How long repository events are collected before the status is recomputed.
+ * A single `git commit` moves several of the Git extension's resource groups
+ * and fires an event per move; 300 ms is short enough to read as immediate and
+ * long enough that one user action costs one recomputation.
+ */
+const GIT_STATUS_DEBOUNCE_MS = 300;
 // Window of time after createWebviewPanel within which the webview is expected
 // to send back its `ready` handshake. VS Code's webview host registers a
 // ServiceWorker on first use, and on a freshly opened window that registration
@@ -187,6 +210,16 @@ export class AgendaPanel {
     // Last `dateLocale` value that was rejected, so the warning about it is
     // shown once rather than on every refresh.
     private static warnedLocale?: string | undefined;
+    // Subscriptions to the Git extension: one per open repository plus the two
+    // that track repositories appearing and disappearing. Rebuilt whenever the
+    // set of repositories changes, disposed with the panel.
+    private static gitListeners: vscode.Disposable[] = [];
+    private static gitDebounceTimer?: NodeJS.Timeout | undefined;
+    // Monotonic id of the in-flight status computation. A recomputation is
+    // async (it may spawn `git diff`), so a later one can finish first; the
+    // result of anything but the newest request is dropped rather than
+    // overwriting fresher numbers with older ones.
+    private static gitRequestSeq = 0;
     // Whether a render failure inside the webview has already been reported for
     // the open panel. A broken payload fails on every refresh, and the
     // file-watcher refreshes on each save, so the report is once per panel.
@@ -287,6 +320,10 @@ export class AgendaPanel {
         if (!AgendaPanel.watcher && refreshCallback) {
             AgendaPanel.ensureWatcher(config);
         }
+
+        // Every render can change which files the view is built from, so the
+        // status is recomputed per render as well as on repository events.
+        AgendaPanel.requestGitStatus();
 
         if (!AgendaPanel.dayCheckTimer && refreshCallback) {
             AgendaPanel.scheduleNextDayCheck();
@@ -525,6 +562,10 @@ export class AgendaPanel {
         AgendaPanel.createRetries = 0;
         AgendaPanel.lastCreateArgs = undefined;
         AgendaPanel.flushPendingHeaderMode();
+        // The first status may well have been computed before the page could
+        // receive it (the panel posts `init` and the status independently), so
+        // it is recomputed once the page says it is listening.
+        AgendaPanel.requestGitStatus();
         if (AgendaPanel.readyTimeout) {
             clearTimeout(AgendaPanel.readyTimeout);
             AgendaPanel.readyTimeout = undefined;
@@ -549,6 +590,13 @@ export class AgendaPanel {
         AgendaPanel.watcher?.dispose();
         AgendaPanel.watcher = undefined;
         AgendaPanel.refreshCallback = undefined;
+        AgendaPanel.disposeGitListeners();
+        if (AgendaPanel.gitDebounceTimer) {
+            clearTimeout(AgendaPanel.gitDebounceTimer);
+            AgendaPanel.gitDebounceTimer = undefined;
+        }
+        // Anything still awaiting will find a newer id and drop its result.
+        AgendaPanel.gitRequestSeq += 1;
         // The next agenda open must rebuild its anchor date from
         // initialDate/toIsoDate(today). Keeping a stale shiftedToday from a
         // previous session around would leak into AgendaPanel.refresh()
@@ -634,6 +682,87 @@ export class AgendaPanel {
                 logDiagnostic(`agenda headerMode "${headerMode}" not delivered; queued for the next page load`);
             }
         });
+    }
+
+    /**
+     * Recompute the git status of the view's source files and push it to the
+     * page, coalescing bursts of repository events.
+     *
+     * Debounced rather than run per event: a single commit moves several of the
+     * Git extension's resource groups and fires an event for each, and each
+     * recomputation can spawn a `git diff`.
+     */
+    private static requestGitStatus(): void {
+        if (AgendaPanel.gitDebounceTimer) {
+            clearTimeout(AgendaPanel.gitDebounceTimer);
+        }
+        AgendaPanel.gitDebounceTimer = setTimeout(() => {
+            AgendaPanel.gitDebounceTimer = undefined;
+            void AgendaPanel.pushGitStatus();
+            void AgendaPanel.ensureGitWatch();
+        }, GIT_STATUS_DEBOUNCE_MS);
+    }
+
+    /**
+     * Compute the status and send it to the page as its own message.
+     *
+     * A separate message, not part of `update`: the status arrives on git's
+     * schedule rather than the agenda's, and folding it into a full update
+     * would re-render the task list (and its scroll position) every time a
+     * file is saved.
+     */
+    private static async pushGitStatus(): Promise<void> {
+        const panel = AgendaPanel.currentPanel;
+        const args = AgendaPanel.lastRenderArgs;
+        if (!panel || !args) {
+            return;
+        }
+        const seq = ++AgendaPanel.gitRequestSeq;
+        try {
+            const status = await collectGitStatus(agendaSourceFiles(args.data));
+            // A newer request started while this one was awaiting: its answer
+            // is the current one, so this result is stale by definition.
+            if (seq !== AgendaPanel.gitRequestSeq || AgendaPanel.currentPanel !== panel) {
+                return;
+            }
+            // `status` is undefined when there is no git at all; the page then
+            // removes the chip rather than showing an empty one.
+            void panel.webview.postMessage({ command: 'gitStatus', status: status ?? null });
+        } catch (error) {
+            // Nothing here is worth a toast: the agenda itself rendered fine and
+            // the only casualty is a header chip.
+            logDiagnostic(`agenda git status failed: ${formatError(error)}`);
+        }
+    }
+
+    /**
+     * Keep one listener per open repository, plus the two that fire when the
+     * set of repositories changes.
+     *
+     * Rebuilt wholesale on each call because a repository can be opened by the
+     * resolution chain itself (a symlinked source file outside the workspace
+     * folders), which means the set is not known until after a status pass.
+     */
+    private static async ensureGitWatch(): Promise<void> {
+        const api = await gitApiForEvents();
+        if (!api || !AgendaPanel.currentPanel) {
+            return;
+        }
+        AgendaPanel.disposeGitListeners();
+        const onChange = (): void => {
+            AgendaPanel.requestGitStatus();
+        };
+        AgendaPanel.gitListeners.push(api.onDidOpenRepository(onChange), api.onDidCloseRepository(onChange));
+        for (const repository of api.repositories) {
+            AgendaPanel.gitListeners.push(repository.state.onDidChange(onChange));
+        }
+    }
+
+    private static disposeGitListeners(): void {
+        for (const listener of AgendaPanel.gitListeners) {
+            listener.dispose();
+        }
+        AgendaPanel.gitListeners = [];
     }
 
     /** Re-send a header mode the page never received (see {@link pushHeaderMode}). */
@@ -722,6 +851,30 @@ export class AgendaPanel {
             if (targetCommand) {
                 await vscode.commands.executeCommand(targetCommand, AgendaPanel.shiftedToday);
             }
+        } else if (message.command === 'openSourceFile') {
+            // Same trust argument as `openTask` above: the path is one the
+            // agenda itself put in the page, and attribute injection through
+            // `data-file` is closed by escaping (agendaEscapeHtml.ts). Line 1
+            // because a source row names a file, not a task.
+            if (typeof message.file === 'string') {
+                await AgendaPanel.openTaskInEditor(message.file, 1);
+            }
+        } else if (message.command === 'gitCommit' || message.command === 'gitPush') {
+            const args = AgendaPanel.lastRenderArgs;
+            if (!args) {
+                return;
+            }
+            const { strings } = AgendaPanel.uiStrings();
+            const files = agendaSourceFiles(args.data);
+            if (message.command === 'gitCommit') {
+                await commitAgendaSources(files, strings);
+            } else {
+                await pushAgendaSources(files, strings);
+            }
+            // The repository events that follow will refresh the chip on their
+            // own; this covers the case where nothing changed (a cancelled
+            // prompt) and no event is coming.
+            AgendaPanel.requestGitStatus();
         }
     }
 
@@ -786,6 +939,8 @@ export class AgendaPanel {
         heroSharesControlRow: boolean;
         heroSub: string;
         dayNumbers: string[];
+        /** Text of the git chip, or empty when the header carries none. */
+        gitChip: string;
     } | null> {
         const panel = AgendaPanel.currentPanel;
         if (!panel) {
@@ -803,6 +958,7 @@ export class AgendaPanel {
                     heroSharesControlRow?: boolean;
                     heroSub?: string;
                     dayNumbers?: string[];
+                    gitChip?: string;
                 }) => {
                     if (m.command === 'renderedInfo') {
                         clearTimeout(timer);
@@ -815,7 +971,8 @@ export class AgendaPanel {
                             headerLayout: m.headerLayout ?? '',
                             heroSharesControlRow: m.heroSharesControlRow ?? false,
                             heroSub: m.heroSub ?? '',
-                            dayNumbers: m.dayNumbers ?? []
+                            dayNumbers: m.dayNumbers ?? [],
+                            gitChip: m.gitChip ?? ''
                         });
                     }
                 }
@@ -953,7 +1110,21 @@ export class AgendaPanel {
         calendarCellOpenTag,
         renderMonthCalendar,
         renderTaskRow,
-        renderCard
+        renderCard,
+        // The git chip's markup, split the way the rest of the header is: the
+        // exported helpers are what the inlined bodies call, and a function
+        // that is not listed here is simply not defined in the page.
+        gitCount,
+        gitChipStats,
+        gitChipTitle,
+        renderGitChip,
+        gitUnpushedGroupTitle,
+        gitFileRows,
+        gitFilesByRepository,
+        gitGroup,
+        gitGroups,
+        gitActions,
+        renderGitMenu
     } satisfies AgendaClientDeps;
 
     /**

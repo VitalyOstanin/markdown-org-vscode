@@ -96,6 +96,60 @@ export interface AgendaStrings {
         priorityHighest: string;
         priorityLowest: string;
     };
+    /**
+     * Git status of the agenda's source files: the header chip, the list it
+     * expands to, and the prompts the two actions raise.
+     *
+     * The last block is read on the extension side rather than in the page
+     * (an `InputBox` and a modal are host UI), but it lives here so the whole
+     * feature speaks one language -- the one `markdown-org.uiLanguage` picked,
+     * not the editor's display language.
+     */
+    git: {
+        /** Dropdown caption. */
+        caption: string;
+        /** Word next to the checkmark when nothing is pending. */
+        clean: string;
+        cleanTitle: string;
+        /** Chip tooltip halves; `{0}` is a counted noun from `files`. */
+        uncommittedTitle: string;
+        unpushedTitle: string;
+        /** Joins the two halves above. */
+        titleSeparator: string;
+        /** Group headings; `{0}` is a counted noun from `files`. */
+        uncommittedGroup: string;
+        unpushedGroup: string;
+        /**
+         * Single-repository variant of the unpushed heading: `{0}` files,
+         * `{1}` commits, `{2}` branch, `{3}` upstream.
+         */
+        unpushedGroupDetailed: string;
+        cleanGroup: string;
+        outsideGroup: string;
+        /** Counted nouns, in the order `pluralIndex` returns. */
+        files: string[];
+        commits: string[];
+        /** Action buttons; `{0}` is the count each acts on. */
+        commitButton: string;
+        commitButtonTitle: string;
+        pushButton: string;
+        pushButtonTitle: string;
+        /** Row tooltips; `{0}` is the path. */
+        openFileTitle: string;
+        realPathTitle: string;
+        /** Commit prompt: title, placeholder, and the pre-filled message (`{0}` = date). */
+        commitPrompt: string;
+        commitPlaceholder: string;
+        commitDefault: string;
+        /** Refusal when the message is blank. */
+        commitEmptyMessage: string;
+        /** Push with no upstream: `{0}` branch, `{1}` the upstream to create. */
+        setUpstreamPrompt: string;
+        setUpstreamConfirm: string;
+        /** Status-bar confirmations; `{0}` is a counted noun from `files`. */
+        committed: string;
+        pushed: string;
+    };
     /** Panel tab title; `{0}` is the mode label. */
     tabTitle: string;
 }
@@ -138,6 +192,35 @@ const EN: AgendaStrings = {
         priority: 'Priority {0}',
         priorityHighest: 'Priority {0} (highest)',
         priorityLowest: 'Priority {0} (lowest)'
+    },
+    git: {
+        caption: 'Source files',
+        clean: 'clean',
+        cleanTitle: 'Every agenda source file is committed and pushed',
+        uncommittedTitle: '{0} not committed',
+        unpushedTitle: '{0} not pushed',
+        titleSeparator: ', ',
+        uncommittedGroup: 'Not committed: {0}',
+        unpushedGroup: 'Not pushed: {0}',
+        unpushedGroupDetailed: 'Not pushed: {0} in {1} ({2} → {3})',
+        cleanGroup: 'Clean: {0}',
+        outsideGroup: 'Outside git: {0}',
+        files: ['file', 'files'],
+        commits: ['commit', 'commits'],
+        commitButton: 'Commit {0}',
+        commitButtonTitle: 'Stage and commit the changed source files of this view',
+        pushButton: 'Push {0}',
+        pushButtonTitle: 'Push the current branch to its upstream',
+        openFileTitle: 'Open {0}',
+        realPathTitle: 'Real path: {0}',
+        commitPrompt: 'Commit message',
+        commitPlaceholder: 'What changed in these files',
+        commitDefault: 'agenda: {0}',
+        commitEmptyMessage: 'Commit cancelled: the message is empty',
+        setUpstreamPrompt: 'Branch "{0}" has no upstream. Push it and set "{1}"?',
+        setUpstreamConfirm: 'Push',
+        committed: 'Committed {0}',
+        pushed: 'Pushed {0}'
     },
     tabTitle: 'Agenda: {0}'
 };
@@ -193,6 +276,35 @@ const RU: AgendaStrings = {
         priority: 'Приоритет {0}',
         priorityHighest: 'Приоритет {0} (высший)',
         priorityLowest: 'Приоритет {0} (низший)'
+    },
+    git: {
+        caption: 'Файлы-источники',
+        clean: 'чисто',
+        cleanTitle: 'Все файлы-источники агенды закоммичены и отправлены',
+        uncommittedTitle: 'не закоммичено: {0}',
+        unpushedTitle: 'не отправлено: {0}',
+        titleSeparator: ', ',
+        uncommittedGroup: 'Без коммита: {0}',
+        unpushedGroup: 'Без пуша: {0}',
+        unpushedGroupDetailed: 'Без пуша: {0} в {1} ({2} → {3})',
+        cleanGroup: 'Чисто: {0}',
+        outsideGroup: 'Вне git: {0}',
+        files: ['файл', 'файла', 'файлов'],
+        commits: ['коммит', 'коммита', 'коммитов'],
+        commitButton: 'Закоммитить {0}',
+        commitButtonTitle: 'Добавить в индекс и закоммитить изменённые файлы-источники этого показа',
+        pushButton: 'Отправить {0}',
+        pushButtonTitle: 'Отправить текущую ветку в upstream',
+        openFileTitle: 'Открыть {0}',
+        realPathTitle: 'Реальный путь: {0}',
+        commitPrompt: 'Сообщение коммита',
+        commitPlaceholder: 'Что изменилось в этих файлах',
+        commitDefault: 'agenda: {0}',
+        commitEmptyMessage: 'Коммит отменён: сообщение пустое',
+        setUpstreamPrompt: 'У ветки «{0}» нет upstream. Отправить и установить «{1}»?',
+        setUpstreamConfirm: 'Отправить',
+        committed: 'Закоммичено: {0}',
+        pushed: 'Отправлено: {0}'
     },
     tabTitle: 'Агенда: {0}'
 };
