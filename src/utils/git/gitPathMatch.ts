@@ -14,13 +14,20 @@
  *
  * Kept free of `vscode` and `node:fs` so the unit suite can exercise both
  * platform rules without a host: the platform is a parameter, defaulted to the
- * running one.
+ * running one. Separators follow that same parameter rather than the running
+ * platform, so a Windows checkout of the suite still sees POSIX rules for
+ * `'linux'` -- `path.normalize` alone would rewrite `/repo/a` to `\repo\a`.
  */
 import * as path from 'node:path';
 
 /** Platforms that compare paths without regard to case. */
 function isCaseInsensitive(platform: NodeJS.Platform): boolean {
     return platform === 'win32' || platform === 'darwin';
+}
+
+/** The path rules of `platform`, not of the machine the code runs on. */
+function pathApi(platform: NodeJS.Platform): path.PlatformPath {
+    return platform === 'win32' ? path.win32 : path.posix;
 }
 
 /**
@@ -31,9 +38,10 @@ function isCaseInsensitive(platform: NodeJS.Platform): boolean {
  * trimming it would turn the root into an empty key that matches nothing.
  */
 export function pathKey(value: string, platform: NodeJS.Platform = process.platform): string {
-    const normalized = path.normalize(value);
+    const api = pathApi(platform);
+    const normalized = api.normalize(value);
     const trimmed =
-        normalized.length > 1 && (normalized.endsWith(path.sep) || normalized.endsWith('/'))
+        normalized.length > 1 && (normalized.endsWith(api.sep) || normalized.endsWith('/'))
             ? normalized.slice(0, -1)
             : normalized;
     return isCaseInsensitive(platform) ? trimmed.toLowerCase() : trimmed;
@@ -56,7 +64,8 @@ export function isInside(parent: string, child: string, platform: NodeJS.Platfor
     if (parentKey === childKey) {
         return true;
     }
-    const prefix = parentKey.endsWith(path.sep) ? parentKey : parentKey + path.sep;
+    const sep = pathApi(platform).sep;
+    const prefix = parentKey.endsWith(sep) ? parentKey : parentKey + sep;
     return childKey.startsWith(prefix);
 }
 
