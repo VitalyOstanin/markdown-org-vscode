@@ -20,9 +20,16 @@ import { waitForAgendaRender, waitUntil } from './_helpers';
  * symlink, because that is the arrangement the resolution chain exists for: a
  * notes folder linked into place while the repository sits elsewhere.
  *
- * Git identity is passed per command with `-c`. The global config is never
- * touched -- a test that rewrites `user.email` would re-author every commit the
- * developer makes afterwards in any repository without a local identity.
+ * Git identity is passed per command with `-c`, and written into the test
+ * repository's own config for the commits the Git extension makes. The global
+ * config is never touched -- a test that rewrites `user.email` would re-author
+ * every commit the developer makes afterwards in any repository without a
+ * local identity.
+ *
+ * Where the symlink cannot be created (Windows without the developer mode
+ * privilege), the suite falls back to the real path: the resolution chain is
+ * then exercised on the platforms that can link, and the rest of the
+ * assertions still run everywhere.
  */
 const GIT_ID = ['-c', 'user.name=Test', '-c', 'user.email=test@example.invalid'];
 
@@ -51,6 +58,12 @@ suite('agenda git status against a real repository', () => {
         // remote, the symlink and the loose file another test needs to be
         // outside any repository.
         git(['init', '--initial-branch=master']);
+        // The commit under test is made by the Git extension, which runs plain
+        // `git commit` -- it never sees the `-c` pairs above. A machine without
+        // a global identity (every CI runner) would fail that commit, so the
+        // identity is written into this repository's own config.
+        git(['config', 'user.name', 'Test']);
+        git(['config', 'user.email', 'test@example.invalid']);
         // A bare repository stands in for the remote: enough for a real
         // upstream and a real `origin/master` ref, with nothing to serve.
         const remote = path.join(workDir, 'remote.git');
@@ -76,7 +89,11 @@ suite('agenda git status against a real repository', () => {
         fs.writeFileSync(path.join(repoDir, 'fresh.md'), '# untracked\n');
         fs.appendFileSync(path.join(repoDir, 'unrelated.md'), 'edit\n');
 
-        fs.symlinkSync(repoDir, linkDir, 'dir');
+        try {
+            fs.symlinkSync(repoDir, linkDir, 'dir');
+        } catch {
+            linkDir = repoDir;
+        }
     });
 
     suiteTeardown(() => {
@@ -146,10 +163,19 @@ suite('agenda git status against a real repository', () => {
         (vscode.window as { showInputBox: unknown }).showInputBox = () => Promise.resolve('agenda: test commit');
         try {
             await commitAgendaSources([linked('work.md')], AGENDA_STRINGS.en);
-            await waitUntil(
-                () => !git(['status', '--porcelain']).includes(' work.md'),
-                'work.md to leave the pending list'
-            );
+            try {
+                await waitUntil(
+                    () => !git(['status', '--porcelain']).includes(' work.md'),
+                    'work.md to leave the pending list'
+                );
+            } catch (error) {
+                // The commit runs inside the Git extension, which reports its
+                // own failures to the UI rather than to this process; without
+                // the tree state the timeout says nothing about why.
+                throw new Error(`${String(error)}\ngit status:\n${git(['status', '--porcelain'])}`, {
+                    cause: error
+                });
+            }
         } finally {
             (vscode.window as { showInputBox: unknown }).showInputBox = original;
         }
