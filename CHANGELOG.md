@@ -28,6 +28,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   appears when the files are under git and the built-in Git extension is
   available, and is absent otherwise.
 
+### Changed
+
+- The README's agenda assets are reshot against the current header, and a new
+  screenshot shows the git chip expanded to the files behind the view. The demo
+  pipeline gained what that needed: every run starts from an empty workspace
+  (the driver deletes the previous one along with its remote), the agenda
+  scenario seeds a repository with one file committed but not pushed and one
+  edited but not committed, screenshots switch views by invoking the command
+  instead of typing into the Command Palette -- which on a loaded machine could
+  lose the query and photograph an empty palette -- and they no longer draw the
+  mouse pointer.
+
 ### Removed
 
 - The Back / Forward buttons for the agenda view history. The header held two

@@ -401,6 +401,13 @@ The agenda keeps a browser-style history of the views you opened (mode plus anch
     <img src="media/agenda-month-light.png" alt="Agenda month view">
 </picture>
 
+**Git status of the source files:** the chip on the right of the header counts the files behind the current view that carry uncommitted changes (`●`) and the files touched by commits the remote does not have (`↑`). Expanding it names those files, groups them by state, and offers the two actions for the view's own files -- committing them without touching unrelated edits in the same repository, and pushing the branch.
+
+<picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/VitalyOstanin/markdown-org-vscode/raw/HEAD/media/agenda-git-dark.png">
+    <img src="media/agenda-git-light.png" alt="Agenda git status chip, expanded to the source files behind the view">
+</picture>
+
 ### Shadowed VS Code chords
 
 The extension's `Ctrl+K …` chords deliberately take precedence over the VS Code defaults listed

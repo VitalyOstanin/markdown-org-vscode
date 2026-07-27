@@ -222,6 +222,14 @@
     - Added `"publisher": "vitalyostanin"` (reused as the Open VSX namespace).
 - [x] Pick a distribution channel
     - Open VSX (`vitalyostanin.markdown-org-vscode`) + GitHub Releases (per-target VSIX). Microsoft Marketplace is out of scope -- see [ADR-0004](docs/adr/0004-open-vsx-distribution.md).
+- [ ] Release the git status feature
+    - `Unreleased` in the CHANGELOG holds the agenda git status chip, the commit
+      and push actions, and the removal of the history Back / Forward buttons.
+      Pick the version, move the section under it, tag and let the release
+      workflow publish (`validate-tag` requires an annotated tag with a matching
+      CHANGELOG section).
+    - Do the media recapture above first: the release notes and the README point
+      at assets that would otherwise predate the feature.
 - [ ] Sign release tags
     - All release tags are annotated (CI rejects lightweight ones) but unsigned:
       `git tag -v v0.11.1` reports "no signature found".
@@ -297,6 +305,23 @@
       child environment). Without it Electron picks the Wayland backend on a
       Wayland session: the demo window opens on the real screen and Xvfb
       records an empty desktop.
+- [x] Recapture the screenshots and the demo video with the git status chip
+    - Both themes, as always: the five screenshots and the `agenda` recording
+      were reshot through the existing drivers, which do dark and light in one
+      run. The other six recordings never show the agenda header and were left
+      alone.
+    - The demo workspace is now a git repository with one file committed but
+      not pushed and one edited but not committed, so the chip carries a number
+      on each counter instead of reading `✓ clean`. New asset
+      `media/agenda-git-{dark,light}.png` shows the dropdown expanded to the
+      files and the commit / push actions; README embeds it under the three
+      view screenshots.
+    - Two traps found on the way, both documented in DEVELOPMENT.md: a `.git`
+      inherited from the previous run makes the Git extension answer from a
+      stale, clean state (the drivers wipe the workspace, the helper refuses to
+      seed over an existing repository), and driving the Command Palette from
+      xdotool can lose the typed query on a loaded machine, so the screenshot
+      scenario invokes the commands directly.
 - [x] Add Open VSX version badge to README
     - Shipped in 0.6.0 alongside the auto-publish workflow ([ADR-0004](docs/adr/0004-open-vsx-distribution.md)).
 - [x] Create CHANGELOG.md
