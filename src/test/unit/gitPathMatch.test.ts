@@ -1,6 +1,6 @@
 import * as assert from 'node:assert';
 import { suite, test } from 'mocha';
-import { buildPathSet, isInside, pathKey, pathSetHas, pathsEqual } from '../../utils/git/gitPathMatch';
+import { isInside, pathKey } from '../../utils/git/gitPathMatch';
 
 suite('gitPathMatch', () => {
     test('normalizes redundant segments so the same file has one key', () => {
@@ -13,12 +13,20 @@ suite('gitPathMatch', () => {
     });
 
     test('linux keeps case: two spellings are two different files', () => {
-        assert.strictEqual(pathsEqual('/repo/Work.md', '/repo/work.md', 'linux'), false);
+        assert.notStrictEqual(pathKey('/repo/Work.md', 'linux'), pathKey('/repo/work.md', 'linux'));
     });
 
     test('macOS and Windows fold case, as the git extension does', () => {
-        assert.strictEqual(pathsEqual('/repo/Work.md', '/repo/work.md', 'darwin'), true);
-        assert.strictEqual(pathsEqual('C:\\Repo\\Work.md', 'c:\\repo\\work.md', 'win32'), true);
+        assert.strictEqual(pathKey('/repo/Work.md', 'darwin'), pathKey('/repo/work.md', 'darwin'));
+        assert.strictEqual(pathKey('C:\\Repo\\Work.md', 'win32'), pathKey('c:\\repo\\work.md', 'win32'));
+    });
+
+    test('windows separators survive a posix host, and the reverse', () => {
+        // The platform is a parameter, so a Windows key must not depend on the
+        // machine running the suite -- and a linux key must not gain
+        // backslashes on a Windows checkout.
+        assert.strictEqual(pathKey('C:\\repo\\inbox\\..\\work.md', 'win32'), 'c:\\repo\\work.md');
+        assert.strictEqual(pathKey('/repo/inbox/../work.md', 'linux'), '/repo/work.md');
     });
 
     test('isInside accepts the directory itself and its descendants', () => {
@@ -30,26 +38,17 @@ suite('gitPathMatch', () => {
         assert.strictEqual(isInside('/repo', '/repo-backup/work.md', 'linux'), false);
     });
 
-    test('a symlink path and its target match once both sides are realpath-resolved', () => {
-        // What the caller does: resolve both, then compare. The link path itself
-        // is deliberately NOT equal to the target -- that is the bug this
-        // module exists to make impossible to write by accident.
+    test('a symlink path is not the same key as its target', () => {
+        // Why callers resolve both sides before comparing: the link path and
+        // the real path are different strings and must stay different keys, or
+        // a file would be matched against a change list it is not in.
         const linkPath = '/home/user/notes/work.md';
         const realPath = '/data/repo/notes/work.md';
-        assert.strictEqual(pathsEqual(linkPath, realPath, 'linux'), false);
-
-        const changes = buildPathSet([realPath], 'linux');
-        assert.strictEqual(pathSetHas(changes, realPath, 'linux'), true);
-        assert.strictEqual(pathSetHas(changes, linkPath, 'linux'), false);
+        assert.notStrictEqual(pathKey(linkPath, 'linux'), pathKey(realPath, 'linux'));
     });
 
-    test('buildPathSet collapses duplicate spellings of one path', () => {
-        const set = buildPathSet(['/repo/a.md', '/repo/./a.md', '/repo/b/../a.md'], 'linux');
-        assert.strictEqual(set.size, 1);
-    });
-
-    test('pathSetHas normalizes the probe as well as the stored keys', () => {
-        const set = buildPathSet(['/repo/notes/work.md'], 'linux');
-        assert.strictEqual(pathSetHas(set, '/repo/notes/./work.md', 'linux'), true);
+    test('duplicate spellings of one path collapse to a single key', () => {
+        const keys = new Set(['/repo/a.md', '/repo/./a.md', '/repo/b/../a.md'].map((p) => pathKey(p, 'linux')));
+        assert.strictEqual(keys.size, 1);
     });
 });

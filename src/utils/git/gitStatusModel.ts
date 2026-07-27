@@ -12,12 +12,12 @@
  * many of them are saved but not sent". The commit count is carried alongside
  * for the wording in the expanded list, not for the header chip.
  */
-import * as path from 'node:path';
 // The three result types are payload contracts with the page, so they live
 // in src/types.ts alongside `Task` -- the webview project cannot import a
-// module that reaches for `node:path`, which this one does.
+// module that reaches for `node:path`, which this one does through
+// `gitPathMatch`.
 import type { AgendaGitStatus, GitFileState, GitRepoState } from '../../types';
-import { pathKey } from './gitPathMatch';
+import { pathApi, pathKey } from './gitPathMatch';
 
 /** One repository, reduced to what the model needs. */
 export interface GitRepoSnapshot {
@@ -90,7 +90,7 @@ export function buildGitStatus(
         files.push({
             file: source.file,
             ...(source.realPath === source.file ? {} : { realPath: source.realPath }),
-            label: fileLabel(source),
+            label: fileLabel(source, platform),
             ...(source.repoRoot === undefined ? {} : { repoRoot: source.repoRoot }),
             uncommitted,
             unpushed
@@ -102,7 +102,7 @@ export function buildGitStatus(
         .filter((repo): repo is GitRepoSnapshot => repo !== undefined)
         .map((repo): GitRepoState => ({
             root: repo.root,
-            name: path.basename(repo.root),
+            name: pathApi(platform).basename(repo.root),
             ...(repo.branch === undefined ? {} : { branch: repo.branch }),
             ...(repo.upstream === undefined ? {} : { upstream: repo.upstream }),
             ...(repo.aheadCommits === undefined ? {} : { aheadCommits: repo.aheadCommits })
@@ -128,18 +128,14 @@ export function buildGitStatus(
  * produce a `../../..` chain. The path the user typed still reaches the page as
  * `file` and remains what the row opens.
  */
-function fileLabel(source: GitSourceFile): string {
+function fileLabel(source: GitSourceFile, platform: NodeJS.Platform): string {
+    const api = pathApi(platform);
     if (source.repoRoot === undefined) {
-        return path.basename(source.file);
+        return api.basename(source.file);
     }
-    const relative = path.relative(source.repoRoot, source.realPath);
+    const relative = api.relative(source.repoRoot, source.realPath);
     // A file that is not under the root (which `resolveRepositoryFor` can
     // produce for a committed symlink pointing outside) would render as a
     // `../` chain; its bare name reads better and the tooltip carries the rest.
-    return relative && !relative.startsWith('..') ? relative : path.basename(source.file);
-}
-
-/** Whether there is anything at all to show. Drives "render the chip or not". */
-export function hasGitSignal(status: AgendaGitStatus): boolean {
-    return status.repos.length > 0;
+    return relative && !relative.startsWith('..') ? relative : api.basename(source.file);
 }

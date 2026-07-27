@@ -26,7 +26,7 @@ function isCaseInsensitive(platform: NodeJS.Platform): boolean {
 }
 
 /** The path rules of `platform`, not of the machine the code runs on. */
-function pathApi(platform: NodeJS.Platform): path.PlatformPath {
+export function pathApi(platform: NodeJS.Platform = process.platform): path.PlatformPath {
     return platform === 'win32' ? path.win32 : path.posix;
 }
 
@@ -47,11 +47,6 @@ export function pathKey(value: string, platform: NodeJS.Platform = process.platf
     return isCaseInsensitive(platform) ? trimmed.toLowerCase() : trimmed;
 }
 
-/** Whether two paths name the same location under the platform's rules. */
-export function pathsEqual(a: string, b: string, platform: NodeJS.Platform = process.platform): boolean {
-    return pathKey(a, platform) === pathKey(b, platform);
-}
-
 /**
  * Whether `child` is inside `parent` (or is `parent` itself).
  *
@@ -67,28 +62,4 @@ export function isInside(parent: string, child: string, platform: NodeJS.Platfor
     const sep = pathApi(platform).sep;
     const prefix = parentKey.endsWith(sep) ? parentKey : parentKey + sep;
     return childKey.startsWith(prefix);
-}
-
-/**
- * Index a set of paths for repeated membership tests.
- *
- * Used to turn the change lists of a repository (working tree, index,
- * untracked, and the `upstream...HEAD` diff) into something an agenda file can
- * be looked up in once per file instead of scanned per file.
- */
-export function buildPathSet(paths: Iterable<string>, platform: NodeJS.Platform = process.platform): Set<string> {
-    const set = new Set<string>();
-    for (const value of paths) {
-        set.add(pathKey(value, platform));
-    }
-    return set;
-}
-
-/** Membership test against a set built by {@link buildPathSet}. */
-export function pathSetHas(
-    set: ReadonlySet<string>,
-    value: string,
-    platform: NodeJS.Platform = process.platform
-): boolean {
-    return set.has(pathKey(value, platform));
 }

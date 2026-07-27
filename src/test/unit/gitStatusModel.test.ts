@@ -1,6 +1,6 @@
 import * as assert from 'node:assert';
 import { suite, test } from 'mocha';
-import { buildGitStatus, hasGitSignal } from '../../utils/git/gitStatusModel';
+import { buildGitStatus } from '../../utils/git/gitStatusModel';
 import type { GitRepoSnapshot, GitSourceFile } from '../../utils/git/gitStatusModel';
 
 const REPO: GitRepoSnapshot = {
@@ -137,16 +137,27 @@ suite('buildGitStatus', () => {
         assert.strictEqual(status.unpushedCommits, 0);
     });
 
-    test('hasGitSignal is false when no source file belongs to a repository', () => {
+    test('a file outside every repository leaves the repository list empty', () => {
         const status = buildGitStatus([outside('/elsewhere/loose.md')], [], 'linux');
-        assert.strictEqual(hasGitSignal(status), false);
+        assert.strictEqual(status.repos.length, 0);
     });
 
-    test('hasGitSignal is true for a clean repository, so the chip can say so', () => {
+    test('a clean repository is still listed, so the chip can say so', () => {
         const clean: GitRepoSnapshot = { ...REPO, aheadCommits: 0, uncommitted: [], unpushed: [] };
         const status = buildGitStatus([source('/repo/notes.md')], [clean], 'linux');
-        assert.strictEqual(hasGitSignal(status), true);
+        assert.strictEqual(status.repos.length, 1);
         assert.strictEqual(status.uncommittedCount, 0);
         assert.strictEqual(status.unpushedCount, 0);
+    });
+
+    test('the label keeps windows separators when the platform is windows', () => {
+        const winRepo: GitRepoSnapshot = { ...REPO, root: 'C:\\repo', uncommitted: [], unpushed: [] };
+        const status = buildGitStatus(
+            [{ file: 'C:\\repo\\inbox\\work.md', realPath: 'C:\\repo\\inbox\\work.md', repoRoot: 'C:\\repo' }],
+            [winRepo],
+            'win32'
+        );
+        assert.strictEqual(status.files[0]?.label, 'inbox\\work.md');
+        assert.strictEqual(status.repos[0]?.name, 'repo');
     });
 });
