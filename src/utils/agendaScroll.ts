@@ -43,3 +43,39 @@ export function recallScroll(history: ScrollMemory, anchor: string): number | nu
     }
     return history[anchor] ?? null;
 }
+
+/** The window methods `focusStickyAnchor` needs, structurally typed for fakes. */
+export interface ScrollWindowLike {
+    scrollTo(x: number, y: number): void;
+}
+
+/** The element method it needs; a real Element satisfies it. */
+export interface StickyAnchorLike {
+    scrollIntoView(options: { block: 'start'; behavior: 'auto' }): void;
+}
+
+/**
+ * Scroll `target` to just under the sticky header, and to the top of the page
+ * when there is no target.
+ *
+ * The reset to 0 is what makes this correct rather than a plain
+ * `scrollIntoView`. A `position: sticky` element that is already pinned
+ * reports its PINNED box: `getBoundingClientRect().top` (and `offsetTop`)
+ * return where it is stuck, not where it sits in the flow. `scrollIntoView`
+ * measures that box, concludes the element is already where `scroll-margin-top`
+ * wants it, and moves the page by the one pixel the two differ by -- leaving
+ * the page scrolled deeper than intended, with the day's first rows hidden
+ * behind the header that is supposedly at the top of them.
+ *
+ * Scrolling to 0 first unpins every header, so the measurement `scrollIntoView`
+ * then makes is the flow one. Both happen inside a single frame, so nothing is
+ * painted in between and the user sees one jump, not two.
+ *
+ * Inlined into the webview via `.toString()`, so it must stay self-contained.
+ */
+export function focusStickyAnchor(win: ScrollWindowLike, target: StickyAnchorLike | null): void {
+    win.scrollTo(0, 0);
+    if (target) {
+        target.scrollIntoView({ block: 'start', behavior: 'auto' });
+    }
+}

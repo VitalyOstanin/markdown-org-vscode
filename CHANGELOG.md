@@ -7,7 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Clipping markers on the week view's day headers. When a day holds more rows
+  than fit, its header shows how many are out of sight: `↑ N` for the rows
+  behind the pinned header and `↓ M` for those below the bottom of the panel,
+  each with a tooltip spelling the count out. A day whose rows are all visible
+  shows neither. The header also casts a shadow while it covers rows, so
+  "this day continues above" reads without looking at the number.
+
 ### Fixed
+
+- The week view no longer opens with the first tasks of today hidden behind
+  their own day header. Switching into Week from a scrolled view left the page
+  where it was: the day header is `position: sticky`, and one that is already
+  pinned reports its pinned box, so `scrollIntoView` concluded it was in place
+  and moved nothing. The page now unpins the headers before measuring, inside
+  the same frame -- the user still sees a single jump.
+- The same rows stayed visible when the panel header changes height right after
+  the week was focused -- which it routinely does, because the git chip arrives
+  on its own message a moment after the render. The day headers pin below the
+  panel header, so growing it moved the pin point down onto rows that had just
+  been brought into view. The week now keeps its focus through such a resize,
+  and releases it as soon as the scroll position is the user's own.
 
 - A timestamp carrying a warning cookie (`<2026-01-12 Пн +1w -2d>`, the window
   in which a `DEADLINE:` starts showing up) is now parsed by the cursor engine.

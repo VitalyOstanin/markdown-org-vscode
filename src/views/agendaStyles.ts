@@ -464,6 +464,44 @@ export const AGENDA_STYLES = `
         .day-header-link:hover .day-weekday {
             text-decoration: underline;
         }
+        /* Clipping markers (updateDayClipMarkers): the two chips sit at the
+           right edge of the day header and count that day's rows currently out
+           of view -- above, behind the pinned header, and below, past the
+           bottom of the panel. margin-left auto pushes them there without a
+           spacer element; align-self overrides the header's baseline alignment,
+           which would hang the pills off the text baseline. */
+        .day-clip {
+            display: flex;
+            gap: var(--space-1);
+            margin-left: auto;
+            align-self: center;
+        }
+        .day-clip-count {
+            font-size: var(--font-xs);
+            line-height: 1;
+            padding: var(--space-1) var(--space-2);
+            border-radius: var(--radius-pill);
+            /* Tabular figures so the chip does not resize on every scroll step
+               as the count goes 9 -> 10. */
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+        .day-clip-above {
+            color: var(--accent-yellow);
+            background: color-mix(in srgb, var(--vscode-charts-yellow) 16%, transparent);
+        }
+        .day-clip-below {
+            color: var(--accent-blue);
+            background: color-mix(in srgb, var(--vscode-charts-blue) 16%, transparent);
+        }
+        /* The peripheral half of the marker: while a day has rows hidden behind
+           its pinned header, that header casts a shadow downwards, so "this day
+           continues above" reads without looking at the number. The theme's own
+           shadow token keeps it visible in light and dark alike; the negative
+           spread confines it to a band under the bottom edge. */
+        .day-header-clipped {
+            box-shadow: 0 6px 6px -6px var(--vscode-widget-shadow);
+        }
         .task-line {
             display: grid;
             /* dot | big time | flag | priority | heading | offset (see

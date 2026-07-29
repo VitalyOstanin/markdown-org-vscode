@@ -48,6 +48,11 @@ export interface AgendaStrings {
     todayBadge: string;
     /** Tooltip on a clickable week day-header. */
     openDayView: string;
+    /**
+     * Week-view clipping chips: what the counts in a day header mean. `{0}` is
+     * the number of that day's tasks currently out of view on that side.
+     */
+    clip: { above: string; below: string };
     /** File-tag dropdown: caption, collapsed button (`{0}` = tag), row titles. */
     tagCaption: string;
     tagButton: string;
@@ -163,6 +168,7 @@ const EN: AgendaStrings = {
     navTodayTitle: 'Jump to today',
     todayBadge: 'TODAY',
     openDayView: 'Open this day in Day view',
+    clip: { above: 'Hidden above the view: {0}', below: 'Hidden below the view: {0}' },
     tagCaption: 'File tag',
     tagButton: 'Tag: {0}',
     tagAll: 'ALL',
@@ -234,6 +240,7 @@ const RU: AgendaStrings = {
     navTodayTitle: 'Перейти к сегодняшнему дню',
     todayBadge: 'СЕГОДНЯ',
     openDayView: 'Открыть этот день в режиме дня',
+    clip: { above: 'Скрыто выше видимой области: {0}', below: 'Скрыто ниже видимой области: {0}' },
     tagCaption: 'Метка файла',
     tagButton: 'Метка: {0}',
     tagAll: 'ВСЕ',

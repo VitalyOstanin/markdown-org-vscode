@@ -5,7 +5,8 @@ import { isMeaningfulSelection, resolveTaskClickIntent, sanitizeTaskLine } from 
 import { escapeHtml } from '../utils/agendaEscapeHtml';
 import { DEFAULT_AGENDA_FONT_STACK, sanitizeFontFamily } from '../utils/agendaFontFamily';
 import { agendaModeCommand } from '../utils/agendaModeCommand';
-import { rememberScroll, recallScroll } from '../utils/agendaScroll';
+import { rememberScroll, recallScroll, focusStickyAnchor } from '../utils/agendaScroll';
+import { countClippedRows, renderDayClipHtml, updateDayClipMarkers } from '../utils/agendaClipMarkers';
 import { resolveHeadingClass } from '../utils/agendaHeadingTint';
 import { resolveTaskFlag } from '../utils/agendaTaskFlag';
 import { resolveAttentionLevel } from '../utils/agendaAttention';
@@ -941,6 +942,13 @@ export class AgendaPanel {
         dayNumbers: string[];
         /** Text of the git chip, or empty when the header carries none. */
         gitChip: string;
+        /** Rows hidden above/below per day header, aligned with `dayHeaders`. */
+        clipAbove: number[];
+        clipBelow: number[];
+        /** Whether today's first task row sits behind its own sticky header. */
+        todayFirstRowHidden: boolean;
+        /** Where the page ended up after the render decided its scroll. */
+        scrollY: number;
     } | null> {
         const panel = AgendaPanel.currentPanel;
         if (!panel) {
@@ -959,6 +967,10 @@ export class AgendaPanel {
                     heroSub?: string;
                     dayNumbers?: string[];
                     gitChip?: string;
+                    clipAbove?: number[];
+                    clipBelow?: number[];
+                    todayFirstRowHidden?: boolean;
+                    scrollY?: number;
                 }) => {
                     if (m.command === 'renderedInfo') {
                         clearTimeout(timer);
@@ -972,7 +984,11 @@ export class AgendaPanel {
                             heroSharesControlRow: m.heroSharesControlRow ?? false,
                             heroSub: m.heroSub ?? '',
                             dayNumbers: m.dayNumbers ?? [],
-                            gitChip: m.gitChip ?? ''
+                            gitChip: m.gitChip ?? '',
+                            clipAbove: m.clipAbove ?? [],
+                            clipBelow: m.clipBelow ?? [],
+                            todayFirstRowHidden: m.todayFirstRowHidden ?? false,
+                            scrollY: m.scrollY ?? 0
                         });
                     }
                 }
@@ -983,6 +999,22 @@ export class AgendaPanel {
             }, timeoutMs);
             panel.webview.postMessage({ command: 'getRenderedInfo' });
         });
+    }
+
+    /**
+     * Test-only helper: scroll the open panel to `y`.
+     *
+     * The week view's sticky-anchor handling and its clipping chips only differ
+     * from the trivial case when the page is already scrolled, and a test
+     * driving VS Code from outside has no other way to put it there. Resolves
+     * to false when no panel is open. Production code never calls this.
+     */
+    public static setScrollForTesting(y: number): Thenable<boolean> {
+        const panel = AgendaPanel.currentPanel;
+        if (!panel) {
+            return Promise.resolve(false);
+        }
+        return panel.webview.postMessage({ command: 'setScrollForTesting', y });
     }
 
     /**
@@ -1068,6 +1100,10 @@ export class AgendaPanel {
         escapeHtml,
         rememberScroll,
         recallScroll,
+        focusStickyAnchor,
+        countClippedRows,
+        renderDayClipHtml,
+        updateDayClipMarkers,
         resolveHeadingClass,
         toIsoDate,
         formatDayHeaderParts,

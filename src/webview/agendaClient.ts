@@ -202,6 +202,48 @@ export interface DayHeaderRootLike {
     querySelectorAll(selectors: string): Iterable<DayHeaderElementLike>;
 }
 
+/** Window subset `focusStickyAnchor` drives. */
+export interface ScrollWindowLike {
+    scrollTo(x: number, y: number): void;
+}
+
+/** Element subset it scrolls to. */
+export interface StickyAnchorLike {
+    scrollIntoView(options: { block: 'start'; behavior: 'auto' }): void;
+}
+
+/** A row's vertical extent in viewport coordinates. */
+export interface ClipRectLike {
+    top: number;
+    bottom: number;
+}
+
+/** Rows of one day that are out of sight, split by which edge hides them. */
+export interface ClipCounts {
+    above: number;
+    below: number;
+}
+
+/** Chip element a day header carries for one of the two counts. */
+export interface ClipChipLike {
+    textContent: string | null;
+    hidden: boolean;
+    setAttribute(name: string, value: string): void;
+}
+
+/** Node subset the clipping pass walks over. */
+export interface ClipNodeLike {
+    classList: { contains(token: string): boolean; toggle(token: string, force: boolean): void };
+    getBoundingClientRect(): ClipRectLike;
+    querySelector(selectors: string): ClipChipLike | null;
+    nextElementSibling: ClipNodeLike | null;
+}
+
+/** Root that can query for the day headers to refresh. */
+export interface ClipRootLike {
+    querySelectorAll(selectors: string): Iterable<ClipNodeLike>;
+}
+
 /**
  * The pure helpers the client runs on. Each one is inlined into the page as a
  * top-level function declaration and handed over here by name, so a helper that
@@ -220,6 +262,16 @@ export interface AgendaClientDeps {
     escapeHtml: (text: string | number | boolean | undefined | null) => string;
     rememberScroll: (history: ScrollMemory, anchor: string, scrollY: number) => void;
     recallScroll: (history: ScrollMemory, anchor: string) => number | null;
+    focusStickyAnchor: (win: ScrollWindowLike, target: StickyAnchorLike | null) => void;
+    countClippedRows: (rows: ClipRectLike[], headerBottom: number, viewportHeight: number) => ClipCounts;
+    renderDayClipHtml: () => string;
+    updateDayClipMarkers: (
+        root: ClipRootLike,
+        viewportHeight: number,
+        titles: { above: string; below: string },
+        countRows: (rows: ClipRectLike[], headerBottom: number, viewportHeight: number) => ClipCounts,
+        format: (template: string, ...values: string[]) => string
+    ) => void;
     resolveHeadingClass: (task: HeadingTintInput) => string;
     toIsoDate: (date: Date) => string;
     formatDayHeaderParts: (dateStr: string, locale: string) => DayHeaderParts;
@@ -518,7 +570,10 @@ type HostMessage =
     // `null` is "there is no git here", which removes the chip; it is distinct
     // from a status whose counters are zero, which shows the clean marker.
     | { command: 'gitStatus'; status?: AgendaGitStatus | null }
-    | { command: 'getRenderedInfo' };
+    | { command: 'getRenderedInfo' }
+    // Integration-test hook: the host cannot scroll the page from outside, and
+    // the clipping behaviour only exists at a non-zero scroll position.
+    | { command: 'setScrollForTesting'; y?: number };
 
 /**
  * Run the agenda client in the page. Called once, from the injected `<script>`.
@@ -533,6 +588,10 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         escapeHtml,
         rememberScroll,
         recallScroll,
+        focusStickyAnchor,
+        countClippedRows,
+        renderDayClipHtml,
+        updateDayClipMarkers,
         resolveHeadingClass,
         toIsoDate,
         formatDayHeaderParts,
@@ -629,6 +688,24 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
     let fullHeaderHeight = 0;
 
     /**
+     * Whether the week view still owes today's header its place under the
+     * agenda header.
+     *
+     * Focusing the week is a state to hold, not a single jump. The header keeps
+     * changing height AFTER the render that focused the week: the git chip
+     * arrives on its own message (see `gitStatus` above), a web font swaps in,
+     * the layout flips to compact. Each of those moves the pin point the day
+     * headers stick to, while the browser's scroll anchoring keeps the content
+     * where it was on screen -- so today's header ends up ABOVE the new pin
+     * point, sticks there, and covers the very rows the focus had just brought
+     * into view. Re-applying the focus on every such resize is what keeps them
+     * visible. Cleared as soon as the scroll position becomes the user's own
+     * (their gesture, or a render that restores a remembered position), because
+     * from then on moving the page would be taking their place away.
+     */
+    let weekFocusHeld = false;
+
+    /**
      * Apply the header layout for the current mode and viewport. Called after
      * every render and on resize, because `auto` follows the share of the panel
      * the header takes and a webview panel is resized by dragging the editor
@@ -669,7 +746,19 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
     // the initial swap directly.
     const agendaHeaderEl = document.getElementById('agenda-header');
     if (agendaHeaderEl && typeof ResizeObserver !== 'undefined') {
-        new ResizeObserver(syncHeaderOffset).observe(agendaHeaderEl);
+        // A taller header hides one more row behind itself, so the clipping
+        // chips are re-measured with the offset they are counted against -- and
+        // a week that is still holding its focus is re-focused against the new
+        // offset, or today's first rows would go back under the day header (see
+        // weekFocusHeld).
+        new ResizeObserver(() => {
+            syncHeaderOffset();
+            if (weekFocusHeld && initialMode === 'week') {
+                applyWeekFocus();
+                return;
+            }
+            refreshClipMarkers();
+        }).observe(agendaHeaderEl);
     } else {
         window.addEventListener('resize', syncHeaderOffset);
     }
@@ -728,6 +817,36 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         }
     });
 
+    /** A clipping chip's number, or 0 when the chip is not on screen. */
+    function readChipCount(chip: HTMLElement | null): number {
+        if (!chip || chip.hidden) {
+            return 0;
+        }
+        return Number(chip.textContent.replaceAll(/[^0-9]/g, '')) || 0;
+    }
+
+    /**
+     * Is the first task row of today's day behind its own sticky header?
+     *
+     * This is the symptom the week view had: the header claims the day starts
+     * there while its first row is already scrolled under it. `false` when
+     * today has no header (another week) or no rows.
+     */
+    function measureTodayFirstRowHidden(): boolean {
+        const header = document.querySelector('.day-header[data-date="' + toIsoDate(new Date()) + '"]');
+        if (!header) {
+            return false;
+        }
+        let node = header.nextElementSibling;
+        while (node && !node.classList.contains('day-header') && !node.classList.contains('task-line')) {
+            node = node.nextElementSibling;
+        }
+        if (!node?.classList.contains('task-line')) {
+            return false;
+        }
+        return node.getBoundingClientRect().top < header.getBoundingClientRect().bottom - 0.5;
+    }
+
     function handleHostMessage(message: HostMessage): void {
         if (message.command === 'init') {
             initialData = message.data ?? [];
@@ -759,6 +878,7 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             syncHeaderOffset();
             renderCurrentMode();
             scrollToWeekFocus();
+            refreshClipMarkers();
         } else if (message.command === 'update') {
             if (message.locale) {
                 // Dates follow the setting on the next render, like the
@@ -802,17 +922,22 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             applyHeaderLayout();
             syncHeaderOffset();
             renderCurrentMode();
+            // Each branch below either focuses the week or restores a position
+            // that is the user's; the latter releases the focus hold, so a later
+            // header resize leaves their scroll alone (see weekFocusHeld).
             if (!userInitiated) {
                 // File-watcher / cycleTag refresh -- keep scroll.
                 window.scrollTo(0, scrollPos);
             } else if (initialMode !== 'week') {
                 // Day / month / tasks have no per-day scroll anchor.
+                weekFocusHeld = false;
             } else if (navigation) {
                 // Prev/Next/Today. If we've been on this anchor before
                 // (round-trip case), restore the user's last scroll there;
                 // otherwise focus the week as usual.
                 const remembered = recallScroll(scrollHistory, shiftedToday);
                 if (remembered !== null) {
+                    weekFocusHeld = false;
                     window.scrollTo(0, remembered);
                 } else {
                     scrollToWeekFocus();
@@ -820,10 +945,14 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             } else if (wasOnCurrentWeek && currentWeekIsVisible()) {
                 // Repeated Show Agenda (Week) on the same current week -- keep
                 // the user's place.
+                weekFocusHeld = false;
                 window.scrollTo(0, scrollPos);
             } else {
                 scrollToWeekFocus();
             }
+            // Every branch above lands the page on a scroll position, which is
+            // what the chips are counted against.
+            refreshClipMarkers();
         } else if (message.command === 'headerMode') {
             // The setting changed while the panel was open -- from the settings
             // editor, the command, or the button in the control row. Only the
@@ -839,7 +968,6 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             // move the task list or the user's scroll position.
             gitStatus = message.status ?? null;
             refreshGitMenu();
-            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- spelled out rather than a bare `else`, so the branch says which command it serves
         } else if (message.command === 'getRenderedInfo') {
             // Integration-test query: snapshot the rendered DOM so the host can
             // verify that renderAgenda produced the expected day-headers for the
@@ -873,6 +1001,15 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             // resolution, the status message, the markup -- reached the page.
             const gitChip = document.getElementById('gitMenuBtn')?.textContent ?? '';
             const dayNumbers = [...document.querySelectorAll('.calendar-day .day-number')].map((el) => el.textContent);
+            // Clipping chips per day header, in the same order as `dayHeaders`.
+            // A hidden chip reports 0 rather than its stale text, which is what
+            // the page shows the user.
+            const clipAbove: number[] = [];
+            const clipBelow: number[] = [];
+            for (const header of document.querySelectorAll('.day-header[data-date]')) {
+                clipAbove.push(readChipCount(header.querySelector<HTMLElement>('.day-clip-above')));
+                clipBelow.push(readChipCount(header.querySelector<HTMLElement>('.day-clip-below')));
+            }
             vscode.postMessage({
                 command: 'renderedInfo',
                 dayHeaders: headers,
@@ -882,11 +1019,26 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
                 mode: initialMode,
                 flags,
                 sections,
+                clipAbove,
+                clipBelow,
+                scrollY: window.scrollY,
+                // The bug this snapshot was extended for: after a mode switch
+                // the day's first row sat behind its own sticky header, which
+                // no other field here would show.
+                todayFirstRowHidden: measureTodayFirstRowHidden(),
                 // The header layout is a class on <body>, so this is how a test
                 // sees which of the two the page settled on.
                 headerLayout: document.body.classList.contains('compact-header') ? 'compact' : 'full',
                 heroSharesControlRow
             });
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- spelled out rather than a bare `else`, so the branch says which command it serves
+        } else if (message.command === 'setScrollForTesting') {
+            // Integration-test hook: the clipping markers and the sticky-anchor
+            // fix only differ from the trivial case at a non-zero scroll
+            // position, and nothing outside the page can put it there.
+            // Production code never sends this command.
+            window.scrollTo(0, message.y ?? 0);
+            refreshClipMarkers();
         }
     }
 
@@ -1013,6 +1165,10 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
                     escapeHtml(day.date) +
                     '">' +
                     formatDayHeader(day.date) +
+                    // Empty until refreshClipMarkers measures: the counts depend
+                    // on the scroll position, which does not exist yet while the
+                    // markup is still a string.
+                    renderDayClipHtml() +
                     '</div>'
             );
             (day.overdue ?? []).forEach((task) => parts.push(renderTask(task, task.days_offset, 'overdue')));
@@ -1104,15 +1260,49 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         if (initialMode !== 'week') {
             return;
         }
-        requestAnimationFrame(() => {
-            const target = document.querySelector('.day-header[data-date="' + toIsoDate(new Date()) + '"]');
-            if (target) {
-                target.scrollIntoView({ block: 'start', behavior: 'auto' });
-            } else {
-                window.scrollTo(0, 0);
-            }
+        weekFocusHeld = true;
+        requestAnimationFrame(applyWeekFocus);
+    }
+
+    /** Put today's header under the agenda header, wherever it currently ends. */
+    function applyWeekFocus(): void {
+        // focusStickyAnchor, not a bare scrollIntoView: today's header is
+        // sticky, and one that is already pinned reports its pinned box, so
+        // scrollIntoView would consider it in place and leave the page
+        // scrolled past the day's first rows. See agendaScroll.ts.
+        focusStickyAnchor(window, document.querySelector('.day-header[data-date="' + toIsoDate(new Date()) + '"]'));
+        refreshClipMarkers();
+    }
+
+    // A real scrolling gesture makes the position the user's own, so the week
+    // focus stops following the header. Listening for the gestures rather than
+    // for `scroll` is what separates the two: the focus scrolls the page itself,
+    // and a `scroll` listener could not tell that apart from a wheel turn.
+    for (const gesture of ['wheel', 'touchstart', 'keydown'] as const) {
+        window.addEventListener(gesture, () => {
+            weekFocusHeld = false;
         });
     }
+
+    // Clipping chips (week view): how many of each day's rows are currently
+    // hidden behind the pinned day-header or below the bottom of the panel.
+    // Recomputed from live geometry, so it has to run on every scroll frame as
+    // well as after a render or a resize. rAF-coalesced: a scroll fires far
+    // more often than the page paints, and the measurement is only meaningful
+    // once per frame anyway.
+    let clipTicking = false;
+    function refreshClipMarkers(): void {
+        if (initialMode !== 'week' || clipTicking) {
+            return;
+        }
+        clipTicking = true;
+        requestAnimationFrame(() => {
+            clipTicking = false;
+            updateDayClipMarkers(document, window.innerHeight, UI.clip, countClippedRows, formatString);
+        });
+    }
+    window.addEventListener('scroll', refreshClipMarkers, { passive: true });
+    window.addEventListener('resize', refreshClipMarkers);
 
     // Tasks view (date-less --tasks mode): the same card vocabulary as the Day
     // view -- a sticky summary bar plus stacked section panels -- but grouped by

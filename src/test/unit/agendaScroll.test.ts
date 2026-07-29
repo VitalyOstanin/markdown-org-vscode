@@ -1,7 +1,7 @@
 import * as assert from 'node:assert';
 import { suite, test } from 'mocha';
 import type { ScrollMemory } from '../../utils/agendaScroll';
-import { rememberScroll, recallScroll } from '../../utils/agendaScroll';
+import { rememberScroll, recallScroll, focusStickyAnchor } from '../../utils/agendaScroll';
 
 // These helpers are inlined into the agenda webview JS via `.toString()`,
 // so unit-testing them in plain Node transitively covers the round-trip
@@ -101,5 +101,63 @@ suite('agendaScroll', () => {
         // have a remembered scroll for this anchor?
         const remembered = recallScroll(history, '2026-05-17');
         assert.strictEqual(remembered, 0, 'must restore scroll=0 (top), not snap to today');
+    });
+});
+
+// focusStickyAnchor is what makes the week view land under the day header
+// instead of behind it. The order of its two calls is the whole point, so the
+// fakes below record the sequence rather than any coordinates.
+suite('focusStickyAnchor', () => {
+    function setup() {
+        const calls: string[] = [];
+        const win = {
+            scrollTo(x: number, y: number): void {
+                calls.push(`scrollTo(${x},${y})`);
+            }
+        };
+        const target = {
+            scrollIntoView(options: { block: 'start'; behavior: 'auto' }): void {
+                calls.push(`scrollIntoView(${options.block},${options.behavior})`);
+            }
+        };
+        return { calls, win, target };
+    }
+
+    test('resets the scroll to the top before scrolling the anchor into view', () => {
+        // A sticky header that is already pinned reports its pinned box, so
+        // scrollIntoView would conclude it is in place and leave the page
+        // scrolled deeper -- with the day's first rows behind the header.
+        // Unpinning by scrolling to 0 first is what makes the measurement the
+        // flow one.
+        const { calls, win, target } = setup();
+
+        focusStickyAnchor(win, target);
+
+        assert.deepStrictEqual(calls, ['scrollTo(0,0)', 'scrollIntoView(start,auto)']);
+    });
+
+    test('without an anchor it only scrolls to the top', () => {
+        // The week the user navigated to holds no today header (Next Week);
+        // the top of the page is the intended landing spot.
+        const { calls, win } = setup();
+
+        focusStickyAnchor(win, null);
+
+        assert.deepStrictEqual(calls, ['scrollTo(0,0)']);
+    });
+
+    test('scrolls without animation so both steps land in one frame', () => {
+        // A smooth scroll would paint the intermediate position and turn the
+        // reset into a visible jump to the top and back.
+        let behavior = '';
+        focusStickyAnchor(
+            { scrollTo: () => undefined },
+            {
+                scrollIntoView(options: { block: 'start'; behavior: 'auto' }): void {
+                    behavior = options.behavior;
+                }
+            }
+        );
+        assert.strictEqual(behavior, 'auto');
     });
 });
