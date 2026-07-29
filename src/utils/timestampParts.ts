@@ -42,8 +42,16 @@ export interface ClockTimestampPartHit {
 // Order inside the alternations matters: `.+` and `++` must come before `+`,
 // `wd` must come before `d`, otherwise the engine commits to the shorter
 // option and consumes a partial match.
+//
+// The warning cookie `-N<unit>` follows the repeater, and its units are the
+// ones the extractor scans for (`src/timestamp/parser.rs`): `h`, `d`, `w`,
+// `m`, `y` -- no `wd`. A timestamp carrying one has to parse here too, or the
+// cursor engine goes silent on the whole line and Shift+Up/Down does nothing
+// on a DEADLINE that names its own warning window. Written in the canonical
+// order (repeater, then cookie); the extractor scans the two independently and
+// accepts either order, which the shared grammar in TODO.md settles.
 const TIMESTAMP_REGEX =
-    /(?<open>[<[])(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})(?: (?<weekday>[А-Яа-яA-Za-z]+))?(?: (?<hour>\d{2}):(?<minute>\d{2}))?(?: (?<repeater>(?:\.\+|\+\+|\+)\d+(?:wd|[dwmyh])))?(?<close>[>\]])/;
+    /(?<open>[<[])(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})(?: (?<weekday>[А-Яа-яA-Za-z]+))?(?: (?<hour>\d{2}):(?<minute>\d{2}))?(?: (?<repeater>(?:\.\+|\+\+|\+)\d+(?:wd|[dwmyh])))?(?: (?<warning>-\d+[dwmyh]))?(?<close>[>\]])/;
 
 function isPairedBracket(open: string, close: string): boolean {
     return (open === '<' && close === '>') || (open === '[' && close === ']');

@@ -31,6 +31,7 @@ export function incrementTimestamp(
     const hour = g.hour ? parseInt(g.hour, 10) : undefined;
     const minute = g.minute ? parseInt(g.minute, 10) : undefined;
     const repeater = g.repeater ?? '';
+    const warning = g.warning ?? '';
 
     const date = new Date(year, month - 1, day, hour ?? 0, minute ?? 0);
 
@@ -60,7 +61,8 @@ export function incrementTimestamp(
         bracket: active ? 'angle' : 'square',
         weekday: newWeekday || undefined,
         includeTime: hour !== undefined && minute !== undefined,
-        repeater: repeater || undefined
+        repeater: repeater || undefined,
+        warning: warning || undefined
     });
 }
 

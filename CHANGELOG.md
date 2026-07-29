@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- A timestamp carrying a warning cookie (`<2026-01-12 Пн +1w -2d>`, the window
+  in which a `DEADLINE:` starts showing up) is now parsed by the cursor engine.
+  Shift+Up / Shift+Down used to do nothing on such a line, and the extractor
+  had been reading it all along, so the agenda and the editor disagreed about
+  the same file. The cookie survives a shift the way a repeater does.
+- A priority cookie written without a space after it (`## TODO [#A]Title`) is
+  recognized. The extractor accepts that form, so the agenda showed a priority
+  the commands could not see -- toggling would have added a second cookie.
+
 ## [0.13.0] - 2026-07-27
 
 ### Added

@@ -202,6 +202,32 @@
       same reason (`formatDateForTitle`); numbers have no such cache, and cannot
       use a module-level one because `formatNumber` is inlined into the page.
 
+- [ ] Read headings and timestamps through the extractor instead of the
+      extension's own regexes
+    - Investigate first, then agree the implementation. The problem statement
+      and the questions the investigation has to answer are in the extractor's
+      `TODO.md`, section "One grammar for every client, over WebAssembly".
+    - What is wrong today: `HEADING_REGEX` (`src/orgPatterns.ts`) wants the
+      priority cookie directly after the keyword, while the extractor accepts
+      it anywhere in the remainder; `TIMESTAMP_REGEX`
+      (`src/utils/timestampParts.ts`) spells the whole bracket out
+      positionally, while the extractor takes a date plus a free-form body it
+      scans token by token, in any order. So `## TODO Написать [#A] отчёт`
+      shows no priority here, and a bracket whose tokens are written the other
+      way round (`-2d +1w`) is still not recognised.
+    - Two of these were closed by hand in the meantime: the space after the
+      cookie is now optional, and a warning cookie after the repeater parses
+      and survives a shift. Both are patches to the second grammar, not an end
+      to it -- moving the cookie anywhere would mean rebuilding the heading
+      from captured parts and relocating what the user typed, which is exactly
+      the kind of thing token ranges from a shared parser make unnecessary.
+    - Publishing the extractor's regex strings would not be enough: what
+      diverges is the order they are applied in and how the bracket body is
+      scanned. Compiling the extractor to `wasm32` removes the second grammar
+      rather than synchronising it, and `parse_heading_line` /
+      `parse_timestamp_parts` already return the token ranges the cursor-aware
+      commands compute by hand today.
+
 ## Configuration
 
 - [x] Remove hardcoded path from package.json default settings

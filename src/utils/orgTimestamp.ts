@@ -9,6 +9,8 @@ export interface OrgTimestampOptions {
     includeTime?: boolean;
     /** Org repeater (e.g. `+1d`); appended after the time when non-empty. */
     repeater?: string | undefined;
+    /** Org warning cookie (e.g. `-2d`); appended after the repeater when non-empty. */
+    warning?: string | undefined;
 }
 
 /**
@@ -21,7 +23,7 @@ export interface OrgTimestampOptions {
  * The weekday is passed in already localized; this builder never derives it.
  */
 export function buildOrgTimestamp(opts: OrgTimestampOptions): string {
-    const { date, bracket, weekday, includeTime = true, repeater } = opts;
+    const { date, bracket, weekday, includeTime = true, repeater, warning } = opts;
     const year = date.getFullYear().toString().padStart(4, '0');
     const month = (date.getMonth() + 1).toString().padStart(2, '0');
     const day = date.getDate().toString().padStart(2, '0');
@@ -39,6 +41,9 @@ export function buildOrgTimestamp(opts: OrgTimestampOptions): string {
     }
     if (repeater) {
         result += ` ${repeater}`;
+    }
+    if (warning) {
+        result += ` ${warning}`;
     }
     return result + close;
 }

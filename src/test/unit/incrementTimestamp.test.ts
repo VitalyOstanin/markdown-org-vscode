@@ -95,4 +95,12 @@ suite('incrementTimestamp', () => {
     test('repeater (++1w catch-up) survives a day shift', () => {
         assert.strictEqual(inc('<2026-05-15 Fri 12:00 ++1w>', 'day', 1), '<2026-05-16 Sat 12:00 ++1w>');
     });
+
+    test('warning cookie survives a day shift', () => {
+        assert.strictEqual(inc('<2026-05-15 Fri 12:00 -2d>', 'day', 1), '<2026-05-16 Sat 12:00 -2d>');
+    });
+
+    test('repeater and warning cookie together survive a day shift', () => {
+        assert.strictEqual(inc('<2026-05-15 Fri 12:00 +1w -2d>', 'day', 1), '<2026-05-16 Sat 12:00 +1w -2d>');
+    });
 });

@@ -43,6 +43,14 @@ export function matchTimestampLine(text: string): TimestampLineMatch | null {
 // (its `HEADING_PRIORITY_RE`, src/parser.rs): a single uppercase A-Z, or a
 // non-leading-zero decimal in 0..=64. The numeric alternatives are ordered
 // long-to-short so the regex engine never matches `6` before `64` or `1`
-// before `12`.
+// before `12`. The space after the cookie is optional there, so it is optional
+// here as well -- otherwise `[#A]Title` shows a priority in the agenda while
+// the commands on the same line see none and offer to add a second cookie.
+//
+// One difference is left standing on purpose: the extractor matches a cookie
+// ANYWHERE in the heading text, this pattern only right after the keyword.
+// Accepting it anywhere would mean rewriting the line from the captured parts
+// and moving the user's cookie to the front, which is a heavier change than a
+// grammar fix -- it belongs with the shared parser tracked in TODO.md.
 export const HEADING_REGEX =
-    /^(?<hashes>#+)\s+(?:(?<status>TODO|DONE|CANCELLED|CANCELED)\s+)?(?:\[#(?<priority>[A-Z]|6[0-4]|[1-5][0-9]|[0-9])\]\s+)?(?<title>.+)$/;
+    /^(?<hashes>#+)\s+(?:(?<status>TODO|DONE|CANCELLED|CANCELED)\s+)?(?:\[#(?<priority>[A-Z]|6[0-4]|[1-5][0-9]|[0-9])\]\s*)?(?<title>.+)$/;

@@ -208,6 +208,24 @@ suite('getTimestampPartAt (plain timestamp)', () => {
             assert.strictEqual(hit.active, false);
             assert.strictEqual(hit.match.groups!.repeater, '+1d');
         });
+
+        // A DEADLINE may carry a warning cookie (`-2d`), on its own or after a
+        // repeater. The extractor reads both; a timestamp the cursor engine
+        // could not parse left Shift+Up/Down silent on that line.
+        test('warning cookie alone is parsed and captured', () => {
+            const hit = getTimestampPartAt('<2026-01-12 Пн -2d>', 6);
+            assert.ok(hit);
+            assert.strictEqual(hit.part, 'month');
+            assert.strictEqual(hit.match.groups!.warning, '-2d');
+        });
+
+        test('repeater followed by a warning cookie is parsed', () => {
+            const hit = getTimestampPartAt('<2026-01-12 Пн +1w -2d>', 9);
+            assert.ok(hit);
+            assert.strictEqual(hit.part, 'day');
+            assert.strictEqual(hit.match.groups!.repeater, '+1w');
+            assert.strictEqual(hit.match.groups!.warning, '-2d');
+        });
     });
 });
 

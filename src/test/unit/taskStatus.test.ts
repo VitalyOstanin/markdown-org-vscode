@@ -66,6 +66,20 @@ suite('Task Status Tests', () => {
         assert.strictEqual(match.groups.title, 'Foo');
     });
 
+    // The extractor's cookie pattern ends in an OPTIONAL space
+    // (`HEADING_PRIORITY_RE`, src/parser.rs), so a heading typed without one
+    // still carries a priority in the agenda. Requiring the space here made
+    // the commands treat the same line as priority-free and offer to add a
+    // second cookie.
+    test('Parse heading with a priority cookie and no space after it', () => {
+        const match = '## TODO [#A]High priority task'.match(HEADING_REGEX);
+
+        assert.ok(match?.groups);
+        assert.strictEqual(match.groups.status, 'TODO');
+        assert.strictEqual(match.groups.priority, 'A');
+        assert.strictEqual(match.groups.title, 'High priority task');
+    });
+
     test('Parse heading with CANCELED (single-L) status', () => {
         const match = '### CANCELED Foo'.match(HEADING_REGEX);
 
