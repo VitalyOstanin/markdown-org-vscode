@@ -353,6 +353,20 @@
 - [x] Create CHANGELOG.md
     - Documented version 0.1.0 features
     - Set up format for future releases
+- [ ] Announce the Android client (`markdown-org-android`) in the extension
+    - Blocked until two things hold, both outside this repository: the
+      `markdown-org-extract` refactor is finished (the wire contract stops
+      moving) and the Android client has a release a reader can install. The
+      gate itself is tracked in the ecosystem coordinator's TODO (section
+      "Announce the Android client from the extension"), which is where the
+      state of all three projects is visible.
+    - What this repository then carries: a README section presenting the mobile
+      client next to the existing views (screenshots in BOTH themes, per the
+      capture rules above), a CHANGELOG entry, and a link to the client's
+      repository. Worth deciding at that point whether the extension should
+      also surface it once in the UI (a one-time notification on update) or
+      leave it to the README -- a notification is more visible and more
+      intrusive, so it is a decision, not a detail.
 
 ## Testing
 
