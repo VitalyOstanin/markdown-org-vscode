@@ -27,27 +27,34 @@ export interface ClipCounts {
 }
 
 /**
- * Count the rows of one day that the user cannot see.
+ * Count the rows of one day that the user cannot read.
  *
- * `above` are the rows the sticky day header covers -- their bottom edge is at
- * or over the header's bottom edge, which includes everything scrolled past
- * the top of the window. `below` are the rows that start at or under the
- * bottom edge of the viewport. A row that is partly visible counts as visible:
- * the chips answer "is any task of this day entirely out of view", and a half
- * row still shows its text.
+ * A row counts as hidden once less than half of its height is inside the band
+ * between the sticky header's bottom edge and the bottom of the viewport. Half
+ * is where the row stops being readable: a task line puts its text in the
+ * middle of its box, so a row sliced past the halfway mark shows padding, not
+ * words -- and a row cut by a few pixels still reads fine, so counting it
+ * would report a task the user can see. `above` is the side the day header
+ * covers (including everything scrolled past the top of the window), `below`
+ * is the bottom edge of the panel.
  *
- * The half-pixel slack absorbs sub-pixel layout: a row parked exactly under
- * the header lands on 0.3px differences between browsers and zoom levels, and
- * a chip that flickers between 0 and 1 while nothing moves is worse than one
- * that resolves the tie towards "visible".
+ * The half-pixel slack resolves a row parked exactly on the halfway mark
+ * towards "visible": sub-pixel layout differs by 0.3px between zoom levels,
+ * and a chip that flickers between 0 and 1 while nothing moves is worse than
+ * one that holds still.
  */
 export function countClippedRows(rows: ClipRectLike[], headerBottom: number, viewportHeight: number): ClipCounts {
     let above = 0;
     let below = 0;
     for (const row of rows) {
-        if (row.bottom <= headerBottom + 0.5) {
+        const height = row.bottom - row.top;
+        const visible = Math.min(row.bottom, viewportHeight) - Math.max(row.top, headerBottom);
+        if (visible + 0.5 >= height / 2) {
+            continue;
+        }
+        if (row.top < headerBottom) {
             above++;
-        } else if (row.top >= viewportHeight - 0.5) {
+        } else {
             below++;
         }
     }

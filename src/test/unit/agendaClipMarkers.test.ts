@@ -52,30 +52,47 @@ suite('countClippedRows', () => {
         assert.deepStrictEqual(countClippedRows(rows, HEADER_BOTTOM, VIEWPORT), { above: 1, below: 1 });
     });
 
-    test('a partly visible row counts as visible on either edge', () => {
-        // The chips answer "is any task entirely out of view", and half a row
-        // still shows its text -- counting it as hidden would report a task
-        // the user can read.
+    test('a row cut past its halfway mark counts as hidden on either edge', () => {
+        // 20 of 60px left under the header, 20 of 60px left above the bottom
+        // edge: both show padding rather than text.
         const rows = [
-            { top: 80, bottom: 140 }, // crosses the header's bottom edge
+            { top: 60, bottom: 120 }, // crosses the header's bottom edge
             { top: 480, bottom: 540 } // crosses the viewport's bottom edge
+        ];
+        assert.deepStrictEqual(countClippedRows(rows, HEADER_BOTTOM, VIEWPORT), { above: 1, below: 1 });
+    });
+
+    test('a row that keeps more than half of its height counts as visible', () => {
+        // 40 of 60px on either edge: cut, but the text still reads, and a chip
+        // that counts it would report a task the user can see.
+        const rows = [
+            { top: 80, bottom: 140 },
+            { top: 460, bottom: 520 }
         ];
         assert.deepStrictEqual(countClippedRows(rows, HEADER_BOTTOM, VIEWPORT), { above: 0, below: 0 });
     });
 
-    test('the half-pixel slack resolves a sub-pixel tie towards visible', () => {
-        // A row parked exactly under the header lands on 0.3px differences
+    test('a row sliced to a few pixels of padding counts as hidden', () => {
+        // The week view's own geometry: 42px rows, the last one starting 7px
+        // above the bottom edge. Counting it as visible reported one task
+        // fewer than the day actually hid.
+        const rows = [{ top: VIEWPORT - 7, bottom: VIEWPORT + 35 }];
+        assert.deepStrictEqual(countClippedRows(rows, HEADER_BOTTOM, VIEWPORT), { above: 0, below: 1 });
+    });
+
+    test('the half-pixel slack resolves a halfway tie towards visible', () => {
+        // A row parked exactly on the halfway mark lands on 0.3px differences
         // between zoom levels; without the slack the chip would flicker
         // between 0 and 1 while nothing moves.
-        const justUnder = [{ top: 80, bottom: 100.4 }];
-        const clearlyUnder = [{ top: 80, bottom: 100.6 }];
-        assert.strictEqual(countClippedRows(justUnder, HEADER_BOTTOM, VIEWPORT).above, 1);
-        assert.strictEqual(countClippedRows(clearlyUnder, HEADER_BOTTOM, VIEWPORT).above, 0);
+        const exactlyHalf = [{ top: 90, bottom: 110 }]; // 10 of 20px visible
+        const justUnderHalf = [{ top: 89, bottom: 109 }]; // 9 of 20px visible
+        assert.strictEqual(countClippedRows(exactlyHalf, HEADER_BOTTOM, VIEWPORT).above, 0);
+        assert.strictEqual(countClippedRows(justUnderHalf, HEADER_BOTTOM, VIEWPORT).above, 1);
 
-        const justPast = [{ top: 499.6, bottom: 520 }];
-        const clearlyInside = [{ top: 499.4, bottom: 520 }];
-        assert.strictEqual(countClippedRows(justPast, HEADER_BOTTOM, VIEWPORT).below, 1);
-        assert.strictEqual(countClippedRows(clearlyInside, HEADER_BOTTOM, VIEWPORT).below, 0);
+        const exactlyHalfBelow = [{ top: 490, bottom: 510 }];
+        const justUnderHalfBelow = [{ top: 491, bottom: 511 }];
+        assert.strictEqual(countClippedRows(exactlyHalfBelow, HEADER_BOTTOM, VIEWPORT).below, 0);
+        assert.strictEqual(countClippedRows(justUnderHalfBelow, HEADER_BOTTOM, VIEWPORT).below, 1);
     });
 
     test('a day with no rows reports nothing hidden', () => {
