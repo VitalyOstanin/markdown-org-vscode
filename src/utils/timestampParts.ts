@@ -50,10 +50,13 @@ export interface ClockTimestampPartHit {
 // on a DEADLINE that names its own warning window. Written in the canonical
 // order (repeater, then cookie); the extractor scans the two independently and
 // accepts either order, which the shared grammar in TODO.md settles.
-const TIMESTAMP_REGEX =
+// Exported so the editor highlighter (`orgHighlightSpans`) paints exactly the
+// parts this cursor engine can shift: one pattern, so a timestamp that Shift+Up
+// can edit is never left uncoloured, and vice versa.
+export const TIMESTAMP_REGEX =
     /(?<open>[<[])(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})(?: (?<weekday>[А-Яа-яA-Za-z]+))?(?: (?<hour>\d{2}):(?<minute>\d{2}))?(?: (?<repeater>(?:\.\+|\+\+|\+)\d+(?:wd|[dwmyh])))?(?: (?<warning>-\d+[dwmyh]))?(?<close>[>\]])/;
 
-function isPairedBracket(open: string, close: string): boolean {
+export function isPairedBracket(open: string, close: string): boolean {
     return (open === '<' && close === '>') || (open === '[' && close === ']');
 }
 

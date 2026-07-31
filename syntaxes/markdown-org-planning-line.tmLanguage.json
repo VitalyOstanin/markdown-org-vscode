@@ -1,0 +1,13 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "scopeName": "markdown.org.planning-line",
+  "injectionSelector": "L:text.html.markdown",
+  "patterns": [{ "include": "#planning-line" }],
+  "repository": {
+    "planning-line": {
+      "comment": "A planning line, marked as inline code so its punctuation keeps one colour at any indentation. Markdown itself only reaches that verdict when the line is indented by three spaces or less: at four spaces or a tab the line becomes an indented code block, which carries no inner rules and, in most themes, no colour -- while markdown-org-extract reads the line regardless of indentation. The `L:` prefix on the injection selector puts this rule ahead of the base grammar, which is what lets it match inside markup.raw.block.markdown. Only the punctuation relies on this scope: the keyword, the timestamp parts and the cookies are painted by the editor decorations in src/decorations/orgHighlight.ts, in the colours the agenda uses.",
+      "match": "^\\s*`?(?:SCHEDULED|DEADLINE|CLOSED|CREATED|CLOCK):.*$",
+      "name": "markup.inline.raw.string.markdown"
+    }
+  }
+}

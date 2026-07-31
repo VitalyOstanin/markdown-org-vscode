@@ -43,6 +43,7 @@ travel with the repository.
     - [`markdown-org.maintainFilePath`](#markdown-orgmaintainfilepath)
     - [`markdown-org.dateLocale`](#markdown-orgdatelocale)
     - [`markdown-org.uiLanguage`](#markdown-orguilanguage)
+    - [`markdown-org.highlightInEditor`](#markdown-orghighlightineditor)
     - [`markdown-org.firstDayOfWeek`](#markdown-orgfirstdayofweek)
     - [`markdown-org.fileTags`](#markdown-orgfiletags)
     - [`markdown-org.currentTag`](#markdown-orgcurrenttag)
@@ -86,7 +87,8 @@ connect / select / sync demos and [ADR-0010](docs/adr/0010-google-calendar-sync.
 - **Timestamps** -- `CREATED`, `SCHEDULED`, `DEADLINE`, `CLOSED` with full date / time, in both active `<...>` and inactive `[...]` forms per [ADR-0005](docs/adr/0005-active-and-inactive-timestamps.md).
 - **Repeating tasks** -- Org-mode repeaters `+1d`, `+1w`, `+1m`, `.+1m`, `++1w`, and `+1wd` for workdays (skips weekends and Russian holidays).
 - **CLOCK entries** -- Time tracking with start / finish events and an aggregated CLOCK table per file.
-- **Agenda views** -- Day, Week, Month and Tasks. Day and Tasks are cards (a sticky summary bar plus sections by time of day or by priority), the week groups overdue, scheduled and upcoming tasks under sticky day headers, and the month calendar shows a per-day task count that turns red when a day holds something overdue. Views keep a browser-style history you can step through with the Back / Forward commands. In the week, a day header whose rows do not all fit shows how many are out of sight -- `↑ N` behind the pinned header, `↓ M` below the bottom of the panel -- so a day that continues past the edge is never mistaken for a short one.
+- **Agenda views** -- Day, Week, Month and Tasks. Day and Tasks are cards (a sticky summary bar plus sections by time of day or by priority), the week groups overdue, scheduled and upcoming tasks under sticky day headers, and the month calendar shows a per-day task count that turns red when a day holds something overdue. Views keep a browser-style history you can step through with the Back / Forward commands. In the week, a day header whose rows do not all fit shows how many are out of sight -- `↑ N` behind the pinned header, `↓ M` below the bottom of the panel -- so a day that continues past the edge is never mistaken for a short one. A row counts once less than half of it is visible, which is where its text stops being readable.
+- **Editor colouring** -- Planning keywords, the parts of a timestamp (date, weekday, time, repeater, warning cookie), status keywords and the `[#A]` / `[#B]` / `[#C]` cookies are coloured in markdown editors, in the same colours the agenda uses for the same things. It works at any indentation, including the four spaces that make markdown treat a line as a code block and stop highlighting it -- the indentation the extractor reads without complaint. Turn it off with [`markdown-org.highlightInEditor`](#markdown-orghighlightineditor).
 - **Interface language** -- The agenda panel speaks English or Russian, following [`markdown-org.uiLanguage`](#markdown-orguilanguage); by default it follows the date locale, then the VS Code display language.
 - **Tag filtering** -- Filter agenda by file-name patterns (e.g. `WORK` / `PRIVATE`), toggled from the agenda or by hotkey.
 - **Git status of the source files** -- A chip in the agenda header counts the files of the current view that have uncommitted changes and the files touched by unpushed commits, and expands to the list behind those numbers. Commit (only the view's changed files, never unrelated edits in the same repository) and push run from the same dropdown. Files reached through a symlink resolve to the repository behind them, including one outside the open workspace folders. Needs no setting and no configuration: the chip appears when the built-in Git extension is available and the files are tracked. See [ADR-0016](docs/adr/0016-git-status-via-git-extension-api.md).
@@ -573,6 +575,27 @@ The setting covers what the agenda panel itself renders. Three things stay in En
 ```
 
 The setting is read on every agenda render, so an open panel follows a change on the next refresh. Command names are supplied by the extension manifest, which ships English strings only (see [ADR-0013](docs/adr/0013-agenda-ui-language-own-dictionary.md)).
+
+### `markdown-org.highlightInEditor`
+
+**Type:** `boolean`
+**Default:** `true`
+
+Colour org constructs in markdown editors: the planning keywords `SCHEDULED`, `DEADLINE`, `CLOSED`, `CREATED` and `CLOCK`, the parts of every timestamp (date, weekday, time, repeater, warning cookie), the status keywords `TODO` / `DONE` / `CANCELLED` on a heading, and the `[#A]` / `[#B]` / `[#C]` cookies.
+
+The colours are the ones the agenda paints the same things with -- a DEADLINE and a `[#A]` red, a repeater and a `[#B]` amber, a SCHEDULED, a time and a `[#C]` blue, DONE green, a cancelled task grey -- so a task line reads the same in both places. They are theme colour tokens (`charts.*`, `disabledForeground`), so a light theme gets its own shades rather than fixed values.
+
+This runs as editor decorations rather than a syntax grammar, which is what makes it work at **any** indentation. Markdown reads a line indented by four spaces or a tab as an indented code block and highlights nothing inside it, while `markdown-org-extract` reads the planning line at any indentation -- the editor and the agenda used to disagree about such a line.
+
+The punctuation between the coloured parts -- the backticks, the colon after the keyword, the timestamp brackets, a CLOCK range's `--` and its `=> H:MM` duration -- keeps the colour the theme gives inline code (amber in Monokai), at any indentation. That is the colour it has always had at shallow indentation, where the backticks make markdown read the run as inline code; at four spaces or a tab markdown instead reads the line as an indented code block and gives it no colour, which made the same line look like two different things depending on how deep it sits. A one-rule injection grammar (`syntaxes/markdown-org-planning-line.tmLanguage.json`, contributed with `injectTo: ["text.html.markdown"]`) marks a planning line as inline code regardless of indentation, so the theme keeps deciding that colour.
+
+The trade-off: the decorations cannot tell a planning line apart from the same text inside a real code block, so a documentation example is coloured too. Set the value to `false` to leave editors to the markdown grammar alone.
+
+```json
+{
+    "markdown-org.highlightInEditor": false
+}
+```
 
 ### `markdown-org.firstDayOfWeek`
 
