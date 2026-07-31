@@ -60,6 +60,15 @@
     }
   },
   "contributes": {
+    "grammars": [
+      {
+        "scopeName": "markdown.org.planning-line",
+        "path": "./syntaxes/markdown-org-planning-line.tmLanguage.json",
+        "injectTo": [
+          "text.html.markdown"
+        ]
+      }
+    ],
     "commands": [
       {
         "command": "markdown-org.setTodo",
@@ -371,6 +380,11 @@
           "default": "auto",
           "description": "Language of the agenda interface (buttons, section titles, tooltips). Notification messages, command names and these setting descriptions stay in English."
         },
+        "markdown-org.highlightInEditor": {
+          "type": "boolean",
+          "default": true,
+          "description": "Colour org constructs in markdown editors -- planning keywords, timestamp parts, status keywords and priority cookies -- using the same colours as the agenda. Works at any indentation, including the four spaces that make markdown treat a line as a code block. The colouring cannot tell a planning line apart from the same text inside a real fenced code block, so a documentation example is coloured too; turn this off to leave editors to the markdown grammar alone."
+        },
         "markdown-org.firstDayOfWeek": {
           "type": "string",
           "enum": [
@@ -532,12 +546,12 @@
     "brace-expansion": "^5.0.8"
   },
   "x-markdown-org": {
-    "extractorVersion": "0.11.1",
+    "extractorVersion": "0.12.0",
     "extractorSha256": {
-      "x86_64-unknown-linux-gnu": "5095947c9bf2529f38661e9c947a0337e2d6117d025206bea8196896b746e305",
-      "x86_64-apple-darwin": "49996beef9b3f5e832c10fc99792080250325ce30f4ac41ec46d2fa28da82a6d",
-      "aarch64-apple-darwin": "2f952f53b9b8c45b10098b2aba84637f3d51be5a04bcd29411dab9e455bd2deb",
-      "x86_64-pc-windows-msvc": "cdb67cc3d4a13600d56585d63ae0ff944da497b199c50b236ccd42cfccda35a7"
+      "x86_64-unknown-linux-gnu": "3aef2081e1289a405914a631db8084f103a7fd89f657382520454bf76abf1458",
+      "x86_64-apple-darwin": "187f46b74b0939a7fb9f38eba4db85b69f925ba6bbd504772109a16e7730a018",
+      "aarch64-apple-darwin": "a0cb5071e421bd46a7f160e97618873b0b5e6713c05ab4cd758e4e223edb63c2",
+      "x86_64-pc-windows-msvc": "8549eec30e044ba18453d0ed8efde2e895fe33614a8a70bb5c4abef30ea103f5"
     }
   },
   "devDependencies": {

@@ -9,12 +9,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Editor colouring for org constructs, in the colours the agenda already uses
+  for the same things: planning keywords (`SCHEDULED`, `DEADLINE`, `CLOSED`,
+  `CREATED`, `CLOCK`), the parts of every timestamp (date, weekday, time,
+  repeater, warning cookie), the status keyword on a heading and the `[#A]` /
+  `[#B]` / `[#C]` cookies. Unlike the markdown grammar it works at any
+  indentation: four spaces or a tab make markdown read a line as an indented
+  code block and highlight nothing inside it, while the extractor reads the
+  planning line regardless -- so a line the agenda acts on used to sit
+  colourless in the editor. Implemented as editor decorations pointing at theme
+  colour tokens (`charts.*`), which is what allows the two views to agree on a
+  colour; a grammar can only name a scope and leave the colour to the theme.
+  The punctuation between the coloured parts (backticks, the keyword's colon, the
+  timestamp brackets, a CLOCK range's `--` and its `=> H:MM` duration) keeps the
+  theme's inline-code colour at any indentation, which is the colour it already
+  had at shallow indentation -- a one-rule injection grammar marks a planning
+  line as inline code, the verdict markdown itself only reaches while the line is
+  indented by three spaces or less. The decorations cannot tell a planning line
+  apart from the same text inside a real code block, so a documentation example
+  is coloured too; the new `markdown-org.highlightInEditor` setting turns the
+  decorations off.
 - Clipping markers on the week view's day headers. When a day holds more rows
   than fit, its header shows how many are out of sight: `↑ N` for the rows
   behind the pinned header and `↓ M` for those below the bottom of the panel,
-  each with a tooltip spelling the count out. A day whose rows are all visible
-  shows neither. The header also casts a shadow while it covers rows, so
+  each with a tooltip spelling the count out. A row counts as out of sight once
+  less than half of it is inside the visible band -- that is where a task line
+  stops showing its text -- so a row sliced to a strip of padding is counted
+  while one merely cut at the edge is not. A day whose rows are all visible
+  shows neither chip. The header also casts a shadow while it covers rows, so
   "this day continues above" reads without looking at the number.
+
+### Changed
+
+- The bundled extractor is 0.12.0. A heading now keeps the text of an inline
+  code span: ``## TODO `build` is broken`` shows as `build is broken`
+  rather than as `is broken` -- the literal used to be dropped along with the
+  backticks, taking a word out of the middle of the title. The version is also
+  the one the Android client compiles in, so both read a file the same way.
 
 ### Fixed
 
