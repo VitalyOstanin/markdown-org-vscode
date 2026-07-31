@@ -44,6 +44,7 @@ was decided, and the trade-offs that came with it.
 | 0014 | [One agenda style, no style switcher](0014-single-agenda-style.md)                                         | Accepted                                                  |
 | 0015 | [Pin "today" with `--current-date`, not `--date`](0015-pin-today-with-current-date.md)                     | Accepted                                                  |
 | 0016 | [Read the agenda's git status through the Git extension API](0016-git-status-via-git-extension-api.md)     | Accepted                                                  |
+| 0017 | [Marking a repeating task done moves it forward](0017-repeating-tasks-move-on-done.md)                     | Accepted                                                  |
 
 ## Adding a new ADR
 

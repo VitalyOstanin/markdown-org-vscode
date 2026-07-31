@@ -265,4 +265,85 @@ suite('Task Status Integration Tests', () => {
         await vscode.commands.executeCommand('markdown-org.timestampUp');
         assert.strictEqual(document.lineAt(0).text, '## TODO [#64] Numeric task');
     });
+
+    // Completing a repeating task moves it instead of closing it (ADR-0017),
+    // which is what the phone does as well. Dates are built relative to today
+    // so the expectation does not go stale.
+    suite('repeating tasks', () => {
+        test('DONE on a repeating task moves the date and leaves it open', async () => {
+            const yesterday = shiftDays(new Date(), -1);
+            document = await vscode.workspace.openTextDocument({
+                content: `## TODO Water the plants\n\`SCHEDULED: ${stamp(yesterday, '+1d')}\`\n`,
+                language: 'markdown'
+            });
+            editor = await vscode.window.showTextDocument(document);
+
+            await vscode.commands.executeCommand('markdown-org.setDone');
+
+            assert.strictEqual(document.lineAt(0).text, '## TODO Water the plants');
+            assert.strictEqual(document.lineAt(1).text, `\`SCHEDULED: ${stamp(new Date(), '+1d')}\``);
+        });
+
+        test('a heading with no keyword gains none, and the date still moves', async () => {
+            const yesterday = shiftDays(new Date(), -1);
+            document = await vscode.workspace.openTextDocument({
+                content: `## Water the plants\n\`SCHEDULED: ${stamp(yesterday, '+1d')}\`\n`,
+                language: 'markdown'
+            });
+            editor = await vscode.window.showTextDocument(document);
+
+            await vscode.commands.executeCommand('markdown-org.setDone');
+
+            assert.strictEqual(document.lineAt(0).text, '## Water the plants');
+            assert.strictEqual(document.lineAt(1).text, `\`SCHEDULED: ${stamp(new Date(), '+1d')}\``);
+        });
+
+        test('clearing DONE moves nothing', async () => {
+            const yesterday = shiftDays(new Date(), -1);
+            const scheduled = `\`SCHEDULED: ${stamp(yesterday, '+1d')}\``;
+            document = await vscode.workspace.openTextDocument({
+                content: `## DONE Water the plants\n${scheduled}\n`,
+                language: 'markdown'
+            });
+            editor = await vscode.window.showTextDocument(document);
+
+            await vscode.commands.executeCommand('markdown-org.setDone');
+
+            assert.strictEqual(document.lineAt(0).text, '## Water the plants');
+            assert.strictEqual(document.lineAt(1).text, scheduled);
+        });
+
+        test('a task without a repeater is closed as before', async () => {
+            const scheduled = `\`SCHEDULED: ${stamp(new Date())}\``;
+            document = await vscode.workspace.openTextDocument({
+                content: `## TODO Pay the bill\n${scheduled}\n`,
+                language: 'markdown'
+            });
+            editor = await vscode.window.showTextDocument(document);
+
+            await vscode.commands.executeCommand('markdown-org.setDone');
+
+            assert.strictEqual(document.lineAt(0).text, '## DONE Pay the bill');
+            assert.strictEqual(document.lineAt(1).text, scheduled);
+        });
+    });
 });
+
+/**
+ * `<YYYY-MM-DD>` or `<YYYY-MM-DD +1d>`: the date-only active form the tests
+ * above compare against, with the repeater inside the brackets where org puts
+ * it.
+ */
+function stamp(date: Date, repeater?: string): string {
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
+    const tail = repeater ? ` ${repeater}` : '';
+    return `<${date.getFullYear()}-${month}-${day}${tail}>`;
+}
+
+/** `days` from `date`, as a new `Date`. */
+function shiftDays(date: Date, days: number): Date {
+    const moved = new Date(date.getTime());
+    moved.setDate(moved.getDate() + days);
+    return moved;
+}

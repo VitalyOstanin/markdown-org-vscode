@@ -5,6 +5,9 @@ import { buildHeading } from '../utils/buildHeading';
 import { computeToggledStatus, normalizeTaskType } from '../utils/normalizeTaskType';
 import type { TaskStatus } from '../types';
 import { namedGroups } from '../utils/regexGroups';
+import { planCompletion, type CompletionPlan } from '../utils/completeRepeatingTask';
+import { notifyError } from '../utils/notify';
+import { formatError } from '../utils/formatError';
 
 function formatActiveTimestamp(date: Date): string {
     return formatOrgTimestamp(date, 'angle');
@@ -39,9 +42,40 @@ export async function setTaskStatus(status: TaskStatus) {
 
     // Toggle rule lives in computeToggledStatus (unit-tested): re-applying the
     // same logical keyword clears it; cancelled spellings count as one status.
+    const toggled = computeToggledStatus(currentStatus, status);
+
+    // Org-mode does not close a task that repeats: this occurrence is done and
+    // the next one is due later, so the planning dates move and the keyword
+    // goes back to open (ADR-0017). Only when DONE is being applied — clearing
+    // it, or marking the task cancelled, moves nothing.
+    if (toggled === 'DONE') {
+        const plan = planRepeatingCompletion(editor, headingLine);
+        if (plan === undefined) {
+            return; // the repeater is there and cannot be advanced; said so already
+        }
+        if (plan.repeated) {
+            const reopened = buildHeading({
+                hashes,
+                // A heading that carries no keyword keeps carrying none: the
+                // user asked for the date to move, not for the line to become
+                // a task. Same rule as the core's.
+                status: currentStatus ? 'TODO' : undefined,
+                priority,
+                title
+            });
+
+            return editor.edit((editBuilder) => {
+                editBuilder.replace(line.range, reopened);
+                for (const shifted of plan.planning) {
+                    editBuilder.replace(editor.document.lineAt(shifted.line).range, shifted.text);
+                }
+            });
+        }
+    }
+
     const newText = buildHeading({
         hashes,
-        status: computeToggledStatus(currentStatus, status),
+        status: toggled,
         priority,
         title
     });
@@ -49,6 +83,28 @@ export async function setTaskStatus(status: TaskStatus) {
     return editor.edit((editBuilder) => {
         editBuilder.replace(line.range, newText);
     });
+}
+
+/**
+ * What completing the task at `headingLine` moves, or `undefined` when a
+ * repeater is there but cannot be advanced — in which case the user has been
+ * told and nothing should be written.
+ *
+ * `wd` is the case that cannot be advanced: working days depend on the public
+ * calendar, and the extractor publishes the holidays but not the Saturdays
+ * moved to working (`--holidays` carries one of the two lists). Counting
+ * without them would put the editor a day or two off the phone, which is the
+ * disagreement this whole path exists to remove.
+ */
+function planRepeatingCompletion(editor: vscode.TextEditor, headingLine: number): CompletionPlan | undefined {
+    const lines = editor.document.getText().split(/\r?\n/);
+
+    try {
+        return planCompletion({ lines, heading: headingLine, today: new Date() });
+    } catch (error) {
+        notifyError(`Cannot move the repeating task: ${formatError(error)}`);
+        return undefined;
+    }
 }
 
 /** Shorthand for `setTaskStatus('CANCELLED')`. */

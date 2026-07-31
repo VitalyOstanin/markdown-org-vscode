@@ -41,6 +41,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Marking a repeating task DONE now moves it forward instead of closing it, as
+  Emacs Org-mode does (`org-auto-repeat-maybe`) and as the Android client of
+  the same ecosystem already did: the planning dates take one step (`+N`), step
+  until they pass today (`++N`) or restart from today (`.+N`), and the keyword
+  goes back to `TODO`. A heading that carried no keyword still carries none, a
+  planning line without a repeater is left where it is, and clearing DONE or
+  marking a task cancelled moves nothing. A `wd` (working days) repeater is
+  refused with a message rather than approximated: working days depend on the
+  public calendar, of which the extractor publishes the holidays but not the
+  Saturdays moved to working, and counting without them would put the editor a
+  day or two off the phone. See ADR-0017.
 - The bundled extractor is 0.12.0. A heading now keeps the text of an inline
   code span: ``## TODO `build` is broken`` shows as `build is broken`
   rather than as `is broken` -- the literal used to be dropped along with the
