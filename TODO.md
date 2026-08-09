@@ -164,6 +164,33 @@
       if the native `title` proves insufficient.
     - Design-language principle recorded alongside the other agenda visual
       principles (design log, principle 7).
+
+- [ ] Tooltips on the rest of the agenda
+    - The elements carrying none, from a walk over the HTML builders on
+      2026-08-09: the time column (`.time-plain`, whose dash stands for an
+      all-day task), the heading (`.heading`, which already knows the file and
+      the line it came from through `data-file` / `data-line`), the offset
+      column (`.offset`, where overdue and upcoming read apart by styling
+      alone), the day summary counts (`.day-summary-stat`), the clip chips
+      (`.day-clip-count`, a bare number of rows past the top or the bottom
+      edge), the glyphs inside the git chip (`.git-chip-stat`) and the mark on
+      a file row (`.git-file-mark`, whose button title names the path rather
+      than the mark).
+    - The strings belong in `agendaI18n`, and the value-derived ones in the
+      `agendaTooltips` helpers, which is what puts them within reach of the
+      unit suite.
+
+- [ ] A styled tooltip of our own instead of the native `title`
+    - Raised out of the deferred note above. `title` gives one line, a delay
+      the page cannot set and no theming, so a tooltip that has to state a date
+      and a source together does not fit in it.
+    - Keyboard focus and the screen reader have to keep reading what `title`
+      hands them today, so `aria-label` (or `aria-describedby`) carries the
+      same text once the attribute goes.
+    - The Android client needs none of this: Material's `TooltipBox` already
+      owns the delay and the positioning there, so only the coverage above
+      applies to it.
+
 - [ ] Agenda rendering at scale
     - Measure the render cost of the Tasks and Month views on a large corpus
       (1k+ tasks) before choosing a fix; the pre-release review of 2026-07-25
