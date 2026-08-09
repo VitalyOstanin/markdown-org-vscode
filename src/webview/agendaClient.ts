@@ -469,8 +469,10 @@ export interface AgendaClientDeps {
                 strings: TooltipStrings,
                 fill: (template: string, ...values: string[]) => string
             ) => string;
+            showDate?: 'when-offset' | 'always' | undefined;
         }
     ) => string;
+    taskDateDirection: (task: Task, anchorIso: string) => 'overdue' | 'today' | 'upcoming' | undefined;
     renderCard: (
         kind: 'day' | 'tasks',
         summaryHtml: string,
@@ -633,6 +635,7 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         buildWeekdayLabels,
         renderMonthCalendar,
         renderTaskRow,
+        taskDateDirection,
         renderCard,
         renderGitMenu
     } = deps;
@@ -1321,11 +1324,18 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         if (summary.done > 0) {
             pieces.push(summaryStat(summary.done, UI.summary.done, 'day-summary-done'));
         }
+        // This card holds tasks of every date at once, so a row states its own
+        // date -- a bare 09:30 names no day -- and reads its direction off that
+        // date rather than off a bucket. The anchor is the pinned today when
+        // one is set (ADR-0015), the real one otherwise.
+        const anchor = shiftedToday || toIsoDate(new Date());
         // Group key -> section key: "pa"/"pb"/"pc"/"pnone", which the style sheet
         // tints to match the priority chip colours.
         const groupsHtml = groups
             .map((group) => {
-                const rows = group.items.map((task) => renderTask(task)).join('');
+                const rows = group.items
+                    .map((task) => renderTask(task, undefined, taskDateDirection(task, anchor), 'always'))
+                    .join('');
                 return renderSectionPanel(`p${group.key}`, group.title, group.items.length, rows);
             })
             .join('');
@@ -1338,8 +1348,14 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
 
     // The row markup is in utils/agendaCardHtml.ts; this binds the page's
     // dictionary and the memoised date formatter to it. Called from both cards.
-    function renderTask(task: TaskWithOffset, daysOffset?: number, taskType?: string): string {
+    function renderTask(
+        task: TaskWithOffset,
+        daysOffset?: number,
+        taskType?: string,
+        showDate?: 'when-offset' | 'always'
+    ): string {
         return renderTaskRow(task, daysOffset, taskType, {
+            showDate,
             tooltips: UI.tooltips,
             escapeHtml,
             formatString,

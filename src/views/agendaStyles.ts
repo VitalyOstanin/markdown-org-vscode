@@ -538,6 +538,23 @@ export const AGENDA_STYLES = `
         }
         .offset[data-dir="overdue"] { color: var(--vscode-descriptionForeground); text-align: right; }
         .offset[data-dir="upcoming"] { color: var(--vscode-textLink-foreground); text-align: right; font-weight: bold; }
+        /* A date that is neither behind nor ahead carries no urgency, so it
+           stays in the muted meta colour of the rest of the row's edge (design
+           principle 4: colour is spent on urgency alone). Only the Tasks card,
+           which has no anchor day, renders this direction. */
+        .offset[data-dir="today"] { color: var(--vscode-descriptionForeground); text-align: right; }
+        /* The Tasks card inverts which direction earns the colour. In the day
+           and week views a date appears only on the rare row that sits off the
+           anchor day, so highlighting the ones ahead reads as "this is not
+           today". The Tasks card dates every row, and there the same rule paints
+           most of the right edge in bold blue while an overdue date stays as
+           muted as a today one -- attention pulled towards the least urgent
+           work. Colour goes to what is late instead (design principle 4). */
+        .day-card[data-card="tasks"] .offset[data-dir="upcoming"] {
+            color: var(--vscode-descriptionForeground);
+            font-weight: normal;
+        }
+        .day-card[data-card="tasks"] .offset[data-dir="overdue"] { color: var(--vscode-charts-red); }
         /* ============ month calendar ============
            Same visual language as the cards and the nav pill: rounded cells on
            a hairline border, colour reserved for meaning (today, holidays, task
@@ -715,19 +732,12 @@ export const AGENDA_STYLES = `
                foreground. */
             color: var(--accent-blue);
         }
-        /* time column shows an em-dash placeholder when a task has no clock
-           time, so the big-time column never collapses to blank (per mockup). */
-        .time-plain:empty::before {
-            content: "—";
-            color: var(--vscode-disabledForeground);
-            font-weight: normal;
-        }
-        /* ...except in the date-less Tasks card, where most rows have no clock
-           time and a full column of em-dashes reads as noise. The cell keeps
-           its width, so the columns stay aligned with the timed rows. */
-        .day-card[data-card="tasks"] .time-plain:empty::before {
-            content: "";
-        }
+        /* A task with no clock time leaves the column empty: design principle 2
+           ("time is the spine of the row") asks for a fixed, right-aligned time
+           column that is blank when there is no time, and the cell keeps its
+           width either way, so the rows stay aligned. The em-dash that used to
+           stand here came from the mockup and read as "no data" on a task that
+           simply runs all day. */
         /* flag column */
         .flag {
             display: block;

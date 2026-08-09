@@ -42,6 +42,7 @@ import {
     resolveFirstDayOffset
 } from '../utils/agendaCalendarHtml';
 import { renderCard, renderTaskRow } from '../utils/agendaCardHtml';
+import { taskDateDirection } from '../utils/agendaDateDirection';
 import {
     gitActions,
     gitChipStats,
@@ -1146,6 +1147,7 @@ export class AgendaPanel {
         calendarCellOpenTag,
         renderMonthCalendar,
         renderTaskRow,
+        taskDateDirection,
         renderCard,
         // The git chip's markup, split the way the rest of the header is: the
         // exported helpers are what the inlined bodies call, and a function

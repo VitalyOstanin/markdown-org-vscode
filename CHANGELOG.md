@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Every row of the Tasks view states its date, in full and with the year. The
+  view lists tasks of every date at once, so a bare `09:30` named no day and a
+  task with no time named nothing at all; the date now sits in the row's right
+  edge, where the day and week views already put it. Only a date behind today is
+  coloured; today's own date and the ones ahead stay in the muted meta colour --
+  with every row dated, colour is spent on what is late alone. The day and week
+  views are unchanged: a date there appears only on a row that sits off the
+  anchor day, and highlighting the ones ahead still says "not this day".
+- The time column of a task with no clock time is empty again, instead of
+  holding an em-dash. A task that runs all day is not a task whose time is
+  missing, and the column keeps its width either way, so the rows stay aligned.
+
 ### Added
 
 - Editor colouring for org constructs, in the colours the agenda already uses

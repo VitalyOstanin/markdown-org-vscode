@@ -56,6 +56,14 @@ function row(t: TaskWithOffset, daysOffset?: number, taskType?: string): Element
     return el;
 }
 
+/** A row as the date-less Tasks card renders it: every date spelled out. */
+function alwaysDatedRow(t: TaskWithOffset, taskType?: string): Element {
+    const html = renderTaskRow(t, undefined, taskType, { ...ctx, showDate: 'always' });
+    const el = parse(html).querySelector('.task-line');
+    assert.ok(el, 'expected a task row');
+    return el;
+}
+
 suite('agendaCardHtml.renderTaskRow', () => {
     test('the row carries the click target: file and line', () => {
         const el = row(task());
@@ -106,6 +114,23 @@ suite('agendaCardHtml.renderTaskRow', () => {
     test('the offset column says which way it points', () => {
         assert.strictEqual(row(task(), 3, 'upcoming').querySelector('.offset')?.getAttribute('data-dir'), 'upcoming');
         assert.strictEqual(row(task(), -3, 'overdue').querySelector('.offset')?.getAttribute('data-dir'), 'overdue');
+    });
+
+    test('a card with no date axis spells the date out on every row, today included', () => {
+        // The Tasks card holds tasks of every date at once, so a bare 09:30
+        // names no day. The date is the only thing that places such a row.
+        assert.strictEqual(alwaysDatedRow(task(), 'today').querySelector('.offset')?.textContent, '[2025-12-09]');
+        assert.strictEqual(alwaysDatedRow(task(), 'overdue').querySelector('.offset')?.textContent, '[2025-12-09]');
+    });
+
+    test('a task carrying no date leaves the column empty rather than inventing one', () => {
+        const undated = task();
+        delete undated.timestamp_date;
+        assert.strictEqual(alwaysDatedRow(undated).querySelector('.offset')?.textContent, '');
+    });
+
+    test('a date on the anchor day points neither back nor forward', () => {
+        assert.strictEqual(alwaysDatedRow(task(), 'today').querySelector('.offset')?.getAttribute('data-dir'), 'today');
     });
 
     test('every glyph column carries a tooltip -- colour and shape are the only other legend', () => {

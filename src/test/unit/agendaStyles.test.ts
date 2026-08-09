@@ -46,6 +46,24 @@ suite('AGENDA_STYLES theming invariant', () => {
         assert.strictEqual(/#[0-9a-fA-F]{3,8}\b/.test(withoutContent), false);
     });
 
+    // Where every row carries a date, the emphasis has to sit on what is late.
+    // The day and week views keep the opposite rule (a date there means "not
+    // this day"), so both overrides must stay scoped to the Tasks card.
+    test('the Tasks card spends the date colour on overdue, not upcoming', () => {
+        assert.ok(
+            /\.day-card\[data-card="tasks"\] \.offset\[data-dir="overdue"\][^}]*var\(--vscode-charts-red\)/s.test(
+                AGENDA_STYLES
+            ),
+            'an overdue date in the Tasks card must be painted red'
+        );
+        assert.ok(
+            /\.day-card\[data-card="tasks"\] \.offset\[data-dir="upcoming"\][^}]*var\(--vscode-descriptionForeground\)/s.test(
+                AGENDA_STYLES
+            ),
+            'an upcoming date in the Tasks card must fall back to the muted meta colour'
+        );
+    });
+
     test('the time and offset columns use tabular-nums', () => {
         assert.ok(/font-variant-numeric:\s*tabular-nums/.test(AGENDA_STYLES));
     });

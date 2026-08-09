@@ -48,6 +48,13 @@ export interface TaskRowContext {
         task?: TaskWithOffset
     ) => string;
     priorityTooltip: (letter: string, strings: TooltipStrings, fill: FormatString) => string;
+    /**
+     * Whether a row spells its date out. `when-offset` (the default) is the
+     * day and week reading: the view already names the day, so only a row that
+     * sits off it repeats the date. `always` is for the Tasks card, which
+     * holds tasks of every date at once -- there a bare `09:30` names no day.
+     */
+    showDate?: 'when-offset' | 'always' | undefined;
 }
 
 /**
@@ -71,9 +78,13 @@ export function renderTaskRow(
     const flag = ctx.resolveTaskFlag(task, ctx.isCancelled);
     const attention = ctx.resolveAttentionLevel(task, daysOffset, taskType, ctx.isCancelled);
 
+    const offDay = daysOffset !== undefined && daysOffset !== 0;
     const dateDisplay =
-        daysOffset !== undefined && daysOffset !== 0 && task.timestamp_date ? ctx.formatDate(task.timestamp_date) : '';
-    const dateDir = taskType === 'upcoming' ? 'upcoming' : 'overdue';
+        task.timestamp_date && (ctx.showDate === 'always' || offDay) ? ctx.formatDate(task.timestamp_date) : '';
+    // `today` is the third direction a date can point: neither back nor
+    // forward. It only arises where the date is shown for its own sake (the
+    // Tasks card), since a view anchored on a day says so in its header.
+    const dateDir = taskType === 'upcoming' ? 'upcoming' : taskType === 'today' ? 'today' : 'overdue';
     // Source of truth: agendaHeadingTint.ts. `typeAttr` feeds the
     // [data-type="deadline"] selector that paints the heading red for a
     // DEADLINE task; resolveHeadingClass still owns the DEADLINE > priority >
@@ -84,8 +95,8 @@ export function renderTaskRow(
         `<div class="task-line" data-status="${statusKind}" data-priority="${priorityAttr}"` +
         ` data-type="${typeAttr}" data-file="${ctx.escapeHtml(task.file)}"` +
         ` data-line="${ctx.sanitizeTaskLine(task.line)}">` +
-        // The big-time column: a clean HH:MM, or empty for an all-day task (the
-        // stylesheet then fills in an em-dash placeholder).
+        // The big-time column: a clean HH:MM, or empty for an all-day task --
+        // an empty column is the whole statement, no placeholder glyph.
         `<span class="time-plain">${ctx.escapeHtml(task.timestamp_time ?? '')}</span>` +
         `<span class="status" data-status="${statusKind}" data-attention="${attention}"` +
         ` title="${ctx.escapeHtml(ctx.attentionTooltip(attention, ctx.tooltips))}">${ctx.escapeHtml(status)}</span>` +
