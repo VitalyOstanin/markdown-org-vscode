@@ -1,10 +1,14 @@
 import * as assert from 'node:assert';
 import { suite, test } from 'mocha';
-import { agendaSourceFiles } from '../../utils/git/agendaSourceFiles';
+import { agendaSourceFiles, agendaSourceRoots } from '../../utils/git/agendaSourceFiles';
 import type { DayAgenda, Task } from '../../types';
 
 function task(file: string, heading = 'x'): Task {
     return { file, line: 1, heading, content: '' };
+}
+
+function taskIn(root: string, file: string): Task {
+    return { ...task(file), root };
 }
 
 suite('agendaSourceFiles', () => {
@@ -48,5 +52,23 @@ suite('agendaSourceFiles', () => {
 
     test('an empty payload yields no files', () => {
         assert.deepStrictEqual(agendaSourceFiles([]), []);
+    });
+});
+
+suite('agendaSourceRoots', () => {
+    test('collects the roots of a day payload in order of first appearance', () => {
+        const day: DayAgenda = {
+            date: '2026-08-10',
+            overdue: [taskIn('/notes/work', '/notes/work/a.md')],
+            scheduled_timed: [taskIn('/notes/home', '/notes/home/b.md')],
+            scheduled_no_time: [taskIn('/notes/work', '/notes/work/c.md')]
+        };
+        assert.deepStrictEqual(agendaSourceRoots([day]), ['/notes/work', '/notes/home']);
+    });
+
+    test('a single-directory run reports no root, so there is nothing to mark', () => {
+        // The extractor omits `root` when it swept one directory: the caller
+        // named it and the field would only repeat it back.
+        assert.deepStrictEqual(agendaSourceRoots([task('/notes/a.md'), task('/notes/b.md')]), []);
     });
 });

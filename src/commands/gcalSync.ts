@@ -36,6 +36,7 @@ import { formatError, notifyInfo, notifyWarn } from '../utils/notify';
 import { debounce, type DebouncedFunction } from '../utils/debounce';
 import { timestampedLine } from '../utils/logLine';
 import { at } from '../utils/exactIndex';
+import { resolveAgendaDirectories } from '../utils/agendaDirectories';
 
 const CONNECT_TIMEOUT_MS = 5 * 60 * 1000;
 
@@ -422,17 +423,11 @@ async function reportSyncSummary(summary: SyncSummary, trigger: SyncTrigger): Pr
  * never published). Without these flags such a task simply vanishes from the
  * list and its event is orphaned (never deleted).
  */
-function runExtractorTasks(extractorPath: string, dir: string): Promise<Task[]> {
-    const args = [
-        '--dir',
-        dir,
-        '--format',
-        'json',
-        '--absolute-paths',
-        '--tasks',
-        '--tasks-include-done',
-        '--tasks-include-cancelled'
-    ];
+function runExtractorTasks(extractorPath: string, dirs: readonly string[]): Promise<Task[]> {
+    // One `--dir` per configured directory, as the agenda command does: the
+    // calendar holds the tasks of every directory the user reads as one agenda.
+    const args = dirs.flatMap((dir) => ['--dir', dir]);
+    args.push('--format', 'json', '--absolute-paths', '--tasks', '--tasks-include-done', '--tasks-include-cancelled');
     return new Promise<Task[]>((resolve, reject) => {
         const timeout = setTimeout(() => {
             reject(new Error(`Command timeout after ${EXTRACTOR_TIMEOUT_MS / 1000} seconds`));
@@ -514,11 +509,17 @@ export function makePropertiesWriter(): PropertiesWriter {
     };
 }
 
-/** Per-workspace lock file path under the extension's global storage. */
-async function lockPathFor(context: vscode.ExtensionContext, workspaceDir: string): Promise<string> {
+/**
+ * Per-workspace lock file path under the extension's global storage.
+ *
+ * Keyed by the whole set of scanned directories, joined: two windows syncing
+ * the same directories must contend for one lock, and a window reading a
+ * different set is a different sync with its own calendar entries.
+ */
+async function lockPathFor(context: vscode.ExtensionContext, workspaceDirs: readonly string[]): Promise<string> {
     const dir = context.globalStorageUri.fsPath;
     await vscode.workspace.fs.createDirectory(context.globalStorageUri);
-    const key = createHash('sha256').update(workspaceDir).digest('hex').slice(0, 16);
+    const key = createHash('sha256').update(workspaceDirs.join('\n')).digest('hex').slice(0, 16);
     return path.join(dir, `gcal-sync-${key}.lock`);
 }
 
@@ -539,10 +540,13 @@ export async function syncNow(context: vscode.ExtensionContext, opts: { trigger?
     }
     const cfg = vscode.workspace.getConfiguration('markdown-org');
     const getToken = await resolveTokenProvider(context, cfg);
-    // Same as in commands/agenda.ts: an empty setting is "not set".
-    // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-    const workspaceDir = cfg.get<string>('workspaceDir') || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-    if (!workspaceDir) {
+    // The same directories the agenda reads (commands/agenda.ts).
+    const workspaceDirs = resolveAgendaDirectories(
+        cfg.get<string[]>('workspaceDirs'),
+        cfg.get<string>('workspaceDir'),
+        vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
+    );
+    if (workspaceDirs.length === 0) {
         throw new Error('open a workspace folder or set markdown-org.workspaceDir');
     }
     const extractorPath = await extractor.resolveExtractorPath();
@@ -562,7 +566,7 @@ export async function syncNow(context: vscode.ExtensionContext, opts: { trigger?
         { location: vscode.ProgressLocation.Window, title: 'Markdown Org: syncing Google Calendar…' },
         () =>
             getSingleFlight().run(async (signal) => {
-                const lockPath = await lockPathFor(context, workspaceDir);
+                const lockPath = await lockPathFor(context, workspaceDirs);
                 // A lease that stops being renewed is not a cosmetic problem:
                 // once it goes stale another window takes the lock and starts a
                 // second pass writing the same files and the same calendar. So
@@ -591,7 +595,7 @@ export async function syncNow(context: vscode.ExtensionContext, opts: { trigger?
                     const calendarName = calendarNameSetting(cfg);
                     const pinnedId = (cfg.get<string>('gcalSync.calendarId') ?? '').trim() || undefined;
                     const calendarId = await ensureCalendar(fetch, getToken, { name: calendarName, pinnedId });
-                    const tasks = await runExtractorTasks(extractorPath, workspaceDir);
+                    const tasks = await runExtractorTasks(extractorPath, workspaceDirs);
                     const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
                     const defaultEventMinutes = cfg.get<number>('gcalSync.defaultEventMinutes') ?? 60;
                     const onDone = (cfg.get<string>('gcalSync.onDone') ?? 'delete') === 'keep' ? 'keep' : 'delete';
@@ -605,7 +609,12 @@ export async function syncNow(context: vscode.ExtensionContext, opts: { trigger?
                         mapOptions: (t): MapOptions => ({
                             timeZone,
                             defaultEventMinutes,
-                            relPath: path.relative(workspaceDir, t.file) || t.file
+                            // Named against the directory the task came from,
+                            // so a note keeps the same event title whichever
+                            // of the scanned directories holds it. `root` is
+                            // absent on a single-directory run, where the one
+                            // configured directory is the answer.
+                            relPath: path.relative(t.root ?? workspaceDirs[0] ?? '', t.file) || t.file
                         }),
                         onDone,
                         signal,

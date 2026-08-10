@@ -14,20 +14,35 @@ import type { AgendaData, DayAgenda, Task } from '../../types';
 
 /** Unique source paths in the order they first appear. */
 export function agendaSourceFiles(data: AgendaData): string[] {
+    // The extractor always emits `file`, but the payload crosses a JSON
+    // boundary; an empty or missing path is skipped rather than resolved
+    // against the workspace root by accident.
+    return distinctTaskValues(data, (task) => task.file);
+}
+
+/**
+ * Unique scan roots in the order they first appear.
+ *
+ * The extractor emits `root` only when the run swept several directories, so a
+ * single-directory agenda yields an empty list -- which is exactly what "there
+ * are no collections to tell apart" means to the caller
+ * (`buildCollectionMarks`).
+ */
+export function agendaSourceRoots(data: AgendaData): string[] {
+    return distinctTaskValues(data, (task) => task.root);
+}
+
+/** One walk over either payload shape, collecting one field per task. */
+function distinctTaskValues(data: AgendaData, pick: (task: Task) => string | undefined): string[] {
     const seen = new Set<string>();
-    const files: string[] = [];
+    const values: string[] = [];
     const add = (task: Task): void => {
-        // The extractor always emits `file`, but the payload crosses a JSON
-        // boundary; an empty or missing path is skipped rather than resolved
-        // against the workspace root by accident.
-        if (typeof task.file !== 'string' || task.file === '') {
+        const value = pick(task);
+        if (typeof value !== 'string' || value === '' || seen.has(value)) {
             return;
         }
-        if (seen.has(task.file)) {
-            return;
-        }
-        seen.add(task.file);
-        files.push(task.file);
+        seen.add(value);
+        values.push(value);
     };
 
     for (const entry of data) {
@@ -41,7 +56,7 @@ export function agendaSourceFiles(data: AgendaData): string[] {
             add(entry);
         }
     }
-    return files;
+    return values;
 }
 
 /**
