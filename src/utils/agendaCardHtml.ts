@@ -49,6 +49,12 @@ export interface TaskRowContext {
     ) => string;
     priorityTooltip: (letter: string, strings: TooltipStrings, fill: FormatString) => string;
     /**
+     * The collection dot for this row, already rendered, or an empty string --
+     * which is what a single scanned directory always yields. Supplied as a
+     * function rather than a string so a row that carries no root costs nothing.
+     */
+    collectionMark?: ((root: string | undefined) => string) | undefined;
+    /**
      * Whether a row spells its date out. `when-offset` (the default) is the
      * day and week reading: the view already names the day, so only a row that
      * sits off it repeats the date. `always` is for the Tasks card, which
@@ -106,7 +112,12 @@ export function renderTaskRow(
         `<span class="priority" data-priority="${priorityAttr}"` +
         ` title="${ctx.escapeHtml(ctx.priorityTooltip(priorityLetter, ctx.tooltips, ctx.formatString))}">` +
         `${ctx.escapeHtml(priorityLetter)}</span>` +
-        `<span class="heading">${ctx.escapeHtml(task.heading)}</span>` +
+        // The collection dot leads the heading rather than taking a grid column
+        // of its own: the row's six columns are sized for what every row has,
+        // and an extra column would indent every agenda on the far more common
+        // single-directory setup just to stay empty.
+        `<span class="heading">${ctx.collectionMark ? ctx.collectionMark(task.root) : ''}` +
+        `${ctx.escapeHtml(task.heading)}</span>` +
         `<span class="offset" data-dir="${dateDir}">${dateDisplay}</span>` +
         '</div>'
     );

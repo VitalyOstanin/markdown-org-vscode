@@ -1,6 +1,11 @@
 import * as assert from 'node:assert';
 import { suite, test } from 'mocha';
-import { buildDaySections, computeDaySummary } from '../../utils/agendaDaySummary';
+import {
+    OVERDUE_LONG_AGO_DAYS,
+    OVERDUE_RECENT_DAYS,
+    buildDaySections,
+    computeDaySummary
+} from '../../utils/agendaDaySummary';
 import { AGENDA_STRINGS } from '../../utils/agendaI18n';
 import type { DayAgenda, TaskWithOffset } from '../../types';
 
@@ -71,9 +76,56 @@ suite('buildDaySections', () => {
         const sections = buildDaySections(d, SECTIONS);
         assert.deepStrictEqual(
             sections.map((s) => s.key),
-            ['scheduled', 'allday', 'overdue']
+            ['scheduled', 'allday', 'overdue-recent']
         );
-        assert.strictEqual(sections.at(-1)?.key, 'overdue', 'overdue must be the last section');
+        assert.ok(sections.at(-1)?.key.startsWith('overdue'), 'overdue must be the last section');
+    });
+
+    test('splits the overdue backlog into bands, most actionable first', () => {
+        // What a slipped entry asks for differs with its age: a missed repeat
+        // is today's work, last week's date wants a nudge, and a date from
+        // three years ago wants to be closed. One "Overdue" heading over all
+        // of them buries the first under the last.
+        const d = day({
+            overdue: [
+                task({ heading: 'ancient', days_offset: -1947 }),
+                task({ heading: 'this spring', days_offset: -152 }),
+                task({ heading: 'yesterday', days_offset: -1 }),
+                task({ heading: 'missed standup', days_offset: -3, timestamp_repeater: '++7d' })
+            ]
+        });
+        const sections = buildDaySections(d, SECTIONS);
+        assert.deepStrictEqual(
+            sections.map((s) => [s.key, s.items[0]?.task.heading]),
+            [
+                ['overdue-repeat', 'missed standup'],
+                ['overdue-recent', 'yesterday'],
+                ['overdue-earlier', 'this spring'],
+                ['overdue-long', 'ancient']
+            ]
+        );
+    });
+
+    test('a repeater outranks the age of the date it missed', () => {
+        // Whether the occurrence was missed yesterday or last spring, what to
+        // do with it is the same: the next occurrence is the work.
+        const d = day({
+            overdue: [task({ heading: 'old repeat', days_offset: -400, timestamp_repeater: '+1m' })]
+        });
+        assert.strictEqual(buildDaySections(d, SECTIONS)[0]?.key, 'overdue-repeat');
+    });
+
+    test('a date exactly on a band boundary stays in the nearer band', () => {
+        const d = day({
+            overdue: [
+                task({ heading: 'a week ago', days_offset: -OVERDUE_RECENT_DAYS }),
+                task({ heading: 'a year ago', days_offset: -OVERDUE_LONG_AGO_DAYS })
+            ]
+        });
+        assert.deepStrictEqual(
+            buildDaySections(d, SECTIONS).map((s) => s.key),
+            ['overdue-recent', 'overdue-earlier']
+        );
     });
 
     test('all-day & upcoming merges scheduled_no_time then upcoming, tagged by kind', () => {
@@ -95,7 +147,7 @@ suite('buildDaySections', () => {
     test('overdue items are tagged overdue; timed items tagged timed', () => {
         const d = day({ overdue: [task()], scheduled_timed: [task()] });
         const sections = buildDaySections(d, SECTIONS);
-        assert.strictEqual(sections.find((s) => s.key === 'overdue')!.items[0]!.kind, 'overdue');
+        assert.strictEqual(sections.find((s) => s.key === 'overdue-recent')!.items[0]!.kind, 'overdue');
         assert.strictEqual(sections.find((s) => s.key === 'scheduled')!.items[0]!.kind, 'timed');
     });
 
@@ -115,7 +167,11 @@ suite('buildDaySections', () => {
     test('section titles come from the supplied labels, not from the helper', () => {
         const d = day({ overdue: [task()], scheduled_timed: [task()], scheduled_no_time: [task()] });
         const titles = buildDaySections(d, AGENDA_STRINGS.ru.sections).map((s) => s.title);
-        assert.deepStrictEqual(titles, ['Запланировано на сегодня', 'Без времени и предстоящие', 'Просрочено']);
+        assert.deepStrictEqual(titles, [
+            'Запланировано на сегодня',
+            'Без времени и предстоящие',
+            'Просрочено на этой неделе'
+        ]);
     });
 
     test('item count matches the source bucket sizes', () => {

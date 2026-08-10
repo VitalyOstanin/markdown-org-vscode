@@ -70,7 +70,11 @@ export function renderSummaryBar(dateIso: string, pieces: string[], ctx: { escap
     return `<div class="day-header day-summary"${dateAttr}>${pieces.join('<span class="day-summary-sep">·</span>')}</div>`;
 }
 
-/** One section panel: title, count chip and the already-rendered rows. */
+/**
+ * One section panel: title, count chip, whatever the head offers on the whole
+ * section (`actionsHtml`, empty for a section that offers nothing) and the
+ * already-rendered rows.
+ */
 export function renderSectionPanel(
     key: string,
     title: string,
@@ -85,7 +89,8 @@ export function renderSectionPanel(
         formatString: FormatString;
         formatNumber: FormatNumber;
         pluralIndex: PluralIndex;
-    }
+    },
+    actionsHtml: string
 ): string {
     // The count chip is the same component as the month cell's task-load chip,
     // so it explains its number the same way.
@@ -95,6 +100,7 @@ export function renderSectionPanel(
         '<div class="day-section-head">' +
         `<span class="day-section-name">${ctx.escapeHtml(title)}</span>` +
         `<span class="day-section-count" title="${chipTitle}">${count}</span>` +
+        actionsHtml +
         '</div>' +
         `<div class="day-section-body">${rowsHtml}</div>` +
         '</section>'

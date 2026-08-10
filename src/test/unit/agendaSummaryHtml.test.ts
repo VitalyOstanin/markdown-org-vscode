@@ -84,7 +84,7 @@ suite('agendaSummaryHtml.renderSectionPanel', () => {
     const ctx = { ...base, inSectionTemplate: '{0} in this section', taskForms: ['task', 'tasks'] };
 
     test('renders the title, the count chip and the rows', () => {
-        const html = renderSectionPanel('overdue', 'Overdue', 2, '<div class="task-line"></div>', ctx);
+        const html = renderSectionPanel('overdue', 'Overdue', 2, '<div class="task-line"></div>', ctx, '');
         assert.match(html, /<section class="day-section day-section-overdue">/);
         assert.match(html, /<span class="day-section-name">Overdue<\/span>/);
         assert.match(html, /<span class="day-section-count" title="2 tasks in this section">2<\/span>/);
@@ -92,11 +92,16 @@ suite('agendaSummaryHtml.renderSectionPanel', () => {
     });
 
     test('the chip title counts in the UI language, singular included', () => {
-        assert.match(renderSectionPanel('p1', 'A', 1, '', ctx), /title="1 task in this section"/);
+        assert.match(renderSectionPanel('p1', 'A', 1, '', ctx, ''), /title="1 task in this section"/);
     });
 
     test('escapes the section title', () => {
-        assert.match(renderSectionPanel('x', '<script>', 0, '', ctx), /&lt;script&gt;/);
+        assert.match(renderSectionPanel('x', '<script>', 0, '', ctx, ''), /&lt;script&gt;/);
+    });
+
+    test('puts the head actions after the count chip, inside the head', () => {
+        const html = renderSectionPanel('overdue-recent', 'Overdue', 1, '', ctx, '<button class="group-menu-btn" />');
+        assert.match(html, /<span class="day-section-count"[^>]*>1<\/span><button class="group-menu-btn" \/><\/div>/);
     });
 });
 

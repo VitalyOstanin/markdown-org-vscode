@@ -40,9 +40,21 @@ export interface DaySectionItem {
     kind: DaySectionItemKind;
 }
 
+/**
+ * Stable key for markup hooks.
+ *
+ * The overdue backlog is four keys rather than one: what a slipped entry asks
+ * of the reader differs with its age, and they are shown apart because they are
+ * acted on apart. A repeat missed on Tuesday is today's work, a date from May
+ * wants a new one, and a date from three years ago wants to be closed. The same
+ * split the Android client makes, and the same reason org-super-agenda keeps
+ * `:scheduled past` apart from `:deadline past`.
+ */
+export type DaySectionKey =
+    'scheduled' | 'allday' | 'overdue-repeat' | 'overdue-recent' | 'overdue-earlier' | 'overdue-long';
+
 export interface DaySection {
-    /** Stable key for markup hooks (`scheduled` / `allday` / `overdue`). */
-    key: 'scheduled' | 'allday' | 'overdue';
+    key: DaySectionKey;
     /** Human-readable panel title, in the active UI language. */
     title: string;
     items: DaySectionItem[];
@@ -52,8 +64,18 @@ export interface DaySection {
 export interface DaySectionLabels {
     scheduled: string;
     allday: string;
-    overdue: string;
+    /** One heading per overdue band; see {@link DaySectionKey}. */
+    overdueRepeat: string;
+    overdueRecent: string;
+    overdueEarlier: string;
+    overdueLong: string;
 }
+
+/** Slipped by no more than this, and it is still the current plan. */
+export const OVERDUE_RECENT_DAYS = 7;
+
+/** Beyond this the date says less than the fact that it is long gone. */
+export const OVERDUE_LONG_AGO_DAYS = 365;
 
 type BucketName = 'overdue' | 'scheduled_timed' | 'scheduled_no_time' | 'upcoming';
 
@@ -73,10 +95,15 @@ export function computeDaySummary(day: DayAgenda): DaySummary {
 
 /**
  * Ordered, non-empty sections for the card. Order is fixed:
- *   1. Scheduled today   (scheduled_timed)
+ *   1. Scheduled today    (scheduled_timed)
  *   2. All-day & upcoming (scheduled_no_time + upcoming)
- *   3. Overdue           (overdue) -- LAST, at the bottom.
+ *   3. The overdue bands  (overdue) -- LAST, at the bottom.
  * Empty sections are dropped so the card never shows a "(0)" panel.
+ *
+ * The bands run most-actionable first — a missed repeat, then this week's
+ * slippage, then the rest of the year, then what is older than that. That is
+ * the order they are worth reading in rather than the order of the dates, which
+ * is what buries a repeat missed yesterday under entries from 2021.
  *
  * The titles come in as `labels` (never hardcoded) so the card follows the
  * configured UI language.
@@ -89,11 +116,35 @@ export function buildDaySections(day: DayAgenda, labels: DaySectionLabels): DayS
     const noTime = b('scheduled_no_time').map((task): DaySectionItem => ({ task, kind: 'notime' }));
     const upcoming = b('upcoming').map((task): DaySectionItem => ({ task, kind: 'upcoming' }));
     const overdue = b('overdue').map((task): DaySectionItem => ({ task, kind: 'overdue' }));
+    // Inlined for the same reason as the accessor above. A repeater wins over
+    // the age on purpose: whether its missed occurrence was yesterday or last
+    // spring, what to do with it is the same — the next occurrence is the work,
+    // and the dates behind it are gone whatever happens.
+    const band = (item: DaySectionItem): DaySectionKey => {
+        const off = item.task.days_offset ?? 0;
+        if ((item.task.timestamp_repeater ?? '') !== '') {
+            return 'overdue-repeat';
+        }
+        if (off >= -7) {
+            return 'overdue-recent';
+        }
+        return off >= -365 ? 'overdue-earlier' : 'overdue-long';
+    };
 
     const sections: DaySection[] = [
         { key: 'scheduled', title: labels.scheduled, items: timed },
         { key: 'allday', title: labels.allday, items: [...noTime, ...upcoming] },
-        { key: 'overdue', title: labels.overdue, items: overdue }
+        { key: 'overdue-repeat', title: labels.overdueRepeat, items: [] },
+        { key: 'overdue-recent', title: labels.overdueRecent, items: [] },
+        { key: 'overdue-earlier', title: labels.overdueEarlier, items: [] },
+        { key: 'overdue-long', title: labels.overdueLong, items: [] }
     ];
+    overdue.forEach((item) => {
+        const key = band(item);
+        const section = sections.find((s) => s.key === key);
+        if (section) {
+            section.items.push(item);
+        }
+    });
     return sections.filter((s) => s.items.length > 0);
 }
