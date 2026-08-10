@@ -1,9 +1,7 @@
 import * as path from 'node:path';
-import type { AgendaData, DayAgenda, FileTag, Task } from '../types';
-
-function isPositivePattern(pattern: string): boolean {
-    return pattern.length > 0 && !pattern.startsWith('!');
-}
+import type { AgendaData, DayAgenda, Task } from '../types';
+import type { MergedTag } from './tagDictionary';
+import { fileMatchesTag } from './tagDictionary';
 
 // Empty arrays return `false` here even though `DayAgenda[]` and `Task[]` are
 // both valid empty shapes. That is deliberate: the caller's two branches both
@@ -17,42 +15,24 @@ function isDayAgendaArray(value: AgendaData): value is DayAgenda[] {
 }
 
 /**
- * Filter agenda tasks by configured file tag.
+ * Filter agenda tasks by the selected tag of the merged dictionary.
  *
- * Pattern semantics (matched against `path.basename(task.file)`):
- *   ''             show everything (tag disables filtering)
- *   'foo'          basename contains "foo"
- *   '!...'         basename does not match any positive pattern in fileTags
- *                  (the text after '!' is ignored — it's only a marker)
+ * The dictionary spans every directory of the agenda plus the settings, so a
+ * tag selects the same notes wherever they came from -- see `tagDictionary` for
+ * how the patterns of one name are merged and what a negation is measured
+ * against.
  *
- * Unknown `tag` (not present in `fileTags`) is treated as "no filter" and
- * the data is returned unchanged.
+ * A tag name the dictionary does not hold is treated as "no filter" and the
+ * data is returned unchanged: a `currentTag` left over from an edited
+ * configuration must not empty the agenda.
  */
-export function filterTasksByTag(data: AgendaData, tag: string, fileTags: FileTag[]): AgendaData {
-    const tagConfig = fileTags.find((t) => t.name === tag);
-    if (!tagConfig) {
+export function filterTasksByTag(data: AgendaData, tag: string, dictionary: readonly MergedTag[]): AgendaData {
+    const selected = dictionary.find((t) => t.name === tag);
+    if (!selected) {
         return data;
     }
 
-    const pattern = tagConfig.pattern;
-    const isNegation = pattern.startsWith('!');
-    // Collect positives once instead of re-scanning fileTags inside the hot
-    // loop. With N tasks and M tags the negation branch used to be O(N*M);
-    // it is now O(M + N*P) where P is the number of *positive* patterns
-    // (typically much smaller than M because '!' negations are also entries
-    // in fileTags).
-    const positives = isNegation ? fileTags.filter((t) => isPositivePattern(t.pattern)).map((t) => t.pattern) : [];
-
-    const filterFn = (task: Task) => {
-        if (pattern === '') {
-            return true;
-        }
-        const basename = path.basename(task.file);
-        if (isNegation) {
-            return !positives.some((p) => basename.includes(p));
-        }
-        return basename.includes(pattern);
-    };
+    const filterFn = (task: Task) => fileMatchesTag(path.basename(task.file), selected, dictionary);
 
     if (isDayAgendaArray(data)) {
         // `markdown-org-extract` omits empty buckets in some agenda modes

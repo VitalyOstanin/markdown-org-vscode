@@ -18,6 +18,14 @@ export type TaskStatus = 'TODO' | 'DONE' | 'CANCELLED' | 'CANCELED';
 // lockstep and document the change in CHANGELOG.md.
 export interface Task {
     file: string;
+    // Canonical path of the scan root this file was found under, emitted by
+    // markdown-org-extract only when the run swept several directories
+    // (`--dir` given more than once). Absent for a single-directory run, where
+    // the root is what the caller passed in and the field would repeat it.
+    // Optional and additive on the wire (extractor ADR-0015). The agenda uses
+    // it for the collection mark on a row; nothing keys navigation off it,
+    // since `--absolute-paths` makes `file` self-sufficient.
+    root?: string;
     line: number;
     heading: string;
     content: string;
@@ -77,9 +85,19 @@ export interface DayAgenda {
 
 export type AgendaData = DayAgenda[] | Task[];
 
+/**
+ * One entry of a tag declaration, as the settings and a tags file spell it.
+ *
+ * Either spelling, or both at once: `pattern` is the single string the setting
+ * has always taken (a leading `!` making it "everything else"), `include` and
+ * `exclude` are the lists a tags file can use to say what a tag takes and what
+ * it refuses in one entry. What they mean once merged is in `tagDictionary`.
+ */
 export interface FileTag {
     name: string;
-    pattern: string;
+    pattern?: string;
+    include?: string[];
+    exclude?: string[];
 }
 
 /**

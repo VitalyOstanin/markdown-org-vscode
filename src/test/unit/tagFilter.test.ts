@@ -1,6 +1,17 @@
 import * as assert from 'node:assert';
 import { filterTasksByTag } from '../../utils/tagFilter';
+import { mergeTagDictionaries } from '../../utils/tagDictionary';
 import type { FileTag, Task, DayAgenda } from '../../types';
+
+/**
+ * The dictionary one directory's declaration merges into.
+ *
+ * These tests are about what a tag selects, which is settled by the merge --
+ * see `tagDictionary.test.ts` for what several directories do to each other.
+ */
+function dict(tags: FileTag[]) {
+    return mergeTagDictionaries([{ directory: '/home/u/notes', tags }]);
+}
 
 const TAGS: FileTag[] = [
     { name: 'ALL', pattern: '' },
@@ -41,19 +52,19 @@ function dayAgenda(tasks: Task[]): DayAgenda[] {
 suite('Tag Filter Unit Tests', () => {
     suite('Empty pattern (ALL semantics)', () => {
         test('empty pattern returns everything', () => {
-            const result = filterTasksByTag(TASKS, 'ALL', TAGS) as Task[];
+            const result = filterTasksByTag(TASKS, 'ALL', dict(TAGS)) as Task[];
             assert.strictEqual(result.length, 4);
         });
 
         test('empty pattern works even with positives configured', () => {
-            const result = filterTasksByTag(TASKS, 'ALL', TAGS) as Task[];
+            const result = filterTasksByTag(TASKS, 'ALL', dict(TAGS)) as Task[];
             assert.deepStrictEqual(result.map((t) => t.file).sort(), TASKS.map((t) => t.file).sort());
         });
     });
 
     suite('Positive pattern (basename substring)', () => {
         test('WORK matches files with "work" in basename', () => {
-            const result = filterTasksByTag(TASKS, 'WORK', TAGS) as Task[];
+            const result = filterTasksByTag(TASKS, 'WORK', dict(TAGS)) as Task[];
             assert.deepStrictEqual(
                 result.map((t) => t.file),
                 [T_WORK.file]
@@ -61,7 +72,7 @@ suite('Tag Filter Unit Tests', () => {
         });
 
         test('PROJECT matches files with "project" in basename', () => {
-            const result = filterTasksByTag(TASKS, 'PROJECT', TAGS) as Task[];
+            const result = filterTasksByTag(TASKS, 'PROJECT', dict(TAGS)) as Task[];
             assert.deepStrictEqual(
                 result.map((t) => t.file),
                 [T_PROJECT.file]
@@ -71,14 +82,14 @@ suite('Tag Filter Unit Tests', () => {
         test('pattern does NOT match against directory components', () => {
             // /home/u/networking/notes.md must not be tagged WORK ("work" appears
             // in the parent directory "networking" but not in the basename).
-            const result = filterTasksByTag([T_PATH_TRAP], 'WORK', TAGS) as Task[];
+            const result = filterTasksByTag([T_PATH_TRAP], 'WORK', dict(TAGS)) as Task[];
             assert.strictEqual(result.length, 0);
         });
     });
 
     suite('Negation pattern', () => {
         test('OTHER excludes tasks matching any positive pattern', () => {
-            const result = filterTasksByTag(TASKS, 'OTHER', TAGS) as Task[];
+            const result = filterTasksByTag(TASKS, 'OTHER', dict(TAGS)) as Task[];
             const files = result.map((t) => t.file).sort();
             assert.deepStrictEqual(files, [T_PATH_TRAP.file, T_PERSONAL.file].sort());
         });
@@ -91,9 +102,9 @@ suite('Tag Filter Unit Tests', () => {
                 { name: 'NEG_B', pattern: '!work' },
                 { name: 'NEG_C', pattern: '!xyz' }
             ];
-            const a = filterTasksByTag(TASKS, 'NEG_A', customTags) as Task[];
-            const b = filterTasksByTag(TASKS, 'NEG_B', customTags) as Task[];
-            const c = filterTasksByTag(TASKS, 'NEG_C', customTags) as Task[];
+            const a = filterTasksByTag(TASKS, 'NEG_A', dict(customTags)) as Task[];
+            const b = filterTasksByTag(TASKS, 'NEG_B', dict(customTags)) as Task[];
+            const c = filterTasksByTag(TASKS, 'NEG_C', dict(customTags)) as Task[];
             const sorted = (arr: Task[]) => arr.map((t) => t.file).sort();
             assert.deepStrictEqual(sorted(a), sorted(b));
             assert.deepStrictEqual(sorted(a), sorted(c));
@@ -104,7 +115,7 @@ suite('Tag Filter Unit Tests', () => {
                 { name: 'WORK', pattern: 'work' },
                 { name: 'PRIVATE', pattern: '!' }
             ];
-            const result = filterTasksByTag(TASKS, 'PRIVATE', simple) as Task[];
+            const result = filterTasksByTag(TASKS, 'PRIVATE', dict(simple)) as Task[];
             const files = result.map((t) => t.file).sort();
             assert.deepStrictEqual(files, [T_PATH_TRAP.file, T_PERSONAL.file, T_PROJECT.file].sort());
         });
@@ -112,7 +123,7 @@ suite('Tag Filter Unit Tests', () => {
 
     suite('Unknown tag', () => {
         test('returns data unchanged when tag is not in fileTags', () => {
-            const result = filterTasksByTag(TASKS, 'NOT_A_REAL_TAG', TAGS) as Task[];
+            const result = filterTasksByTag(TASKS, 'NOT_A_REAL_TAG', dict(TAGS)) as Task[];
             assert.strictEqual(result.length, TASKS.length);
         });
 
@@ -131,7 +142,7 @@ suite('Tag Filter Unit Tests', () => {
                 scheduled_no_time: [T_PATH_TRAP],
                 upcoming: [T_WORK]
             };
-            const result = filterTasksByTag([day], 'WORK', TAGS) as DayAgenda[];
+            const result = filterTasksByTag([day], 'WORK', dict(TAGS)) as DayAgenda[];
             assert.strictEqual(result.length, 1);
             const r = result[0];
             assert.deepStrictEqual(
@@ -153,7 +164,7 @@ suite('Tag Filter Unit Tests', () => {
         });
 
         test('preserves the date field on filtered days', () => {
-            const result = filterTasksByTag(dayAgenda(TASKS), 'WORK', TAGS) as DayAgenda[];
+            const result = filterTasksByTag(dayAgenda(TASKS), 'WORK', dict(TAGS)) as DayAgenda[];
             assert.strictEqual(result[0]!.date, '2025-12-09');
         });
 
@@ -162,7 +173,7 @@ suite('Tag Filter Unit Tests', () => {
             // there is no discriminator object, so the function falls through
             // to the Task[] branch. Both branches reduce to [] on empty input,
             // so the caller observes the same shape it passed in (empty).
-            const result = filterTasksByTag([], 'WORK', TAGS) as Task[];
+            const result = filterTasksByTag([], 'WORK', dict(TAGS)) as Task[];
             assert.deepStrictEqual(result, []);
         });
 
@@ -171,7 +182,7 @@ suite('Tag Filter Unit Tests', () => {
             // agenda output. Cast away the missing fields to mirror what the
             // real extractor produces over the wire.
             const partialDay = { date: '2025-12-09', scheduled_timed: [T_WORK] } as unknown as DayAgenda;
-            const result = filterTasksByTag([partialDay], 'WORK', TAGS) as DayAgenda[];
+            const result = filterTasksByTag([partialDay], 'WORK', dict(TAGS)) as DayAgenda[];
             assert.strictEqual(result.length, 1);
             assert.deepStrictEqual(
                 result[0]!.scheduled_timed!.map((t) => t.file),
