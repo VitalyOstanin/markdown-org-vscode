@@ -380,6 +380,21 @@
 - [x] Create CHANGELOG.md
     - Documented version 0.1.0 features
     - Set up format for future releases
+- [ ] Recapture every screenshot and recording through the command palette
+    - The assets drive the features by keyboard shortcut, so what a viewer sees
+      is a file changing and no cause: the chord is invisible, and nothing on
+      screen names the command behind it. A reader cannot repeat what they
+      watched, and the shortcut may not even be theirs -- another keymap, or a
+      rebinding, and the chord shown is wrong.
+    - Every scenario opens the command palette instead, types the command name
+      the way a user would, and waits about three seconds before Enter, long
+      enough that the name is read rather than glimpsed. The palette closes and
+      the effect follows, so the recording answers "which command does this".
+    - Applies to both drivers and both themes, per the capture rules above.
+      Where a scenario exists only to show a shortcut, decide whether it stays
+      at all: with the palette on screen the chord is documentation, and the
+      README already tabulates the bindings.
+
 - [ ] Announce the Android client (`markdown-org-android`) in the extension
     - Blocked until two things hold, both outside this repository: the
       `markdown-org-extract` refactor is finished (the wire contract stops
