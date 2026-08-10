@@ -50,6 +50,15 @@ async function showAgenda(view: 'Day' | 'Week' | 'Month'): Promise<void> {
     await sleep(3500);
 }
 
+/**
+ * The Tasks view, which is a command of its own rather than an agenda mode --
+ * it has no date axis to name, so it is `showTasks` and not `showAgendaTasks`.
+ */
+async function showTasks(): Promise<void> {
+    await vscode.commands.executeCommand('markdown-org.showTasks');
+    await sleep(3500);
+}
+
 function atTime(base: Date, hour: number, minute: number): Date {
     return new Date(base.getFullYear(), base.getMonth(), base.getDate(), hour, minute);
 }
@@ -59,7 +68,7 @@ function addDays(base: Date, days: number): Date {
 }
 
 suite('Demo: Screenshots', () => {
-    test('agenda day/week/month + clocktable + editor', async function () {
+    test('agenda day/week/month/tasks + clocktable + editor', async function () {
         this.timeout(120000);
 
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
@@ -110,6 +119,13 @@ suite('Demo: Screenshots', () => {
                 '\n' +
                 '## TODO Daily standup\n' +
                 `\`SCHEDULED: ${iso(0, { hour: 9, minute: 30, repeater: '+1d' })}\`\n` +
+                '\n' +
+                // A date already behind today. The day and week views place it
+                // by its own date; the Tasks view, which dates every row, is
+                // where it earns the overdue colour -- so the shot of that view
+                // shows what late looks like next to what is merely ahead.
+                '## TODO [#A] Send the quarterly report\n' +
+                `\`DEADLINE: ${iso(-2, { hour: 10, minute: 0 })}\`\n` +
                 '\n' +
                 // A cancelled task still shows in the agenda (only DONE is hidden),
                 // rendered struck-through -- this is what the CANCELLED status looks
@@ -242,7 +258,14 @@ suite('Demo: Screenshots', () => {
         await showAgenda('Month');
         await captureScreenshot('agenda-month');
 
-        // 6. Clocktable: the file already contains the rendered table, just
+        // 6. Tasks: everything open at once, grouped by priority instead of by
+        //    day. The three views above are anchored on a date, so this is the
+        //    only one that answers "what is on my plate" rather than "what is
+        //    on this day".
+        await showTasks();
+        await captureScreenshot('agenda-tasks');
+
+        // 7. Clocktable: the file already contains the rendered table, just
         //    open it and scroll to the bottom so the table is centred in the
         //    viewport.
         const trackingDoc = await vscode.workspace.openTextDocument(trackingFile);

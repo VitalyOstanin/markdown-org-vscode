@@ -7,94 +7,192 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-
-- Every row of the Tasks view states its date, in full and with the year. The
-  view lists tasks of every date at once, so a bare `09:30` named no day and a
-  task with no time named nothing at all; the date now sits in the row's right
-  edge, where the day and week views already put it. Only a date behind today is
-  coloured; today's own date and the ones ahead stay in the muted meta colour --
-  with every row dated, colour is spent on what is late alone. The day and week
-  views are unchanged: a date there appears only on a row that sits off the
-  anchor day, and highlighting the ones ahead still says "not this day".
-- The time column of a task with no clock time is empty again, instead of
-  holding an em-dash. A task that runs all day is not a task whose time is
-  missing, and the column keeps its width either way, so the rows stay aligned.
-
 ### Added
 
-- Editor colouring for org constructs, in the colours the agenda already uses
-  for the same things: planning keywords (`SCHEDULED`, `DEADLINE`, `CLOSED`,
-  `CREATED`, `CLOCK`), the parts of every timestamp (date, weekday, time,
-  repeater, warning cookie), the status keyword on a heading and the `[#A]` /
-  `[#B]` / `[#C]` cookies. Unlike the markdown grammar it works at any
-  indentation: four spaces or a tab make markdown read a line as an indented
-  code block and highlight nothing inside it, while the extractor reads the
-  planning line regardless -- so a line the agenda acts on used to sit
-  colourless in the editor. Implemented as editor decorations pointing at theme
-  colour tokens (`charts.*`), which is what allows the two views to agree on a
-  colour; a grammar can only name a scope and leave the colour to the theme.
-  The punctuation between the coloured parts (backticks, the keyword's colon, the
-  timestamp brackets, a CLOCK range's `--` and its `=> H:MM` duration) keeps the
-  theme's inline-code colour at any indentation, which is the colour it already
-  had at shallow indentation -- a one-rule injection grammar marks a planning
-  line as inline code, the verdict markdown itself only reaches while the line is
-  indented by three spaces or less. The decorations cannot tell a planning line
-  apart from the same text inside a real code block, so a documentation example
-  is coloured too; the new `markdown-org.highlightInEditor` setting turns the
-  decorations off.
-- Clipping markers on the week view's day headers. When a day holds more rows
-  than fit, its header shows how many are out of sight: `↑ N` for the rows
-  behind the pinned header and `↓ M` for those below the bottom of the panel,
-  each with a tooltip spelling the count out. A row counts as out of sight once
-  less than half of it is inside the visible band -- that is where a task line
-  stops showing its text -- so a row sliced to a strip of padding is counted
-  while one merely cut at the edge is not. A day whose rows are all visible
-  shows neither chip. The header also casts a shadow while it covers rows, so
-  "this day continues above" reads without looking at the number.
+- Several note directories can be read as one agenda:
+  `markdown-org.workspaceDirs` takes a list, and every directory in it is
+  scanned. The setting that came first, `markdown-org.workspaceDir`, keeps
+  working and is used while the list is empty, so an existing configuration is
+  unchanged. Google Calendar sync follows the same list.
+- A row of a multi-directory agenda carries a small coloured dot at the head of
+  its heading, and the dot's tooltip names the directory the task came from. A
+  mark rather than a grouping: the agenda is one timeline over every directory,
+  and grouping rows by where they live would break the axis the layout is built
+  on. Directories that share a name (two different `notes`) are told apart by
+  their parent in the tooltip. With one directory scanned there are no dots and
+  the agenda is exactly as it was.
+- A multi-directory agenda gets a row of chips under the header, one per
+  scanned directory, and a click takes that directory off the screen and back.
+  The chip works on the rows already in hand, so turning a directory back on
+  costs nothing and the notes are not walked again; the state lives in the
+  panel and is gone when it closes, which is what "for a moment" means. This is
+  the narrower of the two filters and applies first: the chips say which
+  directories are on screen, the file tag says which of their notes.
+
+- Tags can travel with the notes instead of living in the settings: a notes
+  directory declares them in `.markdown-org/tags.json`, holding what
+  `markdown-org.fileTags` holds, and the file is synced through git like the
+  notes around it -- which is how the other clients of the ecosystem come to
+  know the same tags. Everything declared merges into one dictionary: a tag
+  means the same wherever a note came from, so a directory that never named a
+  tag is filtered by it like any other, and reordering the directories changes
+  nothing. Where two declarations disagree they are both kept, their including
+  patterns becoming alternatives.
+- A tag can refuse part of what it takes: `include` and `exclude` beside the
+  single `pattern` the setting has always had. `{"include": ["work"],
+"exclude": ["archive"]}` is "everything about work except the archive", which
+  one substring cannot say. Refusing wins over taking, including across
+  directories -- otherwise a directory that never heard of an exclusion would
+  undo it. A note refused by every tag that would otherwise take it falls to the
+  tag holding the rest (`!`) rather than out of the agenda.
+- `Show File Tags` writes out the merged dictionary: every tag, every pattern
+  under it, what that pattern does, and which directory -- or the settings --
+  declared it. The answer to why a tag shows what it shows, which the name in
+  the dropdown cannot give once several directories have been merged behind it.
+
+- Each overdue panel can be answered as a whole: the mark at the end of its
+  heading opens a menu that dates every entry of the band today, takes the
+  planning date off every one of them, or marks them all cancelled. A missed
+  repeat is caught up to its next occurrence rather than dated today, which is
+  the rule marking a repeating task DONE already follows. Every file is
+  rewritten once, entries whose heading has moved since the agenda was built are
+  left alone and named in the log, and the notice that reports the move offers to
+  put it back -- an undo that skips any note changed in the meantime. The same
+  three actions as the Android client's.
 
 ### Changed
 
-- Marking a repeating task DONE now moves it forward instead of closing it, as
-  Emacs Org-mode does (`org-auto-repeat-maybe`) and as the Android client of
-  the same ecosystem already did: the planning dates take one step (`+N`), step
-  until they pass today (`++N`) or restart from today (`.+N`), and the keyword
-  goes back to `TODO`. A heading that carried no keyword still carries none, a
-  planning line without a repeater is left where it is, and clearing DONE or
-  marking a task cancelled moves nothing. A `wd` (working days) repeater is
-  refused with a message rather than approximated: working days depend on the
-  public calendar, of which the extractor publishes the holidays but not the
-  Saturdays moved to working, and counting without them would put the editor a
-  day or two off the phone. See ADR-0017.
-- The bundled extractor is 0.12.0. A heading now keeps the text of an inline
-  code span: ``## TODO `build` is broken`` shows as `build is broken`
-  rather than as `is broken` -- the literal used to be dropped along with the
-  backticks, taking a word out of the middle of the title. The version is also
-  the one the Android client compiles in, so both read a file the same way.
+- The overdue backlog of a day is four panels instead of one: a missed repeat,
+  what slipped within the week, what slipped earlier this year, and what is
+  older than a year -- in that order, most actionable first. What a slipped
+  entry asks of the reader differs with its age, and one "Overdue" heading over
+  all of them buried a repeat missed yesterday under dates from years ago. A
+  repeater outranks the age of the date it missed: whatever the date was, the
+  work is the next occurrence. The same split the Android client makes, and the
+  same reason `org-super-agenda` keeps `:scheduled past` apart.
+
+## [0.14.0] - 2026-08-09
+
+Four things this release is about: a Tasks view that says which day each of its
+rows belongs to, org syntax that is coloured in the editor and not only in the
+agenda, a week view that admits when a day continues past the edge of the panel,
+and repeating tasks that move forward when marked DONE instead of closing.
+
+### The Tasks view dates every row
+
+<picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/VitalyOstanin/markdown-org-vscode/raw/HEAD/media/agenda-tasks-dark.png">
+    <img src="https://github.com/VitalyOstanin/markdown-org-vscode/raw/HEAD/media/agenda-tasks-light.png" alt="Tasks view: open tasks grouped by priority, each row stating its own date">
+</picture>
+
+- **Changed.** Every row states its date, in full and with the year. The view
+  lists tasks of every date at once, so a bare `09:30` named no day and a task
+  with no time named nothing at all; the date now sits in the row's right edge,
+  where the day and week views already put it.
+- **Changed.** Only a date behind today is coloured; today's own date and the
+  ones ahead stay in the muted meta colour -- with every row dated, colour is
+  spent on what is late alone. The day and week views are unchanged: a date
+  there appears only on a row that sits off the anchor day, and highlighting
+  the ones ahead still says "not this day".
+- **Changed.** The rows within one priority are ordered by date and then by
+  time, with the file and the line as the tiebreaker. What has no time to sort
+  by goes last at both levels: a task with no date after every dated one, and a
+  whole-day task after the timed ones of its day -- the reading Emacs
+  `org-agenda` gives a timeless entry. The order used to come from the walk over
+  the tree, which is unspecified, so `09:30` could sit above `08:00` with
+  nothing to explain it.
+- **Changed.** The time column of a task with no clock time is empty again,
+  instead of holding an em-dash. A task that runs all day is not a task whose
+  time is missing, and the column keeps its width either way, so the rows stay
+  aligned.
+
+### Org syntax is coloured in the editor
+
+<picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/VitalyOstanin/markdown-org-vscode/raw/HEAD/media/editor-markdown-dark.png">
+    <img src="https://github.com/VitalyOstanin/markdown-org-vscode/raw/HEAD/media/editor-markdown-light.png" alt="Editor view of a planning file with org constructs coloured">
+</picture>
+
+- **Added.** Planning keywords (`SCHEDULED`, `DEADLINE`, `CLOSED`, `CREATED`,
+  `CLOCK`), every part of a timestamp (date, weekday, time, repeater, warning
+  cookie), the status keyword on a heading and the `[#A]` / `[#B]` / `[#C]`
+  cookies are coloured in the editor, in the colours the agenda already uses for
+  the same things.
+- **Added.** It works at any indentation. Four spaces or a tab make markdown
+  read a line as an indented code block and highlight nothing inside it, while
+  the extractor reads the planning line regardless -- so a line the agenda acts
+  on used to sit colourless in the editor. This is why the colouring is editor
+  decorations pointing at theme colour tokens (`charts.*`) rather than a
+  grammar: a grammar can only name a scope and leave the colour to the theme,
+  which is what kept the two views from agreeing.
+- **Added.** The punctuation between the coloured parts (backticks, the
+  keyword's colon, the timestamp brackets, a CLOCK range's `--` and its
+  `=> H:MM` duration) keeps the theme's inline-code colour at any indentation --
+  the colour it already had at shallow indentation.
+- **Added.** `markdown-org.highlightInEditor` turns the decorations off. They
+  cannot tell a planning line apart from the same text inside a real code block,
+  so a documentation example is coloured too.
+
+### The week view says what is out of sight
+
+- **Added.** When a day holds more rows than fit, its header shows how many are
+  out of sight: `↑ N` for the rows behind the pinned header and `↓ M` for those
+  below the bottom of the panel, each with a tooltip spelling the count out.
+- **Added.** A row counts as out of sight once less than half of it is inside
+  the visible band -- that is where a task line stops showing its text -- so a
+  row sliced to a strip of padding is counted while one merely cut at the edge
+  is not. A day whose rows are all visible shows neither chip.
+- **Added.** The header casts a shadow while it covers rows, so "this day
+  continues above" reads without looking at the number.
+
+### A repeating task moves forward instead of closing
+
+- **Changed.** Marking a repeating task DONE now moves it forward, as Emacs
+  Org-mode does (`org-auto-repeat-maybe`) and as the Android client of the same
+  ecosystem already did: the planning dates take one step (`+N`), step until
+  they pass today (`++N`) or restart from today (`.+N`), and the keyword goes
+  back to `TODO`.
+- **Changed.** A heading that carried no keyword still carries none, a planning
+  line without a repeater is left where it is, and clearing DONE or marking a
+  task cancelled moves nothing.
+- **Changed.** A `wd` (working days) repeater is refused with a message rather
+  than approximated: working days depend on the public calendar, of which the
+  extractor publishes the holidays but not the Saturdays moved to working, and
+  counting without them would put the editor a day or two off the phone. See
+  ADR-0017.
+
+### The bundled extractor
+
+- **Changed.** The bundled extractor is 0.14.0, up from 0.12.0. Besides the
+  Tasks ordering above, a heading now keeps the text of an inline code span:
+  ``## TODO `build` is broken`` shows as `build is broken` rather than as
+  `is broken` -- the literal used to be dropped along with the backticks,
+  taking a word out of the middle of the title.
 
 ### Fixed
 
-- The week view no longer opens with the first tasks of today hidden behind
-  their own day header. Switching into Week from a scrolled view left the page
-  where it was: the day header is `position: sticky`, and one that is already
-  pinned reports its pinned box, so `scrollIntoView` concluded it was in place
-  and moved nothing. The page now unpins the headers before measuring, inside
-  the same frame -- the user still sees a single jump.
-- The same rows stayed visible when the panel header changes height right after
-  the week was focused -- which it routinely does, because the git chip arrives
-  on its own message a moment after the render. The day headers pin below the
-  panel header, so growing it moved the pin point down onto rows that had just
-  been brought into view. The week now keeps its focus through such a resize,
-  and releases it as soon as the scroll position is the user's own.
-
-- A timestamp carrying a warning cookie (`<2026-01-12 Пн +1w -2d>`, the window
-  in which a `DEADLINE:` starts showing up) is now parsed by the cursor engine.
-  Shift+Up / Shift+Down used to do nothing on such a line, and the extractor
-  had been reading it all along, so the agenda and the editor disagreed about
-  the same file. The cookie survives a shift the way a repeater does.
-- A priority cookie written without a space after it (`## TODO [#A]Title`) is
-  recognized. The extractor accepts that form, so the agenda showed a priority
-  the commands could not see -- toggling would have added a second cookie.
+- **Fixed.** The week view no longer opens with the first tasks of today hidden
+  behind their own day header. Switching into Week from a scrolled view left the
+  page where it was: the day header is `position: sticky`, and one that is
+  already pinned reports its pinned box, so `scrollIntoView` concluded it was in
+  place and moved nothing. The page now unpins the headers before measuring,
+  inside the same frame -- the user still sees a single jump.
+- **Fixed.** The same rows stayed visible when the panel header changes height
+  right after the week was focused -- which it routinely does, because the git
+  chip arrives on its own message a moment after the render. The day headers pin
+  below the panel header, so growing it moved the pin point down onto rows that
+  had just been brought into view. The week now keeps its focus through such a
+  resize, and releases it as soon as the scroll position is the user's own.
+- **Fixed.** A timestamp carrying a warning cookie (`<2026-01-12 Пн +1w -2d>`,
+  the window in which a `DEADLINE:` starts showing up) is now parsed by the
+  cursor engine. Shift+Up / Shift+Down used to do nothing on such a line, and
+  the extractor had been reading it all along, so the agenda and the editor
+  disagreed about the same file. The cookie survives a shift the way a repeater
+  does.
+- **Fixed.** A priority cookie written without a space after it
+  (`## TODO [#A]Title`) is recognized. The extractor accepts that form, so the
+  agenda showed a priority the commands could not see -- toggling would have
+  added a second cookie.
 
 ## [0.13.0] - 2026-07-27
 
@@ -959,7 +1057,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Requires [markdown-org-extract](https://crates.io/crates/markdown-org-extract) utility
 
-[Unreleased]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.11.1...v0.12.0
 [0.11.1]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.11.0...v0.11.1

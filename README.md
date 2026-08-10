@@ -15,6 +15,17 @@ travel with the repository.
     <img src="media/demo-agenda-light.gif" alt="Day / Week / Month agenda demo">
 </picture>
 
+The extension is one of three projects reading the same files:
+
+| Project                                                                         | What it is                                                              |
+| ------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `markdown-org-vscode` (this one)                                                | the VS Code extension: agenda panel, editing commands, time tracking    |
+| [`markdown-org-extract`](https://github.com/VitalyOstanin/markdown-org-extract) | the CLI and Rust library the extension runs to read tasks out of a file |
+| [`markdown-org-android`](https://github.com/VitalyOstanin/markdown-org-android) | the Android client, syncing the same notes over git                     |
+
+The Android client links the same extractor in-process, so a file means the
+same thing on the phone as it does here.
+
 ## Table of Contents
 
 - [Features](#features)
@@ -40,6 +51,7 @@ travel with the repository.
 - [Settings](#settings)
     - [`markdown-org.extractorPath`](#markdown-orgextractorpath)
     - [`markdown-org.workspaceDir`](#markdown-orgworkspacedir)
+    - [`markdown-org.workspaceDirs`](#markdown-orgworkspacedirs)
     - [`markdown-org.maintainFilePath`](#markdown-orgmaintainfilepath)
     - [`markdown-org.dateLocale`](#markdown-orgdatelocale)
     - [`markdown-org.uiLanguage`](#markdown-orguilanguage)
@@ -403,6 +415,19 @@ The agenda keeps a browser-style history of the views you opened (mode plus anch
     <img src="media/agenda-month-light.png" alt="Agenda month view">
 </picture>
 
+**Tasks view:** every open task at once, grouped by priority rather than by day. The three views above are anchored on a date; this one is not, so each row states its own date in full and only a date already behind today is coloured.
+
+<picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/VitalyOstanin/markdown-org-vscode/raw/HEAD/media/agenda-tasks-dark.png">
+    <img src="media/agenda-tasks-light.png" alt="Tasks view: open tasks grouped by priority">
+</picture>
+
+**The overdue backlog, split by age:** a day's slipped entries are four panels rather than one -- a missed repeat, what slipped within the week, what slipped earlier this year, and what is older than a year -- in that order. What a slipped entry asks of the reader differs with its age: a repeat missed on Tuesday is today's work, a date from May wants a new one, and a date from three years ago wants to be closed. A repeater is placed by that alone, ahead of the age of the date it missed.
+
+**Answering a whole band at once:** the mark (`⋮`) at the end of an overdue panel's heading opens three actions that act on every entry of that band -- date them all today, take the planning date off all of them, or mark them all cancelled. A missed repeat is caught up to its next occurrence instead of being dated today, keeping its repeater. Each file is rewritten once; an entry whose heading has moved since the agenda was built is left alone and named in the extension's log, and the rest of the band still goes through. The notice that reports the move offers to undo it, and the undo skips any note that changed in the meantime.
+
+**Several note directories as one agenda:** set [`markdown-org.workspaceDirs`](#markdown-orgworkspacedirs) to a list, and every directory in it is scanned into the same views. Each row then carries a small coloured dot at the head of its heading, and the dot's tooltip names the directory the task came from. A row of chips under the header names the same directories: a click hides one for as long as the panel stays open, another click brings it back. The chips narrow what is on screen by where it came from; the file tag below narrows it by which notes — see [Tag filtering](TAG_FILTERING.md).
+
 **Git status of the source files:** the chip on the right of the header counts the files behind the current view that carry uncommitted changes (`●`) and the files touched by commits the remote does not have (`↑`). Expanding it names those files, groups them by state, and offers the two actions for the view's own files -- committing them without touching unrelated edits in the same repository, and pushing the branch.
 
 <picture>
@@ -529,7 +554,28 @@ Path to the markdown-org-extract executable.
 **Type:** `string`
 **Default:** `""` (workspace root)
 
-Directory to scan for markdown files. Empty value uses workspace root.
+Directory to scan for markdown files. Empty value uses workspace root. Ignored while [`markdown-org.workspaceDirs`](#markdown-orgworkspacedirs) lists directories.
+
+### `markdown-org.workspaceDirs`
+
+**Type:** `string[]`
+**Default:** `[]`
+
+Directories to scan and show as one agenda. While the list is empty the single-directory setting above is used, so an existing configuration keeps working; a non-empty list replaces it rather than adding to it.
+
+One person is one pool of work. The notes may sit anywhere -- a work repository, a home one, a project of its own -- but whoever does them plans in a single list, so the agenda gathers the tasks from everywhere and shows them together. Splitting them up is not for reading the lists apart; it is for narrowing the view for a while. Hence two levels: this setting says what is read at all, and the tags below select notes inside what was read. Both act over one agenda rather than switching between separate ones.
+
+```json
+{
+    "markdown-org.workspaceDirs": ["/home/me/notes/work", "/home/me/notes/home"]
+}
+```
+
+Each row of the agenda then carries a coloured dot at the head of its heading, and the dot's tooltip names the directory the task came from. Two directories with the same name are told apart by their parent (`work/notes` and `home/notes`). The colours are assigned in the order of the list and repeat after five directories, which is why the name is in the tooltip rather than in the colour alone.
+
+Google Calendar sync reads the same list. An event's title is built from the path relative to the directory the task came from, so a note keeps its title whichever of the directories holds it.
+
+[`markdown-org.fileTags`](#markdown-orgfiletags) is the second level: a tag matches a substring of the file's basename, not of its path, so it selects notes inside whatever the scan returned and cannot name a directory of its own.
 
 ### `markdown-org.maintainFilePath`
 
@@ -612,14 +658,20 @@ First day of week in the month calendar. `"auto"` resolves the first day from th
 
 ### `markdown-org.fileTags`
 
-**Type:** `{ name: string; pattern: string }[]`
+**Type:** `{ name: string; pattern?: string; include?: string[]; exclude?: string[] }[]`
 **Default:** `[{ "name": "ALL", "pattern": "" }, { "name": "WORK", "pattern": "work" }, { "name": "PRIVATE", "pattern": "!work" }]`
 
-File tag filters applied in agenda. `pattern` is a case-sensitive substring matched against the file's **basename** (not the full path), so a pattern like `"work"` does not accidentally match files inside a `networking/` directory.
+Tags narrowing the agenda. A pattern is a case-sensitive substring matched against the file's **basename**, never against its path, so `"work"` does not pick up files inside a `networking/` directory -- and cannot name a directory either. Which directories are read is [`markdown-org.workspaceDirs`](#markdown-orgworkspacedirs); a tag selects notes inside whatever those returned.
 
-- `""` (empty) -- filter disabled; all tasks are shown. The tag's name has no special meaning.
-- `"text"` -- basename contains `"text"`.
-- `"!..."` -- basename matches **none** of the positive patterns in `fileTags`. The text after `!` is only a marker and is ignored, so `"!"`, `"!work"`, and `"!xyz"` all behave the same way.
+- `""` (empty) -- filtering off; every note is shown. The tag's name has no special meaning.
+- `"text"` -- basename contains `"text"`, anywhere in it: `"work"` takes `work-plan.md` and `homework.md` alike.
+- `"!..."` -- the tag takes every note no other tag took. The text after `!` is only a marker, so `"!"`, `"!work"` and `"!xyz"` behave the same.
+- `"include": ["a", "b"]` -- alternatives; a note matching either is in.
+- `"exclude": ["c"]` -- keeps notes out, whatever `include` says about them. This is how `"everything about work except the archive"` is written: `{ "include": ["work"], "exclude": ["archive"] }`.
+
+The same tags can travel with the notes instead of living in the settings: a directory declares them in `.markdown-org/tags.json`, holding exactly this list, and the file is synced through git like the notes around it -- which is what carries them to the other clients of the ecosystem.
+
+Everything declared is merged into one dictionary: a tag means the same wherever a note came from, and a directory that never named a tag is filtered by it like any other. Where two declarations disagree, both are kept -- their including patterns become alternatives, and any exclusion holds. Run `Show File Tags` to see the merged dictionary with the directory that declared each pattern.
 
 See [TAG_FILTERING.md](TAG_FILTERING.md) for examples. Cycle the active tag with `Cycle Tag Filter`.
 

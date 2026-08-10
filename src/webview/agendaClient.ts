@@ -117,6 +117,13 @@ export interface FlagTooltipTask {
     timestamp_next?: string;
 }
 
+/** One of several scanned directories, as a row refers to it. */
+export interface CollectionMark {
+    root: string;
+    name: string;
+    tone: number;
+}
+
 /** Nav-bar title model. */
 export interface HeroModel {
     kind: 'date' | 'month' | 'tasks';
@@ -138,8 +145,12 @@ export interface DaySectionItem {
     kind: DaySectionItemKind;
 }
 
+/** The overdue backlog is four panels rather than one; see agendaDaySummary. */
+export type DaySectionKey =
+    'scheduled' | 'allday' | 'overdue-repeat' | 'overdue-recent' | 'overdue-earlier' | 'overdue-long';
+
 export interface DaySection {
-    key: 'scheduled' | 'allday' | 'overdue';
+    key: DaySectionKey;
     title: string;
     items: DaySectionItem[];
 }
@@ -148,7 +159,10 @@ export interface DaySection {
 export interface DaySectionLabels {
     scheduled: string;
     allday: string;
-    overdue: string;
+    overdueRepeat: string;
+    overdueRecent: string;
+    overdueEarlier: string;
+    overdueLong: string;
 }
 
 /** Tasks-card headline counts. */
@@ -370,6 +384,16 @@ export interface AgendaClientDeps {
             formatString: (template: string, ...values: string[]) => string;
             formatNumber: (value: number, locale: string) => string;
             pluralIndex: (n: number, lang: string) => number;
+        },
+        actionsHtml: string
+    ) => string;
+    renderGroupMenu: (
+        sectionKey: string,
+        sectionTitle: string,
+        ctx: {
+            strings: AgendaStrings['group'];
+            escapeHtml: (text: string | number | boolean | undefined | null) => string;
+            formatString: (template: string, ...values: string[]) => string;
         }
     ) => string;
     renderDayHeaderHtml: (parts: DayHeaderParts) => string;
@@ -469,7 +493,27 @@ export interface AgendaClientDeps {
                 strings: TooltipStrings,
                 fill: (template: string, ...values: string[]) => string
             ) => string;
+            collectionMark?: ((root: string | undefined) => string) | undefined;
             showDate?: 'when-offset' | 'always' | undefined;
+        }
+    ) => string;
+    collectionMarkHtml: (
+        root: string | undefined,
+        marks: readonly CollectionMark[],
+        ctx: {
+            collectionTooltip: string;
+            escapeHtml: (text: string | number | boolean | undefined | null) => string;
+            formatString: (template: string, ...values: string[]) => string;
+        }
+    ) => string;
+    hideCollections: (data: AgendaData, hidden: readonly string[]) => AgendaData;
+    renderCollectionChips: (
+        marks: readonly CollectionMark[],
+        hidden: readonly string[],
+        ctx: {
+            chipTitle: string;
+            escapeHtml: (text: string | number | boolean | undefined | null) => string;
+            formatString: (template: string, ...values: string[]) => string;
         }
     ) => string;
     taskDateDirection: (task: Task, anchorIso: string) => 'overdue' | 'today' | 'upcoming' | undefined;
@@ -554,6 +598,12 @@ interface AgendaStatePayload {
     shiftedToday?: string;
     currentTag?: string;
     availableTags?: string[];
+    /**
+     * The scanned directories a row can belong to, empty while one directory
+     * is scanned. Sent with every payload because it is derived from the tasks
+     * in it.
+     */
+    collections?: CollectionMark[];
     firstDayOfWeek?: string;
     headerMode?: string;
     strings?: AgendaStrings;
@@ -575,7 +625,11 @@ type HostMessage =
     | { command: 'getRenderedInfo' }
     // Integration-test hook: the host cannot scroll the page from outside, and
     // the clipping behaviour only exists at a non-zero scroll position.
-    | { command: 'setScrollForTesting'; y?: number };
+    | { command: 'setScrollForTesting'; y?: number }
+    // Integration-test hook: a directory chip is only ever turned off by a
+    // click inside the page, and what a test needs to see is what that click
+    // leaves on screen -- so the chip is pressed rather than the state poked.
+    | { command: 'clickCollectionChipForTesting'; root?: string };
 
 /**
  * Run the agenda client in the page. Called once, from the injected `<script>`.
@@ -621,6 +675,7 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         summaryStat: summaryStatHtml,
         renderSummaryBar: renderSummaryBarHtml,
         renderSectionPanel: renderSectionPanelHtml,
+        renderGroupMenu: renderGroupMenuHtml,
         renderDayHeaderHtml,
         renderModeSwitch,
         tagButtonText,
@@ -635,6 +690,9 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         buildWeekdayLabels,
         renderMonthCalendar,
         renderTaskRow,
+        collectionMarkHtml,
+        hideCollections,
+        renderCollectionChips,
         taskDateDirection,
         renderCard,
         renderGitMenu
@@ -666,6 +724,13 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
     // menu without reopening the panel.
     let availableTags: string[] = ['ALL'];
     let holidays: string[] = [];
+    // Which scanned directory each row belongs to, and in what colour. Empty
+    // for the usual single-directory agenda, where a row carries no mark.
+    let collections: CollectionMark[] = [];
+    // Which of them the reader has turned off, by root. Not carried between
+    // openings: a panel that opens missing half its rows, with no memory of
+    // why, is worse off than one that opens whole.
+    let hiddenCollections: string[] = [];
     let firstDayOfWeek = 'monday';
     // Per-anchor scroll memory. Saved on every navigate() before the postMessage
     // and restored on navigation=true updates so that a round-trip (Next then
@@ -861,6 +926,7 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
                 availableTags = message.availableTags;
             }
             holidays = message.holidays ?? [];
+            collections = message.collections ?? [];
             if (message.firstDayOfWeek) {
                 firstDayOfWeek = message.firstDayOfWeek;
             }
@@ -914,6 +980,10 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
                 uiLang = message.language || uiLang;
             }
             initialData = message.data ?? [];
+            // Replaced outright, not merged: the set of scanned directories is
+            // whatever this payload came from, and a directory that no longer
+            // holds tasks must stop colouring rows.
+            collections = message.collections ?? [];
             const userInitiated = message.userInitiated === true;
             const navigation = message.navigation === true;
             const scrollPos = window.scrollY;
@@ -983,6 +1053,24 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             // Section-panel titles in document order (Day and Tasks cards), so a
             // test can assert the grouping and its order.
             const sections = [...document.querySelectorAll('.day-section-name')].map((el) => el.textContent);
+            // Which sections offer an action on the whole band: the key each
+            // menu carries, which is also what a click on it would post back.
+            const sectionMenus = [...document.querySelectorAll('.group-menu')].map((el) =>
+                el.getAttribute('data-section')
+            );
+            // Collection dots in row order, each reported by the tooltip that
+            // names its directory: with one directory scanned there are none,
+            // which is the state a test has no other way to tell apart from
+            // "the mark was rendered without a name".
+            const collectionMarks = [...document.querySelectorAll('.task-line .collection')].map((el) =>
+                el.getAttribute('title')
+            );
+            // The chip row, each chip as its directory name plus the state it is
+            // in. The name alone would not tell a chip that is off from one
+            // that is on, and that difference is the whole feature.
+            const collectionChips = [...document.querySelectorAll('.collection-chip')].map(
+                (el) => `${el.textContent}${el.classList.contains('off') ? ' (off)' : ''}`
+            );
             // Measured, not inferred: the compact header is only compact if the
             // hero really shares a line with the control block. A class on
             // <body> proves nothing about the layout it was supposed to
@@ -1022,6 +1110,9 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
                 mode: initialMode,
                 flags,
                 sections,
+                sectionMenus,
+                collectionMarks,
+                collectionChips,
                 clipAbove,
                 clipBelow,
                 scrollY: window.scrollY,
@@ -1034,7 +1125,6 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
                 headerLayout: document.body.classList.contains('compact-header') ? 'compact' : 'full',
                 heroSharesControlRow
             });
-            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- spelled out rather than a bare `else`, so the branch says which command it serves
         } else if (message.command === 'setScrollForTesting') {
             // Integration-test hook: the clipping markers and the sticky-anchor
             // fix only differ from the trivial case at a non-zero scroll
@@ -1042,6 +1132,12 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             // Production code never sends this command.
             window.scrollTo(0, message.y ?? 0);
             refreshClipMarkers();
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- spelled out rather than a bare `else`, so the branch says which command it serves
+        } else if (message.command === 'clickCollectionChipForTesting') {
+            const chip = document.querySelector<HTMLElement>(
+                `.collection-chip[data-root="${(message.root ?? '').replaceAll('"', '\\"')}"]`
+            );
+            chip?.click();
         }
     }
 
@@ -1052,13 +1148,18 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         if (!content) {
             return;
         }
+        // What the chips left on screen. Held in a local rather than written
+        // back over `initialData`: the chips are a view of the scan, and a
+        // reader turning one back on must get its rows back without another
+        // walk of the notes.
+        const shown = hideCollections(initialData, hiddenCollections);
         if (initialMode === 'month') {
-            content.innerHTML = renderMonth(initialData as DayAgenda[]);
+            content.innerHTML = renderMonth(shown as DayAgenda[]);
             attachCalendarListeners();
             return;
         }
         if (initialMode === 'week') {
-            content.innerHTML = renderAgenda(initialData as DayAgenda[]);
+            content.innerHTML = renderAgenda(shown as DayAgenda[]);
             wireDayHeaderNavigation(document, initialMode, navigateToDay, UI.openDayView);
             return;
         }
@@ -1066,8 +1167,7 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         if (initialMode !== 'day' && initialMode !== 'tasks') {
             return;
         }
-        content.innerHTML =
-            initialMode === 'day' ? renderDayCard(initialData as DayAgenda[]) : renderTasks(initialData as Task[]);
+        content.innerHTML = initialMode === 'day' ? renderDayCard(shown as DayAgenda[]) : renderTasks(shown as Task[]);
     }
 
     function parseLocalDate(str: string): Date {
@@ -1104,6 +1204,12 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         document.querySelectorAll('.tag-menu.open').forEach(function (m) {
             m.classList.remove('open');
         });
+        // Same rule for the band menus: a click anywhere else puts them away.
+        // Their own handler stops the event before it reaches here, so opening
+        // one does not immediately close it.
+        document.querySelectorAll('.group-menu.open').forEach(function (m) {
+            m.classList.remove('open');
+        });
     });
 
     // Agenda navigation history (Alt+Shift+- back, Alt+Shift+= forward) is NOT
@@ -1135,6 +1241,12 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
     // the editor N times. Rows themselves are recreated by the render, so
     // delegation is also what keeps the handler valid for the new markup.
     document.getElementById('content')?.addEventListener('click', (e) => {
+        // The section-head menu sits inside #content, so it is read first: its
+        // mark and its items are not task rows, and letting the row handler see
+        // them would open a file the click was never about.
+        if (handleGroupMenuClick(e)) {
+            return;
+        }
         // Source of truth: src/utils/agendaClick.ts -- jsdom tested.
         const intent = resolveTaskClickIntent(e as unknown as ClickEventLike, window.getSelection());
         if (intent) {
@@ -1145,6 +1257,49 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             });
         }
     });
+
+    /**
+     * The band menu: the mark opens it, an item acts on the whole band.
+     *
+     * Returns whether the click belonged to a menu, so the row handler can stand
+     * down. The message carries the band's key rather than its tasks: the
+     * extension side holds the payload the view was built from and resolves the
+     * band there, so the page never assembles a file list.
+     */
+    function handleGroupMenuClick(e: Event): boolean {
+        const target = e.target as HTMLElement | null;
+        const item = target?.closest('.group-menu-item');
+        if (item) {
+            e.stopPropagation();
+            closeGroupMenus();
+            const section = item.closest('.group-menu')?.getAttribute('data-section');
+            const action = item.getAttribute('data-action');
+            if (section && action) {
+                vscode.postMessage({ command: 'groupAction', section: section, action: action });
+            }
+            return true;
+        }
+        const button = target?.closest('.group-menu-btn');
+        if (!button) {
+            return false;
+        }
+        e.stopPropagation();
+        const menu = button.closest('.group-menu');
+        document.querySelectorAll('.group-menu').forEach((m) => {
+            if (m === menu) {
+                m.classList.toggle('open');
+            } else {
+                m.classList.remove('open');
+            }
+        });
+        return true;
+    }
+
+    function closeGroupMenus(): void {
+        document.querySelectorAll('.group-menu.open').forEach((m) => {
+            m.classList.remove('open');
+        });
+    }
 
     function renderAgenda(days: DayAgenda[]): string {
         const today = toIsoDate(new Date());
@@ -1218,7 +1373,12 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
                         return renderTask(it.task, it.task.days_offset, taskType);
                     })
                     .join('');
-                return renderSectionPanel(sec.key, sec.title, sec.items.length, rows);
+                // Only the overdue bands offer a group action: what "move the
+                // whole section to today" would mean for the tasks already
+                // scheduled today is nothing, and for the upcoming ones it is
+                // the opposite of what they are.
+                const actions = sec.key.startsWith('overdue-') ? renderGroupMenu(sec.key, sec.title) : '';
+                return renderSectionPanel(sec.key, sec.title, sec.items.length, rows, actions);
             })
             .join('');
         return renderCard('day', renderSummaryBar(day.date, pieces), sectionsHtml, UI.empty.day, { escapeHtml });
@@ -1237,17 +1397,34 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         return renderSummaryBarHtml(dateIso, pieces, { escapeHtml });
     }
 
-    function renderSectionPanel(key: string, title: string, count: number, rowsHtml: string): string {
-        return renderSectionPanelHtml(key, title, count, rowsHtml, {
-            locale,
-            uiLang,
-            inSectionTemplate: UI.countChip.inSection,
-            taskForms: UI.countChip.tasks,
-            escapeHtml,
-            formatString,
-            formatNumber,
-            pluralIndex
-        });
+    function renderSectionPanel(
+        key: string,
+        title: string,
+        count: number,
+        rowsHtml: string,
+        actionsHtml: string
+    ): string {
+        return renderSectionPanelHtml(
+            key,
+            title,
+            count,
+            rowsHtml,
+            {
+                locale,
+                uiLang,
+                inSectionTemplate: UI.countChip.inSection,
+                taskForms: UI.countChip.tasks,
+                escapeHtml,
+                formatString,
+                formatNumber,
+                pluralIndex
+            },
+            actionsHtml
+        );
+    }
+
+    function renderGroupMenu(sectionKey: string, sectionTitle: string): string {
+        return renderGroupMenuHtml(sectionKey, sectionTitle, { strings: UI.group, escapeHtml, formatString });
     }
 
     // The week view scrolls to today's header when today is in the visible
@@ -1336,7 +1513,7 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
                 const rows = group.items
                     .map((task) => renderTask(task, undefined, taskDateDirection(task, anchor), 'always'))
                     .join('');
-                return renderSectionPanel(`p${group.key}`, group.title, group.items.length, rows);
+                return renderSectionPanel(`p${group.key}`, group.title, group.items.length, rows, '');
             })
             .join('');
         return renderCard('tasks', renderSummaryBar('', pieces), groupsHtml, UI.empty.tasks, { escapeHtml });
@@ -1367,7 +1544,13 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             resolveHeadingClass,
             attentionTooltip,
             flagTooltip,
-            priorityTooltip
+            priorityTooltip,
+            collectionMark: (root) =>
+                collectionMarkHtml(root, collections, {
+                    collectionTooltip: UI.tooltips.collection,
+                    escapeHtml,
+                    formatString
+                })
         });
     }
 
@@ -1687,5 +1870,41 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         attachModeSwitchListeners();
         attachTagMenuListeners();
         attachGitMenuListeners();
+        renderCollectionRow();
+    }
+
+    /**
+     * The row of collection chips under the header, and its listeners.
+     *
+     * Its own element rather than part of the nav bar: the nav bar is one line
+     * of controls that the compact layout squeezes, and a directory name is
+     * text of unknown length. Rebuilt with the header, so a scan that brought a
+     * new directory in is followed by a chip for it.
+     */
+    function renderCollectionRow(): void {
+        const row = document.getElementById('collection-row');
+        if (!row) {
+            return;
+        }
+        row.innerHTML = renderCollectionChips(collections, hiddenCollections, {
+            chipTitle: UI.collectionChipTitle,
+            escapeHtml,
+            formatString
+        });
+        row.querySelectorAll('.collection-chip').forEach((chip) => {
+            chip.addEventListener('click', () => {
+                const root = chip.getAttribute('data-root');
+                if (root === null) {
+                    return;
+                }
+                hiddenCollections = hiddenCollections.includes(root)
+                    ? hiddenCollections.filter((entry) => entry !== root)
+                    : [...hiddenCollections, root];
+                // The chips themselves are redrawn too: the one just pressed
+                // has to show which side of the filter it is on now.
+                renderCollectionRow();
+                renderCurrentMode();
+            });
+        });
     }
 }

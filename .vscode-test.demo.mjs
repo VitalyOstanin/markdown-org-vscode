@@ -5,11 +5,20 @@ import { mkdirSync } from 'node:fs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
+// Which VS Code the demos run against. `stable` is the default and the right
+// answer for media that advertises the extension -- it is what a reader has.
+// The override exists because a fresh stable is a ~330 MB download at whatever
+// the connection to the CDN gives, and a re-shot demo does not depend on the
+// build: any version already unpacked under .vscode-test (see `ls
+// .vscode-test`) produces the same frames minutes sooner.
+const demoVscodeVersion = process.env.MARKDOWN_ORG_DEMO_VSCODE_VERSION || 'stable';
+
 function demoEntry(label, file, workspaceName) {
     const workspaceFolder = resolve(here, workspaceName);
     mkdirSync(workspaceFolder, { recursive: true });
     return {
         label,
+        version: demoVscodeVersion,
         files: `out/test/demo/${file}`,
         extensionDevelopmentPath: here,
         workspaceFolder,

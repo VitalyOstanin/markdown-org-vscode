@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { AgendaPanel } from '../views/agendaPanel';
-import type { AgendaData, FileTag } from '../types';
+import type { AgendaData } from '../types';
 import { normalizeAgendaTaskTypes } from '../utils/normalizeTaskType';
 import { toIsoDate } from '../utils';
 import { exec } from '../utils/exec';
@@ -11,6 +11,9 @@ import { buildTagCycle, computeNextTag, resolveRequestedTag } from '../utils/cyc
 import { nextHeaderMode } from '../utils/agendaHeaderMode';
 import { buildExecError } from '../utils/execError';
 import { currentConfigTarget } from '../utils/configTarget';
+import { resolveAgendaDirectories } from '../utils/agendaDirectories';
+import { currentTagDictionary } from '../utils/agendaTags';
+import { renderTagDictionaryReport } from '../utils/tagDictionaryReport';
 import { getCachedHolidays } from '../utils/holidaysCache';
 import { logDiagnostic } from '../utils/logChannel';
 
@@ -35,13 +38,15 @@ export async function showAgenda(
     }
 
     const startupConfig = vscode.workspace.getConfiguration('markdown-org');
-    // An empty `workspaceDir` setting means "not set" and must fall through to
-    // the open folder, which is what `||` does and `??` would not.
-    const workspaceDir =
-        // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-        startupConfig.get<string>('workspaceDir') || vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    // Read once, at open: the same list feeds every refresh of this panel, and
+    // a settings change reaches the agenda through the reopen it already needs.
+    const workspaceDirs = resolveAgendaDirectories(
+        startupConfig.get<string[]>('workspaceDirs'),
+        startupConfig.get<string>('workspaceDir'),
+        vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
+    );
 
-    if (!workspaceDir) {
+    if (workspaceDirs.length === 0) {
         notifyError('Please open a workspace folder or configure markdown-org.workspaceDir');
         return;
     }
@@ -77,7 +82,7 @@ export async function showAgenda(
     const loadPayload = async (
         args: string[],
         anchor: string | undefined
-    ): Promise<{ data: AgendaData; currentTag: string; holidays: string[] } | undefined> => {
+    ): Promise<{ data: AgendaData; currentTag: string; tagNames: string[]; holidays: string[] } | undefined> => {
         try {
             const result = await execCommand(extractorPath, args);
             // Parse boundary: the extractor JSON arrives untyped. Normalize
@@ -87,13 +92,22 @@ export async function showAgenda(
             const rawData = normalizeAgendaTaskTypes(JSON.parse(result) as AgendaData);
             const config = vscode.workspace.getConfiguration('markdown-org');
             const currentTag = config.get<string>('currentTag', 'ALL');
-            const fileTags = config.get<FileTag[]>('fileTags', []);
-            const data = filterTasksByTag(rawData, currentTag, fileTags);
+            // The same dictionary answers both questions of this load: which
+            // tasks the selected tag keeps, and which names the dropdown
+            // offers. Reading it twice could show a tag the data was not
+            // filtered by, if a tags file arrived in between.
+            const dictionary = await currentTagDictionary();
+            const data = filterTasksByTag(rawData, currentTag, dictionary);
             // `anchor` is an ISO date when set, so the year is its first part;
             // an unexpected shape parses to NaN exactly as it did before.
             const year = anchor ? parseInt(anchor.split('-')[0] ?? '', 10) : new Date().getFullYear();
 
-            return { data, currentTag, holidays: await getHolidays(year) };
+            return {
+                data,
+                currentTag,
+                tagNames: dictionary.map((tag) => tag.name),
+                holidays: await getHolidays(year)
+            };
         } catch (error) {
             notifyError(`Failed to load agenda: ${formatError(error)}`);
             return undefined;
@@ -114,7 +128,11 @@ export async function showAgenda(
         // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
         shiftedToday ||= toIsoDate(new Date());
 
-        const args = ['--dir', workspaceDir, '--format', 'json', '--absolute-paths'];
+        // One `--dir` per configured directory: the extractor merges them into
+        // one agenda and tags every task with the root it came from, which is
+        // what the collection mark on a row reads.
+        const args = workspaceDirs.flatMap((dir) => ['--dir', dir]);
+        args.push('--format', 'json', '--absolute-paths');
         if (mode === 'tasks') {
             args.push('--tasks');
         } else {
@@ -147,6 +165,7 @@ export async function showAgenda(
                 refreshCallback: loadData,
                 userInitiated,
                 currentTag: loaded.currentTag,
+                tagNames: loaded.tagNames,
                 holidays: loaded.holidays,
                 navigation
             });
@@ -158,23 +177,27 @@ export async function showAgenda(
     await loadData(undefined, true);
 }
 
-/** Advance the file-tag filter (`markdown-org.currentTag`) to the next entry in `markdown-org.fileTags`. */
+/**
+ * Advance the file-tag filter (`markdown-org.currentTag`) to the next tag of
+ * the dictionary -- the tags the notes directories declare together with those
+ * of `markdown-org.fileTags`.
+ */
 export async function cycleTag(_context: vscode.ExtensionContext) {
     const config = vscode.workspace.getConfiguration('markdown-org');
-    const fileTags = config.get<FileTag[]>('fileTags', []);
+    const dictionary = await currentTagDictionary();
     const currentTag = config.get<string>('currentTag', 'ALL');
 
-    if (fileTags.length === 0) {
-        notifyWarn('No file tags configured (markdown-org.fileTags)');
+    if (dictionary.length === 0) {
+        notifyWarn('No file tags declared by the notes directories or configured in markdown-org.fileTags');
         return;
     }
 
-    const tagNames = fileTags.map((t) => t.name);
+    const tagNames = dictionary.map((t) => t.name);
 
     // A cycle of just [ALL] means there is nothing to rotate to -- every
-    // configured entry is named "ALL". Warn instead of silently staying on ALL.
+    // declared entry is named "ALL". Warn instead of silently staying on ALL.
     if (buildTagCycle(tagNames).length <= 1) {
-        notifyWarn('Only "ALL" is configured in markdown-org.fileTags; nothing to cycle to');
+        notifyWarn('Only "ALL" is declared; nothing to cycle to');
         return;
     }
 
@@ -204,17 +227,33 @@ export async function cycleAgendaHeaderMode() {
 /**
  * Apply a specific file-tag filter chosen directly from the agenda's tag
  * dropdown. Unlike {@link cycleTag} this jumps straight to the picked tag; a
- * request stale against the current `markdown-org.fileTags` resolves to "ALL"
- * (see {@link resolveRequestedTag}). No toast: the dropdown selection is
- * already explicit feedback, and one on every pick would be noise.
+ * request stale against the current dictionary resolves to "ALL" (see
+ * {@link resolveRequestedTag}). No toast: the dropdown selection is already
+ * explicit feedback, and one on every pick would be noise.
  */
 export async function setTag(_context: vscode.ExtensionContext, requestedTag: string) {
     const config = vscode.workspace.getConfiguration('markdown-org');
-    const tagNames = config.get<FileTag[]>('fileTags', []).map((t) => t.name);
+    const tagNames = (await currentTagDictionary()).map((t) => t.name);
     const target = currentConfigTarget();
     await config.update('currentTag', resolveRequestedTag(requestedTag, tagNames), target);
 
     AgendaPanel.refresh();
+}
+
+/**
+ * Show what the tags mean and who said so.
+ *
+ * The dropdown offers a name; behind it several notes directories and the
+ * settings have been merged. This opens the merged dictionary as a Markdown
+ * document, each pattern with what it does and where it was declared -- the
+ * only way to see why a tag selects what it selects.
+ */
+export async function showTagDictionary() {
+    const document = await vscode.workspace.openTextDocument({
+        content: renderTagDictionaryReport(await currentTagDictionary()),
+        language: 'markdown'
+    });
+    await vscode.window.showTextDocument(document, { preview: true });
 }
 
 function execCommand(command: string, args: string[]): Promise<string> {

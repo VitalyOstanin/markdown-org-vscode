@@ -56,7 +56,8 @@ suite('package.json workspace trust', () => {
         for (const setting of [
             'markdown-org.extractorPath',
             'markdown-org.maintainFilePath',
-            'markdown-org.workspaceDir'
+            'markdown-org.workspaceDir',
+            'markdown-org.workspaceDirs'
         ]) {
             assert.ok(restricted.includes(setting), `${setting} must be in restrictedConfigurations`);
         }

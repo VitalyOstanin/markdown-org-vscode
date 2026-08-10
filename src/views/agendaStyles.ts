@@ -112,6 +112,8 @@ export const AGENDA_STYLES = `
         .tag-menu-btn:focus-visible,
         .chip-btn:focus-visible,
         .tag-menu-item:focus-visible,
+        .group-menu-btn:focus-visible,
+        .group-menu-item:focus-visible,
         .git-file:focus-visible,
         .git-action:focus-visible,
         .calendar-day:focus-visible {
@@ -777,6 +779,68 @@ export const AGENDA_STYLES = `
             color: var(--vscode-disabledForeground);
             text-decoration: line-through;
         }
+        /* Collection mark: which of several scanned directories the row came
+           from (markdown-org.workspaceDirs). A dot at the head of the heading,
+           not a column of its own -- see renderTaskRow -- and absent entirely
+           while a single directory is scanned.
+
+           The palette deliberately excludes red: colour is spent on urgency
+           (design principle 4), and a collection is not urgent. The name is in
+           the dot's tooltip, so nothing depends on telling the hues apart. */
+        .task-line .collection {
+            display: inline-block;
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            margin-right: var(--space-2);
+            vertical-align: middle;
+            background: var(--vscode-charts-blue);
+        }
+        .task-line .collection[data-tone="0"] { background: var(--vscode-charts-purple); }
+        .task-line .collection[data-tone="1"] { background: var(--vscode-charts-green); }
+        .task-line .collection[data-tone="2"] { background: var(--vscode-charts-orange); }
+        .task-line .collection[data-tone="3"] { background: var(--vscode-charts-blue); }
+        .task-line .collection[data-tone="4"] { background: var(--vscode-charts-yellow); }
+        /* Directory chips: the same directories the dots above stand for, as a
+           row of toggles under the nav bar. A chip that is on is filled, one
+           that is off keeps its dot and loses the fill -- the state has to be
+           readable without comparing two chips side by side. The row is absent
+           while a single directory is scanned, since there is nothing to turn
+           off that would leave anything on screen. */
+        .collection-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: var(--space-2);
+            margin-bottom: var(--space-2);
+        }
+        .collection-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-2);
+            padding: var(--space-1) var(--space-3);
+            border: 1px solid var(--vscode-panel-border);
+            border-radius: var(--radius-pill);
+            background: var(--vscode-editor-background);
+            color: var(--vscode-foreground);
+            font-family: inherit;
+            font-size: var(--font-xs);
+            cursor: pointer;
+        }
+        .collection-chip.off {
+            opacity: 0.55;
+            text-decoration: line-through;
+        }
+        .collection-chip-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--vscode-charts-blue);
+        }
+        .collection-chip[data-tone="0"] .collection-chip-dot { background: var(--vscode-charts-purple); }
+        .collection-chip[data-tone="1"] .collection-chip-dot { background: var(--vscode-charts-green); }
+        .collection-chip[data-tone="2"] .collection-chip-dot { background: var(--vscode-charts-orange); }
+        .collection-chip[data-tone="3"] .collection-chip-dot { background: var(--vscode-charts-blue); }
+        .collection-chip[data-tone="4"] .collection-chip-dot { background: var(--vscode-charts-yellow); }
         /* ============ agenda card (Day and Tasks views) ============
            A card is a sticky summary bar plus stacked section panels. The Day
            view fills it with schedule buckets (Scheduled today / All-day &
@@ -845,12 +909,19 @@ export const AGENDA_STYLES = `
         .day-section-count {
             margin-left: auto;
         }
-        /* Overdue panel: red-tinted name and a red count chip so the backlog at
-           the bottom stays visually distinct from the day's active work. */
-        .day-section-overdue .day-section-name {
+        /* Overdue panels: red-tinted name and a red count chip so the backlog at
+           the bottom stays visually distinct from the day's active work. The
+           band older than a year is left neutral -- it is kept, not planned,
+           and a screen of red headings says nothing about which of them is
+           worth answering first. */
+        .day-section-overdue-repeat .day-section-name,
+        .day-section-overdue-recent .day-section-name,
+        .day-section-overdue-earlier .day-section-name {
             color: var(--accent-red);
         }
-        .day-section-overdue .day-section-count {
+        .day-section-overdue-repeat .day-section-count,
+        .day-section-overdue-recent .day-section-count,
+        .day-section-overdue-earlier .day-section-count {
             color: var(--vscode-editor-background);
             background: var(--accent-red);
         }
@@ -869,6 +940,63 @@ export const AGENDA_STYLES = `
         .day-section-pc .day-section-count {
             color: var(--vscode-editor-background);
             background: var(--accent-blue);
+        }
+        /* The group menu of an overdue band: one glyph at the end of the head,
+           and a dropdown that repeats the tag menu's panel. It stays the muted
+           colour of the head until hovered -- what is behind it rewrites every
+           note of the band, and a control that loud would be read as the point
+           of the section rather than as something available in it. */
+        .group-menu {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+        .group-menu-btn {
+            background: none;
+            border: none;
+            padding: 0 var(--space-1);
+            cursor: pointer;
+            font-family: inherit;
+            font-size: var(--font-md);
+            line-height: 1;
+            color: var(--vscode-descriptionForeground);
+        }
+        .group-menu-btn:hover {
+            color: var(--vscode-foreground);
+        }
+        .group-menu-list {
+            position: absolute;
+            right: 0;
+            top: 100%;
+            background: var(--vscode-editorWidget-background);
+            border: 1px solid var(--vscode-panel-border);
+            border-radius: var(--radius-md);
+            box-shadow: 0 2px 8px var(--vscode-widget-shadow);
+            overflow: hidden;
+            z-index: 10;
+            display: none;
+            min-width: 160px;
+        }
+        .group-menu.open .group-menu-list {
+            display: block;
+        }
+        /* Same row shell as .tag-menu-item, without the checkmark column: these
+           rows are actions, not a current choice. */
+        .group-menu-item {
+            display: block;
+            width: 100%;
+            padding: var(--space-1) var(--space-3);
+            cursor: pointer;
+            background: none;
+            border: none;
+            font-family: inherit;
+            font-size: var(--font-md);
+            text-align: left;
+            white-space: nowrap;
+            color: var(--vscode-foreground);
+        }
+        .group-menu-item:hover {
+            background: var(--vscode-list-hoverBackground);
         }
         .day-section-body {
             margin-top: var(--space-1);

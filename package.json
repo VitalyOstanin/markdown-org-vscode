@@ -2,7 +2,7 @@
   "name": "markdown-org-vscode",
   "displayName": "Markdown Org",
   "description": "Org-mode style task management in Markdown: TODO/DONE workflow, priorities, SCHEDULED/DEADLINE timestamps, agenda views, and CLOCK time tracking.",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "publisher": "vitalyostanin",
   "repository": {
     "type": "git",
@@ -51,11 +51,12 @@
   "capabilities": {
     "untrustedWorkspaces": {
       "supported": "limited",
-      "description": "In an untrusted workspace, configured executable paths (e.g. markdown-org.extractorPath) and file paths (markdown-org.maintainFilePath, markdown-org.workspaceDir) are not used.",
+      "description": "In an untrusted workspace, configured executable paths (e.g. markdown-org.extractorPath) and file paths (markdown-org.maintainFilePath, markdown-org.workspaceDir, markdown-org.workspaceDirs) are not used.",
       "restrictedConfigurations": [
         "markdown-org.extractorPath",
         "markdown-org.maintainFilePath",
-        "markdown-org.workspaceDir"
+        "markdown-org.workspaceDir",
+        "markdown-org.workspaceDirs"
       ]
     }
   },
@@ -178,6 +179,11 @@
       {
         "command": "markdown-org.cycleTag",
         "title": "Cycle Tag Filter",
+        "category": "Markdown Org"
+      },
+      {
+        "command": "markdown-org.showTagDictionary",
+        "title": "Show File Tags",
         "category": "Markdown Org"
       },
       {
@@ -353,7 +359,15 @@
         "markdown-org.workspaceDir": {
           "type": "string",
           "default": "",
-          "description": "Directory to scan for markdown files (empty = workspace root)"
+          "description": "Directory to scan for markdown files (empty = workspace root). Ignored when markdown-org.workspaceDirs lists directories."
+        },
+        "markdown-org.workspaceDirs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Directories to scan and show as one agenda. Each task keeps a coloured mark naming the directory it came from. Empty (default) falls back to markdown-org.workspaceDir, then the workspace root."
         },
         "markdown-org.maintainFilePath": {
           "type": "string",
@@ -411,7 +425,37 @@
               "pattern": "!work"
             }
           ],
-          "description": "File tags. Pattern is matched (substring) against the file's basename. Empty pattern disables the filter (show all). '!'-prefix means 'not matching any positive pattern' — the text after '!' is ignored."
+          "items": {
+            "type": "object",
+            "required": [
+              "name"
+            ],
+            "properties": {
+              "name": {
+                "type": "string",
+                "description": "What the tag is called in the agenda's dropdown."
+              },
+              "pattern": {
+                "type": "string",
+                "description": "Substring of the file's basename that puts a note in this tag. Empty shows every note; a leading '!' makes the tag 'everything no other tag takes' — the text after '!' is ignored."
+              },
+              "include": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Substrings that put a note in this tag; a note matching any of them is in."
+              },
+              "exclude": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "Substrings that keep a note out of this tag, whatever 'include' says about it."
+              }
+            }
+          },
+          "description": "File tags, merged with the tags every notes directory declares in .markdown-org/tags.json. A pattern is matched as a substring against the file's basename, never against its path — which directories are read is markdown-org.workspaceDirs, and a tag narrows what was read."
         },
         "markdown-org.currentTag": {
           "type": "string",
@@ -546,12 +590,12 @@
     "brace-expansion": "^5.0.8"
   },
   "x-markdown-org": {
-    "extractorVersion": "0.12.0",
+    "extractorVersion": "0.14.0",
     "extractorSha256": {
-      "x86_64-unknown-linux-gnu": "3aef2081e1289a405914a631db8084f103a7fd89f657382520454bf76abf1458",
-      "x86_64-apple-darwin": "187f46b74b0939a7fb9f38eba4db85b69f925ba6bbd504772109a16e7730a018",
-      "aarch64-apple-darwin": "a0cb5071e421bd46a7f160e97618873b0b5e6713c05ab4cd758e4e223edb63c2",
-      "x86_64-pc-windows-msvc": "8549eec30e044ba18453d0ed8efde2e895fe33614a8a70bb5c4abef30ea103f5"
+      "x86_64-unknown-linux-gnu": "8558ad9e2be7a57e8e3c92ded6481f6500b2a3cdec86acc90b2769e95d9db5dc",
+      "x86_64-apple-darwin": "97e6987a272821fd138a88cc36803672e0362f160a0a8ec1ccb1aadd98ae6ab2",
+      "aarch64-apple-darwin": "7f4bca1012f95e3970646ad8e44ec39be2a077546d92bfab260b07808f59e418",
+      "x86_64-pc-windows-msvc": "5da3e94fbfffdbb3c3b00df8f0ac2250434832b64daa668dbabbe87caa7f388a"
     }
   },
   "devDependencies": {

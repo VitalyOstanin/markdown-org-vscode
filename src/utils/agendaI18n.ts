@@ -62,6 +62,13 @@ export interface AgendaStrings {
     /** `{0}` is the tag name. */
     tagFilterTitle: string;
     /**
+     * Tooltip of a directory chip, the row that appears once several
+     * directories are scanned. `{0}` is the directory's name. The chip turns
+     * that directory off and on, which is the level applied before the tag
+     * filter -- what is read, not which of it is shown.
+     */
+    collectionChipTitle: string;
+    /**
      * Header-layout button: the collapsed label (`{0}` = the current mode's
      * name), the tooltip (`{0}` = current mode, `{1}` = what one click gives),
      * and the three mode names.
@@ -69,10 +76,55 @@ export interface AgendaStrings {
     headerModeButton: string;
     headerModeTitle: string;
     headerModes: { auto: string; full: string; compact: string };
-    /** Day-card section titles. */
-    sections: { scheduled: string; allday: string; overdue: string };
+    /**
+     * Day-card section titles. The overdue backlog carries one heading per
+     * band -- see `DaySectionKey` in agendaDaySummary.ts.
+     */
+    sections: {
+        scheduled: string;
+        allday: string;
+        overdueRepeat: string;
+        overdueRecent: string;
+        overdueEarlier: string;
+        overdueLong: string;
+    };
     /** Tasks-card priority group titles. */
     groups: { a: string; b: string; c: string; none: string };
+    /**
+     * Acting on a whole overdue band at once: the menu behind the mark at the
+     * end of a band's heading, and what the move reports afterwards.
+     *
+     * The reports are read on the extension side (a toast and the status bar
+     * are host UI) and the menu in the page, but both live here so the feature
+     * speaks one language -- see the note on `git` below.
+     */
+    group: {
+        /** Tooltip on the mark that opens the menu; `{0}` is the band's name. */
+        menuTitle: string;
+        /** Menu item labels. */
+        moveToToday: string;
+        dropPlanning: string;
+        cancel: string;
+        /** Menu item tooltips: what each does to every entry of the band. */
+        moveToTodayHint: string;
+        dropPlanningHint: string;
+        cancelHint: string;
+        /** What the action did; `{0}` is a counted noun from `summary.tasks`. */
+        moved: string;
+        dropped: string;
+        cancelled: string;
+        /** Appended when part of the band was left alone; `{0}` counts those. */
+        refused: string;
+        /** Nothing in the band could be acted on. */
+        nothing: string;
+        /** The undo offer, and what taking it did; `{0}` counts the files. */
+        undo: string;
+        undone: string;
+        /** Appended when some files had moved on and were left as they are. */
+        undoPartial: string;
+        /** Every file had moved on: there was nothing left to put back. */
+        undoNothing: string;
+    };
     /** Summary bar: the counted noun plus the two qualifier words. */
     summary: { tasks: string[]; overdue: string; done: string; priorityA: string };
     /**
@@ -100,6 +152,11 @@ export interface AgendaStrings {
         priority: string;
         priorityHighest: string;
         priorityLowest: string;
+        /**
+         * The coloured dot a row carries while several directories are scanned
+         * (`markdown-org.workspaceDirs`). `{0}` is the directory's name.
+         */
+        collection: string;
     };
     /**
      * Git status of the agenda's source files: the header chip, the list it
@@ -174,11 +231,39 @@ const EN: AgendaStrings = {
     tagAll: 'ALL',
     tagAllTitle: 'Show tasks from every file',
     tagFilterTitle: 'Filter to files tagged {0}',
+    collectionChipTitle: 'Show or hide the tasks of {0}',
     headerModeButton: 'Header: {0}',
     headerModeTitle: 'Agenda header: {0} (click for {1})',
     headerModes: { auto: 'Auto', full: 'Full', compact: 'Compact' },
-    sections: { scheduled: 'Scheduled today', allday: 'All-day & upcoming', overdue: 'Overdue' },
+    sections: {
+        scheduled: 'Scheduled today',
+        allday: 'All-day & upcoming',
+        overdueRepeat: 'Missed repeats',
+        overdueRecent: 'Overdue this week',
+        overdueEarlier: 'Overdue earlier',
+        overdueLong: 'Overdue long ago'
+    },
     groups: { a: 'Priority A', b: 'Priority B', c: 'Priority C', none: 'No priority' },
+    group: {
+        menuTitle: 'Act on every entry of “{0}” at once, in one move that can be put back',
+        moveToToday: 'Move to today',
+        dropPlanning: 'Drop the date',
+        cancel: 'Mark cancelled',
+        moveToTodayHint:
+            'Date every entry of the band today. A missed repeat is caught up to its next occurrence instead, keeping its repeater.',
+        dropPlanningHint:
+            'Take the planning date off every entry of the band. The tasks stay, and leave the agenda until they are dated again.',
+        cancelHint: 'Mark every entry of the band cancelled, writing the keyword into the note it came from.',
+        moved: 'Moved {0} to today',
+        dropped: 'Dropped the date from {0}',
+        cancelled: 'Cancelled {0}',
+        refused: '({0} left as they were)',
+        nothing: 'Nothing in this group could be changed',
+        undo: 'Undo',
+        undone: 'Put back {0}',
+        undoPartial: 'Some notes had changed and were left as they are.',
+        undoNothing: 'The notes have changed since; nothing was put back'
+    },
     summary: { tasks: ['task', 'tasks'], overdue: 'overdue', done: 'done', priorityA: 'priority A' },
     countChip: { tasks: ['task', 'tasks'], overdue: '{0} overdue', inSection: '{0} in this section' },
     empty: { day: 'Nothing scheduled for this day.', tasks: 'No tasks to show.' },
@@ -197,7 +282,8 @@ const EN: AgendaStrings = {
         attentionNormal: 'On schedule',
         priority: 'Priority {0}',
         priorityHighest: 'Priority {0} (highest)',
-        priorityLowest: 'Priority {0} (lowest)'
+        priorityLowest: 'Priority {0} (lowest)',
+        collection: 'From {0}'
     },
     git: {
         caption: 'Source files',
@@ -246,15 +332,39 @@ const RU: AgendaStrings = {
     tagAll: 'ВСЕ',
     tagAllTitle: 'Показывать задачи из всех файлов',
     tagFilterTitle: 'Только файлы с меткой {0}',
+    collectionChipTitle: 'Показать или скрыть задачи каталога {0}',
     headerModeButton: 'Шапка: {0}',
     headerModeTitle: 'Шапка агенды: {0} (нажмите, чтобы включить «{1}»)',
     headerModes: { auto: 'Авто', full: 'Полная', compact: 'Компактная' },
     sections: {
         scheduled: 'Запланировано на сегодня',
         allday: 'Без времени и предстоящие',
-        overdue: 'Просрочено'
+        overdueRepeat: 'Пропущенные повторы',
+        overdueRecent: 'Просрочено на этой неделе',
+        overdueEarlier: 'Просрочено раньше',
+        overdueLong: 'Просрочено давно'
     },
     groups: { a: 'Приоритет A', b: 'Приоритет B', c: 'Приоритет C', none: 'Без приоритета' },
+    group: {
+        menuTitle: 'Применить действие ко всем задачам раздела «{0}» сразу, одним изменением с возможностью отката',
+        moveToToday: 'Перенести на сегодня',
+        dropPlanning: 'Убрать дату',
+        cancel: 'Отметить отменённым',
+        moveToTodayHint:
+            'Поставить всем задачам раздела сегодняшнюю дату. Пропущенный повтор вместо этого догоняет следующее вхождение и сохраняет повторитель.',
+        dropPlanningHint:
+            'Убрать дату планирования у всех задач раздела. Задачи остаются и уходят из агенды, пока им снова не назначат дату.',
+        cancelHint: 'Отметить все задачи раздела отменёнными, записав ключевое слово в исходную заметку.',
+        moved: 'Перенесено на сегодня: {0}',
+        dropped: 'Дата убрана: {0}',
+        cancelled: 'Отменено: {0}',
+        refused: '(оставлено без изменений: {0})',
+        nothing: 'В этом разделе нечего было изменить',
+        undo: 'Отменить',
+        undone: 'Возвращено: {0}',
+        undoPartial: 'Часть заметок изменилась и оставлена как есть.',
+        undoNothing: 'Заметки успели измениться, возвращать нечего'
+    },
     summary: {
         tasks: ['задача', 'задачи', 'задач'],
         overdue: 'просрочено',
@@ -282,7 +392,8 @@ const RU: AgendaStrings = {
         attentionNormal: 'По плану',
         priority: 'Приоритет {0}',
         priorityHighest: 'Приоритет {0} (высший)',
-        priorityLowest: 'Приоритет {0} (низший)'
+        priorityLowest: 'Приоритет {0} (низший)',
+        collection: 'Из каталога {0}'
     },
     git: {
         caption: 'Файлы-источники',

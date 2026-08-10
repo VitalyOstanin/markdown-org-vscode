@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { randomBytes } from 'node:crypto';
-import type { AgendaData, FileTag } from '../types';
+import type { AgendaData } from '../types';
 import { isMeaningfulSelection, resolveTaskClickIntent, sanitizeTaskLine } from '../utils/agendaClick';
 import { escapeHtml } from '../utils/agendaEscapeHtml';
 import { DEFAULT_AGENDA_FONT_STACK, sanitizeFontFamily } from '../utils/agendaFontFamily';
@@ -10,7 +10,7 @@ import { countClippedRows, renderDayClipHtml, updateDayClipMarkers } from '../ut
 import { resolveHeadingClass } from '../utils/agendaHeadingTint';
 import { resolveTaskFlag } from '../utils/agendaTaskFlag';
 import { resolveAttentionLevel } from '../utils/agendaAttention';
-import { resolveAgendaWatchBase } from '../utils/agendaWatchPattern';
+import { resolveAgendaDirectories } from '../utils/agendaDirectories';
 import { isIsoDate, toIsoDate } from '../utils/isoDate';
 import { resolveDayRolloverAnchor } from '../utils/dayRolloverAnchor';
 import { formatNumber } from '../utils/formatNumber';
@@ -25,6 +25,9 @@ import {
     renderSummaryBar,
     summaryStat
 } from '../utils/agendaSummaryHtml';
+import { renderGroupMenu } from '../utils/agendaGroupMenuHtml';
+import { asBulkAction, groupTargets } from '../utils/agendaGroupTargets';
+import { applyGroupAction } from '../commands/groupActions';
 import {
     renderDateNav,
     renderHeaderModeButton,
@@ -56,7 +59,9 @@ import {
     renderGitChip,
     renderGitMenu
 } from '../utils/agendaGitHtml';
-import { agendaSourceFiles } from '../utils/git/agendaSourceFiles';
+import { agendaSourceFiles, agendaSourceRoots } from '../utils/git/agendaSourceFiles';
+import { buildCollectionMarks, collectionMarkHtml } from '../utils/agendaCollections';
+import { hideCollections, renderCollectionChips } from '../utils/agendaCollectionFilter';
 import { collectGitStatus, gitApiForEvents } from '../utils/git/collectGitStatus';
 import { commitAgendaSources, pushAgendaSources } from '../commands/gitActions';
 import { isCancelled } from '../utils/normalizeTaskType';
@@ -120,6 +125,9 @@ interface AgendaWebviewMessage {
     date?: string;
     mode?: string;
     tag?: string;
+    /** `groupAction`: the day-card section key, and what to do to its tasks. */
+    section?: string;
+    action?: string;
     /** Set on `renderError`: what the page failed at. */
     message?: string;
 }
@@ -152,6 +160,15 @@ export interface AgendaRenderRequest {
     refreshCallback?: (shiftedToday?: string, userInitiated?: boolean) => Promise<void>;
     userInitiated?: boolean;
     currentTag?: string;
+    /**
+     * Names of the merged tag dictionary, in the order the dropdown lists them.
+     *
+     * Passed in rather than read here: the dictionary reaches beyond the
+     * settings into a file per notes directory, and reading those is async
+     * while a render is not. The caller has just built it to filter the data,
+     * so the list and the tasks on screen describe the same dictionary.
+     */
+    tagNames?: readonly string[];
     holidays?: string[];
     /**
      * True when this render came from an explicit jump (Prev/Next/Today button
@@ -165,7 +182,9 @@ export interface AgendaRenderRequest {
 // eslint-disable-next-line @typescript-eslint/no-extraneous-class -- one panel exists at a time, so its state is static by design; a namespace cannot hold the private statics this keeps
 export class AgendaPanel {
     private static currentPanel?: vscode.WebviewPanel | undefined;
-    private static watcher?: vscode.FileSystemWatcher | undefined;
+    // One watcher per scanned directory (`markdown-org.workspaceDirs` may name
+    // several); empty while no panel has asked for one.
+    private static watchers: vscode.FileSystemWatcher[] = [];
     private static debounceTimer?: NodeJS.Timeout | undefined;
     private static refreshCallback?: ((shiftedToday?: string, userInitiated?: boolean) => Promise<void>) | undefined;
     // The "anchor" date the panel is currently built around: today + any
@@ -300,10 +319,10 @@ export class AgendaPanel {
             locale: AgendaPanel.resolveLocaleSetting(config.get<string>('dateLocale')),
             currentTag,
             // The tag dropdown lists the same rotation cycleTag walks: the
-            // implicit "ALL" plus the configured fileTags names (dedup-safe).
-            // Recomputed on every render so a settings edit is reflected
-            // without reopening.
-            availableTags: buildTagCycle(config.get<FileTag[]>('fileTags', []).map((t) => t.name)),
+            // implicit "ALL" plus the names of the dictionary (dedup-safe).
+            // Recomputed on every render so an edited setting or a tags file
+            // arriving with a sync is reflected without reopening.
+            availableTags: buildTagCycle(request.tagNames ?? []),
             holidays,
             firstDayOfWeek: config.get<FirstDayOfWeek>('firstDayOfWeek', 'monday'),
             headerMode: normalizeHeaderMode(config.get<string>('agendaHeaderMode'))
@@ -319,7 +338,7 @@ export class AgendaPanel {
             AgendaPanel.createNewPanel(args);
         }
 
-        if (!AgendaPanel.watcher && refreshCallback) {
+        if (AgendaPanel.watchers.length === 0 && refreshCallback) {
             AgendaPanel.ensureWatcher(config);
         }
 
@@ -412,6 +431,10 @@ export class AgendaPanel {
             shiftedToday: view.shiftedToday,
             currentTag: args.currentTag,
             availableTags: args.availableTags,
+            // Derived from the payload rather than from the setting: what a row
+            // carries is the root the extractor reported, and a directory that
+            // contributed no task is nothing the page can mark.
+            collections: buildCollectionMarks(agendaSourceRoots(args.data)),
             firstDayOfWeek: args.firstDayOfWeek,
             headerMode: args.headerMode,
             userInitiated: view.userInitiated,
@@ -520,6 +543,7 @@ export class AgendaPanel {
             // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- an empty tag is no tag, which is what ALL means
             currentTag: args.currentTag || 'ALL',
             availableTags: args.availableTags,
+            collections: buildCollectionMarks(agendaSourceRoots(args.data)),
             holidays: args.holidays ?? [],
             firstDayOfWeek: args.firstDayOfWeek,
             headerMode: args.headerMode,
@@ -589,8 +613,10 @@ export class AgendaPanel {
         AgendaPanel.configListener?.dispose();
         AgendaPanel.configListener = undefined;
         AgendaPanel.history.clear();
-        AgendaPanel.watcher?.dispose();
-        AgendaPanel.watcher = undefined;
+        AgendaPanel.watchers.forEach((watcher) => {
+            watcher.dispose();
+        });
+        AgendaPanel.watchers = [];
         AgendaPanel.refreshCallback = undefined;
         AgendaPanel.disposeGitListeners();
         if (AgendaPanel.gitDebounceTimer) {
@@ -877,23 +903,56 @@ export class AgendaPanel {
             // own; this covers the case where nothing changed (a cancelled
             // prompt) and no event is coming.
             AgendaPanel.requestGitStatus();
+        } else if (message.command === 'groupAction') {
+            await AgendaPanel.handleGroupAction(message.section, message.action);
+        }
+    }
+
+    /**
+     * Act on a whole band of the day card.
+     *
+     * The page names the band, not its tasks: the payload the view was built
+     * from is here, and rebuilding the band from it keeps the file list on the
+     * side that writes the files. The band is rebuilt rather than remembered
+     * because the same payload and the same rule produce the same grouping the
+     * user is looking at.
+     */
+    private static async handleGroupAction(section: string | undefined, action: string | undefined): Promise<void> {
+        const args = AgendaPanel.lastRenderArgs;
+        const bulkAction = asBulkAction(action);
+        if (!args || !section || !bulkAction) {
+            return;
+        }
+        const { language, strings } = AgendaPanel.uiStrings();
+        const targets = groupTargets(args.data, section, strings.sections);
+        if (targets.length === 0) {
+            return;
+        }
+        if (await applyGroupAction(bulkAction, targets, strings, language)) {
+            // The files changed under the extractor's feet, and the watcher
+            // only fires for the ones inside a scanned directory -- ask for the
+            // refresh here so the band the user just emptied leaves the screen.
+            AgendaPanel.requestRefresh(AgendaPanel.shiftedToday, false);
         }
     }
 
     private static ensureWatcher(config: vscode.WorkspaceConfiguration) {
-        // Scope the watcher to the directory that the extractor actually
+        // Scope the watchers to the directories that the extractor actually
         // sweeps. With a bare `**/*.md` pattern, the underlying OS primitive
         // (inotify/FSEvents/etc.) registers watches for every `.md` under
         // the workspace, including node_modules / .git / .vscode-test, even
         // though triggerRefresh ignores those events. A RelativePattern with
-        // the workspace dir as the base avoids setting up those watches in
-        // the first place.
-        const watchBase = resolveAgendaWatchBase(
+        // a scanned directory as the base avoids setting up those watches in
+        // the first place -- one pattern per directory, since a RelativePattern
+        // has a single base and the directories need not share a parent.
+        const bases = resolveAgendaDirectories(
+            config.get<string[]>('workspaceDirs'),
             config.get<string>('workspaceDir'),
             vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
         );
-        const pattern: vscode.GlobPattern = watchBase ? new vscode.RelativePattern(watchBase, '**/*.md') : '**/*.md';
-        AgendaPanel.watcher = vscode.workspace.createFileSystemWatcher(pattern);
+        const patterns: vscode.GlobPattern[] =
+            bases.length > 0 ? bases.map((base) => new vscode.RelativePattern(base, '**/*.md')) : ['**/*.md'];
+        AgendaPanel.watchers = patterns.map((pattern) => vscode.workspace.createFileSystemWatcher(pattern));
 
         const ignored = (uri: vscode.Uri) => {
             // Normalize backslashes to forward slashes so the same checks
@@ -920,9 +979,11 @@ export class AgendaPanel {
             }, REFRESH_DEBOUNCE_MS);
         };
 
-        AgendaPanel.watcher.onDidChange(triggerRefresh);
-        AgendaPanel.watcher.onDidCreate(triggerRefresh);
-        AgendaPanel.watcher.onDidDelete(triggerRefresh);
+        AgendaPanel.watchers.forEach((watcher) => {
+            watcher.onDidChange(triggerRefresh);
+            watcher.onDidCreate(triggerRefresh);
+            watcher.onDidDelete(triggerRefresh);
+        });
     }
 
     /**
@@ -937,6 +998,12 @@ export class AgendaPanel {
         mode: string;
         flags: string[];
         sections: string[];
+        /** Section keys that offer a group action, in document order. */
+        sectionMenus: string[];
+        /** Tooltip of each collection dot, in row order; empty with one directory. */
+        collectionMarks: string[];
+        /** Directory chips, each as its name plus ` (off)` while it is hidden. */
+        collectionChips: string[];
         headerLayout: string;
         heroSharesControlRow: boolean;
         heroSub: string;
@@ -963,6 +1030,9 @@ export class AgendaPanel {
                     mode?: string;
                     flags?: string[];
                     sections?: string[];
+                    sectionMenus?: string[];
+                    collectionMarks?: string[];
+                    collectionChips?: string[];
                     headerLayout?: string;
                     heroSharesControlRow?: boolean;
                     heroSub?: string;
@@ -981,6 +1051,9 @@ export class AgendaPanel {
                             mode: m.mode ?? '',
                             flags: m.flags ?? [],
                             sections: m.sections ?? [],
+                            sectionMenus: m.sectionMenus ?? [],
+                            collectionMarks: m.collectionMarks ?? [],
+                            collectionChips: m.collectionChips ?? [],
                             headerLayout: m.headerLayout ?? '',
                             heroSharesControlRow: m.heroSharesControlRow ?? false,
                             heroSub: m.heroSub ?? '',
@@ -1016,6 +1089,22 @@ export class AgendaPanel {
             return Promise.resolve(false);
         }
         return panel.webview.postMessage({ command: 'setScrollForTesting', y });
+    }
+
+    /**
+     * Test-only helper: press the directory chip of `root` in the open panel.
+     *
+     * The chips live entirely in the page -- the host is never told which
+     * directories are hidden, because the rows are already there and turning
+     * one back on must not cost a scan. Pressing the chip is therefore the only
+     * way in from outside. Resolves to false when no panel is open.
+     */
+    public static clickCollectionChipForTesting(root: string): Thenable<boolean> {
+        const panel = AgendaPanel.currentPanel;
+        if (!panel) {
+            return Promise.resolve(false);
+        }
+        return panel.webview.postMessage({ command: 'clickCollectionChipForTesting', root });
     }
 
     /**
@@ -1132,6 +1221,7 @@ export class AgendaPanel {
         summaryStat,
         renderSummaryBar,
         renderSectionPanel,
+        renderGroupMenu,
         renderDayHeaderHtml,
         renderModeSwitch,
         tagLabel,
@@ -1147,6 +1237,9 @@ export class AgendaPanel {
         calendarCellOpenTag,
         renderMonthCalendar,
         renderTaskRow,
+        collectionMarkHtml,
+        hideCollections,
+        renderCollectionChips,
         taskDateDirection,
         renderCard,
         // The git chip's markup, split the way the rest of the header is: the
@@ -1211,6 +1304,7 @@ export class AgendaPanel {
     <div class="agenda-header" id="agenda-header">
         <div class="agenda-hero" id="current-date"></div>
         <div class="nav-bar" id="nav-bar"></div>
+        <div id="collection-row"></div>
     </div>
     <div id="content"></div>
     <script nonce="${nonce}">
