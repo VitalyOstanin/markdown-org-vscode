@@ -12,7 +12,7 @@ import {
     forceEnglishWeekdays,
     applyDemoTheme,
     maximizeVscodeWindow,
-    pressKey
+    runCommandViaPalette
 } from './_helpers';
 
 /**
@@ -49,7 +49,9 @@ function addDays(base: Date, days: number): Date {
 
 suite('Demo: CLOCK', () => {
     test('clock history + new entry + clocktable', async function () {
-        this.timeout(90000);
+        // Palette invocations cost about four seconds each, so the budget
+        // sits well above what the chord-driven version needed.
+        this.timeout(180000);
 
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
         if (!workspaceFolder) {
@@ -113,8 +115,9 @@ suite('Demo: CLOCK', () => {
         await moveCursorTo(editor, wireUpLine);
         await sleep(900);
 
-        // insertClockStart is a 3-step chord: ctrl+k ctrl+c ctrl+s
-        await pressKey('ctrl+k ctrl+c ctrl+s');
+        // The three CLOCK commands run through the Command Palette, which
+        // names each one before it fires.
+        await runCommandViaPalette('Markdown Org Insert CLOCK Start');
         await sleep(1400);
 
         // Close the just-opened CLOCK: cursor must be on the CLOCK line
@@ -125,8 +128,7 @@ suite('Demo: CLOCK', () => {
         await moveCursorTo(editor, openClockLine);
         await sleep(700);
 
-        // insertClockFinish: ctrl+k ctrl+c ctrl+f
-        await pressKey('ctrl+k ctrl+c ctrl+f');
+        await runCommandViaPalette('Markdown Org Insert CLOCK Finish');
         await sleep(1500);
 
         // Jump to the bottom of the document and insert the clock table
@@ -137,8 +139,7 @@ suite('Demo: CLOCK', () => {
         await moveCursorTo(editor, editor.document.lineCount - 1);
         await sleep(800);
 
-        // insertClockTable: ctrl+k ctrl+c ctrl+v
-        await pressKey('ctrl+k ctrl+c ctrl+v');
+        await runCommandViaPalette('Markdown Org Insert CLOCK Table');
         await sleep(3000);
     });
 });

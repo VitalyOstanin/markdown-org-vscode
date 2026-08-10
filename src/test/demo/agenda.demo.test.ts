@@ -10,7 +10,6 @@ import {
     forceEnglishWeekdays,
     applyDemoTheme,
     maximizeVscodeWindow,
-    pressKey,
     runCommandViaPalette,
     initDemoRepository,
     commitInDemoRepository
@@ -24,7 +23,8 @@ import {
  */
 suite('Demo: Agenda', () => {
     test('Day / Week / Month views', async function () {
-        this.timeout(90000);
+        // Four palette invocations at about four seconds each.
+        this.timeout(150000);
 
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
         if (!workspaceFolder) {
@@ -102,22 +102,19 @@ suite('Demo: Agenda', () => {
         await markDemoStart();
         await sleep(500);
 
-        // Show Agenda (Day) has no dedicated keybinding -- invoke through the
-        // Command Palette so the overlay still surfaces the action.
+        // Every view is opened through the Command Palette, so the recording
+        // names the command instead of showing a chord the viewer may not
+        // have. The agenda panel grabs focus as it opens; the palette helper
+        // re-activates the VS Code window on each call.
         await runCommandViaPalette('Markdown Org Show Agenda Day');
         await sleep(2500);
 
-        // Show Agenda (Week) is bound to Ctrl+K Ctrl+W. The agenda panel that
-        // opened above grabs focus, so re-activate the VS Code window before
-        // the next chord (pressKey does that automatically).
-        await pressKey('ctrl+k ctrl+w');
+        await runCommandViaPalette('Markdown Org Show Agenda Week');
         await sleep(2800);
 
-        // Show Agenda (Month) is Ctrl+K Ctrl+M.
-        await pressKey('ctrl+k ctrl+m');
+        await runCommandViaPalette('Markdown Org Show Agenda Month');
         await sleep(3200);
 
-        // Show Tasks has no keybinding either -- palette again.
         await runCommandViaPalette('Markdown Org Show Tasks');
         await sleep(2500);
     });

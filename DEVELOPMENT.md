@@ -222,6 +222,23 @@ The drivers check for their binaries up front (see
 [Requirements](#requirements)) and stop with a clear message when one is
 missing. Linux only: they start their own `Xvfb`.
 
+Recordings invoke the extension's commands **through the Command Palette**
+(`runCommandViaPalette`), not by pressing their chord: the palette spells the
+command name out and lists its binding next to it, while a chord alone shows a
+key combination the viewer may not have. The helper holds three seconds on the
+highlighted entry before Enter so the name can be read. Where a step applies
+the same command twice in a row to walk a value -- Timestamp Up over a date --
+only the first invocation goes through the palette and the repeats are sent as
+that chord, since another four seconds buys nothing once the name has been
+read.
+
+Two exceptions, both deliberate. The screenshot scenario invokes commands
+programmatically: the palette is closed by the time a frame is taken, and
+driving it from xdotool is what made the typed query drop characters on a
+loaded machine. `gcal-connect` and `gcal-select` call their entry point
+directly because they run against a fake extension context and its stubs,
+which the real command would not use.
+
 Every run starts from an empty demo workspace, remote repository included --
 the driver deletes both before VS Code launches. The agenda assets need a git
 repository to photograph (the header's status chip reports on the files behind

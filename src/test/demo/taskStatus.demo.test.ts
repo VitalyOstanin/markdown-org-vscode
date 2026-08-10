@@ -11,7 +11,7 @@ import {
     forceEnglishWeekdays,
     applyDemoTheme,
     maximizeVscodeWindow,
-    pressKey
+    runCommandViaPalette
 } from './_helpers';
 
 async function moveCursorIntoPriorityCookie(editor: vscode.TextEditor, line: number): Promise<void> {
@@ -25,7 +25,9 @@ async function moveCursorIntoPriorityCookie(editor: vscode.TextEditor, line: num
 
 suite('Demo: Task Status', () => {
     test('TODO -> priority (letter + numeric) -> DONE / CANCELLED workflow', async function () {
-        this.timeout(90000);
+        // Each palette invocation costs about four seconds of the recording,
+        // so the budget is well above what the chord-driven version needed.
+        this.timeout(180000);
 
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
         if (!workspaceFolder) {
@@ -67,28 +69,32 @@ suite('Demo: Task Status', () => {
         await markDemoStart();
         await sleep(500);
 
+        // Every command runs through the Command Palette so the recording
+        // names what is about to happen; the palette helper holds on the
+        // highlighted entry before accepting it.
+        //
         // Task 1: TODO -> [#A] -> [#B] (timestampUp on the cookie) -> DONE
         const buyLine = 2;
         await moveCursorTo(editor, buyLine);
         await sleep(700);
-        await pressKey('ctrl+k ctrl+t');
+        await runCommandViaPalette('Markdown Org Set TODO');
         await sleep(900);
-        await pressKey('ctrl+k ctrl+p');
+        await runCommandViaPalette('Markdown Org Toggle Priority');
         await sleep(900);
         await moveCursorIntoPriorityCookie(editor, buyLine);
         await sleep(500);
-        await pressKey('shift+Up');
+        await runCommandViaPalette('Markdown Org Timestamp Up');
         await sleep(1000);
-        await pressKey('ctrl+k ctrl+d');
+        await runCommandViaPalette('Markdown Org Set DONE');
         await sleep(1300);
 
         // Task 2: TODO -> [#A] -> rewrite cookie to [#3] -> timestampUp -> [#4]
         const releaseLine = 4;
         await moveCursorTo(editor, releaseLine);
         await sleep(700);
-        await pressKey('ctrl+k ctrl+t');
+        await runCommandViaPalette('Markdown Org Set TODO');
         await sleep(900);
-        await pressKey('ctrl+k ctrl+p');
+        await runCommandViaPalette('Markdown Org Toggle Priority');
         await sleep(900);
 
         const releaseText = editor.document.lineAt(releaseLine).text;
@@ -99,17 +105,16 @@ suite('Demo: Task Status', () => {
         await sleep(900);
         await moveCursorIntoPriorityCookie(editor, releaseLine);
         await sleep(500);
-        await pressKey('shift+Up');
+        await runCommandViaPalette('Markdown Org Timestamp Up');
         await sleep(1500);
 
         // Task 3: TODO -> CANCELLED (the task is abandoned, not completed).
-        // Ctrl+K Ctrl+X is the cancel chord; the keyword renders struck-through
-        // wherever the agenda shows it.
+        // The keyword renders struck-through wherever the agenda shows it.
         await moveCursorTo(editor, 6);
         await sleep(700);
-        await pressKey('ctrl+k ctrl+t');
+        await runCommandViaPalette('Markdown Org Set TODO');
         await sleep(1100);
-        await pressKey('ctrl+k ctrl+x');
+        await runCommandViaPalette('Markdown Org Set CANCELLED');
         await sleep(1500);
     });
 });

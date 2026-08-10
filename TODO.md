@@ -380,20 +380,35 @@
 - [x] Create CHANGELOG.md
     - Documented version 0.1.0 features
     - Set up format for future releases
-- [ ] Recapture every screenshot and recording through the command palette
-    - The assets drive the features by keyboard shortcut, so what a viewer sees
-      is a file changing and no cause: the chord is invisible, and nothing on
-      screen names the command behind it. A reader cannot repeat what they
-      watched, and the shortcut may not even be theirs -- another keymap, or a
-      rebinding, and the chord shown is wrong.
-    - Every scenario opens the command palette instead, types the command name
-      the way a user would, and waits about three seconds before Enter, long
-      enough that the name is read rather than glimpsed. The palette closes and
-      the effect follows, so the recording answers "which command does this".
-    - Applies to both drivers and both themes, per the capture rules above.
-      Where a scenario exists only to show a shortcut, decide whether it stays
-      at all: with the palette on screen the chord is documentation, and the
-      README already tabulates the bindings.
+- [x] Recapture every recording through the command palette
+    - The recordings drove the features by keyboard shortcut, so the command
+      was named only by the screencast overlay -- and the chord shown may not
+      be the viewer's at all (another keymap, a rebinding). Now every scenario
+      opens the palette, types the command name the way a user would, and
+      holds three seconds on the highlighted entry before Enter, so the name is
+      read rather than glimpsed. The palette lists the binding next to the
+      command, so the chord is still on screen.
+    - Repetition rule, where a step applies the same command twice in a row to
+      walk a value (Timestamp Up over a date): the first invocation goes
+      through the palette, the immediate repeats are sent as the chord the
+      palette just showed. Otherwise each increment would cost another four
+      seconds of recording for a name the viewer has just read.
+    - Recaptured in both themes: `task-status`, `timestamps`, `clock`,
+      `agenda`. `gcal-sync` already ran through the palette. The cost is the
+      length: `task-status` went 18.6 s -> 51.9 s and its GIF 1.22 MB ->
+      8.52 MB, `timestamps` reached 58 s and 13.5 MB, and the whole `media/`
+      GIF set went 19 MB -> about 68 MB. Encoding
+      was left at 15 fps / 1280 px after measuring the alternatives (10 fps at
+      1280 saves 15%, 10 fps at 960 saves 40% but shrinks the very command
+      name the recapture exists to show).
+    - Two scenarios keep calling their entry point directly, and it is not an
+      oversight: `gcal-connect` and `gcal-select` run against `fake.context`
+      and its stubs, while the palette would invoke the real command against
+      the real extension context.
+    - The screenshots were deliberately left alone. They invoke commands
+      programmatically, the palette is closed by the time the frame is taken,
+      and driving it from xdotool is what made the query drop characters on a
+      loaded machine (DEVELOPMENT.md).
 
 - [ ] Announce the Android client (`markdown-org-android`) in the extension
     - Blocked until two things hold, both outside this repository: the

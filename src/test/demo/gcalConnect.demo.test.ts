@@ -81,6 +81,11 @@ suite('Demo: Connect Google Calendar', () => {
         await sleep(700);
 
         try {
+            // Called directly rather than through the Command Palette, which
+            // is how the other recordings name their command: the real command
+            // would run against the real extension context, and this scenario
+            // only works against `fake.context` and its stubs.
+            //
             // connectGcal blocks on the secret prompt, then the loopback redirect,
             // and finally shows a button-less "Connected" info toast whose promise
             // does not resolve under headless Xvfb -- so we never await `running`.

@@ -70,6 +70,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   repeater outranks the age of the date it missed: whatever the date was, the
   work is the next occurrence. The same split the Android client makes, and the
   same reason `org-super-agenda` keeps `:scheduled past` apart.
+- The demo recordings run their commands through the Command Palette: each one
+  is opened by name, held on screen for three seconds and then accepted, so a
+  viewer reads which command produces the change instead of matching it to a
+  chord that may not be theirs. The palette lists the binding next to the
+  command, so the shortcut is still shown. Where a step applies one command
+  repeatedly to walk a value, only the first invocation goes through the
+  palette.
 
 ## [0.14.0] - 2026-08-09
 

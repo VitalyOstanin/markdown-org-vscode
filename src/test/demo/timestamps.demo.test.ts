@@ -11,7 +11,8 @@ import {
     forceEnglishWeekdays,
     applyDemoTheme,
     maximizeVscodeWindow,
-    pressKey
+    pressKey,
+    runCommandViaPalette
 } from './_helpers';
 
 async function moveCursorIntoTimestampType(
@@ -37,14 +38,19 @@ async function moveCursorIntoDayDigit(editor: vscode.TextEditor, line: number): 
 }
 
 /**
- * All commands are dispatched via real keystrokes (`pressKey` -> xdotool) so
- * the screencast overlay surfaces every chord. The chord helper itself
- * sends each step as a separate `xdotool key` call with a JS-side sleep in
- * between -- VS Code's chord recognizer otherwise drops state on Xvfb.
+ * Commands are dispatched at the X-server level so the screencast overlay
+ * surfaces the input. Which of the two ways is used follows one rule: the
+ * first time a command appears in a step it goes through the Command Palette,
+ * which spells its name out; an immediate repetition of that same command --
+ * Timestamp Up applied twice to walk a date -- is sent as the chord the
+ * palette just demonstrated, so the step shows both the name and the binding
+ * without repeating a four-second palette dance for every increment.
  */
 suite('Demo: Timestamps', () => {
     test('all four timestamp types + three repeater flavours', async function () {
-        this.timeout(90000);
+        // Nine palette invocations at about four seconds each sit on top of
+        // what the chord-driven version took.
+        this.timeout(240000);
 
         const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
         if (!workspaceFolder) {
@@ -90,17 +96,15 @@ suite('Demo: Timestamps', () => {
         await sleep(500);
 
         // Task 1: CREATED + SCHEDULED, then nudge the SCHEDULED date with
-        // shift+Up/Down so the overlay highlights the key chord.
+        // Timestamp Down / Up.
         const quarterlyLine = 2;
         await moveCursorTo(editor, quarterlyLine);
         await sleep(700);
-        await vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup');
-        await pressKey('ctrl+k ctrl+k ctrl+c');
+        await runCommandViaPalette('Markdown Org Insert CREATED Timestamp');
         await sleep(1100);
         await moveCursorTo(editor, quarterlyLine);
         await sleep(400);
-        await vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup');
-        await pressKey('ctrl+k ctrl+k ctrl+s');
+        await runCommandViaPalette('Markdown Org Insert SCHEDULED Timestamp');
         await sleep(1200);
 
         // Find the SCHEDULED line (insertCreated and insertScheduled append
@@ -112,11 +116,13 @@ suite('Demo: Timestamps', () => {
             .findIndex((l, idx) => idx > quarterlyLine && l.includes('SCHEDULED:'));
         await moveCursorIntoDayDigit(editor, scheduledLine);
         await sleep(500);
+        await runCommandViaPalette('Markdown Org Timestamp Down');
+        await sleep(700);
+        // Same command again -- the chord the palette just showed.
+        await vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup');
         await pressKey('shift+Down');
         await sleep(700);
-        await pressKey('shift+Down');
-        await sleep(700);
-        await pressKey('shift+Up');
+        await runCommandViaPalette('Markdown Org Timestamp Up');
         await sleep(1100);
 
         // Task 2: DEADLINE
@@ -126,29 +132,28 @@ suite('Demo: Timestamps', () => {
             .findIndex((l) => l.includes('Submit visa application'));
         await moveCursorTo(editor, visaLine);
         await sleep(700);
-        await vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup');
-        await pressKey('ctrl+k ctrl+k d');
+        await runCommandViaPalette('Markdown Org Insert DEADLINE Timestamp');
         await sleep(1300);
 
-        // Task 3: SCHEDULED -> cycle the type with shift+Up so the overlay
-        // shows the key while the timestamp type rotates.
+        // Task 3: SCHEDULED -> cycle the type, the cursor sitting on the
+        // keyword rather than on a date part.
         const archiveLine = editor.document
             .getText()
             .split('\n')
             .findIndex((l) => l.includes('Archive old reports'));
         await moveCursorTo(editor, archiveLine);
         await sleep(700);
-        await vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup');
-        await pressKey('ctrl+k ctrl+k ctrl+s');
+        await runCommandViaPalette('Markdown Org Insert SCHEDULED Timestamp');
         await sleep(1300);
 
         const archiveScheduledLine = archiveLine + 1;
         await moveCursorIntoTimestampType(editor, archiveScheduledLine, 'SCHEDULED');
         await sleep(500);
-        await pressKey('shift+Up');
+        await runCommandViaPalette('Markdown Org Timestamp Up');
         await sleep(900);
         await moveCursorIntoTimestampType(editor, archiveScheduledLine, 'DEADLINE');
         await sleep(400);
+        await vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup');
         await pressKey('shift+Up');
         await sleep(1300);
 
@@ -159,8 +164,9 @@ suite('Demo: Timestamps', () => {
             .findIndex((l) => l.includes('++1w'));
         await moveCursorIntoDayDigit(editor, weeklyLine);
         await sleep(500);
-        await pressKey('shift+Up');
+        await runCommandViaPalette('Markdown Org Timestamp Up');
         await sleep(900);
+        await vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup');
         await pressKey('shift+Up');
         await sleep(1300);
 
@@ -170,8 +176,9 @@ suite('Demo: Timestamps', () => {
             .findIndex((l) => l.includes('.+1m'));
         await moveCursorIntoDayDigit(editor, monthlyLine);
         await sleep(500);
-        await pressKey('shift+Down');
+        await runCommandViaPalette('Markdown Org Timestamp Down');
         await sleep(900);
+        await vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup');
         await pressKey('shift+Down');
         await sleep(1800);
     });

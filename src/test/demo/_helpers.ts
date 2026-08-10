@@ -442,16 +442,22 @@ function splitToken(token: string): { modifiers: string[]; key: string } {
 }
 
 /**
- * Invoke a command that has no dedicated keybinding by running it through
- * the Command Palette. The whole flow -- palette opening shortcut, typed
- * command name, and the final Enter -- is dispatched at the X-server level,
- * so the screencast overlay shows the keystrokes the same way a user would
- * see them when reproducing the demo by hand.
+ * Invoke a command by running it through the Command Palette. The whole flow
+ * -- palette opening shortcut, typed command name, and the final Enter -- is
+ * dispatched at the X-server level, so the screencast overlay shows the
+ * keystrokes the same way a user would see them when reproducing the demo by
+ * hand.
+ *
+ * This is how a recording names the command it is about to run: a chord alone
+ * shows a key combination that may not even be the viewer's (another keymap,
+ * a rebinding), while the palette spells the command out. The default pause
+ * holds on the highlighted match long enough for the name to be read rather
+ * than glimpsed.
  *
  * `name` should match the palette query a user would type, e.g.
  * "Markdown Org Show Agenda Day".
  */
-export async function runCommandViaPalette(name: string, pauseBeforeEnterMs = 450): Promise<void> {
+export async function runCommandViaPalette(name: string, pauseBeforeEnterMs = 3000): Promise<void> {
     await ensureVscodeWindowFocused();
     // Clear any stale chord/modifier state from a previous pressKey.
     for (const mod of ['ctrl', 'shift', 'alt', 'super']) {

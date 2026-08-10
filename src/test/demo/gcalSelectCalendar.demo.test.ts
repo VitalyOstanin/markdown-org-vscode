@@ -67,6 +67,11 @@ suite('Demo: Select Google Calendar', () => {
             // keyboard focus; navigation below must not re-activate the window.
             await focusVscodeWindow();
 
+            // Called directly rather than through the Command Palette (which
+            // names the command in the other recordings): the real command
+            // would run against the real extension context, while this
+            // scenario needs `fake.context` and its stubbed calendar list.
+            //
             // selectCalendar awaits showQuickPick; drive the pick from the keyboard.
             // It ends on a button-less info toast whose promise does not resolve
             // under headless Xvfb, so we never await `running` -- the pick and the
