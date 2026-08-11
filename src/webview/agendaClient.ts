@@ -632,7 +632,17 @@ type HostMessage =
     // Integration-test hook: a directory chip is only ever turned off by a
     // click inside the page, and what a test needs to see is what that click
     // leaves on screen -- so the chip is pressed rather than the state poked.
-    | { command: 'clickCollectionChipForTesting'; root?: string };
+    | { command: 'clickCollectionChipForTesting'; root?: string }
+    // Integration-test hook: the band menu is opened and answered by clicks in
+    // the page, and what the message carries is decided there -- so the item is
+    // pressed rather than the message forged.
+    | { command: 'clickGroupActionForTesting'; section?: string; action?: string };
+
+/** The payload that fills a page built from nothing. */
+type InitMessage = Extract<HostMessage, { command: 'init' }>;
+
+/** The payload that patches a page already on screen. */
+type UpdateMessage = Extract<HostMessage, { command: 'update' }>;
 
 /**
  * Run the agenda client in the page. Called once, from the injected `<script>`.
@@ -918,216 +928,178 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         return node.getBoundingClientRect().top < header.getBoundingClientRect().bottom - 0.5;
     }
 
-    function handleHostMessage(message: HostMessage): void {
-        if (message.command === 'init') {
-            initialData = message.data ?? [];
-            initialMode = message.mode ?? '';
-            locale = message.locale ?? '';
-            shiftedToday = message.shiftedToday ?? '';
-            currentTag = message.currentTag ?? '';
-            if (message.availableTags) {
-                availableTags = message.availableTags;
+    /**
+     * The state both payloads carry, written down once.
+     *
+     * `init` and `update` disagree about what an absent field means, and the
+     * disagreement is deliberate: `init` fills a page that shows nothing yet,
+     * so a field the host left out falls back to its empty default, while
+     * `update` patches a page that is already showing something, so a field
+     * left out keeps what is on screen. Both rules live here because the real
+     * hazard is a field that reaches one payload and not the other -- the same
+     * hazard `buildInitMessage` guards against on the host side.
+     */
+    function applyStatePayload(message: AgendaStatePayload, kind: 'init' | 'update'): void {
+        // An empty string is as absent as an undefined one: the host sends ''
+        // for a setting it has no value for.
+        function adopt(incoming: string | undefined, current: string): string {
+            if (incoming) {
+                return incoming;
             }
-            holidays = message.holidays ?? [];
-            collections = message.collections ?? [];
-            if (message.firstDayOfWeek) {
-                firstDayOfWeek = message.firstDayOfWeek;
-            }
-            if (message.headerMode) {
-                headerMode = message.headerMode;
-            }
-            if (message.strings) {
-                UI = message.strings;
-                // An empty language tag leaves the current one in place.
-                // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-                uiLang = message.language || uiLang;
-            }
-            // After renderNavBar, not before: the layout is decided from the
-            // header's measured height, and before the first render there is
-            // nothing to measure.
-            renderNavBar();
-            applyHeaderLayout();
-            syncHeaderOffset();
-            renderCurrentMode();
-            scrollToWeekFocus();
-            refreshClipMarkers();
-        } else if (message.command === 'update') {
-            if (message.locale) {
-                // Dates follow the setting on the next render, like the
-                // dictionary above -- otherwise a locale change repainted the
-                // labels but left the dates formatted the old way.
-                locale = message.locale;
-            }
-            if (message.shiftedToday) {
-                shiftedToday = message.shiftedToday;
-            }
-            if (message.currentTag) {
-                currentTag = message.currentTag;
-            }
-            if (message.availableTags) {
-                availableTags = message.availableTags;
-            }
-            if (message.mode) {
-                initialMode = message.mode;
-            }
-            if (message.firstDayOfWeek) {
-                firstDayOfWeek = message.firstDayOfWeek;
-            }
-            if (message.headerMode) {
-                headerMode = message.headerMode;
-            }
-            if (message.strings) {
-                UI = message.strings;
-                // As above: an empty language tag keeps the current one.
-                // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
-                uiLang = message.language || uiLang;
-            }
-            initialData = message.data ?? [];
-            // Replaced outright, not merged: the set of scanned directories is
-            // whatever this payload came from, and a directory that no longer
-            // holds tasks must stop colouring rows.
-            collections = message.collections ?? [];
-            const userInitiated = message.userInitiated === true;
-            const navigation = message.navigation === true;
-            const scrollPos = window.scrollY;
-            const wasOnCurrentWeek = currentWeekIsVisible();
-            renderNavBar();
-            // Every mode carries its own header (a week names one day, a month
-            // one month), so the share it takes is re-decided per render, not
-            // only when the setting changes.
-            applyHeaderLayout();
-            syncHeaderOffset();
-            renderCurrentMode();
-            // Each branch below either focuses the week or restores a position
-            // that is the user's; the latter releases the focus hold, so a later
-            // header resize leaves their scroll alone (see weekFocusHeld).
-            if (!userInitiated) {
-                // File-watcher / cycleTag refresh -- keep scroll.
-                window.scrollTo(0, scrollPos);
-            } else if (initialMode !== 'week') {
-                // Day / month / tasks have no per-day scroll anchor.
+            return kind === 'init' ? '' : current;
+        }
+
+        // Dates follow the setting on the next render, like the dictionary
+        // below -- otherwise a locale change repainted the labels but left the
+        // dates formatted the old way.
+        locale = adopt(message.locale, locale);
+        shiftedToday = adopt(message.shiftedToday, shiftedToday);
+        currentTag = adopt(message.currentTag, currentTag);
+        initialMode = adopt(message.mode, initialMode);
+
+        // These four keep what the page has in both payloads: the host sends
+        // them whenever it has them, and an empty one has never meant "drop
+        // what you are showing".
+        if (message.availableTags) {
+            availableTags = message.availableTags;
+        }
+        if (message.firstDayOfWeek) {
+            firstDayOfWeek = message.firstDayOfWeek;
+        }
+        if (message.headerMode) {
+            headerMode = message.headerMode;
+        }
+        if (message.strings) {
+            UI = message.strings;
+            // An empty language tag leaves the current one in place.
+            // eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing
+            uiLang = message.language || uiLang;
+        }
+
+        // Replaced outright, not merged: the tasks and the set of scanned
+        // directories are whatever this payload came from, and a directory that
+        // no longer holds tasks must stop colouring rows.
+        initialData = message.data ?? [];
+        collections = message.collections ?? [];
+    }
+
+    /** A page built from nothing: render it whole and focus the week. */
+    function renderFromInit(message: InitMessage): void {
+        // Init-only: an update carries no holidays, and the ones the panel was
+        // opened with stay in force.
+        holidays = message.holidays ?? [];
+        // After renderNavBar, not before: the layout is decided from the
+        // header's measured height, and before the first render there is
+        // nothing to measure.
+        renderNavBar();
+        applyHeaderLayout();
+        syncHeaderOffset();
+        renderCurrentMode();
+        scrollToWeekFocus();
+        refreshClipMarkers();
+    }
+
+    /** A page already on screen: render it again and settle where to leave it. */
+    function renderFromUpdate(message: UpdateMessage): void {
+        const userInitiated = message.userInitiated === true;
+        const navigation = message.navigation === true;
+        // Measured before the re-render, because both are about the page the
+        // reader is looking at now, not the one about to replace it.
+        const scrollPos = window.scrollY;
+        const wasOnCurrentWeek = currentWeekIsVisible();
+        renderNavBar();
+        // Every mode carries its own header (a week names one day, a month
+        // one month), so the share it takes is re-decided per render, not
+        // only when the setting changes.
+        applyHeaderLayout();
+        syncHeaderOffset();
+        renderCurrentMode();
+        // Each branch below either focuses the week or restores a position
+        // that is the user's; the latter releases the focus hold, so a later
+        // header resize leaves their scroll alone (see weekFocusHeld).
+        if (!userInitiated) {
+            // File-watcher / cycleTag refresh -- keep scroll.
+            window.scrollTo(0, scrollPos);
+        } else if (initialMode !== 'week') {
+            // Day / month / tasks have no per-day scroll anchor.
+            weekFocusHeld = false;
+        } else if (navigation) {
+            // Prev/Next/Today. If we've been on this anchor before
+            // (round-trip case), restore the user's last scroll there;
+            // otherwise focus the week as usual.
+            const remembered = recallScroll(scrollHistory, shiftedToday);
+            if (remembered !== null) {
                 weekFocusHeld = false;
-            } else if (navigation) {
-                // Prev/Next/Today. If we've been on this anchor before
-                // (round-trip case), restore the user's last scroll there;
-                // otherwise focus the week as usual.
-                const remembered = recallScroll(scrollHistory, shiftedToday);
-                if (remembered !== null) {
-                    weekFocusHeld = false;
-                    window.scrollTo(0, remembered);
-                } else {
-                    scrollToWeekFocus();
-                }
-            } else if (wasOnCurrentWeek && currentWeekIsVisible()) {
-                // Repeated Show Agenda (Week) on the same current week -- keep
-                // the user's place.
-                weekFocusHeld = false;
-                window.scrollTo(0, scrollPos);
+                window.scrollTo(0, remembered);
             } else {
                 scrollToWeekFocus();
             }
-            // Every branch above lands the page on a scroll position, which is
-            // what the chips are counted against.
-            refreshClipMarkers();
+        } else if (wasOnCurrentWeek && currentWeekIsVisible()) {
+            // Repeated Show Agenda (Week) on the same current week -- keep
+            // the user's place.
+            weekFocusHeld = false;
+            window.scrollTo(0, scrollPos);
+        } else {
+            scrollToWeekFocus();
+        }
+        // Every branch above lands the page on a scroll position, which is
+        // what the chips are counted against.
+        refreshClipMarkers();
+    }
+
+    /**
+     * The header-mode setting changed while the panel was open -- from the
+     * settings editor, the command, or the button in the control row. Only the
+     * <body> class and that button's label depend on it, so this reflows the
+     * header in place instead of re-rendering the agenda: no scroll jump, no
+     * data round-trip.
+     */
+    function applyHeaderModeMessage(mode: string | undefined): void {
+        headerMode = mode ?? 'auto';
+        applyHeaderLayout();
+        refreshHeaderModeButton();
+    }
+
+    /**
+     * Repository events arrive on git's schedule, not the agenda's, so this
+     * replaces one node instead of re-rendering: a save must not move the task
+     * list or the user's scroll position.
+     */
+    function applyGitStatus(status: AgendaGitStatus | null): void {
+        gitStatus = status;
+        refreshGitMenu();
+    }
+
+    /** Click a directory chip by its root, as `clickCollectionChipForTesting` asks. */
+    function clickCollectionChip(root: string): void {
+        const chip = document.querySelector<HTMLElement>(
+            `.collection-chip[data-root="${root.replaceAll('"', '\\"')}"]`
+        );
+        chip?.click();
+    }
+
+    /** Click one item of a section's group menu, as `clickGroupActionForTesting` asks. */
+    function clickGroupAction(section: string, action: string): void {
+        const quote = (value: string) => value.replaceAll('"', '\\"');
+        const item = document.querySelector<HTMLElement>(
+            `.group-menu[data-section="${quote(section)}"] .group-menu-item[data-action="${quote(action)}"]`
+        );
+        item?.click();
+    }
+
+    function handleHostMessage(message: HostMessage): void {
+        if (message.command === 'init') {
+            applyStatePayload(message, 'init');
+            renderFromInit(message);
+        } else if (message.command === 'update') {
+            applyStatePayload(message, 'update');
+            renderFromUpdate(message);
         } else if (message.command === 'headerMode') {
-            // The setting changed while the panel was open -- from the settings
-            // editor, the command, or the button in the control row. Only the
-            // <body> class and that button's label depend on it, so this
-            // reflows the header in place instead of re-rendering the agenda:
-            // no scroll jump, no data round-trip.
-            headerMode = message.headerMode ?? 'auto';
-            applyHeaderLayout();
-            refreshHeaderModeButton();
+            applyHeaderModeMessage(message.headerMode);
         } else if (message.command === 'gitStatus') {
-            // Repository events arrive on git's schedule, not the agenda's, so
-            // this replaces one node instead of re-rendering: a save must not
-            // move the task list or the user's scroll position.
-            gitStatus = message.status ?? null;
-            refreshGitMenu();
+            applyGitStatus(message.status ?? null);
         } else if (message.command === 'getRenderedInfo') {
-            // Integration-test query: snapshot the rendered DOM so the host can
-            // verify that renderAgenda produced the expected day-headers for the
-            // given anchor date. Production code never sends this query, so it
-            // has no effect on normal use.
-            const headers = [...document.querySelectorAll('.day-header')]
-                .map((el) => el.getAttribute('data-date'))
-                .filter((d) => d !== null);
-            const flags = [...document.querySelectorAll('.flag')].map((el) => el.getAttribute('data-flag'));
-            // Section-panel titles in document order (Day and Tasks cards), so a
-            // test can assert the grouping and its order.
-            const sections = [...document.querySelectorAll('.day-section-name')].map((el) => el.textContent);
-            // Which sections offer an action on the whole band: the key each
-            // menu carries, which is also what a click on it would post back.
-            const sectionMenus = [...document.querySelectorAll('.group-menu')].map((el) =>
-                el.getAttribute('data-section')
-            );
-            // Collection dots in row order, each reported by the tooltip that
-            // names its directory: with one directory scanned there are none,
-            // which is the state a test has no other way to tell apart from
-            // "the mark was rendered without a name".
-            const collectionMarks = [...document.querySelectorAll('.task-line .collection')].map((el) =>
-                el.getAttribute('title')
-            );
-            // The chip row, each chip as its directory name plus the state it is
-            // in. The name alone would not tell a chip that is off from one
-            // that is on, and that difference is the whole feature.
-            const collectionChips = [...document.querySelectorAll('.collection-chip')].map(
-                (el) => `${el.textContent}${el.classList.contains('off') ? ' (off)' : ''}`
-            );
-            // Measured, not inferred: the compact header is only compact if the
-            // hero really shares a line with the control block. A class on
-            // <body> proves nothing about the layout it was supposed to
-            // produce, so the two boxes are compared for vertical overlap.
-            const heroEl = document.querySelector('.agenda-hero');
-            const navEl = document.getElementById('nav-bar');
-            let heroSharesControlRow = false;
-            if (heroEl && navEl) {
-                const hero = heroEl.getBoundingClientRect();
-                const nav = navEl.getBoundingClientRect();
-                heroSharesControlRow = hero.bottom > nav.top + 1 && nav.bottom > hero.top + 1;
-            }
-            // Hero subtitle and calendar cell numbers as rendered: a locale with
-            // non-Latin digits must reach the page as such, and nothing but the
-            // rendered text proves it.
-            const heroSub = document.querySelector('.hero-sub span')?.textContent ?? '';
-            // The git chip arrives on its own message, after the render; its
-            // text is how a test sees that the whole path -- repository
-            // resolution, the status message, the markup -- reached the page.
-            const gitChip = document.getElementById('gitMenuBtn')?.textContent ?? '';
-            const dayNumbers = [...document.querySelectorAll('.calendar-day .day-number')].map((el) => el.textContent);
-            // Clipping chips per day header, in the same order as `dayHeaders`.
-            // A hidden chip reports 0 rather than its stale text, which is what
-            // the page shows the user.
-            const clipAbove: number[] = [];
-            const clipBelow: number[] = [];
-            for (const header of document.querySelectorAll('.day-header[data-date]')) {
-                clipAbove.push(readChipCount(header.querySelector<HTMLElement>('.day-clip-above')));
-                clipBelow.push(readChipCount(header.querySelector<HTMLElement>('.day-clip-below')));
-            }
-            vscode.postMessage({
-                command: 'renderedInfo',
-                dayHeaders: headers,
-                heroSub,
-                dayNumbers,
-                gitChip,
-                mode: initialMode,
-                flags,
-                sections,
-                sectionMenus,
-                collectionMarks,
-                collectionChips,
-                clipAbove,
-                clipBelow,
-                scrollY: window.scrollY,
-                // The bug this snapshot was extended for: after a mode switch
-                // the day's first row sat behind its own sticky header, which
-                // no other field here would show.
-                todayFirstRowHidden: measureTodayFirstRowHidden(),
-                // The header layout is a class on <body>, so this is how a test
-                // sees which of the two the page settled on.
-                headerLayout: document.body.classList.contains('compact-header') ? 'compact' : 'full',
-                heroSharesControlRow
-            });
+            postRenderedInfo();
         } else if (message.command === 'setScrollForTesting') {
             // Integration-test hook: the clipping markers and the sticky-anchor
             // fix only differ from the trivial case at a non-zero scroll
@@ -1135,13 +1107,98 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             // Production code never sends this command.
             window.scrollTo(0, message.y ?? 0);
             refreshClipMarkers();
-            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- spelled out rather than a bare `else`, so the branch says which command it serves
         } else if (message.command === 'clickCollectionChipForTesting') {
-            const chip = document.querySelector<HTMLElement>(
-                `.collection-chip[data-root="${(message.root ?? '').replaceAll('"', '\\"')}"]`
-            );
-            chip?.click();
+            clickCollectionChip(message.root ?? '');
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- spelled out rather than a bare `else`, so the branch says which command it serves
+        } else if (message.command === 'clickGroupActionForTesting') {
+            clickGroupAction(message.section ?? '', message.action ?? '');
         }
+    }
+
+    /**
+     * Integration-test query: snapshot the rendered DOM so the host can verify
+     * that renderAgenda produced the expected day-headers for the given anchor
+     * date. Production code never sends this query, so it has no effect on
+     * normal use.
+     */
+    function postRenderedInfo(): void {
+        const headers = [...document.querySelectorAll('.day-header')]
+            .map((el) => el.getAttribute('data-date'))
+            .filter((d) => d !== null);
+        const flags = [...document.querySelectorAll('.flag')].map((el) => el.getAttribute('data-flag'));
+        // Section-panel titles in document order (Day and Tasks cards), so a
+        // test can assert the grouping and its order.
+        const sections = [...document.querySelectorAll('.day-section-name')].map((el) => el.textContent);
+        // Which sections offer an action on the whole band: the key each
+        // menu carries, which is also what a click on it would post back.
+        const sectionMenus = [...document.querySelectorAll('.group-menu')].map((el) => el.getAttribute('data-section'));
+        // Collection dots in row order, each reported by the tooltip that
+        // names its directory: with one directory scanned there are none,
+        // which is the state a test has no other way to tell apart from
+        // "the mark was rendered without a name".
+        const collectionMarks = [...document.querySelectorAll('.task-line .collection')].map((el) =>
+            el.getAttribute('title')
+        );
+        // The chip row, each chip as its directory name plus the state it is
+        // in. The name alone would not tell a chip that is off from one
+        // that is on, and that difference is the whole feature.
+        const collectionChips = [...document.querySelectorAll('.collection-chip')].map(
+            (el) => `${el.textContent}${el.classList.contains('off') ? ' (off)' : ''}`
+        );
+        // Measured, not inferred: the compact header is only compact if the
+        // hero really shares a line with the control block. A class on
+        // <body> proves nothing about the layout it was supposed to
+        // produce, so the two boxes are compared for vertical overlap.
+        const heroEl = document.querySelector('.agenda-hero');
+        const navEl = document.getElementById('nav-bar');
+        let heroSharesControlRow = false;
+        if (heroEl && navEl) {
+            const hero = heroEl.getBoundingClientRect();
+            const nav = navEl.getBoundingClientRect();
+            heroSharesControlRow = hero.bottom > nav.top + 1 && nav.bottom > hero.top + 1;
+        }
+        // Hero subtitle and calendar cell numbers as rendered: a locale with
+        // non-Latin digits must reach the page as such, and nothing but the
+        // rendered text proves it.
+        const heroSub = document.querySelector('.hero-sub span')?.textContent ?? '';
+        // The git chip arrives on its own message, after the render; its
+        // text is how a test sees that the whole path -- repository
+        // resolution, the status message, the markup -- reached the page.
+        const gitChip = document.getElementById('gitMenuBtn')?.textContent ?? '';
+        const dayNumbers = [...document.querySelectorAll('.calendar-day .day-number')].map((el) => el.textContent);
+        // Clipping chips per day header, in the same order as `dayHeaders`.
+        // A hidden chip reports 0 rather than its stale text, which is what
+        // the page shows the user.
+        const clipAbove: number[] = [];
+        const clipBelow: number[] = [];
+        for (const header of document.querySelectorAll('.day-header[data-date]')) {
+            clipAbove.push(readChipCount(header.querySelector<HTMLElement>('.day-clip-above')));
+            clipBelow.push(readChipCount(header.querySelector<HTMLElement>('.day-clip-below')));
+        }
+        vscode.postMessage({
+            command: 'renderedInfo',
+            dayHeaders: headers,
+            heroSub,
+            dayNumbers,
+            gitChip,
+            mode: initialMode,
+            flags,
+            sections,
+            sectionMenus,
+            collectionMarks,
+            collectionChips,
+            clipAbove,
+            clipBelow,
+            scrollY: window.scrollY,
+            // The bug this snapshot was extended for: after a mode switch
+            // the day's first row sat behind its own sticky header, which
+            // no other field here would show.
+            todayFirstRowHidden: measureTodayFirstRowHidden(),
+            // The header layout is a class on <body>, so this is how a test
+            // sees which of the two the page settled on.
+            headerLayout: document.body.classList.contains('compact-header') ? 'compact' : 'full',
+            heroSharesControlRow
+        });
     }
 
     // Render the current mode into #content and wire its listeners. Shared by
