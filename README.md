@@ -346,7 +346,8 @@ Hotkeys below match the bindings declared in `package.json`. They are
 active while a Markdown editor has focus, with three exceptions: the
 four `Show Agenda …` / `Show Tasks` commands also work while the agenda
 panel has focus, the agenda history commands work only there, and
-`Cycle Tag Filter` works everywhere.
+`Cycle Tag Filter` works in both places -- a Markdown editor or the
+agenda panel.
 
 On macOS every `Ctrl+K …` chord uses `Cmd` instead, e.g. `Cmd+K Cmd+T`
 for `Set TODO` (the `Shift+Up`/`Shift+Down` bindings are unchanged).
@@ -546,9 +547,11 @@ Path to the markdown-org-extract executable.
 > from a source tree you control. Do not point it at downloaded
 > executables of unknown origin, files in world-writable locations
 > (`/tmp`, shared caches), or scripts that wrap the extractor with
-> extra side effects. In untrusted workspaces VS Code automatically
-> refuses to honour this setting (see `capabilities.untrustedWorkspaces`
-> in `package.json`).
+> extra side effects. The setting is machine-scoped, so it is read from
+> your user or machine settings only -- a `.vscode/settings.json` inside
+> an opened repository cannot choose the executable, trusted workspace
+> or not. In untrusted workspaces VS Code additionally refuses to honour
+> the setting (see `capabilities.untrustedWorkspaces` in `package.json`).
 
 ### `markdown-org.workspaceDir`
 

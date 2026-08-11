@@ -27,7 +27,7 @@ live in [README.md](README.md).
 
 - Node.js 24+ required (`engines.node` in `package.json`); CI and `.nvmrc` also use **Node 24**, the active LTS line -- run `nvm use` to match. This is the build and test runtime only: the extension itself runs on the Node build inside VS Code's Electron.
 - npm
-- VS Code 1.85+
+- VS Code 1.101+ (`engines.vscode`; the git status chain calls a Git extension API member added in that release -- see [ADR-0018](docs/adr/0018-minimum-host-follows-the-git-api.md))
 - For running integration tests on **Linux** (any session, graphical or headless): `xvfb-run` (e.g. `apt install xvfb`). The runner requires it and refuses the real display; see [Tests](#tests). Not needed on macOS or Windows.
 - For recording the README media (Linux only): `Xvfb`, `ffmpeg`, `xdpyinfo`, `xdotool` (e.g. `apt install xvfb ffmpeg x11-utils xdotool`). Only needed when regenerating screenshots or demo recordings; see [Demo media](#demo-media).
 
@@ -35,8 +35,18 @@ live in [README.md](README.md).
 
 ```bash
 npm install
+bash scripts/download-extractor.sh linux-x64   # the target of your machine
 npm run compile         # or `npm run watch` for incremental compilation
 ```
+
+The middle step is not optional on a fresh clone: `bin/` is not in the
+repository, and without the binary in it the extension falls back to
+`markdown-org-extract` on `PATH` -- so unless one is installed there, every read
+of the notes fails and both the agenda and the integration tests come up empty.
+Run it once per checkout; it is idempotent afterwards. The target is the one
+`vsce package --target` takes: `linux-x64`, `darwin-x64`, `darwin-arm64` or
+`win32-x64`. See [Bundled extractor](#bundled-extractor) for what the script
+pins and checks.
 
 `npm run compile` is `tsc -b` over two projects:
 
@@ -57,6 +67,9 @@ anything at runtime. See [ADR-0012](docs/adr/0012-webview-client-as-a-typed-proj
 npm test                # unit tests via Mocha (no VS Code host required)
 npm run test:integration   # integration tests via @vscode/test-electron (downloads VS Code)
 ```
+
+The integration suite reads notes through the extractor, so `bin/` has to be
+populated first -- see the download step in [Build](#build).
 
 `npm run test:integration` goes through `scripts/run-integration-tests.js`, which
 starts the test VS Code under `xvfb-run` itself -- do not prefix the command by
@@ -167,9 +180,11 @@ agenda page are the other exception: their bodies travel through
 ## Debug
 
 1. Open project in VS Code
-2. Press `F5` or `Run > Start Debugging`
-3. A new VS Code window opens with the extension installed
-4. Open any `.md` file and test commands
+2. Make sure `bin/` holds the extractor (see [Build](#build)) -- without it the
+   agenda in the debug window stays empty
+3. Press `F5` or `Run > Start Debugging`
+4. A new VS Code window opens with the extension installed
+5. Open any `.md` file and test commands
 
 **Debug tips:**
 
@@ -179,9 +194,12 @@ agenda page are the other exception: their bodies travel through
 
 ## Bundled extractor
 
-The VSIX ships `markdown-org-extract` as a binary, downloaded at packaging time
-by `scripts/download-extractor.sh` from the release named in
-`x-markdown-org.extractorVersion`. Two things pin what gets installed:
+The VSIX ships `markdown-org-extract` as a binary, downloaded by
+`scripts/download-extractor.sh` from the release named in
+`x-markdown-org.extractorVersion` -- at packaging time for the released
+artifact, and once per checkout for development (see [Build](#build); CI runs
+the same script before its test and coverage jobs). Two things pin what gets
+installed:
 
 - **the version**, which selects the release, and
 - **`x-markdown-org.extractorSha256`**, one sha256 per Rust target, checked
