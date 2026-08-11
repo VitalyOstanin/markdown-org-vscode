@@ -110,7 +110,8 @@ export function updateDayClipMarkers(
     viewportHeight: number,
     titles: { above: string; below: string },
     countRows: (rows: ClipRectLike[], headerBottom: number, viewportHeight: number) => ClipCounts,
-    format: (template: string, ...values: string[]) => string
+    format: (template: string, ...values: string[]) => string,
+    formatCount: (n: number) => string
 ): void {
     const headers = root.querySelectorAll('.day-header[data-date]');
     for (const header of headers) {
@@ -129,15 +130,17 @@ export function updateDayClipMarkers(
         header.classList.toggle('day-header-clipped', counts.above > 0);
         const above = header.querySelector('.day-clip-above');
         if (above) {
+            const count = formatCount(counts.above);
             above.hidden = counts.above === 0;
-            above.textContent = '↑ ' + String(counts.above);
-            above.setAttribute('title', format(titles.above, String(counts.above)));
+            above.textContent = '↑ ' + count;
+            above.setAttribute('title', format(titles.above, count));
         }
         const below = header.querySelector('.day-clip-below');
         if (below) {
+            const count = formatCount(counts.below);
             below.hidden = counts.below === 0;
-            below.textContent = '↓ ' + String(counts.below);
-            below.setAttribute('title', format(titles.below, String(counts.below)));
+            below.textContent = '↓ ' + count;
+            below.setAttribute('title', format(titles.below, count));
         }
     }
 }

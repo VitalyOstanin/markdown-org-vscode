@@ -59,6 +59,13 @@ suite('agendaSummaryHtml.summaryStat', () => {
     test('escapes the label', () => {
         assert.match(summaryStat(1, '<b>x</b>', '', base), /&lt;b&gt;x&lt;\/b&gt;/);
     });
+
+    test('the digits follow the date locale, as they do everywhere else on the screen', () => {
+        // The day header and the month grid go through `formatNumber`; a
+        // summary that printed the raw number put Latin digits next to
+        // Arabic-Indic ones on the same screen.
+        assert.match(summaryStat(3, 'overdue', '', { ...base, locale: 'ar-EG' }), /<b>«3»<\/b>/);
+    });
 });
 
 suite('agendaSummaryHtml.renderSummaryBar', () => {
@@ -97,6 +104,13 @@ suite('agendaSummaryHtml.renderSectionPanel', () => {
 
     test('escapes the section title', () => {
         assert.match(renderSectionPanel('x', '<script>', 0, '', ctx, ''), /&lt;script&gt;/);
+    });
+
+    test('the chip and its tooltip use the same digits', () => {
+        // Both say the same number; one of them going through `formatNumber`
+        // and the other not made the element disagree with itself.
+        const html = renderSectionPanel('p1', 'A', 3, '', { ...ctx, locale: 'ar-EG' }, '');
+        assert.match(html, /<span class="day-section-count" title="«3» tasks in this section">«3»<\/span>/, html);
     });
 
     test('puts the head actions after the count chip, inside the head', () => {

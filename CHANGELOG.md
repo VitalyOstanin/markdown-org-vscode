@@ -174,6 +174,14 @@ Ctrl+A` and Promote to Maintain is `Ctrl+K Ctrl+K Ctrl+P`. On macOS every one
   text it publishes, so the agenda's heading and the line in the file say the
   same thing. Requires the extractor 0.15.0 or newer.
 
+- **Fixed.** Every number on the agenda is written in the digits of the date
+  locale. The dates went through `Intl` while the counts beside them did not,
+  so in a locale with non-Latin digits (ar-EG and its neighbours) a section
+  whose tooltip read "١٢ tasks in this section" carried a chip reading "12",
+  and the week view's clipping markers counted hidden rows in a third script
+  again. The summary bar, the section chip and both clipping markers now use
+  the same formatter as the dates and the month cells.
+
 ## [0.14.0] - 2026-08-09
 
 Four things this release is about: a Tasks view that says which day each of its

@@ -284,7 +284,8 @@ export interface AgendaClientDeps {
         viewportHeight: number,
         titles: { above: string; below: string },
         countRows: (rows: ClipRectLike[], headerBottom: number, viewportHeight: number) => ClipCounts,
-        format: (template: string, ...values: string[]) => string
+        format: (template: string, ...values: string[]) => string,
+        formatCount: (n: number) => string
     ) => void;
     resolveHeadingClass: (task: HeadingTintInput) => string;
     toIsoDate: (date: Date) => string;
@@ -360,8 +361,10 @@ export interface AgendaClientDeps {
         word: string | string[],
         cls: string,
         ctx: {
+            locale: string;
             uiLang: string;
             escapeHtml: (text: string | number | boolean | undefined | null) => string;
+            formatNumber: (value: number, locale: string) => string;
             pluralIndex: (n: number, lang: string) => number;
         }
     ) => string;
@@ -1399,7 +1402,7 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
     // instead of being duplicated per view.
 
     function summaryStat(n: number, word: string | string[], cls: string): string {
-        return summaryStatHtml(n, word, cls, { uiLang, escapeHtml, pluralIndex });
+        return summaryStatHtml(n, word, cls, { locale, uiLang, escapeHtml, formatNumber, pluralIndex });
     }
 
     function renderSummaryBar(dateIso: string, pieces: string[]): string {
@@ -1487,7 +1490,9 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         clipTicking = true;
         requestAnimationFrame(() => {
             clipTicking = false;
-            updateDayClipMarkers(document, window.innerHeight, UI.clip, countClippedRows, formatString);
+            updateDayClipMarkers(document, window.innerHeight, UI.clip, countClippedRows, formatString, (n) =>
+                formatNumber(n, locale)
+            );
         });
     }
     window.addEventListener('scroll', refreshClipMarkers, { passive: true });

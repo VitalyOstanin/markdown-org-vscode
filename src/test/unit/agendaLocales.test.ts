@@ -1,8 +1,22 @@
 import * as assert from 'node:assert';
 import { suite, test } from 'mocha';
+import { JSDOM } from 'jsdom';
 import { formatDayHeaderParts } from '../../utils/agendaDayHeader';
 import { formatIsoDate } from '../../utils/formatIsoDate';
 import { AGENDA_STRINGS, UI_LANGUAGES, formatString, pluralIndex } from '../../utils/agendaI18n';
+import {
+    countLabel,
+    renderDayHeaderHtml,
+    renderSectionPanel,
+    renderSummaryBar,
+    summaryStat
+} from '../../utils/agendaSummaryHtml';
+import { buildWeekdayLabels, renderMonthCalendar } from '../../utils/agendaCalendarHtml';
+import { buildMonthGrid } from '../../utils/agendaMonthCells';
+import type { MonthDayIndex } from '../../utils/agendaMonthCells';
+import { countClippedRows, renderDayClipHtml, updateDayClipMarkers } from '../../utils/agendaClipMarkers';
+import { escapeHtml } from '../../utils/agendaEscapeHtml';
+import { formatNumber } from '../../utils/formatNumber';
 
 /**
  * The agenda formats dates through `Intl` with whatever `markdown-org.dateLocale`
@@ -72,5 +86,86 @@ suite('agenda localization across locales', () => {
                 }
             }
         }
+    });
+});
+
+/**
+ * A locale decides the digits, so one counter printing a raw JavaScript number
+ * puts two numbering systems on the same screen: in ar-EG the day header reads
+ * "٥ يناير ٢٠٢٦" while a chip beside it shows "12". This suite renders every
+ * counter of one screen -- day header, summary bar, section chip, month cells
+ * and the week view's clipping markers -- in a locale whose digits are not
+ * ASCII, and asserts that nothing the reader sees carries an ASCII digit.
+ *
+ * Only what is readable counts: element text and tooltips. Attributes that
+ * merely carry state (`data-date` and friends) stay in ISO form on purpose.
+ */
+suite('agenda counters share one numbering system', () => {
+    const locale = 'ar-EG';
+    const EN = AGENDA_STRINGS.en;
+    const iso = '2026-01-05';
+    const ASCII_DIGIT = /[0-9]/;
+
+    /** Everything the reader can read on the screen: text plus tooltips. */
+    function readable(document: Document): string {
+        const titles = [...document.querySelectorAll('[title]')].map((el) => el.getAttribute('title') ?? '');
+        return [document.body.textContent, ...titles].join(' | ');
+    }
+
+    const base = { locale, uiLang: 'en', escapeHtml, formatString, formatNumber, pluralIndex };
+
+    test('the day screen prints no ASCII digit outside its attributes', () => {
+        const panelCtx = { ...base, inSectionTemplate: EN.countChip.inSection, taskForms: EN.countChip.tasks };
+        const index: MonthDayIndex = { [iso]: { total: 12, overdue: 3 } };
+        const calendarCtx = {
+            ...base,
+            openDayView: EN.openDayView,
+            taskChipForms: EN.countChip.tasks,
+            overdueChipTemplate: EN.countChip.overdue,
+            index,
+            isHoliday: (): boolean => false,
+            countLabel
+        };
+        const html =
+            `<div class="day-header" data-date="${iso}">${renderDayHeaderHtml(formatDayHeaderParts(iso, locale))}</div>` +
+            renderSummaryBar(
+                iso,
+                [
+                    summaryStat(12, EN.summary.tasks, '', panelCtx),
+                    summaryStat(3, EN.summary.overdue, 'day-summary-overdue', panelCtx)
+                ],
+                panelCtx
+            ) +
+            renderSectionPanel('overdueRecent', EN.sections.overdueRecent, 12, '', panelCtx, '') +
+            renderMonthCalendar(buildMonthGrid(iso, 1, iso), buildWeekdayLabels(1, locale), calendarCtx);
+
+        const text = readable(new JSDOM(`<!DOCTYPE html><body>${html}</body>`).window.document);
+        assert.ok(!ASCII_DIGIT.test(text), `an ASCII digit reached the screen: "${text}"`);
+    });
+
+    test('the week view clipping chips follow the same system', () => {
+        const document = new JSDOM(
+            `<!DOCTYPE html><body>
+                <div class="day-header" data-date="${iso}">
+                    ${renderDayHeaderHtml(formatDayHeaderParts(iso, locale))}${renderDayClipHtml()}
+                </div>
+                <div class="task-line" id="hidden-above"></div>
+                <div class="task-line" id="visible"></div>
+                <div class="task-line" id="hidden-below"></div>
+            </body>`,
+            { pretendToBeVisual: true }
+        ).window.document;
+        const setRect = (selector: string, top: number, bottom: number): void => {
+            document.querySelector(selector)!.getBoundingClientRect = () => ({ top: top, bottom: bottom }) as DOMRect;
+        };
+        setRect('.day-header', 80, 100);
+        setRect('#hidden-above', 40, 60);
+        setRect('#visible', 200, 220);
+        setRect('#hidden-below', 700, 720);
+
+        updateDayClipMarkers(document, 500, EN.clip, countClippedRows, formatString, (n) => formatNumber(n, locale));
+
+        const text = readable(document);
+        assert.ok(!ASCII_DIGIT.test(text), `an ASCII digit reached the screen: "${text}"`);
     });
 });

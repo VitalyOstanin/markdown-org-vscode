@@ -53,10 +53,17 @@ export function summaryStat(
     n: number,
     word: string | string[],
     cls: string,
-    ctx: { uiLang: string; escapeHtml: EscapeHtml; pluralIndex: PluralIndex }
+    ctx: {
+        locale: string;
+        uiLang: string;
+        escapeHtml: EscapeHtml;
+        formatNumber: FormatNumber;
+        pluralIndex: PluralIndex;
+    }
 ): string {
     const label = Array.isArray(word) ? word[ctx.pluralIndex(n, ctx.uiLang)] : word;
-    return `<span class="day-summary-stat${cls ? ` ${cls}` : ''}"><b>${n}</b> ${ctx.escapeHtml(label)}</span>`;
+    const count = ctx.formatNumber(n, ctx.locale);
+    return `<span class="day-summary-stat${cls ? ` ${cls}` : ''}"><b>${count}</b> ${ctx.escapeHtml(label)}</span>`;
 }
 
 /**
@@ -95,11 +102,14 @@ export function renderSectionPanel(
     // The count chip is the same component as the month cell's task-load chip,
     // so it explains its number the same way.
     const chipTitle = ctx.escapeHtml(ctx.formatString(ctx.inSectionTemplate, countLabel(count, ctx.taskForms, ctx)));
+    // The chip and its tooltip say the same number, so they count it the same
+    // way -- the tooltip already went through `formatNumber`.
+    const chipCount = ctx.escapeHtml(ctx.formatNumber(count, ctx.locale));
     return (
         `<section class="day-section day-section-${key}">` +
         '<div class="day-section-head">' +
         `<span class="day-section-name">${ctx.escapeHtml(title)}</span>` +
-        `<span class="day-section-count" title="${chipTitle}">${count}</span>` +
+        `<span class="day-section-count" title="${chipTitle}">${chipCount}</span>` +
         actionsHtml +
         '</div>' +
         `<div class="day-section-body">${rowsHtml}</div>` +
