@@ -1,9 +1,8 @@
 import * as vscode from 'vscode';
 import type { TimestampLineMatch } from '../orgPatterns';
 import { HEADING_REGEX, matchTimestampLine } from '../orgPatterns';
-import { formatDurationHM } from '../utils';
-import { buildOrgTimestamp } from '../utils/orgTimestamp';
-import { incrementTimestamp, getWeekdayName } from '../utils/incrementTimestamp';
+import { incrementTimestamp } from '../utils/incrementTimestamp';
+import { adjustClockTimestamp } from '../utils/adjustClockTimestamp';
 import { buildHeading } from '../utils/buildHeading';
 import { normalizeTaskType } from '../utils/normalizeTaskType';
 import type { TimestampPart, ClockTimestampPart } from '../utils/timestampParts';
@@ -147,96 +146,6 @@ function getTimestampAtCursor(
     if (!hit) return null;
     const range = new vscode.Range(position.line, hit.start, position.line, hit.end);
     return { match: hit.match, range, part: hit.part, active: hit.active };
-}
-
-function adjustClockTimestamp(match: RegExpMatchArray, part: ClockTimestampPart, delta: number): string {
-    const g = match.groups ?? {};
-    // The start half of a CLOCK line is mandatory in the pattern; the end half
-    // sits in an optional group and is read from `g` with that in mind.
-    const start = namedGroups(
-        match,
-        'indent',
-        'startOpenBracket',
-        'startYear',
-        'startMonth',
-        'startDay',
-        'startHour',
-        'startMinute',
-        'startWeekday'
-    );
-    const indent = start.indent;
-    const startBracket = start.startOpenBracket;
-
-    const startDate = new Date(
-        parseInt(start.startYear, 10),
-        parseInt(start.startMonth, 10) - 1,
-        parseInt(start.startDay, 10),
-        parseInt(start.startHour, 10),
-        parseInt(start.startMinute, 10)
-    );
-    const startWeekday = start.startWeekday;
-
-    // Adjust start date based on part
-    if (part === 'start-year') startDate.setFullYear(startDate.getFullYear() + delta);
-    else if (part === 'start-month') startDate.setMonth(startDate.getMonth() + delta);
-    else if (part === 'start-day' || part === 'start-weekday') startDate.setDate(startDate.getDate() + delta);
-    else if (part === 'start-hour') startDate.setHours(startDate.getHours() + delta);
-    else if (part === 'start-minute') startDate.setMinutes(startDate.getMinutes() + delta);
-
-    const newStartWeekday = getWeekdayName(startDate, startWeekday);
-    // The close bracket is derived from the open one: a well-formed CLOCK is
-    // always `[...]`, and CLOCK_PARTS_REGEX permits (but org never emits) a
-    // mismatched pair like `[...>`, which this normalizes to a matching pair.
-    const startTimestamp = buildOrgTimestamp({
-        date: startDate,
-        bracket: startBracket === '<' ? 'angle' : 'square',
-        weekday: newStartWeekday
-    });
-
-    if (!g.endOpenBracket) {
-        return `${indent}\`CLOCK: ${startTimestamp}\``;
-    }
-
-    // Past the guard above the whole optional group matched, so its members are
-    // read together the same way the start half is.
-    const end = namedGroups(
-        match,
-        'endOpenBracket',
-        'endYear',
-        'endMonth',
-        'endDay',
-        'endHour',
-        'endMinute',
-        'endWeekday'
-    );
-    const endStartBracket = end.endOpenBracket;
-
-    const endDate = new Date(
-        parseInt(end.endYear, 10),
-        parseInt(end.endMonth, 10) - 1,
-        parseInt(end.endDay, 10),
-        parseInt(end.endHour, 10),
-        parseInt(end.endMinute, 10)
-    );
-    const endWeekday = end.endWeekday;
-
-    // Adjust end date based on part
-    if (part === 'end-year') endDate.setFullYear(endDate.getFullYear() + delta);
-    else if (part === 'end-month') endDate.setMonth(endDate.getMonth() + delta);
-    else if (part === 'end-day' || part === 'end-weekday') endDate.setDate(endDate.getDate() + delta);
-    else if (part === 'end-hour') endDate.setHours(endDate.getHours() + delta);
-    else if (part === 'end-minute') endDate.setMinutes(endDate.getMinutes() + delta);
-
-    const newEndWeekday = getWeekdayName(endDate, endWeekday);
-    const endTimestamp = buildOrgTimestamp({
-        date: endDate,
-        bracket: endStartBracket === '<' ? 'angle' : 'square',
-        weekday: newEndWeekday
-    });
-
-    const duration = formatDurationHM(endDate.getTime() - startDate.getTime(), { padHoursWithSpace: true });
-
-    return `${indent}\`CLOCK: ${startTimestamp}--${endTimestamp} => ${duration}\``;
 }
 
 /**

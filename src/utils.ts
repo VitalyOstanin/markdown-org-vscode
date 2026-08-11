@@ -37,14 +37,9 @@ export function formatOrgTimestamp(date: Date, bracket: 'angle' | 'square', loca
     return buildOrgTimestamp({ date, bracket, weekday: days[date.getDay()] });
 }
 
-/** Format a duration in ms as `H:MM`; pad hours with leading space for table alignment if requested. */
-export function formatDurationHM(durationMs: number, opts?: { padHoursWithSpace?: boolean }): string {
-    const totalMinutes = Math.floor(durationMs / 60_000);
-    const hours = Math.floor(totalMinutes / 60);
-    const minutes = totalMinutes % 60;
-    const hoursStr = opts?.padHoursWithSpace ? hours.toString().padStart(2, ' ') : hours.toString();
-    return `${hoursStr}:${minutes.toString().padStart(2, '0')}`;
-}
+// Re-exported from the vscode-free module it now lives in, so the existing
+// `import { formatDurationHM } from '../utils'` call sites keep working.
+export { formatDurationHM } from './utils/durationHM';
 
 export { toIsoDate } from './utils/isoDate';
 
