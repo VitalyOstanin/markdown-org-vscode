@@ -1,5 +1,6 @@
 import * as assert from 'node:assert/strict';
 import { createAccessTokenProvider } from '../../../utils/gcal/accessToken';
+import { GcalAuthError } from '../../../utils/gcal/authError';
 import { TokenStore, type SecretStore } from '../../../utils/gcal/tokenStore';
 import type { FetchFn } from '../../../utils/gcal/oauth';
 
@@ -57,6 +58,9 @@ suite('gcal/accessToken', () => {
         const f = countingFetch('at', 3600);
         const get = createAccessTokenProvider({ clientId: 'cid', tokens, fetchFn: f.fn });
         await assert.rejects(() => get(), /not connected/);
+        // Typed, so the caller's retry loop can tell it from a network blip:
+        // no number of attempts produces credentials that were never stored.
+        await assert.rejects(() => get(), GcalAuthError);
     });
 
     test('forceRefresh bypasses the cache', async () => {

@@ -6,6 +6,7 @@ import {
     CALENDAR_SCOPE,
     type FetchFn
 } from '../../../utils/gcal/oauth';
+import { GcalAuthError } from '../../../utils/gcal/authError';
 
 function fakeFetch(status: number, body: unknown): FetchFn {
     return (async () => ({
@@ -78,6 +79,30 @@ suite('gcal/oauth', () => {
                     redirectUri: 'r'
                 }),
             /no access_token/
+        );
+    });
+
+    test('a 4xx is final and says so by its type; a 5xx stays retryable', async () => {
+        // The retry loop in calendarClient tells the two apart by type: a
+        // rejected grant is answered by connecting again, while the token
+        // endpoint being down is answered by waiting.
+        await assert.rejects(
+            () =>
+                refreshAccessToken(fakeFetch(400, { error: 'invalid_grant' }), {
+                    clientId: 'c',
+                    clientSecret: 's',
+                    refreshToken: 'rt'
+                }),
+            GcalAuthError
+        );
+        await assert.rejects(
+            () =>
+                refreshAccessToken(fakeFetch(503, {}), {
+                    clientId: 'c',
+                    clientSecret: 's',
+                    refreshToken: 'rt'
+                }),
+            (err: unknown) => err instanceof Error && !(err instanceof GcalAuthError)
         );
     });
 

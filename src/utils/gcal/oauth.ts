@@ -1,6 +1,8 @@
 // Google OAuth 2.0 helpers (loopback + PKCE): authorization URL, code exchange,
 // and refresh-token grant. vscode-free; uses the global fetch via an injectable
 // FetchFn so the token math and error handling are unit-testable.
+import { GcalAuthError } from './authError';
+
 export type FetchFn = typeof fetch;
 
 export interface TokenResponse {
@@ -56,7 +58,12 @@ async function postToken(fetchFn: FetchFn, body: URLSearchParams, now: number): 
     const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
     if (!res.ok) {
         const err = (json.error_description as string) || (json.error as string) || `HTTP ${res.status}`;
-        throw new Error(`token request failed: ${err}`);
+        const message = `token request failed: ${err}`;
+        // A rejected grant (`invalid_grant`, a wrong client secret, a revoked
+        // consent) is answered by connecting again, not by trying again -- the
+        // caller's retry loop is told which of the two this is by the type.
+        // 5xx is the token endpoint being unwell, which a retry does fix.
+        throw res.status >= 400 && res.status < 500 ? new GcalAuthError(message) : new Error(message);
     }
     return toTokenResponse(json, now);
 }

@@ -133,6 +133,15 @@ Ctrl+A` and Promote to Maintain is `Ctrl+K Ctrl+K Ctrl+P`. On macOS every one
   under it, which is how a single typo could take a whole day's clocking out of
   the table.
 
+- **Fixed.** A calendar request no longer waits out three backoffs when the
+  account is simply not connected or the grant was revoked. Getting the access
+  token and sending the request sat in one `try`, and every failure there was
+  read as "no response came back" -- a transient network fault worth retrying.
+  An authorization failure is now its own kind of error, raised by the token
+  endpoint on any 4xx and by the token provider when there are no stored
+  credentials, and it goes straight to the caller. A 5xx from the token
+  endpoint, and every other network fault, is retried exactly as before.
+
 ## [0.14.0] - 2026-08-09
 
 Four things this release is about: a Tasks view that says which day each of its

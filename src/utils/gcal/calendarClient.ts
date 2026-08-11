@@ -1,3 +1,4 @@
+import { GcalAuthError } from './authError';
 import type { FetchFn } from './oauth';
 import type { AccessTokenProvider } from './accessToken';
 import type { CalendarSummary, GcalEventResource } from './types';
@@ -149,7 +150,11 @@ async function call(
             // the loop only ever looked at status codes, so the rarer 5xx was
             // retried while this was handed straight to the caller, turning a
             // blip into a whole sync of failed tasks.
-            if (retries >= MAX_RETRIES || opts.signal?.aborted) {
+            //
+            // Authorization is the exception: an account that is not connected
+            // and a grant that was revoked stay that way, so the three backoffs
+            // buy nothing and a sync run pays them once per task.
+            if (err instanceof GcalAuthError || retries >= MAX_RETRIES || opts.signal?.aborted) {
                 throw err;
             }
             retries++;

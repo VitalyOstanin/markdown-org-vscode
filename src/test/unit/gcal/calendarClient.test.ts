@@ -10,6 +10,7 @@ import {
     computeRetryDelayMs,
     setRetrySleepForTests
 } from '../../../utils/gcal/calendarClient';
+import { GcalAuthError } from '../../../utils/gcal/authError';
 import type { FetchFn } from '../../../utils/gcal/oauth';
 
 interface Call {
@@ -259,6 +260,24 @@ suite('gcal/calendarClient', () => {
             };
             await listWritableCalendars(r.fn, flakyToken);
             assert.equal(n, 2, 'the token provider was tried again');
+        });
+
+        test('an authorization failure is final: it is not retried', async () => {
+            // Waiting out three backoffs changes nothing when the account is
+            // not connected or the grant was revoked -- and a whole sync run
+            // multiplies that by its tasks. Only failures that could pass on a
+            // second attempt are worth the wait.
+            let n = 0;
+            const r = recorder(() => ({ status: 200, body: { items: [] } }));
+            const revoked = async () => {
+                n++;
+                throw new GcalAuthError('token request failed: invalid_grant');
+            };
+
+            await assert.rejects(() => listWritableCalendars(r.fn, revoked), /invalid_grant/);
+            assert.equal(n, 1, 'the token endpoint was asked once');
+            assert.equal(r.calls.length, 0, 'no request went out');
+            assert.deepEqual(sleeps, [], 'nothing was waited out');
         });
     });
 

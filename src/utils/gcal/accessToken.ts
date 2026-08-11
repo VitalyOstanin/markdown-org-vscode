@@ -1,3 +1,4 @@
+import { GcalAuthError } from './authError';
 import { refreshAccessToken, type FetchFn } from './oauth';
 import type { TokenStore } from './tokenStore';
 
@@ -28,7 +29,7 @@ export function createAccessTokenProvider(deps: AccessTokenDeps): AccessTokenPro
         const refreshToken = await deps.tokens.getRefreshToken();
         const clientSecret = await deps.tokens.getClientSecret();
         if (!refreshToken || !clientSecret) {
-            throw new Error('not connected to Google Calendar -- run "Connect Google Calendar"');
+            throw new GcalAuthError('not connected to Google Calendar -- run "Connect Google Calendar"');
         }
         const t = await refreshAccessToken(
             deps.fetchFn,
