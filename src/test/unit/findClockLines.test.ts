@@ -93,4 +93,17 @@ suite('findClockLinesInLines', () => {
         const lines = ['## TODO Task', '    `CLOCK: [2025-12-09 Tue 14:30]`'];
         assert.deepStrictEqual(findClockLinesInLines(lines, 0), [1]);
     });
+
+    test('a malformed CLOCK line is passed over, not treated as the end of the block', () => {
+        // It is a broken entry among the entries. Ending the block there hid
+        // every later entry of the heading, while the extractor -- which sweeps
+        // the file rather than walking a block -- went on counting them.
+        const lines = [
+            '## TODO Task',
+            '`CLOCK: [2025-12-09 Tue 10:00>`',
+            '`CLOCK: [2025-12-10 Wed 10:00]--[2025-12-10 Wed 12:00] =>  2:00`',
+            'Prose ends the block.'
+        ];
+        assert.deepStrictEqual(findClockLinesInLines(lines, 0), [2]);
+    });
 });

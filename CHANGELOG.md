@@ -120,6 +120,19 @@ Ctrl+A` and Promote to Maintain is `Ctrl+K Ctrl+K Ctrl+P`. On macOS every one
   repeatedly to walk a value, only the first invocation goes through the
   palette.
 
+### Fixed
+
+- **Fixed.** The clocktable and the extractor's `total_clock_time` no longer
+  disagree about the same file. Three differences in what a CLOCK line may look
+  like are gone: a mixed bracket pair (`[…>`) was counted here and skipped
+  there, a closed entry without the `=> H:MM` tail was skipped here and counted
+  there, and a `<` inside a timestamp body was accepted here alone. The tail is
+  optional as it is for the extractor, and each pair of brackets is now a pair.
+  A line that says CLOCK but does not parse is also passed over instead of
+  ending the heading's CLOCK block -- one such line used to hide every entry
+  under it, which is how a single typo could take a whole day's clocking out of
+  the table.
+
 ## [0.14.0] - 2026-08-09
 
 Four things this release is about: a Tasks view that says which day each of its

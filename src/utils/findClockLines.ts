@@ -1,4 +1,4 @@
-import { CLOCK_REGEX, TIMESTAMP_LINE_REGEX } from '../orgPatterns';
+import { CLOCK_LINE_LOOKALIKE_REGEX, CLOCK_REGEX, TIMESTAMP_LINE_REGEX } from '../orgPatterns';
 
 /**
  * Walk forward from the line after `headingLine` and collect indices of all
@@ -12,6 +12,8 @@ import { CLOCK_REGEX, TIMESTAMP_LINE_REGEX } from '../orgPatterns';
  *     can space CLOCK entries apart visually); blank lines that appear
  *     *before* the first CLOCK terminate the search to avoid skipping past
  *     unrelated paragraphs.
+ *   * A line that says CLOCK but does not parse is passed over: it is a broken
+ *     entry among the entries, not the prose that follows them.
  *   * Any other line terminates the search.
  */
 export function findClockLinesInLines(lines: string[], headingLine: number): number[] {
@@ -26,6 +28,15 @@ export function findClockLinesInLines(lines: string[], headingLine: number): num
 
         if (CLOCK_REGEX.test(text)) {
             clockLines.push(i);
+            continue;
+        }
+
+        // A line that says CLOCK but does not parse is passed over rather than
+        // treated as the end of the block: it is not a paragraph that follows
+        // the entries, it is a broken entry among them, and the extractor --
+        // which sweeps the file rather than walking a block -- goes on counting
+        // the entries under it.
+        if (CLOCK_LINE_LOOKALIKE_REGEX.test(text)) {
             continue;
         }
 

@@ -154,4 +154,25 @@ suite('parseClockEntries', () => {
         const rows = parseClockEntries(text);
         assert.deepStrictEqual(rows, [{ title: 'Spacing', totalMinutes: 105 }]);
     });
+
+    test('a closed entry without the duration tail does not end the block', () => {
+        // The tail is optional for the extractor, and a line that is not
+        // recognized as a CLOCK stops the walk over the heading's block -- so
+        // one such line used to take every entry after it with it.
+        const text =
+            '## TODO Untailed\n' +
+            '`CLOCK: [2025-12-09 Tue 10:00]--[2025-12-09 Tue 11:00]`\n' +
+            '`CLOCK: [2025-12-10 Wed 10:00]--[2025-12-10 Wed 12:00] =>  2:00`\n';
+        const rows = parseClockEntries(text);
+        assert.deepStrictEqual(rows, [{ title: 'Untailed', totalMinutes: 120 }]);
+    });
+
+    test('a mixed bracket pair is skipped, exactly as the extractor skips it', () => {
+        const text =
+            '## TODO Mixed\n' +
+            '`CLOCK: [2025-12-09 Tue 10:00>--[2025-12-09 Tue 11:00] =>  1:00`\n' +
+            '`CLOCK: [2025-12-10 Wed 10:00]--[2025-12-10 Wed 12:00] =>  2:00`\n';
+        const rows = parseClockEntries(text);
+        assert.deepStrictEqual(rows, [{ title: 'Mixed', totalMinutes: 120 }]);
+    });
 });

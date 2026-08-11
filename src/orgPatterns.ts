@@ -1,11 +1,30 @@
-// Whitespace acceptance mirrors markdown-org-extract's `CLOCK_RE` (clock.rs):
-// `CLOCK:\s*` before the first timestamp and `\s*=>\s*` around the duration
-// arrow. Both projects read the same lines off disk, so a line one of them
-// counts and the other silently skips would make `total_clock_time` and the
-// clocktable built here disagree about the same file. The extension always
-// writes the canonical single-space form; this is about what it accepts.
+// Acceptance mirrors markdown-org-extract's `CLOCK_RE` (clock.rs) in three
+// respects. Whitespace: `CLOCK:\s*` before the first timestamp and `\s*=>\s*`
+// around the duration arrow. Brackets: the opening and closing one of each
+// timestamp are alternatives of a pair, so `[…>` and `<…]` are rejected, and a
+// body never contains a bracket of either kind. Duration: the `=> H:MM` tail is
+// optional even on a closed entry -- org-mode writes it but does not require
+// it. Both projects read the same lines off disk, so a line one of them counts
+// and the other silently skips would make `total_clock_time` and the clocktable
+// built here disagree about the same file. The extension always writes the
+// canonical single-space form; this is about what it accepts.
+//
+// The alternatives repeat their group names, which is how each pair reports the
+// same fields whichever bracket it uses.
 export const CLOCK_REGEX =
-    /^(?<indent>\s*)`CLOCK:\s*(?<startOpenBracket>[[<])(?<startYear>\d{4})-(?<startMonth>\d{2})-(?<startDay>\d{2}) (?<startBody>[^\]>]+)(?<startCloseBracket>[\]>])(?:--(?<endOpenBracket>[[<])(?<endYear>\d{4})-(?<endMonth>\d{2})-(?<endDay>\d{2}) (?<endBody>[^\]>]+)(?<endCloseBracket>[\]>])\s*=>\s*(?<durationHours>-?\d+):(?<durationMinutes>-?\d+))?`$/;
+    /^(?<indent>\s*)`CLOCK:\s*(?:(?<startOpenBracket>\[)(?<startYear>\d{4})-(?<startMonth>\d{2})-(?<startDay>\d{2}) (?<startBody>[^\][<>]+)(?<startCloseBracket>\])|(?<startOpenBracket><)(?<startYear>\d{4})-(?<startMonth>\d{2})-(?<startDay>\d{2}) (?<startBody>[^\][<>]+)(?<startCloseBracket>>))(?:--(?:(?<endOpenBracket>\[)(?<endYear>\d{4})-(?<endMonth>\d{2})-(?<endDay>\d{2}) (?<endBody>[^\][<>]+)(?<endCloseBracket>\])|(?<endOpenBracket><)(?<endYear>\d{4})-(?<endMonth>\d{2})-(?<endDay>\d{2}) (?<endBody>[^\][<>]+)(?<endCloseBracket>>)))?(?:\s*=>\s*(?<durationHours>-?\d+):(?<durationMinutes>-?\d+))?`$/;
+
+/**
+ * A line that says CLOCK but is not one -- a malformed bracket pair, a body
+ * with a stray bracket, a truncated timestamp.
+ *
+ * Used to keep such a line from ending the walk over a heading's CLOCK block.
+ * The extractor has no notion of a block at all: it sweeps the file for CLOCK
+ * lines, so one bad line costs it that line and nothing more. Here the block
+ * ends at the first line that is not part of it, and without this a typo in the
+ * first entry hid every entry under the same heading.
+ */
+export const CLOCK_LINE_LOOKALIKE_REGEX = /^\s*`CLOCK:/;
 
 // Strict per-keyword bracket policy from ADR-0014:
 //   SCHEDULED, DEADLINE -> active <...>
@@ -47,10 +66,41 @@ export function matchTimestampLine(text: string): TimestampLineMatch | null {
 // here as well -- otherwise `[#A]Title` shows a priority in the agenda while
 // the commands on the same line see none and offer to add a second cookie.
 //
-// One difference is left standing on purpose: the extractor matches a cookie
-// ANYWHERE in the heading text, this pattern only right after the keyword.
-// Accepting it anywhere would mean rewriting the line from the captured parts
-// and moving the user's cookie to the front, which is a heavier change than a
-// grammar fix -- it belongs with the shared parser tracked in TODO.md.
+// The `priority` group covers only the canonical position -- right after the
+// keyword -- because that is the cookie the extractor takes out of the heading
+// text (its ADR-0027). A cookie written further along counts for the priority
+// there as well, but stays inside the title, and so it does here: it lands in
+// `title` rather than in `priority`, and the two projects agree on what the
+// heading says. Use `findPriorityCookie` to locate it.
 export const HEADING_REGEX =
     /^(?<hashes>#+)\s+(?:(?<status>TODO|DONE|CANCELLED|CANCELED)\s+)?(?:\[#(?<priority>[A-Z]|6[0-4]|[1-5][0-9]|[0-9])\]\s*)?(?<title>.+)$/;
+
+// The cookie on its own, for finding one inside a title. Same accepted values
+// as above, so `[#65]` and `[#01]` are text in both places rather than a
+// priority here and text there.
+export const PRIORITY_COOKIE_REGEX = /\[#(?<priority>[A-Z]|6[0-4]|[1-5][0-9]|[0-9])\]/;
+
+/** Where a priority cookie sits inside `text`, and what it says. */
+export interface PriorityCookie {
+    /** Bare value, e.g. `A` or `12`. */
+    value: string;
+    /** Byte offsets of the cookie itself, framing included. */
+    start: number;
+    end: number;
+}
+
+/**
+ * The first priority cookie in `text`, wherever it is.
+ *
+ * Mirrors the extractor's reading: a cookie counts for the priority no matter
+ * where it was typed. Callers that also need to know whether it is in the
+ * canonical position compare `start` against the start of the title.
+ */
+export function findPriorityCookie(text: string): PriorityCookie | undefined {
+    const match = PRIORITY_COOKIE_REGEX.exec(text);
+    const value = match?.groups?.priority;
+    if (!match || value === undefined) {
+        return undefined;
+    }
+    return { value, start: match.index, end: match.index + match[0].length };
+}

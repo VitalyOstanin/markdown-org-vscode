@@ -202,5 +202,42 @@ suite('orgPatterns named groups', () => {
             assert.strictEqual(match.groups.durationHours, '2');
             assert.strictEqual(match.groups.durationMinutes, '30');
         });
+
+        test('a mixed bracket pair is not a CLOCK line, as the extractor reads it', () => {
+            // The two projects read the same files; a line one counts and the
+            // other skips makes the inserted clocktable disagree with
+            // `total_clock_time` about the same heading. The extractor pairs
+            // its brackets (`test_rejects_mixed_brackets` in clock.rs).
+            assert.strictEqual('`CLOCK: [2025-12-06 Fri 10:00>`'.match(CLOCK_REGEX), null);
+            assert.strictEqual('`CLOCK: <2025-12-06 Fri 10:00]`'.match(CLOCK_REGEX), null);
+            assert.strictEqual(
+                '`CLOCK: [2025-12-06 Fri 10:00]--[2025-12-06 Fri 12:30> =>  2:30`'.match(CLOCK_REGEX),
+                null
+            );
+        });
+
+        test('an angle-bracket pair is a CLOCK line, and reads the same fields', () => {
+            const match = '`CLOCK: <2025-12-06 Fri 10:00>--<2025-12-06 Fri 12:30> =>  2:30`'.match(CLOCK_REGEX);
+            assert.ok(match?.groups);
+            assert.strictEqual(match.groups.startBody, 'Fri 10:00');
+            assert.strictEqual(match.groups.endBody, 'Fri 12:30');
+            assert.strictEqual(match.groups.durationHours, '2');
+        });
+
+        test('a closed CLOCK without the duration tail still parses', () => {
+            // Org-mode writes the tail, but does not require it; the extractor
+            // keeps it optional (`clock.rs`), and a line the extension fails to
+            // match ends the whole CLOCK block, not just that line.
+            const match = '`CLOCK: [2025-12-06 Fri 10:00]--[2025-12-06 Fri 12:30]`'.match(CLOCK_REGEX);
+            assert.ok(match?.groups);
+            assert.strictEqual(match.groups.endBody, 'Fri 12:30');
+            assert.strictEqual(match.groups.durationHours, undefined);
+        });
+
+        test('an angle bracket inside a timestamp body is not part of it', () => {
+            // The extractor's bodies are `[^\]<>]`; a body that swallowed `<`
+            // would let `[... <...]` count here and nowhere else.
+            assert.strictEqual('`CLOCK: [2025-12-06 Fri <10:00]`'.match(CLOCK_REGEX), null);
+        });
     });
 });
