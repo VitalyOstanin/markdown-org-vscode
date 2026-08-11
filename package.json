@@ -354,7 +354,8 @@
         "markdown-org.extractorPath": {
           "type": "string",
           "default": "",
-          "description": "Path to markdown-org-extract executable. Empty (default) uses the bundled binary, falling back to PATH. Set to override (e.g. an absolute path for local builds)."
+          "scope": "machine",
+          "description": "Path to markdown-org-extract executable. Empty (default) uses the bundled binary, falling back to PATH. Set to override (e.g. an absolute path for local builds). Read from user or machine settings only, so an opened repository cannot pick the executable that runs."
         },
         "markdown-org.workspaceDir": {
           "type": "string",

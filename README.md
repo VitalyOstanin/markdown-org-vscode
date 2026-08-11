@@ -460,9 +460,10 @@ One of these is easy to misread: `Copy Path of Active File` is `Ctrl+K P`, witho
 The CLOCK and `Ctrl+K Ctrl+K` entries differ from the rest: both are prefixes here, so in a
 Markdown file the editor waits for the next chord instead of running the default command.
 
-One binding under that prefix is global: `Cycle Tag Filter` (`Ctrl+K Ctrl+K Ctrl+T`) carries no
-`when` clause, so it takes the prefix in every editor, not only in Markdown files. That is
-deliberate -- the tag filter applies to the agenda, which is not tied to the file you are in.
+One binding under that prefix reaches past the editor: `Cycle Tag Filter` (`Ctrl+K Ctrl+K
+Ctrl+T`) is bound in a Markdown editor and in the agenda panel, so the filter can be changed
+while looking at the agenda itself, which is what it applies to. Outside those two the prefix is
+left to the editor's own commands.
 
 ### Heading Management Commands
 

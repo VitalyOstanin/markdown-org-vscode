@@ -95,6 +95,15 @@ Ctrl+A` and Promote to Maintain is `Ctrl+K Ctrl+K Ctrl+P`. On macOS every one
   supported them. The rule behind the choice is written down in
   [ADR-0018](docs/adr/0018-minimum-host-follows-the-git-api.md).
 
+- `markdown-org.extractorPath` is read from user or machine settings only. It
+  names an executable that the agenda and the calendar sync run, and until now
+  a `.vscode/settings.json` inside an opened repository could name it -- so
+  opening the agenda in a repository you had trusted once ran whatever that
+  file pointed at. Trust is granted per repository, broadly, and answers a
+  different question than "may this repository choose my binaries". If you keep
+  a locally built extractor configured per workspace, move the value to your
+  user settings; everything else is unchanged.
+
 - The overdue backlog of a day is four panels instead of one: a missed repeat,
   what slipped within the week, what slipped earlier this year, and what is
   older than a year -- in that order, most actionable first. What a slipped

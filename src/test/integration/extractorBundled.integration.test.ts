@@ -24,15 +24,17 @@ suite('Extractor: bundled binary smoke', () => {
 
     let originalExtractorPath: string | undefined;
 
+    // `extractorPath` is machine-scoped, so the workspace target is not
+    // writable for it; the run's own user settings are.
     before(async () => {
         const config = vscode.workspace.getConfiguration('markdown-org');
         originalExtractorPath = config.get<string>('extractorPath');
-        await config.update('extractorPath', '', vscode.ConfigurationTarget.Workspace);
+        await config.update('extractorPath', '', vscode.ConfigurationTarget.Global);
     });
 
     after(async () => {
         const config = vscode.workspace.getConfiguration('markdown-org');
-        await config.update('extractorPath', originalExtractorPath ?? '', vscode.ConfigurationTarget.Workspace);
+        await config.update('extractorPath', originalExtractorPath ?? '', vscode.ConfigurationTarget.Global);
     });
 
     beforeEach(function () {
