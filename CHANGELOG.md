@@ -75,6 +75,14 @@ Ctrl+A` and Promote to Maintain is `Ctrl+K Ctrl+K Ctrl+P`. On macOS every one
   of them uses `Cmd` as before. If you had learnt the old chords, rebind them
   in **Keyboard Shortcuts**; nothing else about the commands changed.
 
+- The agenda's git status no longer runs `git rev-parse` once per source file
+  on every recomputation. Which repository holds a file was resolved file by
+  file, and the answer "this directory is not under git" was not remembered at
+  all, so a notes directory outside git cost one process per file of the view
+  -- on every save in a watched directory, on every repository event and on
+  every render. The answer is now kept per directory, negative answers
+  included, and dropped when a repository is opened or closed.
+
 - The overdue backlog of a day is four panels instead of one: a missed repeat,
   what slipped within the week, what slipped earlier this year, and what is
   older than a year -- in that order, most actionable first. What a slipped

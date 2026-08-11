@@ -63,6 +63,7 @@ import { agendaSourceFiles, agendaSourceRoots } from '../utils/git/agendaSourceF
 import { buildCollectionMarks, collectionMarkHtml } from '../utils/agendaCollections';
 import { hideCollections, renderCollectionChips } from '../utils/agendaCollectionFilter';
 import { collectGitStatus, gitApiForEvents } from '../utils/git/collectGitStatus';
+import { forgetResolvedRepositories } from '../utils/git/gitApi';
 import { commitAgendaSources, pushAgendaSources } from '../commands/gitActions';
 import { isCancelled } from '../utils/normalizeTaskType';
 import { shiftMonthAnchor } from '../utils/monthNav';
@@ -780,7 +781,17 @@ export class AgendaPanel {
         const onChange = (): void => {
             AgendaPanel.requestGitStatus();
         };
-        AgendaPanel.gitListeners.push(api.onDidOpenRepository(onChange), api.onDidCloseRepository(onChange));
+        // The set of repositories just changed, so which repository holds a
+        // given directory can have changed with it: the remembered answers go,
+        // and the next pass resolves them again.
+        const onRepositorySetChange = (): void => {
+            forgetResolvedRepositories();
+            onChange();
+        };
+        AgendaPanel.gitListeners.push(
+            api.onDidOpenRepository(onRepositorySetChange),
+            api.onDidCloseRepository(onRepositorySetChange)
+        );
         for (const repository of api.repositories) {
             AgendaPanel.gitListeners.push(repository.state.onDidChange(onChange));
         }
@@ -1105,6 +1116,24 @@ export class AgendaPanel {
             return Promise.resolve(false);
         }
         return panel.webview.postMessage({ command: 'clickCollectionChipForTesting', root });
+    }
+
+    /**
+     * Test-only helper: answer the band `section` with `action` in the open
+     * panel, as pressing the menu item does.
+     *
+     * Driving it through the page rather than calling the handler directly is
+     * the point: what the message carries -- the chips that are off among the
+     * rest -- is assembled there, and a test that forged the message would
+     * confirm nothing about the band the reader was looking at. Resolves to
+     * false when no panel is open.
+     */
+    public static clickGroupActionForTesting(section: string, action: string): Thenable<boolean> {
+        const panel = AgendaPanel.currentPanel;
+        if (!panel) {
+            return Promise.resolve(false);
+        }
+        return panel.webview.postMessage({ command: 'clickGroupActionForTesting', section, action });
     }
 
     /**

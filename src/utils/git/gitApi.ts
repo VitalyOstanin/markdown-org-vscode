@@ -18,12 +18,27 @@ import * as vscode from 'vscode';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { formatError } from '../formatError';
+import { KeyedResolutionCache } from '../keyedResolutionCache';
 import { logDiagnostic } from '../logChannel';
 import type { GitApi, GitExtensionExports, GitRepository } from './gitApiTypes';
 
 /** Resolved once per session; `null` records "asked, not available". */
 let cachedApi: GitApi | null | undefined;
 let reportedUnavailable = false;
+
+/**
+ * Which repository holds the notes of a directory, remembered per directory.
+ *
+ * Cleared by {@link forgetResolvedRepositories} when the set of open
+ * repositories changes -- that is the one event that can turn an answer stale
+ * in either direction, and the agenda panel is already subscribed to it.
+ */
+const repositoryByDirectory = new KeyedResolutionCache<GitRepository | undefined>();
+
+/** Drop the remembered directory-to-repository answers. */
+export function forgetResolvedRepositories(): void {
+    repositoryByDirectory.clear();
+}
 
 /**
  * The Git extension's API, or `null` when git is not available.
@@ -160,7 +175,16 @@ export async function resolveRepositoryFor(
  * view and stays there -- which is the accepted cost of supporting agenda files
  * that live outside the workspace folders (ADR-0016).
  */
-async function repositoryForPath(api: GitApi, filePath: string): Promise<GitRepository | undefined> {
+function repositoryForPath(api: GitApi, filePath: string): Promise<GitRepository | undefined> {
+    // Keyed by the directory: every note of one directory has the same answer,
+    // and the answer is what costs a `git rev-parse`. The negative one is
+    // cached along with the rest -- a notes directory outside git used to pay
+    // one process per file on every recomputation, and the status is
+    // recomputed on each save and each repository event.
+    return repositoryByDirectory.resolve(path.dirname(filePath), () => resolveRepositoryUncached(api, filePath));
+}
+
+async function resolveRepositoryUncached(api: GitApi, filePath: string): Promise<GitRepository | undefined> {
     const open = api.getRepository(vscode.Uri.file(filePath));
     if (open) {
         return open;
