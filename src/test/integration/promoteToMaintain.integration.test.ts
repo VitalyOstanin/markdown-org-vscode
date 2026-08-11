@@ -75,8 +75,10 @@ suite('Promote to Maintain: integration', () => {
     });
 
     afterEach(async () => {
-        errorStub.restore();
-        infoStub.restore();
+        // restore() rather than two named stubs: a test may add its own (the
+        // refused-edit case stubs applyEdit), and leaking that into the next
+        // suite would be hard to trace back here.
+        sinon.restore();
         await vscode.workspace
             .getConfiguration('markdown-org')
             .update('maintainFilePath', undefined, vscode.ConfigurationTarget.Workspace);
@@ -226,6 +228,37 @@ suite('Promote to Maintain: integration', () => {
             '# incoming\n## TODO First migration\nnotes\n\n',
             `unexpected initial maintain contents: ${JSON.stringify(maintainText)}`
         );
+    });
+
+    test('a refused edit leaves no copy in the maintain file and says so', async function () {
+        this.timeout(15000);
+        const setup = freshSetup('refused-edit');
+
+        fs.writeFileSync(setup.sourceFile, '# Notes\n## TODO Move me\nbody\n');
+        fs.writeFileSync(setup.maintainFile, '# incoming\n');
+
+        await vscode.workspace
+            .getConfiguration('markdown-org')
+            .update('maintainFilePath', setup.maintainRel, vscode.ConfigurationTarget.Workspace);
+
+        const editor = await openAt(setup.sourceFile, 1);
+        // The host declines the edit against the source: the document moved on
+        // since the version the edit was built against, it is read-only, or
+        // another participant claimed it.
+        const applyEdit = sinon.stub(vscode.workspace, 'applyEdit').resolves(false);
+
+        await vscode.commands.executeCommand('markdown-org.promoteToMaintain');
+
+        assert.ok(applyEdit.called, 'the command must have tried to edit the source');
+        assert.ok(errorStub.called, 'a refused edit must be reported');
+        assert.ok(!infoStub.called, `a refused promotion must not claim success: ${JSON.stringify(infoStub.args)}`);
+
+        const maintainText = fs.readFileSync(setup.maintainFile, 'utf8');
+        assert.ok(
+            !maintainText.includes('## TODO Move me'),
+            `the maintain file kept a copy of a block that was never cut:\n${maintainText}`
+        );
+        assert.match(editor.document.getText(), /## TODO Move me/, 'the source must be untouched');
     });
 
     test('refuses when markdown-org.maintainFilePath is not configured', async function () {

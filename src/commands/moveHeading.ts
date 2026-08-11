@@ -112,6 +112,50 @@ function computeBlockDeletionRange(
     return new vscode.Range(c.startLine, c.startCharacter, c.endLine, c.endCharacter);
 }
 
+/**
+ * Move a block out of the open document and only then file it away.
+ *
+ * Both commands touch two files, so the order decides what a half-finished run
+ * leaves behind. Cutting first means the destructive step is the one that can
+ * be refused: `applyEdit` answers false when the document has moved on since
+ * the edit was built, when it is read-only, or when another participant claims
+ * it -- and in that case nothing has been written anywhere yet. Writing first
+ * would leave the block in the destination *and* in the source, under a toast
+ * saying it had been moved.
+ *
+ * The cut lands in the editor's buffer, not on disk, so it is undoable and the
+ * source file itself is untouched until the user saves. If `write` then fails,
+ * the text is put back at the position it was taken from.
+ *
+ * Returns false when the edit was refused (the caller has already been told).
+ */
+async function cutBlockThenWrite(
+    document: vscode.TextDocument,
+    range: vscode.Range,
+    write: () => Promise<void>
+): Promise<boolean> {
+    const removed = document.getText(range);
+
+    const cut = new vscode.WorkspaceEdit();
+    cut.delete(document.uri, range);
+    if (!(await vscode.workspace.applyEdit(cut))) {
+        notifyError(`the edit was rejected for ${path.basename(document.uri.fsPath)}; nothing was moved`);
+        return false;
+    }
+
+    try {
+        await write();
+    } catch (error) {
+        const restore = new vscode.WorkspaceEdit();
+        restore.insert(document.uri, range.start, removed);
+        if (!(await vscode.workspace.applyEdit(restore))) {
+            notifyError(`could not put the block back into ${path.basename(document.uri.fsPath)}; undo restores it`);
+        }
+        throw error;
+    }
+    return true;
+}
+
 function buildArchiveContent(ancestors: HeadingInfo[], heading: HeadingInfo): string {
     let content = '';
 
@@ -160,11 +204,14 @@ export async function moveToArchive() {
         existingContent += existingContent.endsWith('\n') ? '\n' : '\n\n';
     }
 
-    await atomicWrite(archivePath, existingContent + archiveContent);
-
-    const edit = new vscode.WorkspaceEdit();
-    edit.delete(document.uri, computeBlockDeletionRange(document, heading.line, heading.content.length));
-    await vscode.workspace.applyEdit(edit);
+    const moved = await cutBlockThenWrite(
+        document,
+        computeBlockDeletionRange(document, heading.line, heading.content.length),
+        () => atomicWrite(archivePath, existingContent + archiveContent)
+    );
+    if (!moved) {
+        return;
+    }
 
     notifyInfo(`Moved to ${path.basename(archivePath)}`);
 }
@@ -217,11 +264,14 @@ export async function promoteToMaintain() {
         bodyLines: heading.content.slice(1)
     });
 
-    await atomicWrite(maintainPath, updatedMaintainContent);
-
-    const edit = new vscode.WorkspaceEdit();
-    edit.delete(document.uri, computeBlockDeletionRange(document, heading.line, heading.content.length));
-    await vscode.workspace.applyEdit(edit);
+    const promoted = await cutBlockThenWrite(
+        document,
+        computeBlockDeletionRange(document, heading.line, heading.content.length),
+        () => atomicWrite(maintainPath, updatedMaintainContent)
+    );
+    if (!promoted) {
+        return;
+    }
 
     notifyInfo(`Promoted to ${path.basename(maintainPath)}`);
 }

@@ -151,6 +151,17 @@ Ctrl+A` and Promote to Maintain is `Ctrl+K Ctrl+K Ctrl+P`. On macOS every one
   travel with the message and narrow the band before it is turned into files,
   so the rows edited are exactly the rows shown.
 
+- **Fixed.** Move to Archive and Promote to Maintain no longer report a move
+  that did not happen. Both wrote the destination file first and then removed
+  the block from the open document, discarding the answer to that removal --
+  and the editor refuses an edit whenever the document has moved on since the
+  edit was built, is read-only, or is claimed by another participant. The block
+  then sat in both files while the toast said it had been moved. The order is
+  reversed: the block is cut first, and the destination is written only after
+  the editor confirms the cut; a refusal is reported and nothing is written. If
+  writing the destination fails, the block goes back where it was. Both
+  commands now have end-to-end coverage, the archive one for the first time.
+
 ## [0.14.0] - 2026-08-09
 
 Four things this release is about: a Tasks view that says which day each of its
