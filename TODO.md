@@ -234,20 +234,19 @@
     - Investigate first, then agree the implementation. The problem statement
       and the questions the investigation has to answer are in the extractor's
       `TODO.md`, section "One grammar for every client, over WebAssembly".
-    - What is wrong today: `HEADING_REGEX` (`src/orgPatterns.ts`) wants the
-      priority cookie directly after the keyword, while the extractor accepts
-      it anywhere in the remainder; `TIMESTAMP_REGEX`
+    - What is wrong today: `TIMESTAMP_REGEX`
       (`src/utils/timestampParts.ts`) spells the whole bracket out
       positionally, while the extractor takes a date plus a free-form body it
-      scans token by token, in any order. So `## TODO Написать [#A] отчёт`
-      shows no priority here, and a bracket whose tokens are written the other
-      way round (`-2d +1w`) is still not recognised.
-    - Two of these were closed by hand in the meantime: the space after the
-      cookie is now optional, and a warning cookie after the repeater parses
-      and survives a shift. Both are patches to the second grammar, not an end
-      to it -- moving the cookie anywhere would mean rebuilding the heading
-      from captured parts and relocating what the user typed, which is exactly
-      the kind of thing token ranges from a shared parser make unnecessary.
+      scans token by token, in any order. So a bracket whose tokens are written
+      the other way round (`-2d +1w`) is still not recognised.
+    - Three of these were closed by hand in the meantime: the space after the
+      cookie is now optional, a warning cookie after the repeater parses and
+      survives a shift, and a priority cookie away from the front is read and
+      painted where it was typed (`findPriorityCookie`, `planPriorityToggle`;
+      the extractor's ADR-0027 settles what the heading text then says). All
+      three are patches to the second grammar, not an end to it: each divergence
+      had to be found by comparing two implementations by hand, which is what
+      one grammar would make unnecessary.
     - Publishing the extractor's regex strings would not be enough: what
       diverges is the order they are applied in and how the bracket body is
       scanned. Compiling the extractor to `wasm32` removes the second grammar

@@ -131,6 +131,15 @@ suite('computeHighlightSpans', () => {
         assert.deepStrictEqual(kinds('### TODO [#12] Разобрать шкаф'), ['status-todo']);
     });
 
+    test('a cookie away from the front is painted where it was typed', () => {
+        // The extractor reads a cookie wherever it sits (its ADR-0027) and
+        // leaves it in the heading text. Painting only the canonical position
+        // would colour the priority on one line and not on the next, for the
+        // same priority.
+        assert.deepStrictEqual(painted('### TODO Купить [#A] фильтр'), ['status-todo:TODO', 'priority-a:[#A]']);
+        assert.deepStrictEqual(painted('### Заголовок с cookie в конце [#B]'), ['priority-b:[#B]']);
+    });
+
     test('a heading without a status or a cookie paints nothing', () => {
         assert.deepStrictEqual(painted('### Проверить все жидкости в машине'), []);
     });

@@ -2,7 +2,8 @@ import * as vscode from 'vscode';
 import { findNearestHeading, formatOrgTimestamp, getTimestampIndent, requireActiveEditor } from '../utils';
 import { HEADING_REGEX, matchTimestampLine } from '../orgPatterns';
 import { buildHeading } from '../utils/buildHeading';
-import { computeToggledStatus, normalizeTaskType } from '../utils/normalizeTaskType';
+import { computeToggledStatus } from '../utils/normalizeTaskType';
+import { planPriorityToggle } from '../utils/priorityToggle';
 import type { TaskStatus } from '../types';
 import { namedGroups } from '../utils/regexGroups';
 import { planCompletion, type CompletionPlan } from '../utils/completeRepeatingTask';
@@ -125,26 +126,13 @@ export async function togglePriority() {
     }
 
     const line = editor.document.lineAt(headingLine);
-    const text = line.text;
-    const match = text.match(HEADING_REGEX);
 
-    if (!match?.groups) {
+    // The toggle rule lives in planPriorityToggle (unit-tested): it clears the
+    // cookie wherever the user typed it and adds one only when there is none.
+    const newText = planPriorityToggle(line.text);
+    if (newText === undefined) {
         return;
     }
-
-    const { status, priority: currentPriority } = match.groups;
-    const { hashes, title } = namedGroups(match, 'hashes', 'title');
-
-    // Toggle: clear an existing priority, otherwise default a fresh one to A.
-    // `status` is the raw HEADING_REGEX capture (string | undefined); normalize
-    // it to the typed TaskStatus boundary. HEADING_REGEX only captures
-    // TODO/DONE/CANCELLED/CANCELED, so this is observably identical to passing it through.
-    const newText = buildHeading({
-        hashes,
-        status: normalizeTaskType(status),
-        priority: currentPriority ? undefined : 'A',
-        title
-    });
 
     return editor.edit((editBuilder) => {
         editBuilder.replace(line.range, newText);

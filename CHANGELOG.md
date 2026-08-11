@@ -162,6 +162,18 @@ Ctrl+A` and Promote to Maintain is `Ctrl+K Ctrl+K Ctrl+P`. On macOS every one
   writing the destination fails, the block goes back where it was. Both
   commands now have end-to-end coverage, the archive one for the first time.
 
+- **Fixed.** A priority cookie the user typed away from the front of a heading
+  is read, painted and toggled where it is, instead of being invisible to the
+  commands. Toggling the priority on `## TODO Buy [#A] filter` used to add a
+  second cookie -- the extension looked only right after the keyword -- and the
+  colour stopped at the same boundary. The cookie is now found anywhere on the
+  line, as the extractor finds it, so the toggle clears the one that is there
+  (cutting it out in place, along with one separating space) and adds one only
+  when the heading carries none. Group actions on such a task no longer refuse
+  with "moved": the extractor now leaves a non-canonical cookie in the heading
+  text it publishes, so the agenda's heading and the line in the file say the
+  same thing. Requires the extractor 0.15.0 or newer.
+
 ## [0.14.0] - 2026-08-09
 
 Four things this release is about: a Tasks view that says which day each of its

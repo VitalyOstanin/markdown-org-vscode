@@ -1,4 +1,4 @@
-import { HEADING_REGEX } from '../orgPatterns';
+import { HEADING_REGEX, findPriorityCookie } from '../orgPatterns';
 import { TIMESTAMP_REGEX, isPairedBracket } from './timestampParts';
 
 /**
@@ -145,7 +145,34 @@ function collectHeadingSpans(lineText: string, spans: HighlightSpan[]): void {
             // the pattern already vouched for.
             spans.push({ kind: kind, start: prioritySpan[0] - 2, end: prioritySpan[1] + 1 });
         }
+        return;
     }
+
+    pushLateCookie(lineText, match, spans);
+}
+
+/**
+ * A cookie the user typed away from the front of the heading.
+ *
+ * `HEADING_REGEX` leaves such a cookie inside `title`, following the extractor,
+ * which reads it for the priority and shows the heading as written. Painting
+ * only the canonical position would colour the same priority on one line and
+ * not on the next.
+ */
+function pushLateCookie(lineText: string, match: RegExpExecArray, spans: HighlightSpan[]): void {
+    const titleSpan = groupSpan(match, 'title');
+    if (!titleSpan) {
+        return;
+    }
+
+    const cookie = findPriorityCookie(lineText.slice(titleSpan[0], titleSpan[1]));
+    const kind = cookie && PRIORITY_KINDS[cookie.value];
+    if (!cookie || !kind) {
+        return;
+    }
+
+    // Offsets are relative to the title; the framing is already inside them.
+    spans.push({ kind: kind, start: titleSpan[0] + cookie.start, end: titleSpan[0] + cookie.end });
 }
 
 function collectPlanningSpans(lineText: string, spans: HighlightSpan[]): void {
