@@ -110,8 +110,10 @@ connect / select / sync demos and [ADR-0010](docs/adr/0010-google-calendar-sync.
 
 ## Quick Start
 
-The extension bundles a prebuilt `markdown-org-extract` binary inside
-the VSIX, so there is nothing to install separately. Pick the install
+Requires VS Code 1.101 or newer (see
+[ADR-0018](docs/adr/0018-minimum-host-follows-the-git-api.md)). The
+extension bundles a prebuilt `markdown-org-extract` binary inside the
+VSIX, so there is nothing to install separately. Pick the install
 channel that matches your editor:
 
 - **VSCodium / Cursor / Gitpod / code-server (Open VSX registry):**

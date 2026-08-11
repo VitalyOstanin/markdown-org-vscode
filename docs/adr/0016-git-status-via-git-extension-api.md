@@ -10,7 +10,9 @@
 
 ## Status
 
-Accepted.
+Accepted. Amended by [ADR-0018](0018-minimum-host-follows-the-git-api.md) (2026-08-11): the
+chain below is unchanged, but step 3 requires a host of 1.101 or newer,
+which the manifest now declares.
 
 ## Context
 

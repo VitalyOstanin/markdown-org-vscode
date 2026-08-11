@@ -8,6 +8,11 @@
  * somewhere in `src/utils/git/`, and anything missing is a member we decided
  * not to depend on.
  *
+ * Because the declaration is ours, the compiler cannot tell whether the host
+ * actually has a member: adding one here is a claim about the minimum version
+ * in `engines.vscode`, which moves to the release that introduced it
+ * (ADR-0018). `getRepositoryRoot` is why that minimum is 1.101.
+ *
  * Behaviour worth knowing, verified against the shipped extension rather than
  * assumed:
  *

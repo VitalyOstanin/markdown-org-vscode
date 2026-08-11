@@ -83,6 +83,18 @@ Ctrl+A` and Promote to Maintain is `Ctrl+K Ctrl+K Ctrl+P`. On macOS every one
   every render. The answer is now kept per directory, negative answers
   included, and dropped when a repository is opened or closed.
 
+- The extension now requires VS Code 1.101 or newer. It has been calling
+  `getRepositoryRoot` on the built-in Git extension's API since the git status
+  chip was written, and that member arrived in 1.101 -- on 1.85 to 1.100 the
+  call landed on `undefined`, the error was swallowed by the chain's own
+  handler, and the chip quietly went missing for notes reached through a
+  symlink, which is the arrangement it exists for. Neither the compiler nor the
+  test suite could see it: the API is reached through a declaration of our own,
+  and the integration run downloads the current stable rather than the declared
+  minimum. Both marketplaces keep serving older hosts the last version that
+  supported them. The rule behind the choice is written down in
+  [ADR-0018](docs/adr/0018-minimum-host-follows-the-git-api.md).
+
 - The overdue backlog of a day is four panels instead of one: a missed repeat,
   what slipped within the week, what slipped earlier this year, and what is
   older than a year -- in that order, most actionable first. What a slipped
