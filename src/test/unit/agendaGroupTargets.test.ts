@@ -94,4 +94,21 @@ suite('agendaGroupTargets.groupTargets', () => {
     test('an empty payload yields nothing', () => {
         assert.deepStrictEqual(groupTargets([], 'overdue-recent', LABELS), []);
     });
+
+    test('a row of a hidden directory is not a target, because it is not on screen', () => {
+        const data = day([
+            task({ root: '/a', file: '/a/inbox.md', line: 3, heading: 'Shown' }),
+            task({ root: '/b', file: '/b/inbox.md', line: 4, heading: 'Hidden by its chip' })
+        ]);
+
+        assert.deepStrictEqual(
+            groupTargets(data, 'overdue-recent', LABELS, ['/b']).map((t) => t.heading),
+            ['Shown']
+        );
+        assert.deepStrictEqual(
+            groupTargets(data, 'overdue-recent', LABELS, []).map((t) => t.heading),
+            ['Shown', 'Hidden by its chip'],
+            'with every chip on, the band is whole'
+        );
+    });
 });

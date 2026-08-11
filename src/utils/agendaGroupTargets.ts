@@ -9,6 +9,7 @@
  * exactly the band on screen, with no second definition to keep in step.
  */
 import type { AgendaData, DayAgenda, Task, TaskWithOffset } from '../types';
+import { hideCollections } from './agendaCollectionFilter';
 import { buildDaySections } from './agendaDaySummary';
 import type { DaySectionLabels } from './agendaDaySummary';
 import type { BulkAction, BulkTarget } from './bulkGroupEdit';
@@ -27,9 +28,20 @@ export function asBulkAction(value: string | undefined): BulkAction | undefined 
  * key no section carries both yield nothing: the menu is only rendered on the
  * day card's overdue bands, so anything else is a message that should not have
  * arrived.
+ *
+ * `hidden` names the roots whose chips are off. The state lives in the page, so
+ * it travels with the message: the band is rebuilt from the payload the view was
+ * built from, and that payload is the whole scan. Without narrowing it first,
+ * the edit would reach rows of a directory the reader had switched off -- files
+ * that were never on the screen the menu was opened from.
  */
-export function groupTargets(data: AgendaData, sectionKey: string, labels: DaySectionLabels): BulkTarget[] {
-    const day = firstDay(data);
+export function groupTargets(
+    data: AgendaData,
+    sectionKey: string,
+    labels: DaySectionLabels,
+    hidden: readonly string[] = []
+): BulkTarget[] {
+    const day = firstDay(hideCollections(data, hidden));
     if (!day) {
         return [];
     }

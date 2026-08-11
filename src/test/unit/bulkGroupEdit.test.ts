@@ -199,6 +199,23 @@ suite('planGroupEdit: what it refuses', () => {
         assert.deepStrictEqual(plan.lines, ['## CANCELLED Pay the bill :money:']);
     });
 
+    test('a heading whose cookie is not at the front still matches', () => {
+        // The agenda's heading comes from the extractor, which reads the cookie
+        // for the priority and leaves it in the text (its ADR-0027). The target
+        // therefore carries the cookie, and so must the line this matches
+        // against -- the two used to disagree here and every group action on
+        // such a task was refused as "moved".
+        const plan = planGroupEdit({
+            lines: ['## TODO Buy [#A] filter'],
+            targets: [target(1, 'Buy [#A] filter')],
+            action: 'cancel',
+            today: TODAY
+        });
+
+        assert.strictEqual(plan.applied, 1);
+        assert.deepStrictEqual(plan.lines, ['## CANCELLED Buy [#A] filter']);
+    });
+
     test('an entry the action finds no date on', () => {
         const plan = planGroupEdit({
             lines: ['## TODO Pay the bill', 'body'],

@@ -142,6 +142,15 @@ Ctrl+A` and Promote to Maintain is `Ctrl+K Ctrl+K Ctrl+P`. On macOS every one
   credentials, and it goes straight to the caller. A 5xx from the token
   endpoint, and every other network fault, is retried exactly as before.
 
+- **Fixed.** An action on a whole overdue band no longer reaches notes of a
+  directory whose chip is off. The band was rebuilt on the extension side from
+  the payload the view was built from -- the whole scan -- while the chips are
+  answered in the page, so a reader who switched a directory off, saw three
+  rows and pressed "move to today" had every row of the band rewritten,
+  including the ones that were not on the screen. The chips that are off now
+  travel with the message and narrow the band before it is turned into files,
+  so the rows edited are exactly the rows shown.
+
 ## [0.14.0] - 2026-08-09
 
 Four things this release is about: a Tasks view that says which day each of its

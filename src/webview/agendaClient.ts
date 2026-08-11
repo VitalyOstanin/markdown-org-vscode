@@ -1275,7 +1275,16 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             const section = item.closest('.group-menu')?.getAttribute('data-section');
             const action = item.getAttribute('data-action');
             if (section && action) {
-                vscode.postMessage({ command: 'groupAction', section: section, action: action });
+                // The chips that are off travel with the message. The host
+                // rebuilds the band from the payload the view was built from,
+                // and that payload is the whole scan -- without this it would
+                // reach rows of a directory that is not on this screen.
+                vscode.postMessage({
+                    command: 'groupAction',
+                    section: section,
+                    action: action,
+                    hidden: [...hiddenCollections]
+                });
             }
             return true;
         }

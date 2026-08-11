@@ -129,6 +129,12 @@ interface AgendaWebviewMessage {
     /** `groupAction`: the day-card section key, and what to do to its tasks. */
     section?: string;
     action?: string;
+    /**
+     * `groupAction`: the roots whose chips are off. The state lives in the page
+     * (turning one back on must not cost a scan), so the band the host rebuilds
+     * is narrowed by what the page reports here.
+     */
+    hidden?: unknown;
     /** Set on `renderError`: what the page failed at. */
     message?: string;
 }
@@ -915,7 +921,7 @@ export class AgendaPanel {
             // prompt) and no event is coming.
             AgendaPanel.requestGitStatus();
         } else if (message.command === 'groupAction') {
-            await AgendaPanel.handleGroupAction(message.section, message.action);
+            await AgendaPanel.handleGroupAction(message.section, message.action, message.hidden);
         }
     }
 
@@ -927,15 +933,26 @@ export class AgendaPanel {
      * side that writes the files. The band is rebuilt rather than remembered
      * because the same payload and the same rule produce the same grouping the
      * user is looking at.
+     *
+     * `hidden` is the one part of the view the payload does not carry: the
+     * directory chips are answered in the page, so the roots that are off come
+     * with the message and narrow the band before it is turned into files.
      */
-    private static async handleGroupAction(section: string | undefined, action: string | undefined): Promise<void> {
+    private static async handleGroupAction(
+        section: string | undefined,
+        action: string | undefined,
+        hidden: unknown
+    ): Promise<void> {
         const args = AgendaPanel.lastRenderArgs;
         const bulkAction = asBulkAction(action);
         if (!args || !section || !bulkAction) {
             return;
         }
+        const hiddenRoots = Array.isArray(hidden)
+            ? hidden.filter((root): root is string => typeof root === 'string')
+            : [];
         const { language, strings } = AgendaPanel.uiStrings();
-        const targets = groupTargets(args.data, section, strings.sections);
+        const targets = groupTargets(args.data, section, strings.sections, hiddenRoots);
         if (targets.length === 0) {
             return;
         }
