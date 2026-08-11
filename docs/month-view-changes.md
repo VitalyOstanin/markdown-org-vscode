@@ -85,7 +85,7 @@ function isHoliday(date) {
 
 ## Использование
 
-1. Откройте Agenda Month: `Ctrl+K Ctrl+M` либо `Ctrl+Shift+P` → «Markdown Org: Show Agenda (Month)»
+1. Откройте Agenda Month: `Ctrl+K Ctrl+K Ctrl+M` либо `Ctrl+Shift+P` → «Markdown Org: Show Agenda (Month)»
 2. Кликните на любой день, чтобы открыть его в режиме дня
 3. Переходите между месяцами кнопками Prev / Today / Next в верхней панели;
    `Alt+Shift+-` и `Alt+Shift+=` возвращают по истории просмотренных видов

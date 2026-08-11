@@ -62,6 +62,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The four view commands share one chord scheme, and four bindings moved.**
+  Day and Tasks sat on `Ctrl+K Ctrl+K Ctrl+<letter>` while Week and Month were
+  two steps (`Ctrl+K Ctrl+W`, `Ctrl+K Ctrl+M`), so knowing one of them said
+  nothing about the others -- and the two short chords shadowed VS Code's
+  `Close All Editors` and `Toggle Maximize Editor Group` in every Markdown file
+  and in the agenda. All four views are now `Ctrl+K Ctrl+K Ctrl+<letter>`: Day
+  `Y`, Week `W`, Month `M`, Tasks `L`. The letter `M` was held by the two
+  heading-move commands, the only four-step chords in the extension, and they
+  move up to the same three-step scheme: Move to Archive is `Ctrl+K Ctrl+K
+Ctrl+A` and Promote to Maintain is `Ctrl+K Ctrl+K Ctrl+P`. On macOS every one
+  of them uses `Cmd` as before. If you had learnt the old chords, rebind them
+  in **Keyboard Shortcuts**; nothing else about the commands changed.
+
 - The overdue backlog of a day is four panels instead of one: a missed repeat,
   what slipped within the week, what slipped earlier this year, and what is
   older than a year -- in that order, most actionable first. What a slipped

@@ -479,7 +479,7 @@ export class AgendaPanel {
         );
 
         // Drives the `markdown-org.agendaFocused` when-clause so show/cycle
-        // keybindings (Ctrl+K Ctrl+W, Ctrl+K Ctrl+M, cycleTag) keep working
+        // keybindings (Ctrl+K Ctrl+K Ctrl+W, Ctrl+K Ctrl+K Ctrl+M, cycleTag) keep working
         // when the user is inside the agenda webview and no markdown editor
         // is focused.
         AgendaPanel.setAgendaFocusedContext(true);

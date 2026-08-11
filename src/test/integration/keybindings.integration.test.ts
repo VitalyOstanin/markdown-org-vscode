@@ -132,6 +132,37 @@ suite('Keybindings: package.json contract', () => {
         assert.strictEqual(table.key, 'ctrl+k ctrl+c ctrl+v');
     });
 
+    test('the four view commands share one chord scheme: Ctrl+K Ctrl+K Ctrl+<letter>', () => {
+        // README calls them "All four view commands" and they carry the same
+        // category and the same when-clause, so a reader who has learnt one of
+        // them expects to derive the others. While Week and Month sat on a
+        // two-step chord that was not derivable: knowing Week was Ctrl+K
+        // Ctrl+W said nothing about how to open Day.
+        const views = {
+            'markdown-org.showAgendaDay': 'ctrl+k ctrl+k ctrl+y',
+            'markdown-org.showAgendaWeek': 'ctrl+k ctrl+k ctrl+w',
+            'markdown-org.showAgendaMonth': 'ctrl+k ctrl+k ctrl+m',
+            'markdown-org.showTasks': 'ctrl+k ctrl+k ctrl+l'
+        };
+        for (const [command, key] of Object.entries(views)) {
+            const binding = findKeybinding(pkg, command);
+            assert.ok(binding, `${command} keybinding must exist`);
+            assert.strictEqual(binding.key, key, `${command} is off the view scheme`);
+        }
+    });
+
+    test('the heading-move commands use the same 3-chord scheme as everything else', () => {
+        // They used to be the only 4-chord bindings in the extension, under
+        // Ctrl+K Ctrl+K Ctrl+M -- which is also the letter the Month view
+        // wants, and a binding may not be the prefix of a longer chord.
+        const archive = findKeybinding(pkg, 'markdown-org.moveToArchive');
+        const promote = findKeybinding(pkg, 'markdown-org.promoteToMaintain');
+
+        assert.ok(archive && promote, 'both heading-move keybindings must exist');
+        assert.strictEqual(archive.key, 'ctrl+k ctrl+k ctrl+a');
+        assert.strictEqual(promote.key, 'ctrl+k ctrl+k ctrl+p');
+    });
+
     test('insertCreated stays on Ctrl+K Ctrl+K Ctrl+C (no longer a CLOCK prefix) (#9)', () => {
         const created = findKeybinding(pkg, 'markdown-org.insertCreated');
         assert.ok(created);

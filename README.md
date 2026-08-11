@@ -382,8 +382,8 @@ for `Set TODO` (the `Shift+Up`/`Shift+Down` bindings are unchanged).
 | Command                                    | Hotkey                 | Description                                              |
 | ------------------------------------------ | ---------------------- | -------------------------------------------------------- |
 | `Markdown Org: Show Agenda (Day)`          | `Ctrl+K Ctrl+K Ctrl+Y` | Show today's tasks                                       |
-| `Markdown Org: Show Agenda (Week)`         | `Ctrl+K Ctrl+W`        | Show this week's tasks                                   |
-| `Markdown Org: Show Agenda (Month)`        | `Ctrl+K Ctrl+M`        | Show this month's tasks                                  |
+| `Markdown Org: Show Agenda (Week)`         | `Ctrl+K Ctrl+K Ctrl+W` | Show this week's tasks                                   |
+| `Markdown Org: Show Agenda (Month)`        | `Ctrl+K Ctrl+K Ctrl+M` | Show this month's tasks                                  |
 | `Markdown Org: Show Tasks`                 | `Ctrl+K Ctrl+K Ctrl+L` | Show all TODO tasks grouped by priority                  |
 | `Markdown Org: Go Back in Agenda`          | `Alt+Shift+-`          | Return to the previously shown agenda view               |
 | `Markdown Org: Go Forward in Agenda`       | `Alt+Shift+=`          | Step forward again after going back                      |
@@ -450,12 +450,10 @@ table, nowhere else: in any other editor the default command keeps working. Rebi
 | `Ctrl+K Ctrl+X`        | Set CANCELLED                    | Trim Trailing Whitespace               |
 | `Ctrl+K Ctrl+P`        | Toggle Priority                  | Show All Editors By Appearance         |
 | `Ctrl+K Ctrl+C Ctrl+…` | Insert CLOCK Start/Finish/Table  | Add Line Comment (`Ctrl+K Ctrl+C`)     |
-| `Ctrl+K Ctrl+W`        | Show Agenda (Week)               | Close All Editors                      |
-| `Ctrl+K Ctrl+M`        | Show Agenda (Month)              | Toggle Maximize Editor Group           |
 | `Ctrl+K Ctrl+K Ctrl+…` | Timestamps, views, headings, tag | Select from Anchor to Cursor           |
 
-Two of these are easy to misread. `Copy Path of Active File` is `Ctrl+K P` (no second `Ctrl`) and
-`Change Language Mode` is `Ctrl+K M`, so neither is affected.
+One of these is easy to misread: `Copy Path of Active File` is `Ctrl+K P`, without the second
+`Ctrl`, which is a different chord from `Ctrl+K Ctrl+P` and is not affected.
 
 The CLOCK and `Ctrl+K Ctrl+K` entries differ from the rest: both are prefixes here, so in a
 Markdown file the editor waits for the next chord instead of running the default command.
@@ -466,10 +464,10 @@ deliberate -- the tag filter applies to the agenda, which is not tied to the fil
 
 ### Heading Management Commands
 
-| Command                             | Hotkey                        | Description                                                                  |
-| ----------------------------------- | ----------------------------- | ---------------------------------------------------------------------------- |
-| `Markdown Org: Move to Archive`     | `Ctrl+K Ctrl+K Ctrl+M Ctrl+A` | Move current heading into the file's `*.archive.md`                          |
-| `Markdown Org: Promote to Maintain` | `Ctrl+K Ctrl+K Ctrl+M Ctrl+P` | Move heading to the maintain file (requires `markdown-org.maintainFilePath`) |
+| Command                             | Hotkey                 | Description                                                                  |
+| ----------------------------------- | ---------------------- | ---------------------------------------------------------------------------- |
+| `Markdown Org: Move to Archive`     | `Ctrl+K Ctrl+K Ctrl+A` | Move current heading into the file's `*.archive.md`                          |
+| `Markdown Org: Promote to Maintain` | `Ctrl+K Ctrl+K Ctrl+P` | Move heading to the maintain file (requires `markdown-org.maintainFilePath`) |
 
 #### Migrating into a maintain file with **Promote to Maintain**
 
