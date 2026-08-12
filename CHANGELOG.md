@@ -80,6 +80,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   overdue is still decided against the day being lived through. Group actions
   stay in the Day view -- a band there is a day's band, and one in a week is
   seven of them.
+- **The band of untimed work says what it holds, in Russian.** The heading read
+  «Без времени и предстоящие», which a reader parses as one negation carried
+  over both halves -- neither timed nor upcoming -- while the band holds the
+  opposite: today's tasks with no hour of their own, and what is coming within
+  the window ahead. It now reads «Весь день и предстоящие», the wording a
+  calendar uses for an entry that belongs to a day rather than to an hour. The
+  English heading, `All-day & upcoming`, already said this and is unchanged.
 - **The month grid says what a day's overdue count is made of.** The red chip
   in a cell counted the missed entries and no more, so six repeats missed this
   week and six dates left in 2021 read alike. Its tooltip now names the bands

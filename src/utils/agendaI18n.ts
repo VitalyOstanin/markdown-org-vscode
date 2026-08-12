@@ -338,7 +338,7 @@ const RU: AgendaStrings = {
     headerModes: { auto: 'Авто', full: 'Полная', compact: 'Компактная' },
     sections: {
         scheduled: 'Запланировано на сегодня',
-        allday: 'Без времени и предстоящие',
+        allday: 'Весь день и предстоящие',
         overdueRepeat: 'Пропущенные повторы',
         overdueRecent: 'Просрочено на этой неделе',
         overdueEarlier: 'Просрочено раньше',

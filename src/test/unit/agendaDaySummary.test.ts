@@ -170,7 +170,7 @@ suite('buildDaySections', () => {
         const titles = buildDaySections(d, AGENDA_STRINGS.ru.sections).map((s) => s.title);
         assert.deepStrictEqual(titles, [
             'Запланировано на сегодня',
-            'Без времени и предстоящие',
+            'Весь день и предстоящие',
             'Просрочено на этой неделе'
         ]);
     });
