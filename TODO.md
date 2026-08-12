@@ -256,6 +256,23 @@
 
 ## Configuration
 
+- [ ] Make "long ago" a setting rather than a constant
+    - The overdue backlog is split at two fixed distances: a week
+      (`OVERDUE_RECENT_DAYS = 7`) separates this week's slippage from the rest,
+      and a year (`OVERDUE_LONG_AGO_DAYS = 365`) separates the rest from what is
+      long gone (`src/utils/agendaDaySummary.ts`). Neither is configurable, and
+      neither number is right for everyone: a plan reviewed weekly wants the
+      last band to start at a month, while a personal backlog kept for years
+      wants it much later than a year.
+    - What a setting has to decide, before the number: whether it is one
+      threshold or both, whether the bands can be turned off individually, and
+      what happens to a band whose name stops matching its span -- "Overdue
+      earlier this year" reads wrong once the boundary is three months.
+    - The split is drawn identically by the sibling client of the ecosystem, and
+      the bands are how a whole backlog is acted on at once, so a threshold that
+      differs between the two would mean the same task sits in a different band
+      depending on where it is read. Decide the shape here and there together.
+
 - [x] Remove hardcoded path from package.json default settings
     - Changed extractorPath default to `markdown-org-extract` (searches in PATH)
     - Changed maintainFilePath default to empty string (disabled)
