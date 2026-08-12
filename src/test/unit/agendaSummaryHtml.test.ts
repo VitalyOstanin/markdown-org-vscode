@@ -2,6 +2,7 @@ import * as assert from 'node:assert';
 import { suite, test } from 'mocha';
 import {
     countLabel,
+    renderBandHeading,
     renderDayHeaderHtml,
     renderSectionPanel,
     renderSummaryBar,
@@ -116,6 +117,45 @@ suite('agendaSummaryHtml.renderSectionPanel', () => {
     test('puts the head actions after the count chip, inside the head', () => {
         const html = renderSectionPanel('overdue-recent', 'Overdue', 1, '', ctx, '<button class="group-menu-btn" />');
         assert.match(html, /<span class="day-section-count"[^>]*>1<\/span><button class="group-menu-btn" \/><\/div>/);
+    });
+});
+
+suite('agendaSummaryHtml.renderBandHeading', () => {
+    const ctx = { ...base, inSectionTemplate: '{0} in this section', taskForms: ['task', 'tasks'] };
+
+    test('renders the head alone, with no panel and no body around it', () => {
+        const html = renderBandHeading('overdue-recent', 'Overdue this week', 3, ctx);
+        assert.strictEqual(
+            html,
+            '<div class="day-band day-section-overdue-recent day-section-head">' +
+                '<span class="day-section-name">Overdue this week</span>' +
+                '<span class="day-section-count" title="3 tasks in this section">3</span>' +
+                '</div>'
+        );
+    });
+
+    test('leaves the rows outside itself, which is what the clipping chips count', () => {
+        // The week's chips walk the siblings of a day header and count
+        // `.task-line` among them (agendaClipMarkers). A band that wrapped its
+        // rows would hide them from that walk, so the heading must be a leaf.
+        const html = renderBandHeading('overdue-long', 'Overdue long ago', 1, ctx);
+        assert.ok(!html.includes('day-section-body'), `expected no body element, got: ${html}`);
+        assert.ok(!html.includes('<section'), `expected no section wrapper, got: ${html}`);
+    });
+
+    test('escapes the band title', () => {
+        assert.match(renderBandHeading('x', '<script>', 0, ctx), /&lt;script&gt;/);
+    });
+
+    test('the chip and its tooltip use the same digits', () => {
+        const html = renderBandHeading('overdue-repeat', 'Missed repeats', 3, { ...ctx, locale: 'ar-EG' });
+        assert.match(html, /<span class="day-section-count" title="«3» tasks in this section">«3»<\/span>/, html);
+    });
+
+    test('carries the same band class the panel uses, so both views tint alike', () => {
+        // The red name and chip come from `.day-section-overdue-*`; a band that
+        // named its class differently would read as an ordinary heading.
+        assert.match(renderBandHeading('overdue-repeat', 'Missed repeats', 2, ctx), /class="day-band day-sect/);
     });
 });
 

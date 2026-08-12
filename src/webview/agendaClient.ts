@@ -390,6 +390,22 @@ export interface AgendaClientDeps {
         },
         actionsHtml: string
     ) => string;
+    /** The same head without a panel, for the flat week view. */
+    renderBandHeading: (
+        key: string,
+        title: string,
+        count: number,
+        ctx: {
+            locale: string;
+            uiLang: string;
+            inSectionTemplate: string;
+            taskForms: string[];
+            escapeHtml: (text: string | number | boolean | undefined | null) => string;
+            formatString: (template: string, ...values: string[]) => string;
+            formatNumber: (value: number, locale: string) => string;
+            pluralIndex: (n: number, lang: string) => number;
+        }
+    ) => string;
     renderGroupMenu: (
         sectionKey: string,
         sectionTitle: string,
@@ -690,6 +706,7 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         summaryStat: summaryStatHtml,
         renderSummaryBar: renderSummaryBarHtml,
         renderSectionPanel: renderSectionPanelHtml,
+        renderBandHeading: renderBandHeadingHtml,
         renderGroupMenu: renderGroupMenuHtml,
         renderDayHeaderHtml,
         renderModeSwitch,
@@ -1407,10 +1424,25 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
                     renderDayClipHtml() +
                     '</div>'
             );
-            (day.overdue ?? []).forEach((task) => parts.push(renderTask(task, task.days_offset, 'overdue')));
-            (day.scheduled_timed ?? []).forEach((task) => parts.push(renderTask(task, task.days_offset)));
-            (day.scheduled_no_time ?? []).forEach((task) => parts.push(renderTask(task, task.days_offset)));
-            (day.upcoming ?? []).forEach((task) => parts.push(renderTask(task, task.days_offset, 'upcoming')));
+            // The same sections the day view stacks, in the same order: what is
+            // set for an hour, then what has no hour of its own, then the
+            // overdue bands at the bottom. A week read one way and a day read
+            // another is the same plan told twice.
+            buildDaySections(day, UI.sections).forEach((sec) => {
+                // Every band announces itself except the first: its title
+                // ("Scheduled today") names today, which holds for one of the
+                // seven days here, and the day header above already says which
+                // day the rows belong to. On `flat` none of them do, and the
+                // day is the run of rows under its own header.
+                if (sec.key !== 'scheduled' && grouping !== 'flat') {
+                    parts.push(renderBand(sec.key, sec.title, sec.items.length));
+                }
+                sec.items.forEach((it) => {
+                    const taskType =
+                        it.kind === 'overdue' ? 'overdue' : it.kind === 'upcoming' ? 'upcoming' : undefined;
+                    parts.push(renderTask(it.task, it.task.days_offset, taskType));
+                });
+            });
         });
         return parts.join('');
     }
@@ -1507,6 +1539,20 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             },
             actionsHtml
         );
+    }
+
+    /** A band's head in the week view; the panel's own head, without the panel. */
+    function renderBand(key: string, title: string, count: number): string {
+        return renderBandHeadingHtml(key, title, count, {
+            locale,
+            uiLang,
+            inSectionTemplate: UI.countChip.inSection,
+            taskForms: UI.countChip.tasks,
+            escapeHtml,
+            formatString,
+            formatNumber,
+            pluralIndex
+        });
     }
 
     function renderGroupMenu(sectionKey: string, sectionTitle: string): string {

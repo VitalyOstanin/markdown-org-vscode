@@ -70,6 +70,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **The week view groups each day the way the day view does.** A day used to
+  read as four buckets run together, with everything overdue in one heap at the
+  top; it now carries the same sections the Day view stacks -- what is set for
+  an hour, then what has no hour of its own, then the overdue backlog split
+  into its four bands (missed repeats, this week's slippage, earlier this year,
+  long ago), each with its name and its count. The order matches the Day view
+  and the Android client: today's work first, the backlog underneath. What is
+  overdue is still decided against the day being lived through. Group actions
+  stay in the Day view -- a band there is a day's band, and one in a week is
+  seven of them.
 - **The four view commands share one chord scheme, and four bindings moved.**
   Day and Tasks sat on `Ctrl+K Ctrl+K Ctrl+<letter>` while Week and Month were
   two steps (`Ctrl+K Ctrl+W`, `Ctrl+K Ctrl+M`), so knowing one of them said

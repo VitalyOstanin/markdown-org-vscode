@@ -117,6 +117,44 @@ export function renderSectionPanel(
     );
 }
 
+/**
+ * One band heading for the week view: the section's name and its count, with no
+ * panel around it.
+ *
+ * The week renders as a flat sequence -- a day header, then that day's rows as
+ * its siblings -- and the clipping chips count those rows by walking the
+ * siblings (see agendaClipMarkers). A `<section>` wrapper would take the rows
+ * out of that walk and leave the chips reporting less than the day holds, so
+ * the band announces itself with a heading and leaves the rows where they are.
+ *
+ * The classes are the panel's own, so a band reads the same in both views: the
+ * head's layout, and the red name and chip that `day-section-overdue-*` tints.
+ */
+export function renderBandHeading(
+    key: string,
+    title: string,
+    count: number,
+    ctx: {
+        locale: string;
+        uiLang: string;
+        inSectionTemplate: string;
+        taskForms: string[];
+        escapeHtml: EscapeHtml;
+        formatString: FormatString;
+        formatNumber: FormatNumber;
+        pluralIndex: PluralIndex;
+    }
+): string {
+    const chipTitle = ctx.escapeHtml(ctx.formatString(ctx.inSectionTemplate, countLabel(count, ctx.taskForms, ctx)));
+    const chipCount = ctx.escapeHtml(ctx.formatNumber(count, ctx.locale));
+    return (
+        `<div class="day-band day-section-${key} day-section-head">` +
+        `<span class="day-section-name">${ctx.escapeHtml(title)}</span>` +
+        `<span class="day-section-count" title="${chipTitle}">${chipCount}</span>` +
+        '</div>'
+    );
+}
+
 /** The three-part day header: weekday, day number, month and year. */
 export function renderDayHeaderHtml(parts: DayHeaderPartsLike): string {
     return (

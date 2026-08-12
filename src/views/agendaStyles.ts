@@ -897,6 +897,14 @@ export const AGENDA_STYLES = `
             padding: var(--space-3) 0 var(--space-1) 0;
             border-bottom: 1px solid var(--vscode-panel-border);
         }
+        /* Week view: a band head standing on its own, with its rows as the
+           siblings that follow it rather than as children of a panel (see
+           renderBandHeading). It carries .day-section-head for the layout and
+           the rule below only for the room around it -- inside a card the
+           panel's own margin does that job. */
+        .day-band {
+            margin-top: var(--space-3);
+        }
         .day-section-name {
             font-weight: bold;
             font-size: var(--font-sm);

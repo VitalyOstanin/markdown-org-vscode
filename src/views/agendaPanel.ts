@@ -20,6 +20,7 @@ import { resolveDateLocale } from '../utils/dateLocale';
 import { formatDayHeaderParts } from '../utils/agendaDayHeader';
 import {
     countLabel,
+    renderBandHeading,
     renderDayHeaderHtml,
     renderSectionPanel,
     renderSummaryBar,
@@ -1289,6 +1290,7 @@ export class AgendaPanel {
         summaryStat,
         renderSummaryBar,
         renderSectionPanel,
+        renderBandHeading,
         renderGroupMenu,
         renderDayHeaderHtml,
         renderModeSwitch,
