@@ -9,6 +9,7 @@ import {
 } from '../../utils/agendaCalendarHtml';
 import { buildMonthGrid } from '../../utils/agendaMonthCells';
 import type { MonthDayIndex } from '../../utils/agendaMonthCells';
+import type { OverdueBandIndex } from '../../utils/agendaDaySummary';
 import { countLabel } from '../../utils/agendaSummaryHtml';
 import { AGENDA_STRINGS, formatString, pluralIndex } from '../../utils/agendaI18n';
 import { formatNumber } from '../../utils/formatNumber';
@@ -21,7 +22,7 @@ function parse(html: string): Document {
 }
 
 /** The real helpers, so the assertions describe what the page actually renders. */
-function ctxFor(index: MonthDayIndex, holidays: string[] = [], locale = 'en-US') {
+function ctxFor(index: MonthDayIndex, holidays: string[] = [], locale = 'en-US', bands: OverdueBandIndex = {}) {
     return {
         locale,
         uiLang: 'en',
@@ -29,6 +30,7 @@ function ctxFor(index: MonthDayIndex, holidays: string[] = [], locale = 'en-US')
         taskChipForms: EN.countChip.tasks,
         overdueChipTemplate: EN.countChip.overdue,
         index,
+        bands,
         isHoliday: (date: string): boolean => holidays.includes(date),
         escapeHtml,
         formatString,
@@ -116,6 +118,42 @@ suite('agendaCalendarHtml.renderMonthCalendar', () => {
         const chip = doc.querySelector('[data-date="2025-12-09"] .task-count');
         assert.match(chip?.className ?? '', /\btask-count-overdue\b/);
         assert.strictEqual(chip?.getAttribute('title'), '4 tasks, 2 overdue');
+    });
+
+    test('the tooltip spells the overdue count out band by band', () => {
+        // The grid shows a number and no rows, so this is the only place a
+        // reader can tell six missed repeats from six dates left in 2021.
+        const bands = {
+            '2025-12-09': [
+                { title: EN.sections.overdueRepeat, count: 2 },
+                { title: EN.sections.overdueEarlier, count: 4 }
+            ]
+        };
+        const doc = parse(
+            renderMonthCalendar(cells, labels, ctxFor({ '2025-12-09': { total: 8, overdue: 6 } }, [], 'en-US', bands))
+        );
+        assert.strictEqual(
+            doc.querySelector('[data-date="2025-12-09"] .task-count')?.getAttribute('title'),
+            `8 tasks, 6 overdue (${EN.sections.overdueRepeat}: 2, ${EN.sections.overdueEarlier}: 4)`
+        );
+    });
+
+    test('a day with nothing overdue keeps the plain count, bands or not', () => {
+        const bands = { '2025-12-09': [{ title: EN.sections.overdueRepeat, count: 2 }] };
+        const doc = parse(
+            renderMonthCalendar(cells, labels, ctxFor({ '2025-12-09': { total: 3, overdue: 0 } }, [], 'en-US', bands))
+        );
+        assert.strictEqual(doc.querySelector('[data-date="2025-12-09"] .task-count')?.getAttribute('title'), '3 tasks');
+    });
+
+    test('a date the bands say nothing about still states its overdue count', () => {
+        // An older payload, or a date the index skipped: the chip says what it
+        // knows rather than dropping the count it does have.
+        const doc = parse(renderMonthCalendar(cells, labels, ctxFor({ '2025-12-09': { total: 4, overdue: 2 } })));
+        assert.strictEqual(
+            doc.querySelector('[data-date="2025-12-09"] .task-count')?.getAttribute('title'),
+            '4 tasks, 2 overdue'
+        );
     });
 
     test('a single task is counted in the singular', () => {

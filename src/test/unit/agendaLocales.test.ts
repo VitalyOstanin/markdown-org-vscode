@@ -14,6 +14,7 @@ import {
 import { buildWeekdayLabels, renderMonthCalendar } from '../../utils/agendaCalendarHtml';
 import { buildMonthGrid } from '../../utils/agendaMonthCells';
 import type { MonthDayIndex } from '../../utils/agendaMonthCells';
+import type { OverdueBandIndex } from '../../utils/agendaDaySummary';
 import { countClippedRows, renderDayClipHtml, updateDayClipMarkers } from '../../utils/agendaClipMarkers';
 import { escapeHtml } from '../../utils/agendaEscapeHtml';
 import { formatNumber } from '../../utils/formatNumber';
@@ -117,12 +118,21 @@ suite('agenda counters share one numbering system', () => {
     test('the day screen prints no ASCII digit outside its attributes', () => {
         const panelCtx = { ...base, inSectionTemplate: EN.countChip.inSection, taskForms: EN.countChip.tasks };
         const index: MonthDayIndex = { [iso]: { total: 12, overdue: 3 } };
+        // The chip's tooltip spells the overdue count out band by band, and
+        // those counts are numbers on the screen like any other.
+        const bands: OverdueBandIndex = {
+            [iso]: [
+                { title: EN.sections.overdueRepeat, count: 1 },
+                { title: EN.sections.overdueRecent, count: 2 }
+            ]
+        };
         const calendarCtx = {
             ...base,
             openDayView: EN.openDayView,
             taskChipForms: EN.countChip.tasks,
             overdueChipTemplate: EN.countChip.overdue,
             index,
+            bands,
             isHoliday: (): boolean => false,
             countLabel
         };

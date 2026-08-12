@@ -60,6 +60,15 @@ export interface DaySection {
     items: DaySectionItem[];
 }
 
+/** One band's share of a date's overdue backlog, named in the active language. */
+export interface OverdueBandCount {
+    title: string;
+    count: number;
+}
+
+/** Date (`YYYY-MM-DD`) -> its non-empty overdue bands, most-actionable first. */
+export type OverdueBandIndex = Record<string, OverdueBandCount[]>;
+
 /** Panel titles, supplied by the caller (see `AgendaStrings.sections`). */
 export interface DaySectionLabels {
     scheduled: string;
@@ -147,4 +156,34 @@ export function buildDaySections(day: DayAgenda, labels: DaySectionLabels): DayS
         }
     });
     return sections.filter((s) => s.items.length > 0);
+}
+
+/**
+ * The overdue bands of every date in a month payload, as counts.
+ *
+ * The month grid shows a number per day and no rows at all, so the bands
+ * cannot be drawn there the way the day and week views draw them. What it can
+ * carry is the breakdown behind its red chip: whether those six missed entries
+ * are two repeats to redo and four dates from last spring, or six of the same
+ * thing. The split comes from `buildDaySections`, so the grid and the two
+ * views that list the rows can never disagree about which band an entry is in.
+ *
+ * Dates with nothing overdue are omitted, like `buildMonthDayIndex` omits the
+ * empty ones -- a missing key means "nothing to break down".
+ */
+export function buildOverdueBandIndex(days: DayAgenda[], labels: DaySectionLabels): OverdueBandIndex {
+    const index: OverdueBandIndex = {};
+    const list = Array.isArray(days) ? days : [];
+    for (const day of list) {
+        if (!day.date) {
+            continue;
+        }
+        const bands = buildDaySections(day, labels)
+            .filter((section) => section.key.startsWith('overdue-'))
+            .map((section) => ({ title: section.title, count: section.items.length }));
+        if (bands.length > 0) {
+            index[day.date] = bands;
+        }
+    }
+    return index;
 }

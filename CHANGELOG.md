@@ -80,6 +80,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   overdue is still decided against the day being lived through. Group actions
   stay in the Day view -- a band there is a day's band, and one in a week is
   seven of them.
+- **The month grid says what a day's overdue count is made of.** The red chip
+  in a cell counted the missed entries and no more, so six repeats missed this
+  week and six dates left in 2021 read alike. Its tooltip now names the bands
+  behind the number ("8 tasks, 6 overdue (Missed repeats: 2, Overdue earlier:
+  4)"). The grid itself is unchanged -- a cell has room for a number, not for
+  four rows -- and the split is the one the other two views draw, so they
+  cannot disagree about which band an entry is in.
 - **The four view commands share one chord scheme, and four bindings moved.**
   Day and Tasks sat on `Ctrl+K Ctrl+K Ctrl+<letter>` while Week and Month were
   two steps (`Ctrl+K Ctrl+W`, `Ctrl+K Ctrl+M`), so knowing one of them said

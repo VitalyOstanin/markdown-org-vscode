@@ -72,7 +72,7 @@ import { wireDayHeaderNavigation } from '../utils/agendaDayHeaderNav';
 import { attentionTooltip, flagTooltip, priorityTooltip } from '../utils/agendaTooltips';
 import { buildTagCycle } from '../utils/cycleTag';
 import { resolveHeroModel } from '../utils/agendaHero';
-import { computeDaySummary, buildDaySections } from '../utils/agendaDaySummary';
+import { buildDaySections, buildOverdueBandIndex, computeDaySummary } from '../utils/agendaDaySummary';
 import { buildTaskGroups, computeTasksSummary } from '../utils/agendaTaskGroups';
 import { buildMonthDayIndex, buildMonthGrid } from '../utils/agendaMonthCells';
 import type { AgendaHeaderMode } from '../utils/agendaHeaderMode';
@@ -1280,6 +1280,7 @@ export class AgendaPanel {
         computeTasksSummary,
         buildTaskGroups,
         buildMonthDayIndex,
+        buildOverdueBandIndex,
         formatString,
         pluralIndex,
         formatIsoDate,

@@ -13,6 +13,7 @@
  * imports -- a cross-module call compiles to `module_1.fn`, undefined in the
  * page.
  */
+import type { OverdueBandIndex } from './agendaDaySummary';
 import type { MonthCell, MonthDayIndex } from './agendaMonthCells';
 import type { EscapeHtml, FormatNumber, FormatString, PluralIndex } from './agendaSummaryHtml';
 
@@ -91,6 +92,12 @@ export function renderMonthCalendar(
         taskChipForms: string[];
         overdueChipTemplate: string;
         index: MonthDayIndex;
+        /**
+         * Date -> its overdue bands (see `buildOverdueBandIndex`), which the
+         * chip's tooltip spells out. A date missing from it says its overdue
+         * count without a breakdown, which is what an older payload gives.
+         */
+        bands: OverdueBandIndex;
         isHoliday: (date: string) => boolean;
         escapeHtml: EscapeHtml;
         formatString: FormatString;
@@ -132,7 +139,20 @@ export function renderMonthCalendar(
                     counts.overdue > 0
                         ? `, ${ctx.formatString(ctx.overdueChipTemplate, ctx.formatNumber(counts.overdue, ctx.locale))}`
                         : '';
-                const title = ctx.escapeHtml(ctx.countLabel(counts.total, ctx.taskChipForms, ctx) + overdueSuffix);
+                // What that overdue count is made of, named band by band. The
+                // grid has no room for the bands themselves, and "6 overdue"
+                // reads the same whether it is six repeats missed this week or
+                // six dates from three years ago -- which are not the same day.
+                const bands = ctx.bands[cell.date] ?? [];
+                const breakdown =
+                    counts.overdue > 0 && bands.length > 0
+                        ? ` (${bands
+                              .map((band) => `${band.title}: ${ctx.formatNumber(band.count, ctx.locale)}`)
+                              .join(', ')})`
+                        : '';
+                const title = ctx.escapeHtml(
+                    ctx.countLabel(counts.total, ctx.taskChipForms, ctx) + overdueSuffix + breakdown
+                );
                 const overdueClass = counts.overdue > 0 ? ' task-count-overdue' : '';
                 chip =
                     `<div class="task-count${overdueClass}" title="${title}">` +

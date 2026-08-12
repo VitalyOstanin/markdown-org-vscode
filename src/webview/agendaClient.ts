@@ -194,6 +194,14 @@ export interface MonthCellCounts {
 
 export type MonthDayIndex = Record<string, MonthCellCounts>;
 
+/** One band's share of a date's overdue backlog (see `buildOverdueBandIndex`). */
+export interface OverdueBandCount {
+    title: string;
+    count: number;
+}
+
+export type OverdueBandIndex = Record<string, OverdueBandCount[]>;
+
 /** One laid-out cell of the month grid, as `buildMonthGrid` returns them. */
 export interface MonthCellLike {
     date: string;
@@ -330,6 +338,7 @@ export interface AgendaClientDeps {
     computeTasksSummary: (tasks: Task[]) => TasksSummary;
     buildTaskGroups: (tasks: Task[], labels: TaskGroupLabels) => TaskGroup[];
     buildMonthDayIndex: (days: DayAgenda[]) => MonthDayIndex;
+    buildOverdueBandIndex: (days: DayAgenda[], labels: DaySectionLabels) => OverdueBandIndex;
     formatString: (template: string, ...values: string[]) => string;
     pluralIndex: (n: number, lang: string) => number;
     /** Cycle behind the header-layout button: auto -> full -> compact. */
@@ -553,6 +562,7 @@ export interface AgendaClientDeps {
             taskChipForms: string[];
             overdueChipTemplate: string;
             index: MonthDayIndex;
+            bands: OverdueBandIndex;
             isHoliday: (date: string) => boolean;
             escapeHtml: (text: string | number | boolean | undefined | null) => string;
             formatString: (template: string, ...values: string[]) => string;
@@ -696,6 +706,7 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         computeTasksSummary,
         buildTaskGroups,
         buildMonthDayIndex,
+        buildOverdueBandIndex,
         formatString,
         pluralIndex,
         formatIsoDate,
@@ -1734,6 +1745,9 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             overdueChipTemplate: UI.countChip.overdue,
             // date -> { total, overdue }; a missing date means an empty day.
             index: buildMonthDayIndex(days),
+            // date -> what its overdue count is made of, for the chip's
+            // tooltip: the grid has room for the number and not for the bands.
+            bands: buildOverdueBandIndex(days, UI.sections),
             isHoliday,
             escapeHtml,
             formatString,

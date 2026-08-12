@@ -4,6 +4,7 @@ import {
     OVERDUE_LONG_AGO_DAYS,
     OVERDUE_RECENT_DAYS,
     buildDaySections,
+    buildOverdueBandIndex,
     computeDaySummary
 } from '../../utils/agendaDaySummary';
 import { AGENDA_STRINGS } from '../../utils/agendaI18n';
@@ -177,5 +178,49 @@ suite('buildDaySections', () => {
     test('item count matches the source bucket sizes', () => {
         const d = day({ scheduled_timed: [task(), task(), task()] });
         assert.strictEqual(buildDaySections(d, SECTIONS)[0]!.items.length, 3);
+    });
+});
+
+suite('buildOverdueBandIndex', () => {
+    test("counts each date's overdue backlog band by band", () => {
+        const index = buildOverdueBandIndex(
+            [
+                day({
+                    overdue: [
+                        task({ days_offset: -2, timestamp_repeater: '+1d' }),
+                        task({ days_offset: -3 }),
+                        task({ days_offset: -40 }),
+                        task({ days_offset: -40 })
+                    ]
+                })
+            ],
+            SECTIONS
+        );
+        assert.deepStrictEqual(index['2025-12-09'], [
+            { title: SECTIONS.overdueRepeat, count: 1 },
+            { title: SECTIONS.overdueRecent, count: 1 },
+            { title: SECTIONS.overdueEarlier, count: 2 }
+        ]);
+    });
+
+    test('splits the backlog exactly as the day view does', () => {
+        // Same payload through both helpers: the grid's tooltip and the panels
+        // under it must never disagree about which band an entry is in.
+        const d = day({
+            overdue: [task({ days_offset: -OVERDUE_RECENT_DAYS }), task({ days_offset: -OVERDUE_LONG_AGO_DAYS - 1 })]
+        });
+        const fromSections = buildDaySections(d, SECTIONS)
+            .filter((section) => section.key.startsWith('overdue-'))
+            .map((section) => ({ title: section.title, count: section.items.length }));
+        assert.deepStrictEqual(buildOverdueBandIndex([d], SECTIONS)['2025-12-09'], fromSections);
+    });
+
+    test('a date with nothing overdue is left out entirely', () => {
+        const index = buildOverdueBandIndex([day({ scheduled_timed: [task()] })], SECTIONS);
+        assert.deepStrictEqual(index, {});
+    });
+
+    test('a payload that is not an array renders as empty rather than throwing', () => {
+        assert.deepStrictEqual(buildOverdueBandIndex(undefined as unknown as DayAgenda[], SECTIONS), {});
     });
 });
