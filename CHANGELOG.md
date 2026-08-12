@@ -65,8 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the rule marking a repeating task DONE already follows. Every file is
   rewritten once, entries whose heading has moved since the agenda was built are
   left alone and named in the log, and the notice that reports the move offers to
-  put it back -- an undo that skips any note changed in the meantime. The same
-  three actions as the Android client's.
+  put it back -- an undo that skips any note changed in the meantime.
 
 ### Changed
 
@@ -75,9 +74,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   top; it now carries the same sections the Day view stacks -- what is set for
   an hour, then what has no hour of its own, then the overdue backlog split
   into its four bands (missed repeats, this week's slippage, earlier this year,
-  long ago), each with its name and its count. The order matches the Day view
-  and the Android client: today's work first, the backlog underneath. What is
-  overdue is still decided against the day being lived through. Group actions
+  long ago), each with its name and its count. All but the first: "Scheduled
+  today" names today, which holds for one of the seven days on screen, and the
+  day header above the rows has already said which day they belong to. The
+  order matches the Day view: today's work first, the backlog underneath. What
+  is overdue is still decided against the day being lived through. Group actions
   stay in the Day view -- a band there is a day's band, and one in a week is
   seven of them.
 - **The band of untimed work says what it holds, in Russian.** The heading read
@@ -142,8 +143,8 @@ Ctrl+A` and Promote to Maintain is `Ctrl+K Ctrl+K Ctrl+P`. On macOS every one
   entry asks of the reader differs with its age, and one "Overdue" heading over
   all of them buried a repeat missed yesterday under dates from years ago. A
   repeater outranks the age of the date it missed: whatever the date was, the
-  work is the next occurrence. The same split the Android client makes, and the
-  same reason `org-super-agenda` keeps `:scheduled past` apart.
+  work is the next occurrence. The same split, and for the same reason,
+  `org-super-agenda` keeps `:scheduled past` apart.
 - The demo recordings run their commands through the Command Palette: each one
   is opened by name, held on screen for three seconds and then accepted, so a
   viewer reads which command produces the change instead of matching it to a
@@ -291,8 +292,8 @@ and repeating tasks that move forward when marked DONE instead of closing.
 ### A repeating task moves forward instead of closing
 
 - **Changed.** Marking a repeating task DONE now moves it forward, as Emacs
-  Org-mode does (`org-auto-repeat-maybe`) and as the Android client of the same
-  ecosystem already did: the planning dates take one step (`+N`), step until
+  Org-mode does (`org-auto-repeat-maybe`): the planning dates take one step
+  (`+N`), step until
   they pass today (`++N`) or restart from today (`.+N`), and the keyword goes
   back to `TODO`.
 - **Changed.** A heading that carried no keyword still carries none, a planning

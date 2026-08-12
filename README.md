@@ -15,16 +15,15 @@ travel with the repository.
     <img src="media/demo-agenda-light.gif" alt="Day / Week / Month agenda demo">
 </picture>
 
-The extension is one of three projects reading the same files:
+The extension is one of two projects reading the same files:
 
 | Project                                                                         | What it is                                                              |
 | ------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
 | `markdown-org-vscode` (this one)                                                | the VS Code extension: agenda panel, editing commands, time tracking    |
 | [`markdown-org-extract`](https://github.com/VitalyOstanin/markdown-org-extract) | the CLI and Rust library the extension runs to read tasks out of a file |
-| [`markdown-org-android`](https://github.com/VitalyOstanin/markdown-org-android) | the Android client, syncing the same notes over git                     |
 
-The Android client links the same extractor in-process, so a file means the
-same thing on the phone as it does here.
+Everything the agenda shows is read by the extractor, so a file means the same
+thing to anything else that links it.
 
 ## Table of Contents
 
