@@ -100,8 +100,14 @@ suite('Tags declared beside the notes', () => {
         await vscode.commands.executeCommand('markdown-org.showTagDictionary');
 
         const shown = vscode.window.activeTextEditor?.document.getText() ?? '';
+        // The directory is a filesystem path, and on Windows it carries
+        // backslashes and a drive letter -- pasted into a pattern raw, `\a`
+        // and `\w` are read as escapes and the match fails on that runner
+        // alone. Quote it before it becomes part of the expression.
+        const quoted = work.replaceAll(/[.*+?^${}()|[\]\\]/gu, '\\$&');
+
         assert.match(shown, /## WORK/);
-        assert.match(shown, new RegExp(`takes notes whose name holds "work" — declared by ${work}`));
-        assert.match(shown, new RegExp(`keeps out notes whose name holds "archive" — declared by ${work}`));
+        assert.match(shown, new RegExp(`takes notes whose name holds "work" — declared by ${quoted}`));
+        assert.match(shown, new RegExp(`keeps out notes whose name holds "archive" — declared by ${quoted}`));
     });
 });
