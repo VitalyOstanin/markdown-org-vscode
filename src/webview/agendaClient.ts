@@ -1107,10 +1107,17 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         refreshGitMenu();
     }
 
-    /** Click a directory chip by its root, as `clickCollectionChipForTesting` asks. */
+    /**
+     * Click a directory chip by its root, as `clickCollectionChipForTesting` asks.
+     *
+     * The chip is looked up by comparing the attribute rather than by putting
+     * the root into a selector: a root is a filesystem path, and on Windows it
+     * carries backslashes, which a selector reads as escapes -- `data-root=
+     * "d:\a\work"` then matches nothing and the click is silently dropped.
+     */
     function clickCollectionChip(root: string): void {
-        const chip = document.querySelector<HTMLElement>(
-            `.collection-chip[data-root="${root.replaceAll('"', '\\"')}"]`
+        const chip = [...document.querySelectorAll<HTMLElement>('.collection-chip')].find(
+            (candidate) => candidate.getAttribute('data-root') === root
         );
         chip?.click();
     }
