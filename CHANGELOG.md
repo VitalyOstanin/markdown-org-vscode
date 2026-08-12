@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-08-13
+
+This release is largely about what the agenda looks like, and the theme running
+through it is that a heap is not a plan. A day used to arrive as one run of
+rows; it is now stacked in named, counted sections -- what is set for an hour,
+then what is not, then the overdue backlog split by how long ago it slipped --
+and the week view stacks each of its days the same way instead of pouring
+everything overdue into one heap at the top. A section that is named can be
+acted on: the mark at the end of a heading answers the whole band in one edit
+that can be put back. The month grid, which has only counts to work with, says
+in a tooltip what its red number is made of.
+
+The same reading holds when there is more to read: several note directories
+merge into one timeline, a coloured dot at the head of a row says where the row
+came from, and a chip per directory takes it off the screen and back without
+walking the notes again.
+
+Density is a setting rather than a verdict. Sections cost height, and height is
+what a small panel has least of, so `markdown-org.agendaGrouping` turns the
+headings off and gives their rows the space back -- the same rows in the same
+order, which is the part worth keeping.
+
 ### Added
 
 - `markdown-org.agendaGrouping` decides whether a day is split into named
@@ -216,6 +238,9 @@ Ctrl+A` and Promote to Maintain is `Ctrl+K Ctrl+K Ctrl+P`. On macOS every one
   the same formatter as the dates and the month cells.
 
 ## [0.14.0] - 2026-08-09
+
+Never released on its own: the tag was never cut, so there is no `v0.14.0` to
+install or compare against. Everything below reached users as part of 0.15.0.
 
 Four things this release is about: a Tasks view that says which day each of its
 rows belongs to, org syntax that is coloured in the editor and not only in the
@@ -1201,8 +1226,8 @@ and repeating tasks that move forward when marked DONE instead of closing.
 
 - Requires [markdown-org-extract](https://crates.io/crates/markdown-org-extract) utility
 
-[Unreleased]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.14.0...HEAD
-[0.14.0]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.13.0...v0.14.0
+[Unreleased]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.15.0...HEAD
+[0.15.0]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.13.0...v0.15.0
 [0.13.0]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.11.1...v0.12.0
 [0.11.1]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.11.0...v0.11.1
