@@ -609,6 +609,8 @@ interface AgendaStatePayload {
     collections?: CollectionMark[];
     firstDayOfWeek?: string;
     headerMode?: string;
+    /** `'flat'` draws a day as one list; anything else keeps the sections. */
+    grouping?: string;
     strings?: AgendaStrings;
     language?: string;
 }
@@ -745,6 +747,10 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
     // why, is worse off than one that opens whole.
     let hiddenCollections: string[] = [];
     let firstDayOfWeek = 'monday';
+    // How a day is grouped: 'sections' | 'flat' (markdown-org.agendaGrouping).
+    // 'flat' drops the headings and the group menus that ride on them; the rows
+    // themselves, and the order they are read in, are the same either way.
+    let grouping = 'sections';
     // Per-anchor scroll memory. Saved on every navigate() before the postMessage
     // and restored on navigation=true updates so that a round-trip (Next then
     // Prev, or Prev then Next) returns the user to where they were instead of
@@ -968,6 +974,9 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         }
         if (message.headerMode) {
             headerMode = message.headerMode;
+        }
+        if (message.grouping) {
+            grouping = message.grouping;
         }
         if (message.strings) {
             UI = message.strings;
@@ -1442,6 +1451,14 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
                         return renderTask(it.task, it.task.days_offset, taskType);
                     })
                     .join('');
+                // On `flat` the rows stand on their own: the panel is what
+                // carries the heading, the count and the group menu, and the
+                // setting asks for a day without them. The order is untouched —
+                // the sections still decide it, they just stop announcing
+                // themselves.
+                if (grouping === 'flat') {
+                    return rows;
+                }
                 // Only the overdue bands offer a group action: what "move the
                 // whole section to today" would mean for the tasks already
                 // scheduled today is nothing, and for the upcoming ones it is

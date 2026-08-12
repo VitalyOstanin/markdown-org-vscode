@@ -75,7 +75,7 @@ suite('Agenda state payload: an update lands where a fresh panel would', () => {
 
     afterEach(async () => {
         const config = vscode.workspace.getConfiguration('markdown-org');
-        for (const key of ['dateLocale', 'firstDayOfWeek']) {
+        for (const key of ['dateLocale', 'firstDayOfWeek', 'agendaGrouping']) {
             await config.update(key, undefined, vscode.ConfigurationTarget.Workspace);
         }
         execFileStub.restore();
@@ -107,6 +107,13 @@ suite('Agenda state payload: an update lands where a fresh panel would', () => {
     async function renderMonth(): Promise<PageState> {
         await vscode.commands.executeCommand('markdown-org.showAgendaMonth', ANCHOR);
         await waitForAgendaRender('month');
+        return snapshotState();
+    }
+
+    /** The same for the day view, which is where the section headings live. */
+    async function renderDay(): Promise<PageState> {
+        await vscode.commands.executeCommand('markdown-org.showAgendaDay', ANCHOR);
+        await waitForAgendaRender('day');
         return snapshotState();
     }
 
@@ -162,4 +169,23 @@ suite('Agenda state payload: an update lands where a fresh panel would', () => {
             );
         });
     }
+
+    // Its own test rather than another entry in CASES: the month grid has no
+    // section headings to drop, so the setting has to be watched where they
+    // are drawn.
+    test('the grouping reaches an open panel exactly as it reaches a new one', async function () {
+        this.timeout(30000);
+
+        const base = await renderDay();
+        assert.ok(base.sections.length > 0, 'expected the grouped day to name its sections');
+
+        await setSetting('agendaGrouping', 'flat');
+        const updated = await renderDay();
+
+        await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+        const opened = await renderDay();
+
+        assert.deepStrictEqual(updated, opened, 'flat grouping reached a fresh panel and an updated one differently');
+        assert.deepStrictEqual(opened.sections, [], 'a flat day names no section');
+    });
 });

@@ -104,6 +104,18 @@ const WEBVIEW_READY_TIMEOUT_MS = 2000;
 const WEBVIEW_MAX_RETRIES = 2;
 type FirstDayOfWeek = 'monday' | 'sunday' | 'auto';
 
+/**
+ * Whether a day is split into named sections or drawn as one list.
+ *
+ * Normalized here rather than trusted: the setting is a string a user can put
+ * anything into, and the page decides what to draw from it.
+ */
+export type AgendaGrouping = 'sections' | 'flat';
+
+function normalizeGrouping(value: string | undefined): AgendaGrouping {
+    return value === 'flat' ? 'flat' : 'sections';
+}
+
 function msUntilNextLocalMidnight(now: Date): number {
     const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0);
     return next.getTime() - now.getTime();
@@ -149,6 +161,7 @@ interface AgendaRenderArgs {
     holidays: string[] | undefined;
     firstDayOfWeek: FirstDayOfWeek;
     headerMode: AgendaHeaderMode;
+    grouping: AgendaGrouping;
 }
 
 /**
@@ -332,7 +345,8 @@ export class AgendaPanel {
             availableTags: buildTagCycle(request.tagNames ?? []),
             holidays,
             firstDayOfWeek: config.get<FirstDayOfWeek>('firstDayOfWeek', 'monday'),
-            headerMode: normalizeHeaderMode(config.get<string>('agendaHeaderMode'))
+            headerMode: normalizeHeaderMode(config.get<string>('agendaHeaderMode')),
+            grouping: normalizeGrouping(config.get<string>('agendaGrouping'))
         };
 
         if (AgendaPanel.currentPanel) {
@@ -444,6 +458,7 @@ export class AgendaPanel {
             collections: buildCollectionMarks(agendaSourceRoots(args.data)),
             firstDayOfWeek: args.firstDayOfWeek,
             headerMode: args.headerMode,
+            grouping: args.grouping,
             userInitiated: view.userInitiated,
             navigation: view.navigation,
             // Re-sent on every update so a language change takes effect on the
@@ -523,6 +538,12 @@ export class AgendaPanel {
             if (event.affectsConfiguration('markdown-org.agendaHeaderMode')) {
                 AgendaPanel.pushHeaderMode();
             }
+            // Through a refresh rather than a message of its own: the grouping
+            // decides how the rows are laid out, and the page lays them out
+            // when it is given them. The setting is read again on that render.
+            if (event.affectsConfiguration('markdown-org.agendaGrouping')) {
+                AgendaPanel.requestRefresh(AgendaPanel.shiftedToday, false);
+            }
         });
 
         const nonce = generateNonce();
@@ -554,6 +575,7 @@ export class AgendaPanel {
             holidays: args.holidays ?? [],
             firstDayOfWeek: args.firstDayOfWeek,
             headerMode: args.headerMode,
+            grouping: args.grouping,
             language,
             strings
         };

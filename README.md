@@ -61,6 +61,7 @@ same thing on the phone as it does here.
     - [`markdown-org.currentTag`](#markdown-orgcurrenttag)
     - [`markdown-org.agendaFontFamily`](#markdown-orgagendafontfamily)
     - [`markdown-org.agendaHeaderMode`](#markdown-orgagendaheadermode)
+    - [`markdown-org.agendaGrouping`](#markdown-orgagendagrouping)
     - [`markdown-org.clockRoundMinutes`](#markdown-orgclockroundminutes)
     - [`markdown-org.weekdayLocale`](#markdown-orgweekdaylocale)
     - [`markdown-org.gcalSync.clientId`](#markdown-orggcalsyncclientid)
@@ -707,6 +708,17 @@ Layout of the agenda header. The full header takes about a fifth of a short pane
 `auto` picks compact once the full header would take a fifth of the panel -- the case where it crowds out the tasks it introduces -- and returns to full once it would take under 0.15 of it, following the panel as it is resized. The two thresholds differ so that dragging the editor split across the boundary does not flip the layout back and forth. Until the header has been measured (the very first paint) `auto` falls back to a panel height of 520 px. `full` and `compact` pin the layout regardless of size.
 
 The chip in the agenda control row cycles the three values (`auto` -> `full` -> `compact`) and names the current one; `Markdown Org: Cycle Agenda Header Layout` does the same from the Command Palette. Changing the setting by any route reflows an open agenda; no reopen needed.
+
+### `markdown-org.agendaGrouping`
+
+**Type:** `"sections" | "flat"`
+**Default:** `"sections"`
+
+How a day is grouped in the Day and Week views. `sections` splits it under named headings: what is scheduled for the day, what has no hour of its own, and the overdue bands (a missed repeat, this week's slippage, earlier this year, longer ago). Each heading carries the count of the rows under it, and the overdue ones carry the group menu.
+
+`flat` drops the headings, and with them the counts and the group menus, leaving one list per day. The rows and the order they are read in are the same either way — what is set for an hour, then what has no hour, then the overdue at the bottom — so switching does not move a row past another. What the headings said is still legible in a row's own colour and in the date it carries.
+
+The Month view is unaffected: it draws counts and no rows. Changing the setting re-renders an open agenda; no reopen needed.
 
 ### `markdown-org.clockRoundMinutes`
 

@@ -483,6 +483,19 @@
           "default": "auto",
           "description": "Agenda header layout. The full header takes about a fifth of a short panel, leaving little room for the tasks; the compact one puts the date title on the control row."
         },
+        "markdown-org.agendaGrouping": {
+          "type": "string",
+          "enum": [
+            "sections",
+            "flat"
+          ],
+          "enumDescriptions": [
+            "Each day is split into named sections: what is scheduled for it, what has no hour of its own, and the overdue bands.",
+            "One list per day, in the same order, with no section headings and no group menus."
+          ],
+          "default": "sections",
+          "description": "How a day is grouped in the Day and Week views. The headings name what a row is and offer the group actions; dropping them gives the rows the height the headings took, in the same reading order."
+        },
         "markdown-org.clockRoundMinutes": {
           "type": "number",
           "default": 0,

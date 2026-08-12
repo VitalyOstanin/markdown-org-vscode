@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `markdown-org.agendaGrouping` decides whether a day is split into named
+  sections or drawn as one list. `sections`, the default, is what the Day and
+  Week views have been doing; `flat` drops the headings, their counts and the
+  group menus that ride on them, and gives the rows the height those headings
+  took. The order is untouched — what is set for an hour, then what has no hour
+  of its own, then the overdue at the bottom — so a row never moves past
+  another when the setting changes. The Month view is unaffected: it draws
+  counts and no rows.
 - Several note directories can be read as one agenda:
   `markdown-org.workspaceDirs` takes a list, and every directory in it is
   scanned. The setting that came first, `markdown-org.workspaceDir`, keeps
