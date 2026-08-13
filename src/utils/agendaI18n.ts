@@ -234,6 +234,14 @@ export interface AgendaStrings {
          * gone once the next status arrives.
          */
         commitConflicts: string;
+        /**
+         * Consent for a commit that carries more than this view: `{0}` the
+         * repositories, `{1}` a counted noun from `files`. Raised because the
+         * commit writes the whole index and the index is not ours alone --
+         * see the module comment of `src/commands/gitActions.ts`.
+         */
+        commitForeignStaged: string;
+        commitForeignConfirm: string;
         /** Progress notifications while the two operations run. */
         commitProgress: string;
         pushProgress: string;
@@ -368,6 +376,8 @@ const EN: AgendaStrings = {
         commitDefault: 'agenda: {0}',
         commitEmptyMessage: 'Commit cancelled: the message is empty',
         commitConflicts: 'Commit cancelled: "{0}" has unresolved conflicts. Resolve them in Source Control first.',
+        commitForeignStaged: '"{0}" has {1} staged outside this view. The commit will include them. Continue?',
+        commitForeignConfirm: 'Commit anyway',
         commitProgress: 'Committing the agenda source files…',
         pushProgress: 'Pushing the agenda repositories…',
         pushRejected:
@@ -491,6 +501,8 @@ const RU: AgendaStrings = {
         commitDefault: 'agenda: {0}',
         commitEmptyMessage: 'Коммит отменён: сообщение пустое',
         commitConflicts: 'Коммит отменён: в «{0}» есть неразрешённые конфликты. Сначала разрешите их в Source Control.',
+        commitForeignStaged: 'В «{0}» в индексе {1} вне этого вида. Коммит заберёт и их. Продолжить?',
+        commitForeignConfirm: 'Закоммитить всё',
         commitProgress: 'Коммит файлов-источников агенды…',
         pushProgress: 'Отправка репозиториев агенды…',
         pushRejected:

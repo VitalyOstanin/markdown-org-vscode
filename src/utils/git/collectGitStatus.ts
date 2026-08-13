@@ -7,21 +7,18 @@
  * repository involved two questions: which of its paths are uncommitted, and
  * which were touched by commits upstream does not have.
  *
- * Path canonicalisation deserves the attention it gets below. A repository can
- * be open under a symlinked path while the agenda file resolves to the real one
- * (or the reverse), and then the change lists and the file list are written in
- * two different alphabets. Rather than `realpath` every changed path -- a large
- * repository reports hundreds -- both sides are rewritten relative to the
- * repository root and re-anchored on the root's real path. That costs one
- * `realpath` per repository and makes the two spellings converge.
+ * Path canonicalisation -- the rule that makes a symlinked root and a real one
+ * meet in one alphabet -- lives in `repositoryPaths.ts`, because the commit
+ * action narrows its file list by the same rule.
  */
-import * as path from 'node:path';
 import type { AgendaGitStatus, GitCommitState } from '../../types';
 import { formatError } from '../formatError';
 import { logDiagnostic } from '../logChannel';
 import { getGitApi, resolveRealPath, resolveRepositoryFor } from './gitApi';
 import type { GitApi, GitRepository } from './gitApiTypes';
-import { isInside, pathKey } from './gitPathMatch';
+import { pathKey } from './gitPathMatch';
+import { canonicalPath, repositoryRoots } from './repositoryPaths';
+import type { RepositoryRoots } from './repositoryPaths';
 import { buildGitStatus } from './gitStatusModel';
 import type { GitRepoSnapshot, GitSourceFile } from './gitStatusModel';
 
@@ -40,8 +37,7 @@ const SHORT_HASH_LENGTH = 7;
 /** A repository plus the canonical form of the paths it reports. */
 interface RepositoryContext {
     repository: GitRepository;
-    root: string;
-    rootReal: string;
+    roots: RepositoryRoots;
 }
 
 /**
@@ -69,8 +65,8 @@ export async function collectGitStatus(files: readonly string[]): Promise<Agenda
         const context = await repositoryContext(resolved.repository, contexts, realPathCache);
         sources.push({
             file,
-            realPath: canonicalPath(resolved.realPath, context),
-            repoRoot: context.rootReal
+            realPath: canonicalPath(resolved.realPath, context.roots),
+            repoRoot: context.roots.rootReal
         });
     }
 
@@ -103,35 +99,17 @@ async function repositoryContext(
     contexts: Map<string, RepositoryContext>,
     realPathCache: Map<string, string>
 ): Promise<RepositoryContext> {
-    const root = repository.rootUri.fsPath;
-    const key = pathKey(root);
+    const key = pathKey(repository.rootUri.fsPath);
     const existing = contexts.get(key);
     if (existing) {
         return existing;
     }
     const context: RepositoryContext = {
         repository,
-        root,
-        rootReal: await resolveRealPath(root, realPathCache)
+        roots: await repositoryRoots(repository, realPathCache)
     };
     contexts.set(key, context);
     return context;
-}
-
-/**
- * Rewrite a path so every path of one repository is expressed against the same
- * root. Paths already under the real root are left alone; paths under the root
- * as opened are re-anchored; anything outside both is returned unchanged and
- * simply will not match.
- */
-function canonicalPath(value: string, context: RepositoryContext): string {
-    if (isInside(context.rootReal, value)) {
-        return value;
-    }
-    if (isInside(context.root, value)) {
-        return path.join(context.rootReal, path.relative(context.root, value));
-    }
-    return value;
 }
 
 async function snapshotRepository(context: RepositoryContext): Promise<GitRepoSnapshot> {
@@ -140,18 +118,18 @@ async function snapshotRepository(context: RepositoryContext): Promise<GitRepoSn
     const upstream = head?.upstream ? `${head.upstream.remote}/${head.upstream.name}` : undefined;
 
     const uncommitted = [...state.workingTreeChanges, ...state.indexChanges, ...(state.untrackedChanges ?? [])].map(
-        (change) => canonicalPath(change.uri.fsPath, context)
+        (change) => canonicalPath(change.uri.fsPath, context.roots)
     );
 
     return {
-        root: context.rootReal,
+        root: context.roots.rootReal,
         ...(head?.name === undefined ? {} : { branch: head.name }),
         ...(upstream === undefined ? {} : { upstream }),
         ...(head?.ahead === undefined ? {} : { aheadCommits: head.ahead }),
         uncommitted,
         // Conflicts sit in their own bucket rather than in `workingTreeChanges`,
         // so a file the user is still resolving would otherwise pass for clean.
-        conflicts: (state.mergeChanges ?? []).map((change) => canonicalPath(change.uri.fsPath, context)),
+        conflicts: (state.mergeChanges ?? []).map((change) => canonicalPath(change.uri.fsPath, context.roots)),
         unpushed: await unpushedPaths(context, upstream, head?.ahead),
         commits: await unpushedCommits(context, upstream, head?.ahead)
     };
@@ -189,7 +167,9 @@ async function unpushedCommits(
     } catch (error) {
         // Same degradation as the diff above: the counts survive, only the
         // list of commits is missing.
-        logDiagnostic(`agenda git status: cannot log ${upstream}..HEAD in ${context.rootReal}: ${formatError(error)}`);
+        logDiagnostic(
+            `agenda git status: cannot log ${upstream}..HEAD in ${context.roots.rootReal}: ${formatError(error)}`
+        );
         return [];
     }
 }
@@ -219,13 +199,13 @@ async function unpushedPaths(
     }
     try {
         const changes = await context.repository.diffBetween(upstream, 'HEAD');
-        return changes.map((change) => canonicalPath(change.uri.fsPath, context));
+        return changes.map((change) => canonicalPath(change.uri.fsPath, context.roots));
     } catch (error) {
         // A missing upstream ref or a fresh repository with no commits lands
         // here. The uncommitted half of the status is still valid, so the view
         // degrades to it rather than disappearing.
         logDiagnostic(
-            `agenda git status: cannot diff ${upstream}...HEAD in ${context.rootReal}: ${formatError(error)}`
+            `agenda git status: cannot diff ${upstream}...HEAD in ${context.roots.rootReal}: ${formatError(error)}`
         );
         return [];
     }

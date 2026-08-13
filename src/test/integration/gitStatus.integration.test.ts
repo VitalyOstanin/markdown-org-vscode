@@ -556,6 +556,121 @@ suite('agenda git status against a real repository', () => {
         assert.ok(status);
         assert.strictEqual(status.repos[0]?.branch, undefined, 'a detached HEAD has no branch name');
     });
+
+    // A view spanning two repositories where only one has edits: `commit` on
+    // the untouched one refuses an empty index, and that refusal used to end
+    // the round before the repository with the actual work was reached.
+    test('a repository with nothing to commit does not stop the ones after it', async function () {
+        this.timeout(30000);
+        const cleanDir = path.join(workDir, 'pair-clean');
+        const dirtyDir = path.join(workDir, 'pair-dirty');
+        const prepare = (dir: string, name: string): string => {
+            fs.mkdirSync(dir);
+            const run = (args: string[]): void => {
+                execFileSync('git', [...GIT_ID, ...args], { cwd: dir, encoding: 'utf-8' });
+            };
+            run(['init', '--initial-branch=master']);
+            run(['config', 'user.name', 'Test']);
+            run(['config', 'user.email', 'test@example.invalid']);
+            const file = path.join(dir, name);
+            fs.writeFileSync(file, `# ${name}\n`);
+            run(['add', '.']);
+            run(['commit', '-m', 'initial']);
+            return file;
+        };
+        const cleanFile = prepare(cleanDir, 'settled.md');
+        const dirtyFile = prepare(dirtyDir, 'draft.md');
+        fs.appendFileSync(dirtyFile, 'one more line\n');
+        const headOf = (dir: string): string =>
+            execFileSync('git', ['rev-parse', 'HEAD'], { cwd: dir, encoding: 'utf-8' }).trim();
+        const cleanHead = headOf(cleanDir);
+
+        // The clean repository first, so its refusal would come before the
+        // other one is reached.
+        const files = [cleanFile, dirtyFile];
+        await waitUntil(async () => {
+            const status = await collectGitStatus(files);
+            return status?.uncommittedCount === 1;
+        }, 'the edit in the second repository to be seen');
+
+        const originalInput = vscode.window.showInputBox;
+        (vscode.window as { showInputBox: unknown }).showInputBox = () => Promise.resolve('agenda: the dirty one');
+        try {
+            await commitAgendaSources(files, AGENDA_STRINGS.en, 'en');
+            await waitUntil(
+                () => execFileSync('git', ['status', '--porcelain'], { cwd: dirtyDir, encoding: 'utf-8' }) === '',
+                'the edit to reach a commit despite the clean repository ahead of it'
+            );
+        } finally {
+            (vscode.window as { showInputBox: unknown }).showInputBox = originalInput;
+        }
+        assert.strictEqual(headOf(cleanDir), cleanHead, 'the clean repository must not have been committed to');
+    });
+
+    // `commit()` takes no paths, so whatever is in the index travels with it.
+    // The user is asked before that happens, and a dismissal commits nothing.
+    test('a commit that would carry someone else’s staged file asks first', async function () {
+        this.timeout(30000);
+        const foreignDir = path.join(workDir, 'foreign-index');
+        fs.mkdirSync(foreignDir);
+        const run = (args: string[]): string =>
+            execFileSync('git', [...GIT_ID, ...args], { cwd: foreignDir, encoding: 'utf-8' });
+        run(['init', '--initial-branch=master']);
+        run(['config', 'user.name', 'Test']);
+        run(['config', 'user.email', 'test@example.invalid']);
+        const source = path.join(foreignDir, 'agenda-note.md');
+        const foreign = path.join(foreignDir, 'someone-else.md');
+        fs.writeFileSync(source, '# note\n');
+        fs.writeFileSync(foreign, '# elsewhere\n');
+        run(['add', '.']);
+        run(['commit', '-m', 'initial']);
+        fs.appendFileSync(source, 'agenda edit\n');
+        fs.appendFileSync(foreign, 'staged by hand\n');
+        run(['add', 'someone-else.md']);
+
+        const headOf = (): string => run(['rev-parse', 'HEAD']).trim();
+        const before = headOf();
+        await waitUntil(async () => {
+            const status = await collectGitStatus([source]);
+            return status?.uncommittedCount === 1;
+        }, 'the agenda file to be seen as uncommitted');
+
+        let prompt = '';
+        let asked = 0;
+        const originalWarn = vscode.window.showWarningMessage;
+        const originalInput = vscode.window.showInputBox;
+        (vscode.window as { showWarningMessage: unknown }).showWarningMessage = (message: string) => {
+            prompt = message;
+            return Promise.resolve(undefined);
+        };
+        (vscode.window as { showInputBox: unknown }).showInputBox = () => {
+            asked += 1;
+            return Promise.resolve('agenda: never used');
+        };
+        try {
+            await commitAgendaSources([source], AGENDA_STRINGS.en, 'en');
+            assert.match(prompt, /staged outside this view/, prompt);
+            assert.match(prompt, /foreign-index/, prompt);
+            assert.strictEqual(asked, 0, 'the question must come before the message prompt, not after it');
+            assert.strictEqual(headOf(), before, 'a dismissed question must commit nothing');
+
+            // Answered this time: the commit goes ahead, carrying both files,
+            // which is what the question said it would.
+            (vscode.window as { showWarningMessage: unknown }).showWarningMessage = () =>
+                Promise.resolve(AGENDA_STRINGS.en.git.commitForeignConfirm);
+            (vscode.window as { showInputBox: unknown }).showInputBox = () =>
+                Promise.resolve('agenda: with the staged file');
+            await commitAgendaSources([source], AGENDA_STRINGS.en, 'en');
+            await waitUntil(() => headOf() !== before, 'the confirmed commit to be made');
+        } finally {
+            (vscode.window as { showWarningMessage: unknown }).showWarningMessage = originalWarn;
+            (vscode.window as { showInputBox: unknown }).showInputBox = originalInput;
+        }
+
+        const last = run(['log', '-1', '--name-only', '--format=%s']);
+        assert.ok(last.includes('agenda-note.md'), last);
+        assert.ok(last.includes('someone-else.md'), `the confirmed commit was supposed to carry it too:\n${last}`);
+    });
 });
 
 /**

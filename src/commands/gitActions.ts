@@ -7,6 +7,12 @@
  * That is why `repo.add()` is given an explicit path list rather than the
  * commit being run with `all: true`.
  *
+ * The staging is ours to control; the commit is not. `commit()` takes a message
+ * and no paths (`CommitOptions` has none), so it writes whatever the index
+ * holds -- including a file the user staged in Source Control beforehand. That
+ * case cannot be narrowed away, so it is asked about instead, before the
+ * message is typed.
+ *
  * Paths handed to git are the resolved ones: `git add` runs with the repository
  * root as its working directory and will not accept a symlink path from outside
  * that root (see ADR-0016).
@@ -15,6 +21,8 @@ import * as vscode from 'vscode';
 import * as path from 'node:path';
 import { getGitApi, resolveRepositoryFor } from '../utils/git/gitApi';
 import type { GitRepository } from '../utils/git/gitApiTypes';
+import { pathKey } from '../utils/git/gitPathMatch';
+import { canonicalPath, changeKeys, repositoryRoots } from '../utils/git/repositoryPaths';
 import { formatError, notifyError, notifyStatus } from '../utils/notify';
 import { logDiagnostic } from '../utils/logChannel';
 import { formatString, pluralIndex } from '../utils/agendaI18n';
@@ -23,6 +31,15 @@ import { toIsoDate } from '../utils/isoDate';
 
 /** Files grouped by the repository that will commit them. */
 type FilesByRepository = Map<GitRepository, string[]>;
+
+/** One repository the commit will actually write to. */
+interface CommitTarget {
+    repository: GitRepository;
+    /** View files git reports as changed -- the ones the commit is asked for. */
+    changed: string[];
+    /** Staged paths this view does not name -- the ones it would carry anyway. */
+    foreignStaged: number;
+}
 
 /**
  * The error code the built-in extension attaches when the remote refuses a
@@ -50,7 +67,8 @@ export async function commitAgendaSources(
     strings: AgendaStrings,
     language: UiLanguage
 ): Promise<void> {
-    const grouped = await groupByRepository(files);
+    const realPathCache = new Map<string, string>();
+    const grouped = await groupByRepository(files, realPathCache);
     if (grouped.size === 0) {
         return;
     }
@@ -62,6 +80,17 @@ export async function commitAgendaSources(
     const conflicted = [...grouped.keys()].find((repository) => hasConflicts(repository));
     if (conflicted) {
         notifyError(formatString(strings.git.commitConflicts, path.basename(conflicted.rootUri.fsPath)));
+        return;
+    }
+
+    // A repository whose files are all committed already is left out entirely:
+    // `commit` refuses an empty index, and that refusal used to abort the whole
+    // round, leaving the repositories after it uncommitted.
+    const targets = await commitTargets(grouped, realPathCache);
+    if (targets.length === 0) {
+        return;
+    }
+    if (!(await confirmForeignStaged(targets, strings, language))) {
         return;
     }
 
@@ -85,14 +114,14 @@ export async function commitAgendaSources(
     // look like it ignored the click.
     const committed = await withGitProgress(strings.git.commitProgress, async () => {
         let done = 0;
-        for (const [repository, paths] of grouped) {
+        for (const target of targets) {
             try {
-                await repository.add(paths);
-                await repository.commit(message);
-                done += paths.length;
+                await target.repository.add(target.changed);
+                await target.repository.commit(message);
+                done += target.changed.length;
             } catch (error) {
                 const reason = formatError(error);
-                logDiagnostic(`agenda git commit failed in ${repository.rootUri.fsPath}: ${reason}`);
+                logDiagnostic(`agenda git commit failed in ${target.repository.rootUri.fsPath}: ${reason}`);
                 notifyError(formatString(strings.git.commitFailed, reason));
                 return undefined;
             }
@@ -122,7 +151,7 @@ export async function pushAgendaSources(
     strings: AgendaStrings,
     language: UiLanguage
 ): Promise<void> {
-    const grouped = await groupByRepository(files);
+    const grouped = await groupByRepository(files, new Map());
     if (grouped.size === 0) {
         return;
     }
@@ -221,6 +250,57 @@ function hasConflicts(repository: GitRepository): boolean {
 }
 
 /**
+ * Keep the repositories with something of this view to commit, and count what
+ * else each of them would carry.
+ *
+ * The narrowing is what the counters in the panel already say: a file the view
+ * names but git reports as unchanged is not part of "commit 3 files", and a
+ * repository left with none of them has nothing to be asked for.
+ */
+async function commitTargets(grouped: FilesByRepository, realPathCache: Map<string, string>): Promise<CommitTarget[]> {
+    const targets: CommitTarget[] = [];
+    for (const [repository, paths] of grouped) {
+        const roots = await repositoryRoots(repository, realPathCache);
+        const { changed, staged } = changeKeys(repository, roots);
+        const ourKeys = new Set(paths.map((file) => pathKey(canonicalPath(file, roots))));
+        const ours = paths.filter((file) => changed.has(pathKey(canonicalPath(file, roots))));
+        if (ours.length === 0) {
+            continue;
+        }
+        targets.push({
+            repository,
+            changed: ours,
+            foreignStaged: [...staged].filter((key) => !ourKeys.has(key)).length
+        });
+    }
+    return targets;
+}
+
+/**
+ * Ask before a commit takes more than the view names.
+ *
+ * Asked once for the whole round rather than per repository: the answer is
+ * about the commit the user is starting, and a modal per repository would turn
+ * one decision into several. Silence on the common path -- an index holding
+ * only what this panel staged raises nothing.
+ */
+async function confirmForeignStaged(
+    targets: readonly CommitTarget[],
+    strings: AgendaStrings,
+    language: UiLanguage
+): Promise<boolean> {
+    const affected = targets.filter((target) => target.foreignStaged > 0);
+    if (affected.length === 0) {
+        return true;
+    }
+    const names = affected.map((target) => path.basename(target.repository.rootUri.fsPath)).join(', ');
+    const total = affected.reduce((sum, target) => sum + target.foreignStaged, 0);
+    const prompt = formatString(strings.git.commitForeignStaged, names, counted(total, strings.git.files, language));
+    const choice = await vscode.window.showWarningMessage(prompt, { modal: true }, strings.git.commitForeignConfirm);
+    return choice === strings.git.commitForeignConfirm;
+}
+
+/**
  * Ask before creating an upstream branch.
  *
  * Modal on purpose: this is the one step in the flow that writes something new
@@ -247,13 +327,15 @@ async function confirmSetUpstream(repository: GitRepository, strings: AgendaStri
  * that lead here are only rendered when the counters they carry are non-zero,
  * and those counters already exclude such files.
  */
-async function groupByRepository(files: readonly string[]): Promise<FilesByRepository> {
+async function groupByRepository(
+    files: readonly string[],
+    realPathCache: Map<string, string>
+): Promise<FilesByRepository> {
     const api = await getGitApi();
     const grouped: FilesByRepository = new Map();
     if (!api) {
         return grouped;
     }
-    const realPathCache = new Map<string, string>();
     for (const file of files) {
         const resolved = await resolveRepositoryFor(api, file, realPathCache);
         if (!resolved) {

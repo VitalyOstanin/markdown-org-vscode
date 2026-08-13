@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   buttons go inert until the action is over, so a second click cannot start on
   top of the first. A status that arrives mid-action -- staging alone produces
   one -- no longer hands them back early.
+- Git panel: a commit is refused a second time before it happens when the
+  repository holds staged changes this view does not name. Git commits the
+  whole index and cannot be told otherwise, so the panel names the repository
+  and the number of extra files and asks; dismissing the question commits
+  nothing.
 - Git panel: unresolved merge conflicts get their own group and chip counter
   ("! N"), and the commit button steps aside while they stand. Committing from
   the panel is refused before the message is asked for, naming the repository
@@ -38,6 +43,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Git chip: a source file whose repository could not be read is counted as
   unknown ("? N") instead of being folded into "clean". The diagnostic log
   names the cause when git reports a repository that VS Code declined to open.
+- Git panel: a view spanning several repositories no longer stops at the first
+  one with nothing to commit -- git refuses an empty commit, and that refusal
+  used to end the round before the repositories after it were reached. Only
+  files git reports as changed are staged.
 - Git panel: a source file reached through a symlink that is itself committed
   and points out of its repository is staged under the tracked path again,
   rather than under the target git does not know.
