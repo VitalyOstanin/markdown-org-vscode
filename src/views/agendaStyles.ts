@@ -119,6 +119,7 @@ export const AGENDA_STYLES = `
         .tag-menu-item:focus-visible,
         .group-menu-btn:focus-visible,
         .group-menu-item:focus-visible,
+        .day-section-fold:focus-visible,
         .git-file:focus-visible,
         .git-action:focus-visible,
         .calendar-day:focus-visible {
@@ -1000,6 +1001,36 @@ export const AGENDA_STYLES = `
             gap: var(--space-2);
             padding: var(--space-3) 0 var(--space-1) 0;
             border-bottom: 1px solid var(--vscode-panel-border);
+            /* The whole head folds the section, so it says so under the
+               pointer. The band menu is the one part that does something else
+               and keeps the default arrow. */
+            cursor: pointer;
+        }
+        /* The fold control: a glyph the size of the heading, in the head's own
+           muted colour. It is a button so the fold is reachable by keyboard and
+           announced as expanded or collapsed, and it stays quiet -- what it
+           does is reversible and one press away, not the point of the section.
+           No padding on the leading edge: the glyph lines up with the heading
+           text of the panel above it. */
+        .day-section-fold {
+            background: none;
+            border: none;
+            padding: 0;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: var(--font-sm);
+            line-height: 1;
+            color: var(--vscode-descriptionForeground);
+        }
+        .day-section-head:hover .day-section-fold {
+            color: var(--vscode-foreground);
+        }
+        /* A folded section keeps the space a heading takes and nothing more:
+           the panel's bottom margin is what separates it from the next one, and
+           between two folded heads that reads as a gap wider than the heads
+           themselves. */
+        .day-section.day-section-is-folded {
+            margin-bottom: var(--space-2);
         }
         /* Week view: a band head standing on its own, with its rows as the
            siblings that follow it rather than as children of a panel (see
@@ -1105,6 +1136,9 @@ export const AGENDA_STYLES = `
             position: relative;
             display: flex;
             align-items: center;
+            /* Its own control, on a head that folds: the pointer says the press
+               lands here and not on the fold. */
+            cursor: default;
         }
         .group-menu-btn {
             background: none;

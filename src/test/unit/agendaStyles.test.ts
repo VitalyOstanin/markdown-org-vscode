@@ -279,7 +279,14 @@ suite('AGENDA_STYLES shape and type-scale invariant', () => {
     test('every interactive surface of the panel shares one focus ring', () => {
         const rule = /((?:\.[a-z-]+:focus-visible,\s*)+\.[a-z-]+:focus-visible)\s*\{/.exec(AGENDA_STYLES);
         assert.ok(rule, 'expected a single :focus-visible rule listing the interactive classes');
-        for (const cls of ['.nav-btn', '.seg-item', '.tag-menu-btn', '.tag-menu-item', '.calendar-day']) {
+        for (const cls of [
+            '.nav-btn',
+            '.seg-item',
+            '.tag-menu-btn',
+            '.tag-menu-item',
+            '.calendar-day',
+            '.day-section-fold'
+        ]) {
             assert.ok(rule[1]!.includes(`${cls}:focus-visible`), `${cls} must be covered by the shared focus ring`);
         }
     });

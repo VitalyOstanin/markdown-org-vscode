@@ -36,6 +36,12 @@ import type { AgendaStrings } from '../utils/agendaI18n';
  * a page does not have. The same reason every other helper signature in this
  * file is written out structurally.
  */
+/** Whether a section is folded away, as `renderSectionPanel` reads it. */
+interface SectionFold {
+    folded: boolean;
+    label: string;
+}
+
 /** One counter of the git chip, as `gitCounters` describes it. */
 interface GitCounter {
     kind: string;
@@ -400,12 +406,18 @@ export interface AgendaClientDeps {
             uiLang: string;
             inSectionTemplate: string;
             taskForms: string[];
+            fold: SectionFold;
             escapeHtml: (text: string | number | boolean | undefined | null) => string;
             formatString: (template: string, ...values: string[]) => string;
             formatNumber: (value: number, locale: string) => string;
             pluralIndex: (n: number, lang: string) => number;
         },
         actionsHtml: string
+    ) => string;
+    /** Called by both section heads; not invoked directly by the client. */
+    sectionFoldHtml: (
+        fold: SectionFold,
+        escapeHtml: (text: string | number | boolean | undefined | null) => string
     ) => string;
     /** The same head without a panel, for the flat week view. */
     renderBandHeading: (
@@ -417,6 +429,7 @@ export interface AgendaClientDeps {
             uiLang: string;
             inSectionTemplate: string;
             taskForms: string[];
+            fold: SectionFold;
             escapeHtml: (text: string | number | boolean | undefined | null) => string;
             formatString: (template: string, ...values: string[]) => string;
             formatNumber: (value: number, locale: string) => string;
@@ -684,6 +697,9 @@ type HostMessage =
     // the page, and what the message carries is decided there -- so the item is
     // pressed rather than the message forged.
     | { command: 'clickGroupActionForTesting'; section?: string; action?: string }
+    // Integration-test hook: folding a section is a page-side state and a
+    // re-render of the view around it, so the head is pressed for real.
+    | { command: 'clickSectionFoldForTesting'; section?: string }
     // Integration-test hook: what a press of Commit or Push leaves behind --
     // both buttons out of service, the pressed one spinning -- exists only in
     // the page, and only a real click puts it there.
@@ -798,6 +814,15 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
     // why, is worse off than one that opens whole.
     let hiddenCollections: string[] = [];
     let firstDayOfWeek = 'monday';
+    // Which sections the reader has folded away, by section key. Kept by key
+    // rather than per rendered head, so a band folded in the week view stays
+    // folded on every day of that week -- the Android client folds a band the
+    // same way, once for the screen rather than once per day.
+    //
+    // Not carried between openings, for the reason `hiddenCollections` is not:
+    // a panel that opens with rows missing, and no memory of why, is worse off
+    // than one that opens whole.
+    const foldedSections = new Set<string>();
     // How a day is grouped: 'sections' | 'flat' (markdown-org.agendaGrouping).
     // 'flat' drops the headings and the group menus that ride on them; the rows
     // themselves, and the order they are read in, are the same either way.
@@ -1159,6 +1184,14 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         item?.click();
     }
 
+    /** Press a section head, as `clickSectionFoldForTesting` asks. */
+    function clickSectionFold(section: string): void {
+        const head = [...document.querySelectorAll<HTMLElement>('.day-section-head')].find(
+            (candidate) => candidate.getAttribute('data-section') === section
+        );
+        head?.querySelector<HTMLElement>('.day-section-fold')?.click();
+    }
+
     /** Press Commit or Push, as `clickGitActionForTesting` asks. */
     function clickGitAction(action: string): void {
         const id = action === 'push' ? 'gitPushBtn' : 'gitCommitBtn';
@@ -1191,6 +1224,8 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             clickCollectionChip(message.root ?? '');
         } else if (message.command === 'clickGroupActionForTesting') {
             clickGroupAction(message.section ?? '', message.action ?? '');
+        } else if (message.command === 'clickSectionFoldForTesting') {
+            clickSectionFold(message.section ?? '');
             // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- spelled out rather than a bare `else`, so the branch says which command it serves
         } else if (message.command === 'clickGitActionForTesting') {
             clickGitAction(message.action ?? '');
@@ -1214,6 +1249,17 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         // Which sections offer an action on the whole band: the key each
         // menu carries, which is also what a click on it would post back.
         const sectionMenus = [...document.querySelectorAll('.group-menu')].map((el) => el.getAttribute('data-section'));
+        // Every head that can fold, and whether it is folded now. The title
+        // above says nothing about that -- a folded section keeps its heading,
+        // which is the whole point of folding it rather than dropping it.
+        const sectionFolds = [...document.querySelectorAll('.day-section-head')].map((el) => {
+            const key = el.getAttribute('data-section') ?? '';
+            return el.classList.contains('day-section-is-folded') ? `${key} (folded)` : key;
+        });
+        // How many rows the page is actually showing. A folded section leaves
+        // its rows out of the render rather than hiding them, and this is what
+        // tells the two apart from outside.
+        const taskRows = document.querySelectorAll('.task-line').length;
         // Collection dots in row order, each reported by the tooltip that
         // names its directory: with one directory scanned there are none,
         // which is the state a test has no other way to tell apart from
@@ -1285,6 +1331,8 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             flags,
             sections,
             sectionMenus,
+            sectionFolds,
+            taskRows,
             collectionMarks,
             collectionChips,
             clipAbove,
@@ -1407,6 +1455,10 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         if (handleGroupMenuClick(e)) {
             return;
         }
+        // The head itself comes next, for the same reason: it is not a row.
+        if (handleSectionFoldClick(e)) {
+            return;
+        }
         // Source of truth: src/utils/agendaClick.ts -- jsdom tested.
         const intent = resolveTaskClickIntent(e as unknown as ClickEventLike, window.getSelection());
         if (intent) {
@@ -1464,6 +1516,42 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         return true;
     }
 
+    /**
+     * Fold a section away, or bring it back.
+     *
+     * The whole head answers the press, not only the glyph: the heading is what
+     * the reader is looking at when they decide they are done with the section,
+     * and a control the size of one character is a poor target for it. The band
+     * menu is the exception -- it sits on the same head and opens something of
+     * its own, so a press there must not fold the section under it.
+     *
+     * Returns whether the click belonged to a head, so the row handler can
+     * stand down.
+     */
+    function handleSectionFoldClick(e: Event): boolean {
+        const target = e.target as HTMLElement | null;
+        const head = target?.closest('.day-section-head');
+        if (!head || target?.closest('.group-menu')) {
+            return false;
+        }
+        e.stopPropagation();
+        const key = head.getAttribute('data-section');
+        if (key === null) {
+            return true;
+        }
+        if (foldedSections.has(key)) {
+            foldedSections.delete(key);
+        } else {
+            foldedSections.add(key);
+        }
+        // The rows are rendered, not hidden, so the fold is a re-render like a
+        // directory chip's -- and like it, nothing above the head moves, so the
+        // page needs no scroll of its own afterwards.
+        renderCurrentMode();
+        refreshClipMarkers();
+        return true;
+    }
+
     function closeGroupMenus(): void {
         document.querySelectorAll('.group-menu.open').forEach((m) => {
             m.classList.remove('open');
@@ -1508,8 +1596,15 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
                 // seven days here, and the day header above already says which
                 // day the rows belong to. On `flat` none of them do, and the
                 // day is the run of rows under its own header.
-                if (sec.key !== 'scheduled' && grouping !== 'flat') {
+                const headed = sec.key !== 'scheduled' && grouping !== 'flat';
+                if (headed) {
                     parts.push(renderBand(sec.key, sec.title, sec.items.length));
+                }
+                // A band cannot be folded away while nothing says it is there:
+                // without its heading there would be nothing to unfold it by,
+                // so a day without headings shows every row it has.
+                if (headed && foldedSections.has(sec.key)) {
+                    return;
                 }
                 sec.items.forEach((it) => {
                     const taskType =
@@ -1550,13 +1645,20 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         // count summary, not the date -- the nav hero already shows the date.
         const sectionsHtml = sections
             .map((sec) => {
-                const rows = sec.items
-                    .map((it) => {
-                        const taskType =
-                            it.kind === 'overdue' ? 'overdue' : it.kind === 'upcoming' ? 'upcoming' : undefined;
-                        return renderTask(it.task, it.task.days_offset, taskType);
-                    })
-                    .join('');
+                // A folded section renders its head and nothing else. The rows
+                // are left out rather than hidden, so what is on the page is
+                // what is on screen -- see renderBandHeading on why the week
+                // view cannot hide them and why both views fold alike.
+                const folded = grouping !== 'flat' && foldedSections.has(sec.key);
+                const rows = folded
+                    ? ''
+                    : sec.items
+                          .map((it) => {
+                              const taskType =
+                                  it.kind === 'overdue' ? 'overdue' : it.kind === 'upcoming' ? 'upcoming' : undefined;
+                              return renderTask(it.task, it.task.days_offset, taskType);
+                          })
+                          .join('');
                 // On `flat` the rows stand on their own: the panel is what
                 // carries the heading, the count and the group menu, and the
                 // setting asks for a day without them. The order is untouched —
@@ -1589,6 +1691,18 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         return renderSummaryBarHtml(dateIso, pieces, { escapeHtml });
     }
 
+    /**
+     * How a section's head should present its fold control right now.
+     *
+     * The label names the section, so six stacked heads do not all offer the
+     * same "Hide this section", and it says what a press WOULD do rather than
+     * what the state is -- that is what a tooltip on a control is read as.
+     */
+    function sectionFold(key: string, title: string): SectionFold {
+        const folded = foldedSections.has(key);
+        return { folded, label: formatString(folded ? UI.fold.expand : UI.fold.collapse, title) };
+    }
+
     function renderSectionPanel(
         key: string,
         title: string,
@@ -1606,6 +1720,7 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
                 uiLang,
                 inSectionTemplate: UI.countChip.inSection,
                 taskForms: UI.countChip.tasks,
+                fold: sectionFold(key, title),
                 escapeHtml,
                 formatString,
                 formatNumber,
@@ -1622,6 +1737,7 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             uiLang,
             inSectionTemplate: UI.countChip.inSection,
             taskForms: UI.countChip.tasks,
+            fold: sectionFold(key, title),
             escapeHtml,
             formatString,
             formatNumber,
@@ -1718,10 +1834,13 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         // tints to match the priority chip colours.
         const groupsHtml = groups
             .map((group) => {
-                const rows = group.items
-                    .map((task) => renderTask(task, undefined, taskDateDirection(task, anchor), 'always'))
-                    .join('');
-                return renderSectionPanel(`p${group.key}`, group.title, group.items.length, rows, '');
+                const key = `p${group.key}`;
+                const rows = foldedSections.has(key)
+                    ? ''
+                    : group.items
+                          .map((task) => renderTask(task, undefined, taskDateDirection(task, anchor), 'always'))
+                          .join('');
+                return renderSectionPanel(key, group.title, group.items.length, rows, '');
             })
             .join('');
         return renderCard('tasks', renderSummaryBar('', pieces), groupsHtml, UI.empty.tasks, { escapeHtml });

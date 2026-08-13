@@ -89,7 +89,13 @@ suite('agendaSummaryHtml.renderSummaryBar', () => {
 });
 
 suite('agendaSummaryHtml.renderSectionPanel', () => {
-    const ctx = { ...base, inSectionTemplate: '{0} in this section', taskForms: ['task', 'tasks'] };
+    const unfolded = { folded: false, label: 'Hide the “Overdue” section' };
+    const ctx = {
+        ...base,
+        inSectionTemplate: '{0} in this section',
+        taskForms: ['task', 'tasks'],
+        fold: unfolded
+    };
 
     test('renders the title, the count chip and the rows', () => {
         const html = renderSectionPanel('overdue', 'Overdue', 2, '<div class="task-line"></div>', ctx, '');
@@ -97,6 +103,37 @@ suite('agendaSummaryHtml.renderSectionPanel', () => {
         assert.match(html, /<span class="day-section-name">Overdue<\/span>/);
         assert.match(html, /<span class="day-section-count" title="2 tasks in this section">2<\/span>/);
         assert.match(html, /<div class="day-section-body"><div class="task-line"><\/div><\/div>/);
+    });
+
+    test('the head names its section, which is what a press on it folds', () => {
+        assert.match(renderSectionPanel('overdue-long', 'Overdue', 1, '', ctx, ''), /data-section="overdue-long"/);
+    });
+
+    test('an unfolded section offers to hide itself, and says it is open', () => {
+        const html = renderSectionPanel('overdue', 'Overdue', 2, '', ctx, '');
+        assert.match(html, /<button type="button" class="day-section-fold" aria-expanded="true"/);
+        assert.match(html, /title="Hide the “Overdue” section" aria-label="Hide the “Overdue” section">▾<\/button>/);
+    });
+
+    test('a folded section keeps its head and its count, and drops the body', () => {
+        // The count is the whole reason a folded head is readable: it says how
+        // much is behind it, and without it folding hides that there is
+        // anything there at all.
+        const fold = { folded: true, label: 'Show the “Overdue” section' };
+        const html = renderSectionPanel('overdue', 'Overdue', 12, '', { ...ctx, fold }, '');
+        assert.match(html, /<section class="day-section day-section-overdue day-section-is-folded">/);
+        // The head says it too: in the week view there is no panel around it,
+        // and both views must be readable the same way.
+        assert.match(html, /<div class="day-section-head day-section-is-folded" data-section="overdue">/);
+        assert.match(html, /<span class="day-section-count" title="12 tasks in this section">12<\/span>/);
+        assert.match(html, /aria-expanded="false"[^>]*>▸<\/button>/);
+        assert.ok(!html.includes('day-section-body'), `expected no body element, got: ${html}`);
+    });
+
+    test('escapes the fold label, which carries the section title into an attribute', () => {
+        const fold = { folded: false, label: 'Hide the “<script>” section' };
+        const html = renderSectionPanel('x', 'x', 0, '', { ...ctx, fold }, '');
+        assert.ok(!html.includes('<script>'), `expected the label escaped, got: ${html}`);
     });
 
     test('the chip title counts in the UI language, singular included', () => {
@@ -121,17 +158,32 @@ suite('agendaSummaryHtml.renderSectionPanel', () => {
 });
 
 suite('agendaSummaryHtml.renderBandHeading', () => {
-    const ctx = { ...base, inSectionTemplate: '{0} in this section', taskForms: ['task', 'tasks'] };
+    const ctx = {
+        ...base,
+        inSectionTemplate: '{0} in this section',
+        taskForms: ['task', 'tasks'],
+        fold: { folded: false, label: 'Hide the section' }
+    };
 
     test('renders the head alone, with no panel and no body around it', () => {
         const html = renderBandHeading('overdue-recent', 'Overdue this week', 3, ctx);
         assert.strictEqual(
             html,
-            '<div class="day-band day-section-overdue-recent day-section-head">' +
+            '<div class="day-band day-section-overdue-recent day-section-head" data-section="overdue-recent">' +
+                '<button type="button" class="day-section-fold" aria-expanded="true"' +
+                ' title="Hide the section" aria-label="Hide the section">▾</button>' +
                 '<span class="day-section-name">Overdue this week</span>' +
                 '<span class="day-section-count" title="3 tasks in this section">3</span>' +
                 '</div>'
         );
+    });
+
+    test('a folded band says so on the head both views share', () => {
+        const fold = { folded: true, label: 'Show the section' };
+        const html = renderBandHeading('overdue-long', 'Overdue long ago', 9, { ...ctx, fold });
+        assert.match(html, /class="day-band day-section-overdue-long day-section-head day-section-is-folded"/);
+        assert.match(html, /aria-expanded="false"[^>]*>▸<\/button>/);
+        assert.match(html, /<span class="day-section-count" title="9 tasks in this section">9<\/span>/);
     });
 
     test('leaves the rows outside itself, which is what the clipping chips count', () => {

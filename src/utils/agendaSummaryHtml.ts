@@ -77,10 +77,40 @@ export function renderSummaryBar(dateIso: string, pieces: string[], ctx: { escap
     return `<div class="day-header day-summary"${dateAttr}>${pieces.join('<span class="day-summary-sep">·</span>')}</div>`;
 }
 
+/** Whether a section is folded away, and what pressing its head would do. */
+export interface SectionFold {
+    /** True while the section's rows are left out of the render. */
+    folded: boolean;
+    /** Tooltip and accessible name of the control, already in the UI language. */
+    label: string;
+}
+
 /**
- * One section panel: title, count chip, whatever the head offers on the whole
- * section (`actionsHtml`, empty for a section that offers nothing) and the
- * already-rendered rows.
+ * The control that folds a section, at the head's leading edge.
+ *
+ * A glyph rather than an icon, for the reason the Android client uses one: the
+ * head is text already, and a vector here would be the only drawing on a page
+ * that has none. It is still a `<button>` -- the fold is reachable by keyboard
+ * and announced as expanded or collapsed, which a bare span could not do -- and
+ * the whole head answers a press, so the target is the heading, not the glyph.
+ */
+export function sectionFoldHtml(fold: SectionFold, escapeHtml: EscapeHtml): string {
+    const label = escapeHtml(fold.label);
+    return (
+        `<button type="button" class="day-section-fold" aria-expanded="${fold.folded ? 'false' : 'true'}"` +
+        ` title="${label}" aria-label="${label}">${fold.folded ? '▸' : '▾'}</button>`
+    );
+}
+
+/**
+ * One section panel: the fold control, title, count chip, whatever the head
+ * offers on the whole section (`actionsHtml`, empty for a section that offers
+ * nothing) and the already-rendered rows.
+ *
+ * A folded section is a head with no body at all -- the caller passes no rows,
+ * and nothing here draws an empty container for them. The count stays on the
+ * head either way: a folded section still has to say how much is behind it, or
+ * folding it hides the fact that it is there.
  */
 export function renderSectionPanel(
     key: string,
@@ -92,6 +122,7 @@ export function renderSectionPanel(
         uiLang: string;
         inSectionTemplate: string;
         taskForms: string[];
+        fold: SectionFold;
         escapeHtml: EscapeHtml;
         formatString: FormatString;
         formatNumber: FormatNumber;
@@ -105,14 +136,20 @@ export function renderSectionPanel(
     // The chip and its tooltip say the same number, so they count it the same
     // way -- the tooltip already went through `formatNumber`.
     const chipCount = ctx.escapeHtml(ctx.formatNumber(count, ctx.locale));
+    // The marker goes on both elements: the panel needs it for the room it
+    // takes with no body under it, and the head carries it because the head is
+    // what the state is about -- in the week view there is no panel at all, and
+    // both views must be readable the same way.
+    const foldedCls = ctx.fold.folded ? ' day-section-is-folded' : '';
     return (
-        `<section class="day-section day-section-${key}">` +
-        '<div class="day-section-head">' +
+        `<section class="day-section day-section-${key}${foldedCls}">` +
+        `<div class="day-section-head${foldedCls}" data-section="${ctx.escapeHtml(key)}">` +
+        sectionFoldHtml(ctx.fold, ctx.escapeHtml) +
         `<span class="day-section-name">${ctx.escapeHtml(title)}</span>` +
         `<span class="day-section-count" title="${chipTitle}">${chipCount}</span>` +
         actionsHtml +
         '</div>' +
-        `<div class="day-section-body">${rowsHtml}</div>` +
+        (ctx.fold.folded ? '' : `<div class="day-section-body">${rowsHtml}</div>`) +
         '</section>'
     );
 }
@@ -129,6 +166,10 @@ export function renderSectionPanel(
  *
  * The classes are the panel's own, so a band reads the same in both views: the
  * head's layout, and the red name and chip that `day-section-overdue-*` tints.
+ * The fold control is the panel's too -- the band folds by leaving its rows out
+ * of the render, which is what the sibling walk needs: rows merely hidden would
+ * still be counted, and a day whose backlog is folded would report every folded
+ * row as one scrolled out of sight.
  */
 export function renderBandHeading(
     key: string,
@@ -139,6 +180,7 @@ export function renderBandHeading(
         uiLang: string;
         inSectionTemplate: string;
         taskForms: string[];
+        fold: SectionFold;
         escapeHtml: EscapeHtml;
         formatString: FormatString;
         formatNumber: FormatNumber;
@@ -147,8 +189,10 @@ export function renderBandHeading(
 ): string {
     const chipTitle = ctx.escapeHtml(ctx.formatString(ctx.inSectionTemplate, countLabel(count, ctx.taskForms, ctx)));
     const chipCount = ctx.escapeHtml(ctx.formatNumber(count, ctx.locale));
+    const foldedCls = ctx.fold.folded ? ' day-section-is-folded' : '';
     return (
-        `<div class="day-band day-section-${key} day-section-head">` +
+        `<div class="day-band day-section-${key} day-section-head${foldedCls}" data-section="${ctx.escapeHtml(key)}">` +
+        sectionFoldHtml(ctx.fold, ctx.escapeHtml) +
         `<span class="day-section-name">${ctx.escapeHtml(title)}</span>` +
         `<span class="day-section-count" title="${chipTitle}">${chipCount}</span>` +
         '</div>'

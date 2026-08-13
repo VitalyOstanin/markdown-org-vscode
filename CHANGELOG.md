@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Agenda sections fold away: a press on a section head -- "All-day & upcoming",
+  an overdue band, a priority group -- hides its rows and leaves the heading
+  with its count, and a second press brings them back. Works in the Day, Week
+  and Tasks views; a band folded in the week is folded on every day of it. What
+  is folded lasts as long as the panel is open, and a day rendered without
+  headings (`markdown-org.agendaGrouping: "flat"`) folds nothing, since there
+  would be nothing to unfold it by.
 - Week view: a line down the left of each day, from its heading to its last
   row, so a band such as "All-day & upcoming" reads as part of the day above it
   rather than as a block of its own.

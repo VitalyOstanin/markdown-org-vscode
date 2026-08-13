@@ -116,7 +116,14 @@ suite('agenda counters share one numbering system', () => {
     const base = { locale, uiLang: 'en', escapeHtml, formatString, formatNumber, pluralIndex };
 
     test('the day screen prints no ASCII digit outside its attributes', () => {
-        const panelCtx = { ...base, inSectionTemplate: EN.countChip.inSection, taskForms: EN.countChip.tasks };
+        const panelCtx = {
+            ...base,
+            inSectionTemplate: EN.countChip.inSection,
+            taskForms: EN.countChip.tasks,
+            // Formatted, as the page formats it: the raw template carries a
+            // `{0}`, and the placeholder's digit is not one the reader sees.
+            fold: { folded: false, label: formatString(EN.fold.collapse, EN.sections.overdueRecent) }
+        };
         const index: MonthDayIndex = { [iso]: { total: 12, overdue: 3 } };
         // The chip's tooltip spells the overdue count out band by band, and
         // those counts are numbers on the screen like any other.

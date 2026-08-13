@@ -91,6 +91,13 @@ export interface AgendaStrings {
     /** Tasks-card priority group titles. */
     groups: { a: string; b: string; c: string; none: string };
     /**
+     * Folding a section away and bringing it back: the tooltip and accessible
+     * name of the control on its head. `{0}` is the section's own title, so the
+     * control says which section it answers for -- a screen of identical "Hide
+     * this section" is no help on a card that stacks six of them.
+     */
+    fold: { collapse: string; expand: string };
+    /**
      * Acting on a whole overdue band at once: the menu behind the mark at the
      * end of a band's heading, and what the move reports afterwards.
      *
@@ -305,6 +312,7 @@ const EN: AgendaStrings = {
         overdueLong: 'Overdue long ago'
     },
     groups: { a: 'Priority A', b: 'Priority B', c: 'Priority C', none: 'No priority' },
+    fold: { collapse: 'Hide the “{0}” section', expand: 'Show the “{0}” section' },
     group: {
         menuTitle: 'Act on every entry of “{0}” at once, in one move that can be put back',
         moveToToday: 'Move to today',
@@ -421,6 +429,7 @@ const RU: AgendaStrings = {
         overdueLong: 'Просрочено давно'
     },
     groups: { a: 'Приоритет A', b: 'Приоритет B', c: 'Приоритет C', none: 'Без приоритета' },
+    fold: { collapse: 'Скрыть раздел «{0}»', expand: 'Показать раздел «{0}»' },
     group: {
         menuTitle: 'Применить действие ко всем задачам раздела «{0}» сразу, одним изменением с возможностью отката',
         moveToToday: 'Перенести на сегодня',

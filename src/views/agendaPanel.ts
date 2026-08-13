@@ -24,6 +24,7 @@ import {
     renderDayHeaderHtml,
     renderSectionPanel,
     renderSummaryBar,
+    sectionFoldHtml,
     summaryStat
 } from '../utils/agendaSummaryHtml';
 import { renderGroupMenu } from '../utils/agendaGroupMenuHtml';
@@ -1067,6 +1068,10 @@ export class AgendaPanel {
         sections: string[];
         /** Section keys that offer a group action, in document order. */
         sectionMenus: string[];
+        /** Every foldable head as its key, plus ` (folded)` while it is folded. */
+        sectionFolds: string[];
+        /** How many task rows the page is showing; a folded section renders none. */
+        taskRows: number;
         /** Tooltip of each collection dot, in row order; empty with one directory. */
         collectionMarks: string[];
         /** Directory chips, each as its name plus ` (off)` while it is hidden. */
@@ -1102,6 +1107,8 @@ export class AgendaPanel {
                     flags?: string[];
                     sections?: string[];
                     sectionMenus?: string[];
+                    sectionFolds?: string[];
+                    taskRows?: number;
                     collectionMarks?: string[];
                     collectionChips?: string[];
                     headerLayout?: string;
@@ -1125,6 +1132,8 @@ export class AgendaPanel {
                             flags: m.flags ?? [],
                             sections: m.sections ?? [],
                             sectionMenus: m.sectionMenus ?? [],
+                            sectionFolds: m.sectionFolds ?? [],
+                            taskRows: m.taskRows ?? 0,
                             collectionMarks: m.collectionMarks ?? [],
                             collectionChips: m.collectionChips ?? [],
                             headerLayout: m.headerLayout ?? '',
@@ -1198,6 +1207,23 @@ export class AgendaPanel {
             return Promise.resolve(false);
         }
         return panel.webview.postMessage({ command: 'clickGroupActionForTesting', section, action });
+    }
+
+    /**
+     * Test-only helper: fold the section `section` away, or bring it back, as
+     * pressing its head does.
+     *
+     * Through the page for the same reason as the band menu: which sections are
+     * folded is page-side state, and what a press produces is the view rendered
+     * around it -- a test that set the state directly would step over the part
+     * under test. Resolves to false when no panel is open.
+     */
+    public static clickSectionFoldForTesting(section: string): Thenable<boolean> {
+        const panel = AgendaPanel.currentPanel;
+        if (!panel) {
+            return Promise.resolve(false);
+        }
+        return panel.webview.postMessage({ command: 'clickSectionFoldForTesting', section });
     }
 
     /**
@@ -1350,6 +1376,7 @@ export class AgendaPanel {
         countLabel,
         summaryStat,
         renderSummaryBar,
+        sectionFoldHtml,
         renderSectionPanel,
         renderBandHeading,
         renderGroupMenu,
