@@ -54,6 +54,7 @@ import {
     gitCommitRows,
     gitConflictedGroup,
     gitCount,
+    gitCounters,
     gitFileRows,
     gitFilesByRepository,
     gitGroup,
@@ -1372,6 +1373,7 @@ export class AgendaPanel {
         // exported helpers are what the inlined bodies call, and a function
         // that is not listed here is simply not defined in the page.
         gitCount,
+        gitCounters,
         isGitClean,
         gitChipStats,
         gitChipTitle,

@@ -38,6 +38,37 @@ export function gitCount(n: number, forms: string[], ctx: GitHtmlContext): strin
     return `${ctx.formatNumber(n, ctx.locale)} ${forms[ctx.pluralIndex(n, ctx.uiLang)] ?? ''}`;
 }
 
+/** One counter of the chip: its mark, its number, and the words for its tooltip. */
+export interface GitCounter {
+    kind: string;
+    mark: string;
+    count: number;
+    title: string;
+}
+
+/**
+ * The counters worth showing, in the order the chip shows them.
+ *
+ * One list for the marks and the tooltip: the two used to be four `if` blocks
+ * each, and the way that goes wrong is silently -- a counter added to one half
+ * and not to the other leaves a mark on the chip that its tooltip never
+ * explains. Conflicts lead because they are the one state that stops the
+ * panel's own buttons.
+ *
+ * A function rather than a constant: the page gets these bodies through
+ * `Function.prototype.toString()`, and a module-level value is not carried
+ * across with them.
+ */
+export function gitCounters(status: AgendaGitStatus, ctx: GitHtmlContext): GitCounter[] {
+    const g = ctx.git;
+    return [
+        { kind: 'conflicted', mark: '!', count: status.conflictCount, title: g.conflictedTitle },
+        { kind: 'uncommitted', mark: '●', count: status.uncommittedCount, title: g.uncommittedTitle },
+        { kind: 'unpushed', mark: '↑', count: status.unpushedCount, title: g.unpushedTitle },
+        { kind: 'outside', mark: '?', count: status.outsideGitCount, title: g.outsideTitle }
+    ].filter((counter) => counter.count > 0);
+}
+
 /**
  * The collapsed chip.
  *
@@ -72,30 +103,13 @@ export function gitChipStats(status: AgendaGitStatus, ctx: GitHtmlContext): stri
             `<span class="git-chip-word">${ctx.escapeHtml(g.clean)}</span></span>`
         );
     }
-    let html = '';
-    // Conflicts lead: they are the one state that stops the panel's own
-    // buttons, so a chip that mentions them last would read as an afterthought.
-    if (status.conflictCount > 0) {
-        html +=
-            '<span class="git-chip-stat" data-kind="conflicted">!' +
-            `<b>${ctx.escapeHtml(ctx.formatNumber(status.conflictCount, ctx.locale))}</b></span>`;
-    }
-    if (status.uncommittedCount > 0) {
-        html +=
-            '<span class="git-chip-stat" data-kind="uncommitted">●' +
-            `<b>${ctx.escapeHtml(ctx.formatNumber(status.uncommittedCount, ctx.locale))}</b></span>`;
-    }
-    if (status.unpushedCount > 0) {
-        html +=
-            '<span class="git-chip-stat" data-kind="unpushed">↑' +
-            `<b>${ctx.escapeHtml(ctx.formatNumber(status.unpushedCount, ctx.locale))}</b></span>`;
-    }
-    if (status.outsideGitCount > 0) {
-        html +=
-            '<span class="git-chip-stat" data-kind="outside">?' +
-            `<b>${ctx.escapeHtml(ctx.formatNumber(status.outsideGitCount, ctx.locale))}</b></span>`;
-    }
-    return html;
+    return gitCounters(status, ctx)
+        .map(
+            (counter) =>
+                `<span class="git-chip-stat" data-kind="${counter.kind}">${counter.mark}` +
+                `<b>${ctx.escapeHtml(ctx.formatNumber(counter.count, ctx.locale))}</b></span>`
+        )
+        .join('');
 }
 
 /**
@@ -120,20 +134,9 @@ export function gitChipTitle(status: AgendaGitStatus, ctx: GitHtmlContext): stri
     if (isGitClean(status)) {
         return g.cleanTitle;
     }
-    const parts: string[] = [];
-    if (status.conflictCount > 0) {
-        parts.push(ctx.formatString(g.conflictedTitle, gitCount(status.conflictCount, g.files, ctx)));
-    }
-    if (status.uncommittedCount > 0) {
-        parts.push(ctx.formatString(g.uncommittedTitle, gitCount(status.uncommittedCount, g.files, ctx)));
-    }
-    if (status.unpushedCount > 0) {
-        parts.push(ctx.formatString(g.unpushedTitle, gitCount(status.unpushedCount, g.files, ctx)));
-    }
-    if (status.outsideGitCount > 0) {
-        parts.push(ctx.formatString(g.outsideTitle, gitCount(status.outsideGitCount, g.files, ctx)));
-    }
-    return parts.join(g.titleSeparator);
+    return gitCounters(status, ctx)
+        .map((counter) => ctx.formatString(counter.title, gitCount(counter.count, g.files, ctx)))
+        .join(g.titleSeparator);
 }
 
 /**

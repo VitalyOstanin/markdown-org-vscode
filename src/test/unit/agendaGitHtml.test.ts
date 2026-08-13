@@ -126,6 +126,27 @@ suite('renderGitChip', () => {
         assert.strictEqual(title, '2 files not committed, 1 file not pushed');
     });
 
+    // The chip and its tooltip are two renderings of one list of counters, and
+    // the way that goes wrong is silently: a mark on the chip the tooltip never
+    // explains, or a sentence about a number the chip does not show.
+    test('every counter on the chip is spelled out in the tooltip, and no other', () => {
+        const full = status({
+            files: [
+                file({ file: '/repo/a.md', label: 'a.md', conflicted: true }),
+                file({ file: '/repo/b.md', label: 'b.md', uncommitted: true }),
+                file({ file: '/repo/c.md', label: 'c.md', unpushed: true }),
+                outsideFile('/elsewhere/d.md', 'd.md')
+            ]
+        });
+        const kinds = [...renderGitChip(full, CTX).matchAll(/data-kind="([a-z]+)"/g)].map((hit) => hit[1]);
+        assert.deepStrictEqual(kinds, ['conflicted', 'uncommitted', 'unpushed', 'outside']);
+        assert.strictEqual(
+            gitChipTitle(full, CTX),
+            '1 file with unresolved conflicts, 1 file not committed, 1 file not pushed, ' +
+                '1 file outside git, or in a repository VS Code has not opened'
+        );
+    });
+
     test('russian plural forms follow the count, not the digit', () => {
         const ru: GitHtmlContext = { ...CTX, git: AGENDA_STRINGS.ru.git, uiLang: 'ru', locale: 'ru-RU' };
         const files = Array.from({ length: 5 }, (_, i) =>

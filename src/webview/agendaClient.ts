@@ -36,6 +36,14 @@ import type { AgendaStrings } from '../utils/agendaI18n';
  * a page does not have. The same reason every other helper signature in this
  * file is written out structurally.
  */
+/** One counter of the git chip, as `gitCounters` describes it. */
+interface GitCounter {
+    kind: string;
+    mark: string;
+    count: number;
+    title: string;
+}
+
 interface GitHtmlContext {
     git: AgendaStrings['git'];
     locale: string;
@@ -591,6 +599,7 @@ export interface AgendaClientDeps {
     isGitClean: (status: AgendaGitStatus) => boolean;
     renderGitChip: (status: AgendaGitStatus, ctx: GitHtmlContext) => string;
     gitCount: (n: number, forms: string[], ctx: GitHtmlContext) => string;
+    gitCounters: (status: AgendaGitStatus, ctx: GitHtmlContext) => GitCounter[];
     gitGroups: (status: AgendaGitStatus, ctx: GitHtmlContext) => string;
     gitGroup: (
         kind: string,
