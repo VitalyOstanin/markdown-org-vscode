@@ -38,6 +38,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Git chip: a source file whose repository could not be read is counted as
   unknown ("? N") instead of being folded into "clean". The diagnostic log
   names the cause when git reports a repository that VS Code declined to open.
+- Git panel: failures and refusals git reports -- a failed commit, a failed
+  push, a push from a detached HEAD -- are worded in the interface language
+  instead of arriving half in English.
 - CLOCK lines: an entry whose end was stepped back past its start writes its
   duration as `-2:30` rather than `-3:-30`.
 

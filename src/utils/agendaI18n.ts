@@ -243,6 +243,16 @@ export interface AgendaStrings {
          * git -- "non-fast-forward" names the rule, not the way out.
          */
         pushRejected: string;
+        /**
+         * Any other failure of the two operations; `{0}` is git's own wording,
+         * quoted rather than interpreted. The sentence around it is translated
+         * so the message does not arrive half in the UI language and half in
+         * English.
+         */
+        commitFailed: string;
+        pushFailed: string;
+        /** Push from a detached HEAD: there is no branch to send anywhere. */
+        pushDetachedHead: string;
         /** Push with no upstream: `{0}` branch, `{1}` the upstream to create. */
         setUpstreamPrompt: string;
         setUpstreamConfirm: string;
@@ -362,6 +372,9 @@ const EN: AgendaStrings = {
         pushProgress: 'Pushing the agenda repositories…',
         pushRejected:
             'Push rejected: "{1}" has commits "{0}" does not. Fetch and merge (or rebase) them, then push again.',
+        commitFailed: 'Commit failed: {0}',
+        pushFailed: 'Push failed: {0}',
+        pushDetachedHead: 'Push cancelled: HEAD is not on a branch',
         setUpstreamPrompt: 'Branch "{0}" has no upstream. Push it and set "{1}"?',
         setUpstreamConfirm: 'Push',
         committed: 'Committed {0}',
@@ -482,6 +495,9 @@ const RU: AgendaStrings = {
         pushProgress: 'Отправка репозиториев агенды…',
         pushRejected:
             'Отправка отклонена: в «{1}» есть коммиты, которых нет в «{0}». Получите их (merge или rebase) и отправьте снова.',
+        commitFailed: 'Коммит не выполнен: {0}',
+        pushFailed: 'Отправка не выполнена: {0}',
+        pushDetachedHead: 'Отправка отменена: HEAD не на ветке',
         setUpstreamPrompt: 'У ветки «{0}» нет upstream. Отправить и установить «{1}»?',
         setUpstreamConfirm: 'Отправить',
         committed: 'Закоммичено: {0}',

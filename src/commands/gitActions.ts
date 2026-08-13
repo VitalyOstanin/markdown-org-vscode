@@ -93,7 +93,7 @@ export async function commitAgendaSources(
             } catch (error) {
                 const reason = formatError(error);
                 logDiagnostic(`agenda git commit failed in ${repository.rootUri.fsPath}: ${reason}`);
-                notifyError(`git commit failed: ${reason}`);
+                notifyError(formatString(strings.git.commitFailed, reason));
                 return undefined;
             }
         }
@@ -183,7 +183,7 @@ function reportPushFailure(
         notifyError(formatString(strings.git.pushRejected, branch ?? 'HEAD', target));
         return;
     }
-    notifyError(`git push failed: ${reason}`);
+    notifyError(formatString(strings.git.pushFailed, reason));
 }
 
 /** Two signals for one refusal: the error code, then its text. */
@@ -232,7 +232,7 @@ async function confirmSetUpstream(repository: GitRepository, strings: AgendaStri
     const branch = repository.state.HEAD?.name;
     if (!branch) {
         // Detached HEAD: there is no branch to set an upstream for.
-        notifyError('git push: HEAD is not on a branch');
+        notifyError(strings.git.pushDetachedHead);
         return false;
     }
     const prompt = formatString(strings.git.setUpstreamPrompt, branch, `origin/${branch}`);
