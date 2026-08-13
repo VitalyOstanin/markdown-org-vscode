@@ -9,7 +9,9 @@ const REPO: GitRepoSnapshot = {
     upstream: 'origin/master',
     aheadCommits: 3,
     uncommitted: ['/repo/work.md'],
-    unpushed: ['/repo/home.md']
+    unpushed: ['/repo/home.md'],
+    commits: [],
+    conflicts: []
 };
 
 function source(file: string, realPath = file, repoRoot = '/repo'): GitSourceFile {
@@ -91,7 +93,9 @@ suite('buildGitStatus', () => {
             upstream: 'origin/main',
             aheadCommits: 2,
             uncommitted: ['/other/plan.md'],
-            unpushed: []
+            unpushed: [],
+            commits: [],
+            conflicts: []
         };
         const status = buildGitStatus(
             [source('/repo/work.md'), source('/other/plan.md', '/other/plan.md', '/other')],
@@ -112,7 +116,9 @@ suite('buildGitStatus', () => {
             branch: 'main',
             aheadCommits: 7,
             uncommitted: ['/unused/x.md'],
-            unpushed: ['/unused/x.md']
+            unpushed: ['/unused/x.md'],
+            commits: [],
+            conflicts: []
         };
         const status = buildGitStatus([source('/repo/work.md')], [REPO, unused], 'linux');
         assert.deepStrictEqual(
@@ -129,7 +135,9 @@ suite('buildGitStatus', () => {
             root: '/repo',
             branch: 'wip',
             uncommitted: ['/repo/work.md'],
-            unpushed: []
+            unpushed: [],
+            commits: [],
+            conflicts: []
         };
         const status = buildGitStatus([source('/repo/work.md')], [detached], 'linux');
         assert.strictEqual(status.repos[0]?.upstream, undefined);
@@ -148,6 +156,39 @@ suite('buildGitStatus', () => {
         assert.strictEqual(status.repos.length, 1);
         assert.strictEqual(status.uncommittedCount, 0);
         assert.strictEqual(status.unpushedCount, 0);
+    });
+
+    // Conflicts arrive in their own bucket, so a file the user is still
+    // resolving is in neither the working-tree nor the index list; counting
+    // only those two would file it under "clean".
+    test('a conflicted source file is marked, and not counted as clean', () => {
+        const merging: GitRepoSnapshot = { ...REPO, uncommitted: [], conflicts: ['/repo/work.md'] };
+        const status = buildGitStatus([source('/repo/work.md')], [merging], 'linux');
+        const [file] = status.files;
+        assert.ok(file);
+        assert.strictEqual(file.conflicted, true);
+        assert.strictEqual(file.uncommitted, false);
+        assert.strictEqual(status.conflictCount, 1);
+    });
+
+    // What the panel explains is why the commit button is gone, and that is
+    // decided by the repository -- including paths the agenda never reads.
+    test('the conflict count is the repository total, not the view intersection', () => {
+        const merging: GitRepoSnapshot = {
+            ...REPO,
+            uncommitted: [],
+            conflicts: ['/repo/work.md', '/repo/src/main.ts', '/repo/README.md']
+        };
+        const status = buildGitStatus([source('/repo/work.md')], [merging], 'linux');
+        assert.strictEqual(status.conflictCount, 3);
+        assert.strictEqual(status.repos[0]?.conflictCount, 3);
+        assert.strictEqual(status.files.length, 1);
+    });
+
+    test('a repository with no merge in progress reports no conflict count at all', () => {
+        const status = buildGitStatus([source('/repo/work.md')], [REPO], 'linux');
+        assert.strictEqual(status.conflictCount, 0);
+        assert.strictEqual(status.repos[0]?.conflictCount, undefined);
     });
 
     test('the label keeps windows separators when the platform is windows', () => {

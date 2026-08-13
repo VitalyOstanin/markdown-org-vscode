@@ -31,6 +31,21 @@ export interface GitChange {
     readonly uri: { readonly fsPath: string };
 }
 
+/**
+ * One commit, as `log` returns it. `message` is the full text; the panel shows
+ * only its first line, so the subject is taken here rather than asked for.
+ */
+export interface GitCommit {
+    readonly hash: string;
+    readonly message: string;
+}
+
+/** The `log` options this extension passes. `range` is `upstream..HEAD`. */
+export interface GitLogOptions {
+    readonly range?: string;
+    readonly maxEntries?: number;
+}
+
 /** The branch HEAD points at. `ahead` is absent when there is no upstream. */
 export interface GitBranch {
     readonly name?: string;
@@ -49,6 +64,14 @@ export interface GitRepositoryState {
      * rather than assume the bucket exists.
      */
     readonly untrackedChanges?: readonly GitChange[];
+    /**
+     * Paths left unresolved by a merge, rebase or cherry-pick. Non-empty means
+     * the repository is mid-operation, and a commit made now would carry
+     * whatever else that operation staged -- which is why this extension
+     * refuses to commit rather than narrowing the paths further. Optional for
+     * the same reason as `untrackedChanges`: it is a bucket the API grew.
+     */
+    readonly mergeChanges?: readonly GitChange[];
     readonly onDidChange: (listener: () => void) => { dispose: () => void };
 }
 
@@ -66,6 +89,7 @@ export interface GitRepository {
     commit: (message: string) => Promise<void>;
     push: (remoteName?: string, branchName?: string, setUpstream?: boolean) => Promise<void>;
     diffBetween: (ref1: string, ref2: string) => Promise<GitChange[]>;
+    log: (options?: GitLogOptions) => Promise<GitCommit[]>;
 }
 
 export interface GitApi {

@@ -16,7 +16,7 @@
 // in src/types.ts alongside `Task` -- the webview project cannot import a
 // module that reaches for `node:path`, which this one does through
 // `gitPathMatch`.
-import type { AgendaGitStatus, GitFileState, GitRepoState } from '../../types';
+import type { AgendaGitStatus, GitCommitState, GitFileState, GitRepoState } from '../../types';
 import { pathApi, pathKey } from './gitPathMatch';
 
 /** One repository, reduced to what the model needs. */
@@ -33,6 +33,19 @@ export interface GitRepoSnapshot {
     uncommitted: readonly string[];
     /** Real paths touched by commits absent from upstream. */
     unpushed: readonly string[];
+    /**
+     * Real paths left unresolved by a merge in progress. Counted whole, not
+     * only where it meets the view: the commit this panel offers is refused
+     * for the repository, so the number that explains the refusal is the
+     * repository's.
+     */
+    conflicts: readonly string[];
+    /**
+     * Those commits themselves, newest first and capped by the collector. Kept
+     * apart from `aheadCommits`, which stays the full count: the panel prints
+     * the difference as "and N more".
+     */
+    commits: readonly GitCommitState[];
 }
 
 /** One agenda source file, already resolved against the repositories. */
@@ -62,11 +75,13 @@ export function buildGitStatus(
     const byRoot = new Map<string, GitRepoSnapshot>();
     const uncommittedSets = new Map<string, Set<string>>();
     const unpushedSets = new Map<string, Set<string>>();
+    const conflictSets = new Map<string, Set<string>>();
     for (const repo of repos) {
         const key = pathKey(repo.root, platform);
         byRoot.set(key, repo);
         uncommittedSets.set(key, new Set(repo.uncommitted.map((p) => pathKey(p, platform))));
         unpushedSets.set(key, new Set(repo.unpushed.map((p) => pathKey(p, platform))));
+        conflictSets.set(key, new Set(repo.conflicts.map((p) => pathKey(p, platform))));
     }
 
     const seen = new Set<string>();
@@ -83,6 +98,7 @@ export function buildGitStatus(
         const realKey = pathKey(source.realPath, platform);
         const uncommitted = rootKey !== undefined && (uncommittedSets.get(rootKey)?.has(realKey) ?? false);
         const unpushed = rootKey !== undefined && (unpushedSets.get(rootKey)?.has(realKey) ?? false);
+        const conflicted = rootKey !== undefined && (conflictSets.get(rootKey)?.has(realKey) ?? false);
         if (rootKey !== undefined) {
             usedRoots.add(rootKey);
         }
@@ -93,7 +109,8 @@ export function buildGitStatus(
             label: fileLabel(source, platform),
             ...(source.repoRoot === undefined ? {} : { repoRoot: source.repoRoot }),
             uncommitted,
-            unpushed
+            unpushed,
+            conflicted
         });
     }
 
@@ -105,7 +122,9 @@ export function buildGitStatus(
             name: pathApi(platform).basename(repo.root),
             ...(repo.branch === undefined ? {} : { branch: repo.branch }),
             ...(repo.upstream === undefined ? {} : { upstream: repo.upstream }),
-            ...(repo.aheadCommits === undefined ? {} : { aheadCommits: repo.aheadCommits })
+            ...(repo.aheadCommits === undefined ? {} : { aheadCommits: repo.aheadCommits }),
+            ...(repo.commits.length === 0 ? {} : { unpushedCommitList: [...repo.commits] }),
+            ...(repo.conflicts.length === 0 ? {} : { conflictCount: repo.conflicts.length })
         }))
         .sort((a, b) => a.root.localeCompare(b.root));
 
@@ -115,7 +134,8 @@ export function buildGitStatus(
         uncommittedCount: files.filter((f) => f.uncommitted).length,
         unpushedCount: files.filter((f) => f.unpushed).length,
         outsideGitCount: files.filter((f) => f.repoRoot === undefined).length,
-        unpushedCommits: activeRepos.reduce((sum, repo) => sum + (repo.aheadCommits ?? 0), 0)
+        unpushedCommits: activeRepos.reduce((sum, repo) => sum + (repo.aheadCommits ?? 0), 0),
+        conflictCount: activeRepos.reduce((sum, repo) => sum + (repo.conflictCount ?? 0), 0)
     };
 }
 

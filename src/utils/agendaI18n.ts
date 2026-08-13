@@ -176,10 +176,26 @@ export interface AgendaStrings {
         /** Chip tooltip halves; `{0}` is a counted noun from `files`. */
         uncommittedTitle: string;
         unpushedTitle: string;
+        /**
+         * The third half: files whose state could not be read at all, either
+         * because they are outside git or because the repository holding them
+         * is one VS Code declined to open. "Clean" would be a claim about them
+         * that nothing checked.
+         */
+        outsideTitle: string;
+        /**
+         * Paths a merge left unresolved. Counted over the whole repository,
+         * not over the view: what they block is the commit button, and that
+         * button is refused for the repository.
+         */
+        conflictedTitle: string;
         /** Joins the two halves above. */
         titleSeparator: string;
         /** Group headings; `{0}` is a counted noun from `files`. */
         uncommittedGroup: string;
+        conflictedGroup: string;
+        /** Row under the conflict group: where they are resolved instead. */
+        conflictedHint: string;
         unpushedGroup: string;
         /**
          * Single-repository variant of the unpushed heading: `{0}` files,
@@ -188,6 +204,13 @@ export interface AgendaStrings {
         unpushedGroupDetailed: string;
         cleanGroup: string;
         outsideGroup: string;
+        /**
+         * Last row of the commit list; `{0}` is the number left out. A bare
+         * number, not a counted noun: the group heading right above already
+         * says "in N commits", and repeating the word there reads as a second
+         * subject ("and 29 commits more").
+         */
+        moreCommits: string;
         /** Counted nouns, in the order `pluralIndex` returns. */
         files: string[];
         commits: string[];
@@ -205,11 +228,31 @@ export interface AgendaStrings {
         commitDefault: string;
         /** Refusal when the message is blank. */
         commitEmptyMessage: string;
+        /**
+         * Refusal when the repository is mid-merge; `{0}` is its name. Reached
+         * from a panel whose status is a moment stale -- the button is already
+         * gone once the next status arrives.
+         */
+        commitConflicts: string;
+        /** Progress notifications while the two operations run. */
+        commitProgress: string;
+        pushProgress: string;
+        /**
+         * Push refused by the remote because it holds commits we do not:
+         * `{0}` branch, `{1}` upstream. Says what to do instead of quoting
+         * git -- "non-fast-forward" names the rule, not the way out.
+         */
+        pushRejected: string;
         /** Push with no upstream: `{0}` branch, `{1}` the upstream to create. */
         setUpstreamPrompt: string;
         setUpstreamConfirm: string;
-        /** Status-bar confirmations; `{0}` is a counted noun from `files`. */
+        /** Status-bar confirmation; `{0}` is a counted noun from `files`. */
         committed: string;
+        /**
+         * The same for push, counted in `commits`: what travels is commits,
+         * and a repository count would report "1" for a branch ten commits
+         * ahead.
+         */
         pushed: string;
     };
     /** Panel tab title; `{0}` is the mode label. */
@@ -291,12 +334,17 @@ const EN: AgendaStrings = {
         cleanTitle: 'Every agenda source file is committed and pushed',
         uncommittedTitle: '{0} not committed',
         unpushedTitle: '{0} not pushed',
+        outsideTitle: '{0} outside git, or in a repository VS Code has not opened',
+        conflictedTitle: '{0} with unresolved conflicts',
         titleSeparator: ', ',
         uncommittedGroup: 'Not committed: {0}',
+        conflictedGroup: 'Conflicts: {0}',
+        conflictedHint: 'Resolve them in Source Control, then commit from here',
         unpushedGroup: 'Not pushed: {0}',
         unpushedGroupDetailed: 'Not pushed: {0} in {1} ({2} → {3})',
         cleanGroup: 'Clean: {0}',
         outsideGroup: 'Outside git: {0}',
+        moreCommits: 'and {0} more',
         files: ['file', 'files'],
         commits: ['commit', 'commits'],
         commitButton: 'Commit {0}',
@@ -309,6 +357,11 @@ const EN: AgendaStrings = {
         commitPlaceholder: 'What changed in these files',
         commitDefault: 'agenda: {0}',
         commitEmptyMessage: 'Commit cancelled: the message is empty',
+        commitConflicts: 'Commit cancelled: "{0}" has unresolved conflicts. Resolve them in Source Control first.',
+        commitProgress: 'Committing the agenda source files…',
+        pushProgress: 'Pushing the agenda repositories…',
+        pushRejected:
+            'Push rejected: "{1}" has commits "{0}" does not. Fetch and merge (or rebase) them, then push again.',
         setUpstreamPrompt: 'Branch "{0}" has no upstream. Push it and set "{1}"?',
         setUpstreamConfirm: 'Push',
         committed: 'Committed {0}',
@@ -401,12 +454,17 @@ const RU: AgendaStrings = {
         cleanTitle: 'Все файлы-источники агенды закоммичены и отправлены',
         uncommittedTitle: 'не закоммичено: {0}',
         unpushedTitle: 'не отправлено: {0}',
+        outsideTitle: 'вне git или в репозитории, который VS Code не открыл: {0}',
+        conflictedTitle: 'с неразрешёнными конфликтами: {0}',
         titleSeparator: ', ',
         uncommittedGroup: 'Без коммита: {0}',
+        conflictedGroup: 'Конфликты: {0}',
+        conflictedHint: 'Разрешите их в Source Control, затем коммитьте отсюда',
         unpushedGroup: 'Без пуша: {0}',
         unpushedGroupDetailed: 'Без пуша: {0} в {1} ({2} → {3})',
         cleanGroup: 'Чисто: {0}',
         outsideGroup: 'Вне git: {0}',
+        moreCommits: 'и ещё {0}',
         files: ['файл', 'файла', 'файлов'],
         commits: ['коммит', 'коммита', 'коммитов'],
         commitButton: 'Закоммитить {0}',
@@ -419,6 +477,11 @@ const RU: AgendaStrings = {
         commitPlaceholder: 'Что изменилось в этих файлах',
         commitDefault: 'agenda: {0}',
         commitEmptyMessage: 'Коммит отменён: сообщение пустое',
+        commitConflicts: 'Коммит отменён: в «{0}» есть неразрешённые конфликты. Сначала разрешите их в Source Control.',
+        commitProgress: 'Коммит файлов-источников агенды…',
+        pushProgress: 'Отправка репозиториев агенды…',
+        pushRejected:
+            'Отправка отклонена: в «{1}» есть коммиты, которых нет в «{0}». Получите их (merge или rebase) и отправьте снова.',
         setUpstreamPrompt: 'У ветки «{0}» нет upstream. Отправить и установить «{1}»?',
         setUpstreamConfirm: 'Отправить',
         committed: 'Закоммичено: {0}',

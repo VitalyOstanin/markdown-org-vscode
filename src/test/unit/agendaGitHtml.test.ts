@@ -1,4 +1,6 @@
 import * as assert from 'node:assert';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { suite, test } from 'mocha';
 import { gitChipTitle, renderGitChip, renderGitMenu } from '../../utils/agendaGitHtml';
 import type { GitHtmlContext } from '../../utils/agendaGitHtml';
@@ -26,7 +28,16 @@ const REPO: GitRepoState = {
 };
 
 function file(partial: Partial<GitFileState> & { file: string; label: string }): GitFileState {
-    return { repoRoot: '/repo', uncommitted: false, unpushed: false, ...partial };
+    return { repoRoot: '/repo', uncommitted: false, unpushed: false, conflicted: false, ...partial };
+}
+
+/**
+ * A source file with no repository at all -- outside git, or inside one VS
+ * Code declined to open. `repoRoot` is left out rather than set to undefined:
+ * exactOptionalPropertyTypes tells the two apart, and the model omits the key.
+ */
+function outsideFile(path: string, label: string): GitFileState {
+    return { file: path, label, uncommitted: false, unpushed: false, conflicted: false };
 }
 
 function status(partial: Partial<AgendaGitStatus> = {}): AgendaGitStatus {
@@ -38,6 +49,7 @@ function status(partial: Partial<AgendaGitStatus> = {}): AgendaGitStatus {
         unpushedCount: files.filter((f) => f.unpushed).length,
         outsideGitCount: files.filter((f) => f.repoRoot === undefined).length,
         unpushedCommits: 3,
+        conflictCount: files.filter((f) => f.conflicted).length,
         ...partial
     };
 }
@@ -75,6 +87,31 @@ suite('renderGitChip', () => {
         assert.ok(html.includes('<span class="git-chip-word">clean</span>'));
     });
 
+    // The regression this pair pins: a file whose repository could not be read
+    // is neither uncommitted nor unpushed, and the chip used to answer "clean"
+    // for it -- a claim about a file nothing had looked at.
+    test('a file with no repository is counted, not passed off as clean', () => {
+        const html = renderGitChip(status({ files: [outsideFile('/elsewhere/notes.md', 'notes.md')] }), CTX);
+        assert.ok(html.includes('data-kind="outside"'), 'unknown-state stat missing');
+        assert.ok(!html.includes('data-kind="clean"'), 'clean marker must not stand for an unread file');
+    });
+
+    test('the tooltip names the files whose state could not be read', () => {
+        const title = gitChipTitle(
+            status({
+                files: [
+                    file({ file: '/repo/a.md', label: 'a.md', uncommitted: true }),
+                    outsideFile('/elsewhere/b.md', 'b.md')
+                ]
+            }),
+            CTX
+        );
+        assert.strictEqual(
+            title,
+            '1 file not committed, 1 file outside git, or in a repository VS Code has not opened'
+        );
+    });
+
     test('the tooltip spells out both numbers with plural forms', () => {
         const title = gitChipTitle(
             status({
@@ -98,10 +135,17 @@ suite('renderGitChip', () => {
     });
 });
 
+/** The same repository with nothing waiting to be pushed. */
+const LEVEL_REPO: GitRepoState = { root: '/repo', name: 'repo', branch: 'master', upstream: 'origin/master' };
+
 suite('renderGitMenu', () => {
     test('omits a group that has no files', () => {
         const html = renderGitMenu(
-            status({ files: [file({ file: '/repo/work.md', label: 'work.md', uncommitted: true })] }),
+            status({
+                repos: [LEVEL_REPO],
+                unpushedCommits: 0,
+                files: [file({ file: '/repo/work.md', label: 'work.md', uncommitted: true })]
+            }),
             CTX
         );
         assert.ok(html.includes('data-group="uncommitted"'));
@@ -113,12 +157,48 @@ suite('renderGitMenu', () => {
     test('a file that is both uncommitted and unpushed is listed once, under uncommitted', () => {
         const html = renderGitMenu(
             status({
+                repos: [LEVEL_REPO],
+                unpushedCommits: 0,
                 files: [file({ file: '/repo/diary.md', label: 'diary.md', uncommitted: true, unpushed: true })]
             }),
             CTX
         );
         assert.strictEqual(html.split('data-file="/repo/diary.md"').length - 1, 1);
         assert.ok(!html.includes('data-group="unpushed"'));
+    });
+
+    // The defect behind this one: the group was built from its files alone, so
+    // a branch whose only unpushed file was also uncommitted showed no group at
+    // all -- and the commits the Push button would send stayed invisible.
+    test('the unpushed group appears for commits even when it has no files of its own', () => {
+        const html = renderGitMenu(
+            status({
+                repos: [{ ...REPO, unpushedCommitList: [{ hash: 'abc1234', subject: 'fix the parser' }] }],
+                files: [file({ file: '/repo/diary.md', label: 'diary.md', uncommitted: true, unpushed: true })]
+            }),
+            CTX
+        );
+        assert.ok(html.includes('data-group="unpushed"'));
+        assert.ok(html.includes('fix the parser'), html);
+        assert.ok(html.includes('abc1234'));
+    });
+
+    test('commits beyond the listed ones are summarised, not dropped', () => {
+        const html = renderGitMenu(
+            status({
+                repos: [
+                    {
+                        ...REPO,
+                        aheadCommits: 30,
+                        unpushedCommitList: [{ hash: 'abc1234', subject: 'fix the parser' }]
+                    }
+                ],
+                unpushedCommits: 30,
+                files: [file({ file: '/repo/home.md', label: 'home.md', unpushed: true })]
+            }),
+            CTX
+        );
+        assert.ok(html.includes('and 29 more'), html);
     });
 
     test('names the commit count and the branch pair for a single repository', () => {
@@ -162,7 +242,7 @@ suite('renderGitMenu', () => {
                 repos: [REPO, other],
                 files: [
                     file({ file: '/repo/work.md', label: 'work.md', uncommitted: true }),
-                    { file: '/loose/x.md', label: 'x.md', uncommitted: false, unpushed: false }
+                    outsideFile('/loose/x.md', 'x.md')
                 ]
             }),
             CTX
@@ -172,15 +252,33 @@ suite('renderGitMenu', () => {
 
     test('shows the commit button only when something is uncommitted', () => {
         const withChanges = renderGitMenu(
-            status({ files: [file({ file: '/repo/work.md', label: 'work.md', uncommitted: true })] }),
+            status({
+                repos: [LEVEL_REPO],
+                unpushedCommits: 0,
+                files: [file({ file: '/repo/work.md', label: 'work.md', uncommitted: true })]
+            }),
             CTX
         );
         assert.ok(withChanges.includes('id="gitCommitBtn"'));
         assert.ok(!withChanges.includes('id="gitPushBtn"'));
 
-        const clean = renderGitMenu(status({ files: [file({ file: '/repo/notes.md', label: 'notes.md' })] }), CTX);
+        const clean = renderGitMenu(
+            status({
+                repos: [LEVEL_REPO],
+                unpushedCommits: 0,
+                files: [file({ file: '/repo/notes.md', label: 'notes.md' })]
+            }),
+            CTX
+        );
         assert.ok(!clean.includes('id="gitCommitBtn"'));
         assert.ok(!clean.includes('git-actions'));
+    });
+
+    // The button pushes the branch, so what gates it is the commit count. A
+    // commit that touched none of this view's files still goes out with it.
+    test('the push button appears for commits that touched no file of the view', () => {
+        const html = renderGitMenu(status({ files: [file({ file: '/repo/notes.md', label: 'notes.md' })] }), CTX);
+        assert.ok(html.includes('id="gitPushBtn"'), html);
     });
 
     test('the push button counts commits, not files', () => {
@@ -189,6 +287,57 @@ suite('renderGitMenu', () => {
             CTX
         );
         assert.ok(html.includes('>Push 3</button>'), html);
+    });
+
+    // An unresolved merge takes the commit button away: git would refuse the
+    // commit, and once the conflicts were staged it would accept one carrying
+    // the whole merge -- neither is what a button labelled with this view's
+    // file count offers.
+    test('a conflict removes the commit button and says why', () => {
+        const html = renderGitMenu(
+            status({
+                repos: [{ ...LEVEL_REPO, conflictCount: 2 }],
+                unpushedCommits: 0,
+                conflictCount: 2,
+                files: [file({ file: '/repo/work.md', label: 'work.md', uncommitted: true, conflicted: true })]
+            }),
+            CTX
+        );
+        assert.ok(!html.includes('id="gitCommitBtn"'), 'the commit button must not survive a conflict');
+        assert.ok(html.includes('data-group="conflicted"'), html);
+        assert.ok(html.includes('Resolve them in Source Control'), html);
+    });
+
+    // The heading counts the repository's conflicts, not the view's: two of the
+    // three unresolved paths may well be files this agenda never reads, and a
+    // heading saying "1 file" would make the missing button look unexplained.
+    test('the conflict heading counts the repository, the rows count the view', () => {
+        const html = renderGitMenu(
+            status({
+                repos: [{ ...LEVEL_REPO, conflictCount: 3 }],
+                unpushedCommits: 0,
+                conflictCount: 3,
+                files: [file({ file: '/repo/work.md', label: 'work.md', conflicted: true })]
+            }),
+            CTX
+        );
+        assert.ok(html.includes('Conflicts: 3 files'), html);
+        assert.strictEqual(html.split('data-file="/repo/work.md"').length - 1, 1);
+        assert.ok(!html.includes('data-group="clean"'), 'a conflicted file is not a clean one');
+    });
+
+    test('the chip counts conflicts and never calls them clean', () => {
+        const html = renderGitChip(
+            status({
+                repos: [{ ...LEVEL_REPO, conflictCount: 1 }],
+                unpushedCommits: 0,
+                conflictCount: 1,
+                files: [file({ file: '/repo/work.md', label: 'work.md', conflicted: true })]
+            }),
+            CTX
+        );
+        assert.ok(html.includes('data-kind="conflicted"'), html);
+        assert.ok(!html.includes('data-kind="clean"'));
     });
 
     test('escapes quotes in a path so data-file cannot break out of the attribute', () => {
@@ -218,5 +367,38 @@ suite('renderGitMenu', () => {
         );
         assert.ok(html.includes('title="Real path: /repo/work.md"'), html);
         assert.ok(html.includes('data-file="/home/user/notes/work.md"'), 'the row must open the path the user knows');
+    });
+});
+
+/**
+ * Every function in this module is written to run inside the page, and gets
+ * there only by being listed in the panel's `INLINED_HELPERS`. A function that
+ * is missing from that list is not a compile error and not a wrong string: it
+ * is a `ReferenceError` at render time, which takes the whole chip -- and with
+ * it every group and both buttons -- off the header.
+ *
+ * That is exactly how `gitConflictedGroup` arrived: written, called from
+ * `gitGroups`, covered by unit tests that call it directly, and invisible in
+ * the panel. The check reads the two sources rather than a rendered page, so it
+ * fails in the unit suite, seconds after the omission is made.
+ */
+suite('agendaGitHtml is fully handed to the page', () => {
+    test('every exported function is listed in the panel INLINED_HELPERS', () => {
+        const root = path.join(__dirname, '..', '..', '..');
+        const source = fs.readFileSync(path.join(root, 'src', 'utils', 'agendaGitHtml.ts'), 'utf-8');
+        const panel = fs.readFileSync(path.join(root, 'src', 'views', 'agendaPanel.ts'), 'utf-8');
+        const helpers = /INLINED_HELPERS = \{([\s\S]*?)\n {4}\} satisfies/.exec(panel);
+        assert.ok(helpers, 'could not find the INLINED_HELPERS literal in agendaPanel.ts');
+        const listed = new Set(
+            helpers[1]!
+                .split('\n')
+                .map((line) => /^\s*([A-Za-z0-9_$]+),?\s*$/.exec(line)?.[1])
+                .filter((name): name is string => name !== undefined)
+        );
+
+        const exported = [...source.matchAll(/^export function ([A-Za-z0-9_$]+)/gm)].map((m) => m[1]!);
+        assert.ok(exported.length >= 15, `expected the module's helpers, found ${exported.length}`);
+        const missing = exported.filter((name) => !listed.has(name));
+        assert.deepStrictEqual(missing, [], `not inlined into the page: ${missing.join(', ')}`);
     });
 });

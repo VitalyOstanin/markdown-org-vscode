@@ -11,10 +11,18 @@ import { AgendaPanel } from '../../views/agendaPanel';
  * fails with what it last saw.
  */
 
-/** Poll `condition` until it holds; throw with `what` when the deadline passes. */
-export async function waitUntil(condition: () => boolean, what: string, timeoutMs = 8000): Promise<void> {
+/**
+ * Poll `condition` until it holds; throw with `what` when the deadline passes.
+ * The condition may be asynchronous -- some of what is waited for (the git
+ * status of a repository) can only be read by awaiting it.
+ */
+export async function waitUntil(
+    condition: () => boolean | Promise<boolean>,
+    what: string,
+    timeoutMs = 8000
+): Promise<void> {
     const deadline = Date.now() + timeoutMs;
-    while (!condition()) {
+    while (!(await condition())) {
         if (Date.now() >= deadline) {
             throw new Error(`${what} did not hold within ${timeoutMs}ms`);
         }

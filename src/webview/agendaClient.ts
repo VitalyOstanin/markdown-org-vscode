@@ -588,6 +588,7 @@ export interface AgendaClientDeps {
     renderGitMenu: (status: AgendaGitStatus, ctx: GitHtmlContext) => string;
     gitChipStats: (status: AgendaGitStatus, ctx: GitHtmlContext) => string;
     gitChipTitle: (status: AgendaGitStatus, ctx: GitHtmlContext) => string;
+    isGitClean: (status: AgendaGitStatus) => boolean;
     renderGitChip: (status: AgendaGitStatus, ctx: GitHtmlContext) => string;
     gitCount: (n: number, forms: string[], ctx: GitHtmlContext) => string;
     gitGroups: (status: AgendaGitStatus, ctx: GitHtmlContext) => string;
@@ -599,6 +600,10 @@ export interface AgendaClientDeps {
         ctx: GitHtmlContext
     ) => string;
     gitUnpushedGroupTitle: (fileCount: number, status: AgendaGitStatus, ctx: GitHtmlContext) => string;
+    gitUnpushedGroup: (files: readonly GitFileState[], status: AgendaGitStatus, ctx: GitHtmlContext) => string;
+    gitUnpushedByRepository: (files: readonly GitFileState[], status: AgendaGitStatus, ctx: GitHtmlContext) => string;
+    gitCommitRows: (repo: GitRepoState | undefined, ctx: GitHtmlContext) => string;
+    gitConflictedGroup: (files: readonly GitFileState[], status: AgendaGitStatus, ctx: GitHtmlContext) => string;
     gitFilesByRepository: (
         files: readonly GitFileState[],
         repos: readonly GitRepoState[],
@@ -664,7 +669,11 @@ type HostMessage =
     // Integration-test hook: the band menu is opened and answered by clicks in
     // the page, and what the message carries is decided there -- so the item is
     // pressed rather than the message forged.
-    | { command: 'clickGroupActionForTesting'; section?: string; action?: string };
+    | { command: 'clickGroupActionForTesting'; section?: string; action?: string }
+    // Integration-test hook: what a press of Commit or Push leaves behind --
+    // both buttons out of service, the pressed one spinning -- exists only in
+    // the page, and only a real click puts it there.
+    | { command: 'clickGitActionForTesting'; action?: string };
 
 /** The payload that fills a page built from nothing. */
 type InitMessage = Extract<HostMessage, { command: 'init' }>;
@@ -1131,6 +1140,12 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         item?.click();
     }
 
+    /** Press Commit or Push, as `clickGitActionForTesting` asks. */
+    function clickGitAction(action: string): void {
+        const id = action === 'push' ? 'gitPushBtn' : 'gitCommitBtn';
+        document.getElementById(id)?.click();
+    }
+
     function handleHostMessage(message: HostMessage): void {
         if (message.command === 'init') {
             applyStatePayload(message, 'init');
@@ -1153,9 +1168,11 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             refreshClipMarkers();
         } else if (message.command === 'clickCollectionChipForTesting') {
             clickCollectionChip(message.root ?? '');
-            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- spelled out rather than a bare `else`, so the branch says which command it serves
         } else if (message.command === 'clickGroupActionForTesting') {
             clickGroupAction(message.section ?? '', message.action ?? '');
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- spelled out rather than a bare `else`, so the branch says which command it serves
+        } else if (message.command === 'clickGitActionForTesting') {
+            clickGitAction(message.action ?? '');
         }
     }
 
@@ -1209,6 +1226,22 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         // text is how a test sees that the whole path -- repository
         // resolution, the status message, the markup -- reached the page.
         const gitChip = document.getElementById('gitMenuBtn')?.textContent ?? '';
+        // Which actions the dropdown offers and what state a press left them
+        // in. `off` is the disabled attribute the click sets on both, `busy`
+        // the marker the pressed one carries -- the two together are the whole
+        // feedback a press gives before the host answers.
+        const gitActions = [...document.querySelectorAll<HTMLButtonElement>('#gitMenu .git-action')].map((btn) => {
+            const kind = btn.id === 'gitPushBtn' ? 'push' : 'commit';
+            const marks = [btn.disabled ? 'off' : '', btn.getAttribute('data-busy') === 'true' ? 'busy' : '']
+                .filter((mark) => mark !== '')
+                .join(', ');
+            return marks === '' ? kind : `${kind} (${marks})`;
+        });
+        // Group titles of the dropdown, so a test can tell the conflict group
+        // from the ones that ask for a commit.
+        const gitGroups = [...document.querySelectorAll('#gitMenu .git-group')].map(
+            (el) => el.getAttribute('data-group') ?? ''
+        );
         const dayNumbers = [...document.querySelectorAll('.calendar-day .day-number')].map((el) => el.textContent);
         // Clipping chips per day header, in the same order as `dayHeaders`.
         // A hidden chip reports 0 rather than its stale text, which is what
@@ -1225,6 +1258,8 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             heroSub,
             dayNumbers,
             gitChip,
+            gitActions,
+            gitGroups,
             mode: initialMode,
             flags,
             sections,
@@ -1883,11 +1918,31 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         // Both actions raise host UI (an input box, a modal) and the dropdown
         // would otherwise stay open behind it; the click that reaches document
         // closes it, so nothing extra is needed here beyond sending the intent.
-        document.getElementById('gitCommitBtn')?.addEventListener('click', () => {
+        document.getElementById('gitCommitBtn')?.addEventListener('click', (ev) => {
+            markGitActionBusy(ev.currentTarget);
             vscode.postMessage({ command: 'gitCommit' });
         });
-        document.getElementById('gitPushBtn')?.addEventListener('click', () => {
+        document.getElementById('gitPushBtn')?.addEventListener('click', (ev) => {
+            markGitActionBusy(ev.currentTarget);
             vscode.postMessage({ command: 'gitPush' });
+        });
+    }
+
+    /**
+     * Take both buttons out of service until the next status arrives.
+     *
+     * Nothing here ever turns them back on: the host answers every one of these
+     * actions with a `gitStatus` message -- including the cancelled cases,
+     * where no repository event would come -- and that message rebuilds the
+     * menu with fresh buttons. Re-enabling them on a timer would be the way to
+     * get a second commit started on top of the first.
+     */
+    function markGitActionBusy(target: EventTarget | null): void {
+        document.querySelectorAll<HTMLButtonElement>('#gitMenu .git-action').forEach((btn) => {
+            btn.disabled = true;
+            if (btn === target) {
+                btn.setAttribute('data-busy', 'true');
+            }
         });
     }
 

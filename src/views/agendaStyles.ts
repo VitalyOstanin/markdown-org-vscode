@@ -60,6 +60,11 @@ export const AGENDA_STYLES = `
             --accent-yellow: color-mix(in srgb, var(--vscode-charts-yellow) 78%, var(--vscode-editor-foreground) 22%);
             --accent-blue: color-mix(in srgb, var(--vscode-charts-blue) 65%, var(--vscode-editor-foreground) 35%);
             --accent-blue-strong: color-mix(in srgb, var(--vscode-charts-blue) 82%, var(--vscode-editor-foreground) 18%);
+            /* The line that ties a week-view day together (see the .day-line
+               rules): the day-header's own colour, faded to the weight of a
+               rule rather than of a mark -- it says where a day starts and
+               ends, and competes with nothing inside it. */
+            --day-line: color-mix(in srgb, var(--vscode-textLink-foreground) 32%, transparent);
         }
         body {
             padding: var(--space-5);
@@ -342,6 +347,17 @@ export const AGENDA_STYLES = `
         .git-chip-stat[data-kind='clean'] {
             color: var(--vscode-descriptionForeground);
         }
+        /* "? N": files whose state could not be read. Amber rather than the
+           modified colour -- there is nothing to commit here, only an answer
+           the panel does not have. */
+        .git-chip-stat[data-kind='outside'] {
+            color: var(--accent-yellow);
+        }
+        /* "! N": paths a merge left unresolved. Red, and first in the chip:
+           this is the state that takes the commit button away. */
+        .git-chip-stat[data-kind='conflicted'] {
+            color: var(--accent-red);
+        }
         /* The clean state spells itself out ("✓ clean") instead of leaving a
            bare checkmark to be guessed at. It is not dropped in the compact
            header: that layout is a size change, not a different header (see the
@@ -371,6 +387,44 @@ export const AGENDA_STYLES = `
             padding-left: var(--space-2);
             font-style: italic;
         }
+        /* The commits waiting to be pushed, listed above the files they
+           touched. Rows are not interactive -- there is nothing to open behind
+           a commit -- so they keep the file row's layout without its hover
+           and pointer. */
+        .git-commit {
+            display: flex;
+            align-items: baseline;
+            gap: var(--space-2);
+            padding: var(--space-1) var(--space-3);
+            cursor: default;
+        }
+        /* Monospace and tabular so the subjects start at the same column down
+           the list; the hash itself is the least interesting part of the row
+           and stays muted. */
+        .git-commit-hash {
+            flex: 0 0 auto;
+            font-family: var(--vscode-editor-font-family), monospace;
+            font-size: var(--font-xs);
+            color: var(--vscode-descriptionForeground);
+        }
+        .git-commit-subject {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        /* "and 22 more": a count, not a commit, so it takes the muted colour of
+           a caption rather than the foreground of the rows above it. */
+        .git-commit-more {
+            color: var(--vscode-descriptionForeground);
+            font-size: var(--font-sm);
+        }
+        /* Commits and the files they touched are two lists under one heading;
+           the rule marks where one ends. Hung on the first file rather than on
+           the list above it, so a group with commits and no files of its own
+           does not end in a line under nothing. */
+        .git-commits + .git-file {
+            border-top: 1px solid var(--vscode-panel-border);
+        }
         .git-file {
             display: flex;
             width: 100%;
@@ -395,6 +449,20 @@ export const AGENDA_STYLES = `
             width: 1em;
             text-align: center;
             color: var(--vscode-descriptionForeground);
+        }
+        /* The one marker that is not a state but a demand: a conflicted row
+           needs the user before anything else in this menu can proceed. */
+        .git-file[data-kind='conflicted'] .git-file-mark {
+            color: var(--accent-red);
+        }
+        /* The sentence under the conflict group. A caption, not a control:
+           resolving happens in Source Control, and this row says so rather
+           than offering a button that would only forward the click. */
+        .git-note {
+            padding: var(--space-1) var(--space-3) var(--space-2);
+            color: var(--vscode-descriptionForeground);
+            font-size: var(--font-sm);
+            cursor: default;
         }
         /* A path is more useful truncated at the front: the tail (the file name)
            is what distinguishes two rows. */
@@ -424,6 +492,42 @@ export const AGENDA_STYLES = `
         }
         .git-action:hover {
             background: var(--vscode-button-hoverBackground);
+        }
+        /* Both buttons go inert while either operation runs: the second one
+           would act on a status the first is in the middle of invalidating. */
+        .git-action[disabled] {
+            opacity: 0.6;
+            cursor: default;
+        }
+        .git-action[disabled]:hover {
+            background: var(--vscode-button-background);
+        }
+        /* The spinner marks which of the two is running. The host also raises a
+           progress notification, but that appears in the corner of the window,
+           away from the button the user just pressed. */
+        .git-action[data-busy='true']::before {
+            content: '';
+            display: inline-block;
+            width: 0.85em;
+            height: 0.85em;
+            margin-right: var(--space-1);
+            vertical-align: -0.1em;
+            border: 2px solid currentColor;
+            border-top-color: transparent;
+            border-radius: 50%;
+            animation: git-action-spin 0.8s linear infinite;
+        }
+        @keyframes git-action-spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+        /* Reduced motion keeps the ring -- it still marks the busy button --
+           and drops only the rotation. */
+        @media (prefers-reduced-motion: reduce) {
+            .git-action[data-busy='true']::before {
+                animation: none;
+            }
         }
         .day-header {
             color: var(--vscode-textLink-foreground);
@@ -904,6 +1008,49 @@ export const AGENDA_STYLES = `
            panel's own margin does that job. */
         .day-band {
             margin-top: var(--space-3);
+        }
+        /* Week view: one line down the left of a day, from its heading to its
+           last row, so a band ("All-day & upcoming") reads as part of the day
+           above it instead of as a block of its own.
+           A day is a run of flat siblings -- nothing wraps one -- so the line
+           is a left border on each element of the run, and the run must have no
+           vertical gaps for the pieces to meet: the rows and the band trade
+           their margins for the same amount of padding. Halved on the row,
+           because two paddings add up where the margins they replace collapsed
+           into one.
+           The heading draws its piece as a pseudo-element rather than a border:
+           its top padding is the gap that separates one day from the next, and
+           a border would run straight through it. A row cannot do the same --
+           content-visibility on .task-line brings paint containment with it,
+           which clips a pseudo-element to the row's own box.
+           Everything is anchored on the "#content > .day-header ~" prefix,
+           which no other view can match: the day and tasks cards render rows in
+           a .day-card, and the month view renders a calendar. */
+        #content > .day-header {
+            padding-left: var(--space-2);
+        }
+        #content > .day-header::before {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: var(--space-5);
+            bottom: 0;
+            width: 2px;
+            background: var(--day-line);
+        }
+        #content > .day-header ~ .task-line,
+        #content > .day-header ~ .day-band {
+            border-left: 2px solid var(--day-line);
+            padding-left: var(--space-2);
+        }
+        #content > .day-header ~ .task-line {
+            margin: 0;
+            padding-top: calc(var(--space-1) / 2);
+            padding-bottom: calc(var(--space-1) / 2);
+        }
+        #content > .day-header ~ .day-band {
+            margin-top: 0;
+            padding-top: var(--space-3);
         }
         .day-section-name {
             font-weight: bold;

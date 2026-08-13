@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Week view: a line down the left of each day, from its heading to its last
+  row, so a band such as "All-day & upcoming" reads as part of the day above it
+  rather than as a block of its own.
+- Git panel: the "Not pushed" group lists the commits Push would send -- short
+  hash and subject -- above the files they touched, with the rest summarised as
+  "and N more". The group now appears whenever there is something to push, even
+  when its only file is also uncommitted and listed above.
+- Git panel: commit and push run under a progress notification, and both
+  buttons go inert until the new status arrives, so a second click cannot
+  start on top of the first.
+- Git panel: unresolved merge conflicts get their own group and chip counter
+  ("! N"), and the commit button steps aside while they stand. Committing from
+  the panel is refused before the message is asked for, naming the repository
+  and pointing at Source Control, where they are resolved.
+
+### Changed
+
+- Git panel: push reports the number of commits it sent rather than the number
+  of repositories, and a refusal from the remote is explained -- which branch
+  is behind which upstream, and that the missing commits have to be fetched --
+  instead of being repeated as git's own message. Nothing in this flow forces a
+  push.
+
+### Fixed
+
+- Git chip: a source file whose repository could not be read is counted as
+  unknown ("? N") instead of being folded into "clean". The diagnostic log
+  names the cause when git reports a repository that VS Code declined to open.
+
 ## [0.15.0] - 2026-08-13
 
 This release is largely about what the agenda looks like, and the theme running

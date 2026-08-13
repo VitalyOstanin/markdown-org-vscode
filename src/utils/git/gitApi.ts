@@ -203,10 +203,24 @@ async function resolveRepositoryUncached(api: GitApi, filePath: string): Promise
         // `getRepository` finds it. Asking again covers both.
         const repository =
             api.getRepository(vscode.Uri.file(filePath)) ?? api.getRepository(vscode.Uri.file(root.fsPath));
-        if (repository) {
-            await primeRepositoryState(repository, root.fsPath);
+        if (!repository) {
+            // Git has a repository here and VS Code still refused to open it.
+            // The Git extension does that silently (at trace level) for a root
+            // outside every workspace folder unless
+            // `git.openRepositoryInParentFolders` is "always" or that root was
+            // allowed once before. The file then reaches the panel with no
+            // repository at all, so the reason belongs in the log -- otherwise
+            // the only visible trace is a "?" in the header.
+            logDiagnostic(
+                `agenda git status: git reports a repository at ${root.fsPath} for ${filePath}, ` +
+                    'but VS Code did not open it -- a repository outside the workspace folders is only opened ' +
+                    'when git.openRepositoryInParentFolders is "always" or the root was allowed once through ' +
+                    '"Git: Open Repositories In Parent Folders"'
+            );
+            return undefined;
         }
-        return repository ?? undefined;
+        await primeRepositoryState(repository, root.fsPath);
+        return repository;
     } catch (error) {
         // `getRepositoryRoot` answers null for "not a repository"; anything that
         // throws is a real failure (a broken git binary, an unsafe repository

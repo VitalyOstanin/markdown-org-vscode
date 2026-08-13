@@ -121,6 +121,21 @@ export interface GitFileState {
     repoRoot?: string;
     uncommitted: boolean;
     unpushed: boolean;
+    /**
+     * Left unresolved by a merge in progress. Kept apart from `uncommitted`
+     * because the two ask for opposite actions: one is committed from here,
+     * the other has to be resolved first and this extension will not commit
+     * while it stands.
+     */
+    conflicted: boolean;
+}
+
+/** One unpushed commit, reduced to what the panel prints. */
+export interface GitCommitState {
+    /** Abbreviated hash, already shortened for display. */
+    hash: string;
+    /** First line of the message. */
+    subject: string;
 }
 
 export interface GitRepoState {
@@ -131,6 +146,18 @@ export interface GitRepoState {
     /** `origin/master`; absent when the branch has no upstream. */
     upstream?: string;
     aheadCommits?: number;
+    /**
+     * The commits Push would send, newest first, capped by the collector. The
+     * count in `aheadCommits` is the whole truth, so a shorter list here means
+     * the rest are summarised as "and N more" rather than silently dropped.
+     */
+    unpushedCommitList?: GitCommitState[];
+    /**
+     * Paths the repository reports as conflicted, whether or not the agenda
+     * reads them: the refusal to commit is about the repository's state, so
+     * the number that explains it has to be the repository's own.
+     */
+    conflictCount?: number;
 }
 
 export interface AgendaGitStatus {
@@ -144,4 +171,10 @@ export interface AgendaGitStatus {
     outsideGitCount: number;
     /** Commits ahead of upstream, summed over the repositories in the view. */
     unpushedCommits: number;
+    /**
+     * Unresolved paths, summed over the same repositories. Non-zero disables
+     * the commit button: what stands in the way is the merge, not the files
+     * the view happens to show.
+     */
+    conflictCount: number;
 }

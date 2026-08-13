@@ -16,7 +16,7 @@
  * `realpath` per repository and makes the two spellings converge.
  */
 import * as path from 'node:path';
-import type { AgendaGitStatus } from '../../types';
+import type { AgendaGitStatus, GitCommitState } from '../../types';
 import { formatError } from '../formatError';
 import { logDiagnostic } from '../logChannel';
 import { getGitApi, resolveRealPath, resolveRepositoryFor } from './gitApi';
@@ -24,6 +24,18 @@ import type { GitApi, GitRepository } from './gitApiTypes';
 import { isInside, pathKey } from './gitPathMatch';
 import { buildGitStatus } from './gitStatusModel';
 import type { GitRepoSnapshot, GitSourceFile } from './gitStatusModel';
+
+/**
+ * How many unpushed commits the panel lists before summarising the rest.
+ *
+ * Eight fills the dropdown without turning it into a log viewer, and a branch
+ * that far ahead is better read in the Source Control view anyway. The count
+ * the header states stays the true one, so the list never quietly under-reports.
+ */
+const MAX_UNPUSHED_COMMITS = 8;
+
+/** How much of a hash the panel prints -- git's own default abbreviation. */
+const SHORT_HASH_LENGTH = 7;
 
 /** A repository plus the canonical form of the paths it reports. */
 interface RepositoryContext {
@@ -137,8 +149,55 @@ async function snapshotRepository(context: RepositoryContext): Promise<GitRepoSn
         ...(upstream === undefined ? {} : { upstream }),
         ...(head?.ahead === undefined ? {} : { aheadCommits: head.ahead }),
         uncommitted,
-        unpushed: await unpushedPaths(context, upstream, head?.ahead)
+        // Conflicts sit in their own bucket rather than in `workingTreeChanges`,
+        // so a file the user is still resolving would otherwise pass for clean.
+        conflicts: (state.mergeChanges ?? []).map((change) => canonicalPath(change.uri.fsPath, context)),
+        unpushed: await unpushedPaths(context, upstream, head?.ahead),
+        commits: await unpushedCommits(context, upstream, head?.ahead)
     };
+}
+
+/**
+ * The commits Push would send, newest first.
+ *
+ * Two dots, not the three of `diffBetween`: `upstream..HEAD` is exactly "mine
+ * that the remote has not got", while `upstream...HEAD` would answer with a
+ * diff and say nothing about which commits produced it.
+ *
+ * `maxEntries` is passed but does not bound the answer -- the shipped
+ * extension appends either the range or `-n`, never both -- so the list is cut
+ * here. The whole count still reaches the page as `aheadCommits`, which is
+ * what the "and N more" line is computed from.
+ */
+async function unpushedCommits(
+    context: RepositoryContext,
+    upstream: string | undefined,
+    ahead: number | undefined
+): Promise<GitCommitState[]> {
+    if (upstream === undefined || ahead === 0) {
+        return [];
+    }
+    try {
+        const commits = await context.repository.log({
+            range: `${upstream}..HEAD`,
+            maxEntries: MAX_UNPUSHED_COMMITS
+        });
+        return commits.slice(0, MAX_UNPUSHED_COMMITS).map((commit) => ({
+            hash: commit.hash.slice(0, SHORT_HASH_LENGTH),
+            subject: firstLine(commit.message)
+        }));
+    } catch (error) {
+        // Same degradation as the diff above: the counts survive, only the
+        // list of commits is missing.
+        logDiagnostic(`agenda git status: cannot log ${upstream}..HEAD in ${context.rootReal}: ${formatError(error)}`);
+        return [];
+    }
+}
+
+/** The subject of a commit message: everything up to the first line break. */
+function firstLine(message: string): string {
+    const end = message.search(/[\r\n]/);
+    return (end === -1 ? message : message.slice(0, end)).trim();
 }
 
 /**

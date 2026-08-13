@@ -118,6 +118,16 @@ it rendered -- the only seam into webview DOM), `__testGetCreateCount`,
 or adjust timing, and the page answers `renderedInfo` solely when asked from
 outside.
 
+A second group drives the page instead of reading it: `setScrollForTesting`,
+`clickCollectionChipForTesting`, `clickGroupActionForTesting` and
+`clickGitActionForTesting` press what a user would press, and
+`postGitStatusForTesting` hands the page a git status the tests compose
+themselves. The clicks go through the page rather than into the host handlers
+because what they exercise -- which chips are off, which buttons a press takes
+out of service -- is decided in the page, and calling the handler would step
+over exactly that. The composed status exists for the states a repository
+cannot be left in for a test's sake, an unresolved merge above all.
+
 ## Lint and format
 
 ```bash
@@ -361,18 +371,25 @@ the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
 ### Steps and channels
 
+1. Check whether the README media still match the code, and re-shoot them if
+   they do not -- see [Demo media](#demo-media). Compare against when they were
+   last taken (the `chore(media)` commit) rather than by eye: anything that
+   changed the agenda's markup or stylesheet since then is a candidate, while a
+   state the scenarios never enter (a spinner mid-operation, a merge conflict)
+   is not. Stale media outlive the release: the picture in the registry is what
+   a reader sees first.
 1. Rename the `## [Unreleased]` CHANGELOG section to `## [X.Y.Z] - <date>`,
    add the link definition at the bottom of the file, and bump `version` in
    `package.json` -- both in the same [release commit](#release-commit-form).
-2. Create the annotated tag `vX.Y.Z` on that commit and push it. The tag is
+1. Create the annotated tag `vX.Y.Z` on that commit and push it. The tag is
    what triggers `.github/workflows/release.yml`.
-3. The workflow runs the full lint + unit + integration matrix, validates the
+1. The workflow runs the full lint + unit + integration matrix, validates the
    tag (annotated, version matches `package.json`, CHANGELOG section present),
    builds four platform VSIX files (`linux-x64`, `darwin-x64`, `darwin-arm64`,
    `win32-x64`), each with the matching prebuilt extractor binary inside, and
    checks each package before publishing (valid zip, required and forbidden
    paths, version inside the package, non-zero size).
-4. Publication targets are **GitHub Releases** (all four VSIX files, with the
+1. Publication targets are **GitHub Releases** (all four VSIX files, with the
    CHANGELOG section as the release body) and **Open VSX**
    (`ovsx publish --skip-duplicate`). The VS Code Marketplace is deliberately
    not a target -- see [ADR-0004](docs/adr/0004-open-vsx-distribution.md).

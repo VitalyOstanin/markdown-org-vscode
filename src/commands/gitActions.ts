@@ -12,16 +12,31 @@
  * that root (see ADR-0016).
  */
 import * as vscode from 'vscode';
+import * as path from 'node:path';
 import { getGitApi, resolveRealPath, resolveRepositoryFor } from '../utils/git/gitApi';
 import type { GitRepository } from '../utils/git/gitApiTypes';
 import { formatError, notifyError, notifyStatus } from '../utils/notify';
 import { logDiagnostic } from '../utils/logChannel';
-import { formatString } from '../utils/agendaI18n';
-import type { AgendaStrings } from '../utils/agendaI18n';
+import { formatString, pluralIndex } from '../utils/agendaI18n';
+import type { AgendaStrings, UiLanguage } from '../utils/agendaI18n';
 import { toIsoDate } from '../utils/isoDate';
 
 /** Files grouped by the repository that will commit them. */
 type FilesByRepository = Map<GitRepository, string[]>;
+
+/**
+ * The error code the built-in extension attaches when the remote refuses a
+ * non-fast-forward update. Read as a plain property because the API surface we
+ * declare describes calls, not the errors they throw.
+ */
+const PUSH_REJECTED_CODE = 'PushRejected';
+
+/**
+ * Text of the same refusal, for the paths that do not carry the code -- an
+ * older host, or a rejection reported by the remote's own hook rather than by
+ * git's ref check. Same reason the mobile client watches two signals for it.
+ */
+const PUSH_REJECTED_TEXT = /!\s*\[rejected]|non-fast-forward|fetch first|failed to push some refs/i;
 
 /**
  * Stage the given source files and commit them under one message.
@@ -30,9 +45,23 @@ type FilesByRepository = Map<GitRepository, string[]>;
  * from a single agenda view, and making the user retype the same sentence per
  * repository would be the wrong kind of precision.
  */
-export async function commitAgendaSources(files: readonly string[], strings: AgendaStrings): Promise<void> {
+export async function commitAgendaSources(
+    files: readonly string[],
+    strings: AgendaStrings,
+    language: UiLanguage
+): Promise<void> {
     const grouped = await groupByRepository(files);
     if (grouped.size === 0) {
+        return;
+    }
+
+    // Checked before the message is asked for: typing a commit message only to
+    // be told it cannot be used is the wrong order of a refusal. The panel
+    // normally hides the button already, but its status is a snapshot and the
+    // merge may have started since.
+    const conflicted = [...grouped.keys()].find((repository) => hasConflicts(repository));
+    if (conflicted) {
+        notifyError(formatString(strings.git.commitConflicts, path.basename(conflicted.rootUri.fsPath)));
         return;
     }
 
@@ -51,20 +80,28 @@ export async function commitAgendaSources(files: readonly string[], strings: Age
         return;
     }
 
-    let committed = 0;
-    for (const [repository, paths] of grouped) {
-        try {
-            await repository.add(paths);
-            await repository.commit(message);
-            committed += paths.length;
-        } catch (error) {
-            const reason = formatError(error);
-            logDiagnostic(`agenda git commit failed in ${repository.rootUri.fsPath}: ${reason}`);
-            notifyError(`git commit failed: ${reason}`);
-            return;
+    // Staging and committing run without visible feedback otherwise: on a
+    // repository of any size `git add` alone takes long enough for the panel to
+    // look like it ignored the click.
+    const committed = await withGitProgress(strings.git.commitProgress, async () => {
+        let done = 0;
+        for (const [repository, paths] of grouped) {
+            try {
+                await repository.add(paths);
+                await repository.commit(message);
+                done += paths.length;
+            } catch (error) {
+                const reason = formatError(error);
+                logDiagnostic(`agenda git commit failed in ${repository.rootUri.fsPath}: ${reason}`);
+                notifyError(`git commit failed: ${reason}`);
+                return undefined;
+            }
         }
+        return done;
+    });
+    if (committed !== undefined) {
+        notifyStatus(formatString(strings.git.committed, counted(committed, strings.git.files, language)));
     }
-    notifyStatus(formatString(strings.git.committed, String(committed)));
 }
 
 /**
@@ -73,34 +110,114 @@ export async function commitAgendaSources(files: readonly string[], strings: Age
  * A branch with no upstream cannot be pushed without deciding where to; that
  * decision is the user's, so it is asked as a modal naming the remote and
  * branch that would be created rather than guessed silently.
+ *
+ * Follows the same rules as the mobile client (`rust/markdown-org-ffi`): never
+ * force, and a refusal is explained rather than forwarded. Nothing here passes
+ * a force argument to `push`, and that omission is the safety property -- the
+ * remote's refusal is the signal that the local branch is out of date, and the
+ * answer to it is to get the missing commits, which happens outside this panel.
  */
-export async function pushAgendaSources(files: readonly string[], strings: AgendaStrings): Promise<void> {
+export async function pushAgendaSources(
+    files: readonly string[],
+    strings: AgendaStrings,
+    language: UiLanguage
+): Promise<void> {
     const grouped = await groupByRepository(files);
-    let pushed = 0;
-    for (const repository of grouped.keys()) {
-        const head = repository.state.HEAD;
-        try {
-            if (head?.upstream) {
-                await repository.push();
-            } else {
-                if (!(await confirmSetUpstream(repository, strings))) {
-                    continue;
+    if (grouped.size === 0) {
+        return;
+    }
+    const pushed = await withGitProgress(strings.git.pushProgress, async () => {
+        // Counted in commits, like the button that starts this: a repository
+        // count reports "1" for a branch ten commits ahead. Read before the
+        // push, which is when the number is still true.
+        let commits = 0;
+        for (const repository of grouped.keys()) {
+            const head = repository.state.HEAD;
+            const ahead = head?.ahead ?? 0;
+            try {
+                if (head?.upstream) {
+                    await repository.push();
+                } else {
+                    if (!(await confirmSetUpstream(repository, strings))) {
+                        continue;
+                    }
+                    // `push(remote, branch, setUpstream)`: the third argument is
+                    // what turns this into the equivalent of `push -u`. There is
+                    // no fourth one here -- force stays off.
+                    await repository.push('origin', head?.name, true);
                 }
-                // `push(remote, branch, setUpstream)`: the third argument is
-                // what turns this into the equivalent of `push -u`.
-                await repository.push('origin', head?.name, true);
+                commits += ahead;
+            } catch (error) {
+                reportPushFailure(error, repository, head?.name, head?.upstream, strings);
+                return undefined;
             }
-            pushed += 1;
-        } catch (error) {
-            const reason = formatError(error);
-            logDiagnostic(`agenda git push failed in ${repository.rootUri.fsPath}: ${reason}`);
-            notifyError(`git push failed: ${reason}`);
-            return;
         }
+        return commits;
+    });
+    if (pushed !== undefined && pushed > 0) {
+        notifyStatus(formatString(strings.git.pushed, counted(pushed, strings.git.commits, language)));
     }
-    if (pushed > 0) {
-        notifyStatus(formatString(strings.git.pushed, String(pushed)));
+}
+
+/**
+ * Explain a failed push, and say what to do when the remote simply moved on.
+ *
+ * A non-fast-forward refusal is the one failure with a next step the user can
+ * take, so it gets its own sentence naming both branches; git's own wording
+ * ("Updates were rejected because the remote contains work that you do not
+ * have locally") arrives buried in a multi-line stderr. Everything else is
+ * reported as-is, because inventing an explanation for an unknown failure is
+ * worse than quoting it.
+ */
+function reportPushFailure(
+    error: unknown,
+    repository: GitRepository,
+    branch: string | undefined,
+    upstream: { readonly remote: string; readonly name: string } | undefined,
+    strings: AgendaStrings
+): void {
+    const reason = formatError(error);
+    logDiagnostic(`agenda git push failed in ${repository.rootUri.fsPath}: ${reason}`);
+    if (isPushRejected(error)) {
+        const target = upstream ? `${upstream.remote}/${upstream.name}` : 'upstream';
+        notifyError(formatString(strings.git.pushRejected, branch ?? 'HEAD', target));
+        return;
     }
+    notifyError(`git push failed: ${reason}`);
+}
+
+/** Two signals for one refusal: the error code, then its text. */
+function isPushRejected(error: unknown): boolean {
+    const carrier = error as { gitErrorCode?: unknown; stderr?: unknown } | null | undefined;
+    if (carrier?.gitErrorCode === PUSH_REJECTED_CODE) {
+        return true;
+    }
+    const text = `${formatError(error)}\n${typeof carrier?.stderr === 'string' ? carrier.stderr : ''}`;
+    return PUSH_REJECTED_TEXT.test(text);
+}
+
+/**
+ * Run a git operation under a progress notification.
+ *
+ * `Notification` rather than `Window`: both actions can raise their own modal
+ * (the commit message box, the upstream confirmation), and a status-bar spinner
+ * behind a modal is not feedback anybody sees.
+ */
+function withGitProgress<T>(title: string, run: () => Promise<T>): Thenable<T> {
+    return vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title, cancellable: false },
+        () => run()
+    );
+}
+
+/** `3 files` / `3 файла`: the plural rule of the UI language, digits as typed. */
+function counted(n: number, forms: readonly string[], language: UiLanguage): string {
+    return `${n} ${forms[pluralIndex(n, language)] ?? ''}`.trim();
+}
+
+/** Is the repository mid-merge, with paths still unresolved? */
+function hasConflicts(repository: GitRepository): boolean {
+    return (repository.state.mergeChanges ?? []).length > 0;
 }
 
 /**

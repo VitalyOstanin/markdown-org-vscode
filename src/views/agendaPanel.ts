@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { randomBytes } from 'node:crypto';
-import type { AgendaData } from '../types';
+import type { AgendaData, AgendaGitStatus } from '../types';
 import { isMeaningfulSelection, resolveTaskClickIntent, sanitizeTaskLine } from '../utils/agendaClick';
 import { escapeHtml } from '../utils/agendaEscapeHtml';
 import { DEFAULT_AGENDA_FONT_STACK, sanitizeFontFamily } from '../utils/agendaFontFamily';
@@ -51,12 +51,17 @@ import {
     gitActions,
     gitChipStats,
     gitChipTitle,
+    gitCommitRows,
+    gitConflictedGroup,
     gitCount,
     gitFileRows,
     gitFilesByRepository,
     gitGroup,
     gitGroups,
+    gitUnpushedByRepository,
+    gitUnpushedGroup,
     gitUnpushedGroupTitle,
+    isGitClean,
     renderGitChip,
     renderGitMenu
 } from '../utils/agendaGitHtml';
@@ -932,17 +937,23 @@ export class AgendaPanel {
             if (!args) {
                 return;
             }
-            const { strings } = AgendaPanel.uiStrings();
+            const { language, strings } = AgendaPanel.uiStrings();
             const files = agendaSourceFiles(args.data);
-            if (message.command === 'gitCommit') {
-                await commitAgendaSources(files, strings);
-            } else {
-                await pushAgendaSources(files, strings);
+            try {
+                if (message.command === 'gitCommit') {
+                    await commitAgendaSources(files, strings, language);
+                } else {
+                    await pushAgendaSources(files, strings, language);
+                }
+            } finally {
+                // The repository events that follow will refresh the chip on
+                // their own; this covers the case where nothing changed (a
+                // cancelled prompt) and no event is coming. In `finally`
+                // because the page disables both buttons on the click and
+                // waits for this message to get them back -- a failure that
+                // skipped it would leave the panel unable to try again.
+                AgendaPanel.requestGitStatus();
             }
-            // The repository events that follow will refresh the chip on their
-            // own; this covers the case where nothing changed (a cancelled
-            // prompt) and no event is coming.
-            AgendaPanel.requestGitStatus();
         } else if (message.command === 'groupAction') {
             await AgendaPanel.handleGroupAction(message.section, message.action, message.hidden);
         }
@@ -1061,6 +1072,10 @@ export class AgendaPanel {
         dayNumbers: string[];
         /** Text of the git chip, or empty when the header carries none. */
         gitChip: string;
+        /** Dropdown actions, each as `commit` / `push` plus ` (off, busy)`. */
+        gitActions: string[];
+        /** `data-group` of each dropdown group, in document order. */
+        gitGroups: string[];
         /** Rows hidden above/below per day header, aligned with `dayHeaders`. */
         clipAbove: number[];
         clipBelow: number[];
@@ -1089,6 +1104,8 @@ export class AgendaPanel {
                     heroSub?: string;
                     dayNumbers?: string[];
                     gitChip?: string;
+                    gitActions?: string[];
+                    gitGroups?: string[];
                     clipAbove?: number[];
                     clipBelow?: number[];
                     todayFirstRowHidden?: boolean;
@@ -1110,6 +1127,8 @@ export class AgendaPanel {
                             heroSub: m.heroSub ?? '',
                             dayNumbers: m.dayNumbers ?? [],
                             gitChip: m.gitChip ?? '',
+                            gitActions: m.gitActions ?? [],
+                            gitGroups: m.gitGroups ?? [],
                             clipAbove: m.clipAbove ?? [],
                             clipBelow: m.clipBelow ?? [],
                             todayFirstRowHidden: m.todayFirstRowHidden ?? false,
@@ -1174,6 +1193,42 @@ export class AgendaPanel {
             return Promise.resolve(false);
         }
         return panel.webview.postMessage({ command: 'clickGroupActionForTesting', section, action });
+    }
+
+    /**
+     * Test-only helper: press Commit (`'commit'`) or Push (`'push'`) in the
+     * open panel's git dropdown.
+     *
+     * Through the page for the same reason as the band menu above: what a press
+     * does before the host hears about it -- taking both buttons out of service
+     * and marking the pressed one -- happens entirely in the page, and calling
+     * the host handler directly would step over exactly the part under test.
+     * Resolves to false when no panel is open.
+     */
+    public static clickGitActionForTesting(action: 'commit' | 'push'): Thenable<boolean> {
+        const panel = AgendaPanel.currentPanel;
+        if (!panel) {
+            return Promise.resolve(false);
+        }
+        return panel.webview.postMessage({ command: 'clickGitActionForTesting', action });
+    }
+
+    /**
+     * Test-only helper: hand the page a git status of the test's own making.
+     *
+     * The real status describes whatever repository the test workspace happens
+     * to sit in, which cannot be made to hold an unresolved merge without
+     * leaving one in this repository. States the panel has to render -- a
+     * conflict, a pushable branch -- are therefore posted directly, and what is
+     * asserted afterwards is the markup the page built from them. Resolves to
+     * false when no panel is open.
+     */
+    public static postGitStatusForTesting(status: AgendaGitStatus | null): Thenable<boolean> {
+        const panel = AgendaPanel.currentPanel;
+        if (!panel) {
+            return Promise.resolve(false);
+        }
+        return panel.webview.postMessage({ command: 'gitStatus', status });
     }
 
     /**
@@ -1317,10 +1372,15 @@ export class AgendaPanel {
         // exported helpers are what the inlined bodies call, and a function
         // that is not listed here is simply not defined in the page.
         gitCount,
+        isGitClean,
         gitChipStats,
         gitChipTitle,
         renderGitChip,
         gitUnpushedGroupTitle,
+        gitUnpushedGroup,
+        gitUnpushedByRepository,
+        gitCommitRows,
+        gitConflictedGroup,
         gitFileRows,
         gitFilesByRepository,
         gitGroup,

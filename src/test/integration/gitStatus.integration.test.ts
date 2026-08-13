@@ -10,6 +10,7 @@ import { pathKey } from '../../utils/git/gitPathMatch';
 import { commitAgendaSources, pushAgendaSources } from '../../commands/gitActions';
 import { AGENDA_STRINGS } from '../../utils/agendaI18n';
 import { AgendaPanel } from '../../views/agendaPanel';
+import type { AgendaGitStatus } from '../../types';
 import { waitForAgendaRender, waitUntil } from './_helpers';
 
 /**
@@ -144,6 +145,25 @@ suite('agenda git status against a real repository', () => {
         assert.ok(clean && !clean.uncommitted && !clean.unpushed, 'notes.md must read as clean');
     });
 
+    // The reason this one is here rather than in the unit suite: `log` is
+    // declared in our own copy of the Git API (gitApiTypes.ts), so nothing but
+    // a real host proves the member exists. A missing one would be swallowed
+    // by the collector's catch and leave the list quietly empty.
+    test('the commits waiting to be pushed reach the model, subject and hash', async function () {
+        this.timeout(30000);
+        const status = await collectGitStatus([linked('home.md')]);
+        assert.ok(status);
+        const repo = status.repos[0];
+        assert.ok(repo, 'expected the repository in the model');
+        const commits = repo.unpushedCommitList ?? [];
+        assert.deepStrictEqual(
+            commits.map((c) => c.subject),
+            ['local only'],
+            JSON.stringify(repo)
+        );
+        assert.match(commits[0]?.hash ?? '', /^[0-9a-f]{7}$/);
+    });
+
     test('an edit outside the view is never counted', async function () {
         this.timeout(30000);
         const status = await collectGitStatus([linked('work.md')]);
@@ -194,7 +214,7 @@ suite('agenda git status against a real repository', () => {
         const original = vscode.window.showInputBox;
         (vscode.window as { showInputBox: unknown }).showInputBox = () => Promise.resolve('agenda: test commit');
         try {
-            await commitAgendaSources([linked('work.md')], AGENDA_STRINGS.en);
+            await commitAgendaSources([linked('work.md')], AGENDA_STRINGS.en, 'en');
             try {
                 await waitUntil(
                     () => !git(['status', '--porcelain']).includes(' work.md'),
@@ -227,7 +247,7 @@ suite('agenda git status against a real repository', () => {
         const original = vscode.window.showInputBox;
         (vscode.window as { showInputBox: unknown }).showInputBox = () => Promise.resolve('   ');
         try {
-            await commitAgendaSources([linked('fresh.md')], AGENDA_STRINGS.en);
+            await commitAgendaSources([linked('fresh.md')], AGENDA_STRINGS.en, 'en');
         } finally {
             (vscode.window as { showInputBox: unknown }).showInputBox = original;
         }
@@ -241,7 +261,7 @@ suite('agenda git status against a real repository', () => {
         const original = vscode.window.showInputBox;
         (vscode.window as { showInputBox: unknown }).showInputBox = () => Promise.resolve(undefined);
         try {
-            await commitAgendaSources([linked('fresh.md')], AGENDA_STRINGS.en);
+            await commitAgendaSources([linked('fresh.md')], AGENDA_STRINGS.en, 'en');
         } finally {
             (vscode.window as { showInputBox: unknown }).showInputBox = original;
         }
@@ -256,7 +276,7 @@ suite('agenda git status against a real repository', () => {
         const local = git(['rev-parse', 'HEAD']).trim();
         assert.notStrictEqual(remoteHead(), local, 'precondition: the remote is behind');
 
-        await pushAgendaSources([linked('home.md')], AGENDA_STRINGS.en);
+        await pushAgendaSources([linked('home.md')], AGENDA_STRINGS.en, 'en');
         await waitUntil(() => remoteHead() === local, 'the remote to receive the local commits');
     });
 
@@ -280,7 +300,7 @@ suite('agenda git status against a real repository', () => {
             return Promise.resolve(undefined);
         };
         try {
-            await pushAgendaSources([path.join(soloDir, 'solo.md')], AGENDA_STRINGS.en);
+            await pushAgendaSources([path.join(soloDir, 'solo.md')], AGENDA_STRINGS.en, 'en');
         } finally {
             (vscode.window as { showWarningMessage: unknown }).showWarningMessage = original;
         }
@@ -296,6 +316,211 @@ suite('agenda git status against a real repository', () => {
         assert.strictEqual(status.repos[0]?.upstream, undefined);
         assert.strictEqual(status.unpushedCount, 0);
         assert.strictEqual(status.unpushedCommits, 0);
+    });
+
+    // Its own repository again: a merge left unresolved in the shared one would
+    // stay unresolved for every test after it.
+    test('an unresolved merge stops the commit before the message is asked for', async function () {
+        this.timeout(30000);
+        const mergeDir = path.join(workDir, 'merge-repo');
+        fs.mkdirSync(mergeDir);
+        const run = (args: string[]): void => {
+            execFileSync('git', [...GIT_ID, ...args], { cwd: mergeDir, encoding: 'utf-8' });
+        };
+        const target = path.join(mergeDir, 'plan.md');
+        run(['init', '--initial-branch=master']);
+        fs.writeFileSync(target, '# plan\nbase\n');
+        run(['add', '.']);
+        run(['commit', '-m', 'initial']);
+        run(['checkout', '-b', 'other']);
+        fs.writeFileSync(target, '# plan\nfrom the branch\n');
+        run(['commit', '-am', 'branch edit']);
+        run(['checkout', 'master']);
+        fs.writeFileSync(target, '# plan\nfrom master\n');
+        run(['commit', '-am', 'master edit']);
+        try {
+            run(['merge', 'other']);
+            assert.fail('precondition: the merge was supposed to conflict');
+        } catch {
+            /* the conflict is the precondition */
+        }
+
+        const status = await collectGitStatus([target]);
+        assert.ok(status);
+        assert.strictEqual(status.conflictCount, 1, JSON.stringify(status.repos));
+        assert.strictEqual(status.files[0]?.conflicted, true, JSON.stringify(status.files));
+
+        const head = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: mergeDir, encoding: 'utf-8' }).trim();
+        let asked = 0;
+        let reported = '';
+        const originalInput = vscode.window.showInputBox;
+        const originalError = vscode.window.showErrorMessage;
+        (vscode.window as { showInputBox: unknown }).showInputBox = () => {
+            asked += 1;
+            return Promise.resolve('agenda: should never be used');
+        };
+        (vscode.window as { showErrorMessage: unknown }).showErrorMessage = (message: string) => {
+            reported = message;
+            return Promise.resolve(undefined);
+        };
+        try {
+            await commitAgendaSources([target], AGENDA_STRINGS.en, 'en');
+        } finally {
+            (vscode.window as { showInputBox: unknown }).showInputBox = originalInput;
+            (vscode.window as { showErrorMessage: unknown }).showErrorMessage = originalError;
+        }
+        assert.strictEqual(asked, 0, 'a refusal must come before the message prompt, not after it');
+        assert.match(reported, /unresolved conflicts/, reported);
+        assert.strictEqual(
+            execFileSync('git', ['rev-parse', 'HEAD'], { cwd: mergeDir, encoding: 'utf-8' }).trim(),
+            head,
+            'HEAD moved while a merge was unresolved'
+        );
+    });
+
+    // The mobile client's `SyncError::Rejected` case: the remote moved on, the
+    // push is refused, and the answer is to get those commits -- never to force.
+    test('a rejected push is explained, and the remote is left as it was', async function () {
+        this.timeout(30000);
+        const staleRemote = path.join(workDir, 'stale-remote.git');
+        const staleDir = path.join(workDir, 'stale-repo');
+        const otherDir = path.join(workDir, 'stale-other');
+        execFileSync('git', ['init', '--bare', staleRemote], { encoding: 'utf-8' });
+        const run = (args: string[], cwd: string): string =>
+            execFileSync('git', [...GIT_ID, ...args], { cwd, encoding: 'utf-8' });
+
+        fs.mkdirSync(staleDir);
+        run(['init', '--initial-branch=master'], staleDir);
+        fs.writeFileSync(path.join(staleDir, 'diary.md'), '# diary\n');
+        run(['add', '.'], staleDir);
+        run(['commit', '-m', 'initial'], staleDir);
+        run(['remote', 'add', 'origin', staleRemote], staleDir);
+        run(['push', '-u', 'origin', 'master'], staleDir);
+
+        // A second clone pushes first: from now on the remote holds a commit
+        // this repository does not have.
+        execFileSync('git', [...GIT_ID, 'clone', staleRemote, otherDir], { encoding: 'utf-8' });
+        fs.appendFileSync(path.join(otherDir, 'diary.md'), 'from elsewhere\n');
+        run(['commit', '-am', 'remote side'], otherDir);
+        run(['push'], otherDir);
+        const remoteHead = (): string =>
+            execFileSync('git', ['--git-dir', staleRemote, 'rev-parse', 'master'], { encoding: 'utf-8' }).trim();
+        const before = remoteHead();
+
+        fs.appendFileSync(path.join(staleDir, 'diary.md'), 'local work\n');
+        run(['commit', '-am', 'local side'], staleDir);
+
+        let reported = '';
+        const originalError = vscode.window.showErrorMessage;
+        (vscode.window as { showErrorMessage: unknown }).showErrorMessage = (message: string) => {
+            reported = message;
+            return Promise.resolve(undefined);
+        };
+        try {
+            await pushAgendaSources([path.join(staleDir, 'diary.md')], AGENDA_STRINGS.en, 'en');
+        } finally {
+            (vscode.window as { showErrorMessage: unknown }).showErrorMessage = originalError;
+        }
+        assert.match(reported, /Push rejected/, reported);
+        assert.match(reported, /Fetch and merge/, reported);
+        assert.strictEqual(remoteHead(), before, 'the refused push must leave the remote untouched');
+    });
+
+    // Its own repository: the commit under test has to actually happen for the
+    // progress wrapper around it to be observed, and the shared repository is
+    // read by the tests before this one.
+    test('the commit and the push each run under a progress notification', async function () {
+        this.timeout(30000);
+        const progressRemote = path.join(workDir, 'progress-remote.git');
+        const progressDir = path.join(workDir, 'progress-repo');
+        execFileSync('git', ['init', '--bare', progressRemote], { encoding: 'utf-8' });
+        fs.mkdirSync(progressDir);
+        const run = (args: string[]): string =>
+            execFileSync('git', [...GIT_ID, ...args], { cwd: progressDir, encoding: 'utf-8' });
+        run(['init', '--initial-branch=master']);
+        run(['config', 'user.name', 'Test']);
+        run(['config', 'user.email', 'test@example.invalid']);
+        const target = path.join(progressDir, 'plan.md');
+        fs.writeFileSync(target, '# plan\n');
+        run(['add', '.']);
+        run(['commit', '-m', 'initial']);
+        run(['remote', 'add', 'origin', progressRemote]);
+        run(['push', '-u', 'origin', 'master']);
+        fs.appendFileSync(target, 'one more line\n');
+
+        const titles: string[] = [];
+        const originalProgress = vscode.window.withProgress;
+        const originalInput = vscode.window.showInputBox;
+        // The wrapper is what is under test, so it is recorded and then run:
+        // a stub that skipped the callback would report a title for work that
+        // never happened.
+        (vscode.window as { withProgress: unknown }).withProgress = (
+            options: { title?: string; location?: unknown },
+            task: (p: unknown, t: unknown) => Thenable<unknown>
+        ) => {
+            titles.push(`${String(options.title)} @ ${String(options.location)}`);
+            return originalProgress.call(vscode.window, options as never, task as never);
+        };
+        (vscode.window as { showInputBox: unknown }).showInputBox = () => Promise.resolve('agenda: progress');
+        try {
+            await commitAgendaSources([target], AGENDA_STRINGS.en, 'en');
+            await waitUntil(() => !run(['status', '--porcelain']).includes('plan.md'), 'the edit to reach a commit');
+            await pushAgendaSources([target], AGENDA_STRINGS.en, 'en');
+        } finally {
+            (vscode.window as { withProgress: unknown }).withProgress = originalProgress;
+            (vscode.window as { showInputBox: unknown }).showInputBox = originalInput;
+        }
+
+        assert.strictEqual(titles.length, 2, `expected one progress per action, got ${JSON.stringify(titles)}`);
+        // `ProgressLocation.Notification` is 15: a status-bar spinner would sit
+        // behind the commit-message modal, which is the reason for the choice.
+        assert.strictEqual(titles[0], `${AGENDA_STRINGS.en.git.commitProgress} @ 15`);
+        assert.strictEqual(titles[1], `${AGENDA_STRINGS.en.git.pushProgress} @ 15`);
+    });
+
+    // The mobile client counts what it sent, and so does this: a branch three
+    // commits ahead must not report "1 repository".
+    test('the push reports the commits it sent, not the repositories it visited', async function () {
+        this.timeout(30000);
+        const aheadRemote = path.join(workDir, 'ahead-remote.git');
+        const aheadDir = path.join(workDir, 'ahead-repo');
+        execFileSync('git', ['init', '--bare', aheadRemote], { encoding: 'utf-8' });
+        fs.mkdirSync(aheadDir);
+        const run = (args: string[]): string =>
+            execFileSync('git', [...GIT_ID, ...args], { cwd: aheadDir, encoding: 'utf-8' });
+        run(['init', '--initial-branch=master']);
+        const target = path.join(aheadDir, 'log.md');
+        fs.writeFileSync(target, '# log\n');
+        run(['add', '.']);
+        run(['commit', '-m', 'initial']);
+        run(['remote', 'add', 'origin', aheadRemote]);
+        run(['push', '-u', 'origin', 'master']);
+        for (const line of ['second\n', 'third\n']) {
+            fs.appendFileSync(target, line);
+            run(['commit', '-am', line.trim()]);
+        }
+
+        const reported: string[] = [];
+        const originalStatusBar = vscode.window.setStatusBarMessage;
+        (vscode.window as unknown as { setStatusBarMessage: unknown }).setStatusBarMessage = (message: string) => {
+            reported.push(message);
+            return { dispose: () => undefined };
+        };
+        try {
+            // The extension only learns the branch is ahead after the Git
+            // extension has read this repository, which is what opening it for
+            // the status does.
+            await waitUntil(async () => {
+                const status = await collectGitStatus([target]);
+                return status?.unpushedCommits === 2;
+            }, 'the two local commits to be seen as unpushed');
+            await pushAgendaSources([target], AGENDA_STRINGS.en, 'en');
+        } finally {
+            (vscode.window as unknown as { setStatusBarMessage: unknown }).setStatusBarMessage = originalStatusBar;
+        }
+
+        const line = reported.find((message) => message.includes('ushed')) ?? reported.join(' | ');
+        assert.match(line, /2 commits/, `expected a count in commits, got: ${line}`);
     });
 
     test('a detached HEAD is refused rather than offered an upstream', async function () {
@@ -321,7 +546,7 @@ suite('agenda git status against a real repository', () => {
             return Promise.resolve(undefined);
         };
         try {
-            await pushAgendaSources([path.join(detachedDir, 'detached.md')], AGENDA_STRINGS.en);
+            await pushAgendaSources([path.join(detachedDir, 'detached.md')], AGENDA_STRINGS.en, 'en');
         } finally {
             (vscode.window as { showWarningMessage: unknown }).showWarningMessage = original;
         }
@@ -332,6 +557,52 @@ suite('agenda git status against a real repository', () => {
         assert.strictEqual(status.repos[0]?.branch, undefined, 'a detached HEAD has no branch name');
     });
 });
+
+/**
+ * A status of the test's own making, for the panel states that cannot be
+ * produced by editing files: this repository is not going to be left
+ * mid-merge to make a screenshot of the conflict group.
+ */
+function pendingStatus(): AgendaGitStatus {
+    return {
+        repos: [
+            {
+                root: '/tmp/panel-repo',
+                name: 'panel-repo',
+                branch: 'master',
+                upstream: 'origin/master',
+                aheadCommits: 1,
+                unpushedCommitList: [{ hash: 'abc1234', subject: 'local work' }]
+            }
+        ],
+        files: [
+            {
+                file: '/tmp/panel-repo/notes.md',
+                label: 'notes.md',
+                repoRoot: '/tmp/panel-repo',
+                uncommitted: true,
+                unpushed: false,
+                conflicted: false
+            }
+        ],
+        uncommittedCount: 1,
+        unpushedCount: 0,
+        outsideGitCount: 0,
+        unpushedCommits: 1,
+        conflictCount: 0
+    };
+}
+
+/** The same repository, mid-merge: one path still unresolved. */
+function conflictedStatus(): AgendaGitStatus {
+    const base = pendingStatus();
+    return {
+        ...base,
+        repos: [{ ...base.repos[0]!, conflictCount: 1 }],
+        files: [{ ...base.files[0]!, conflicted: true }],
+        conflictCount: 1
+    };
+}
 
 /**
  * The chip in a real panel. Separate suite because it drives the agenda command
@@ -376,6 +647,75 @@ suite('agenda panel git chip', () => {
             (vscode.window as { showInputBox: unknown }).showInputBox = originalInput;
             (vscode.window as { showWarningMessage: unknown }).showWarningMessage = originalWarn;
         }
+    });
+
+    // What a press leaves on screen while the host works. The status is posted
+    // rather than collected: the buttons only exist when there is something to
+    // commit, and that must not depend on the state this repository happens to
+    // be in while the suite runs.
+    test('pressing an action takes both buttons out of service and marks the pressed one', async function () {
+        this.timeout(30000);
+        await vscode.commands.executeCommand('markdown-org.showAgendaDay');
+        await waitForAgendaRender('day');
+        await AgendaPanel.postGitStatusForTesting(pendingStatus());
+        await waitUntil(async () => {
+            const info = await AgendaPanel.queryRenderedInfoForTesting();
+            return info?.gitActions.join(' | ') === 'commit | push';
+        }, 'both actions to be offered');
+
+        // The commit flow is held at its message prompt, which is what makes
+        // the intermediate state readable at all: released too early and the
+        // fresh status would already have rebuilt the buttons.
+        let release: (value: string | undefined) => void = () => undefined;
+        const held = new Promise<string | undefined>((resolve) => {
+            release = resolve;
+        });
+        const originalInput = vscode.window.showInputBox;
+        (vscode.window as { showInputBox: unknown }).showInputBox = () => held;
+        try {
+            await AgendaPanel.clickGitActionForTesting('commit');
+            await waitUntil(async () => {
+                const info = await AgendaPanel.queryRenderedInfoForTesting();
+                return info?.gitActions.includes('commit (off, busy)') === true;
+            }, 'the pressed button to show it is working');
+            const info = await AgendaPanel.queryRenderedInfoForTesting();
+            assert.ok(info);
+            assert.deepStrictEqual(
+                info.gitActions,
+                ['commit (off, busy)', 'push (off)'],
+                'the other button must be out of service too, and without a spinner of its own'
+            );
+        } finally {
+            release(undefined);
+            (vscode.window as { showInputBox: unknown }).showInputBox = originalInput;
+        }
+
+        // Dismissing the prompt commits nothing, and the buttons come back:
+        // the host answers even the cancelled case with a status, which is the
+        // only thing that re-enables them.
+        await waitUntil(async () => {
+            const info = await AgendaPanel.queryRenderedInfoForTesting();
+            return info !== null && !info.gitActions.some((action) => action.includes('off'));
+        }, 'the buttons to return to service');
+    });
+
+    test('a conflicted status offers no commit button and says where to resolve it', async function () {
+        this.timeout(30000);
+        await vscode.commands.executeCommand('markdown-org.showAgendaDay');
+        await waitForAgendaRender('day');
+        await AgendaPanel.postGitStatusForTesting(conflictedStatus());
+        await waitUntil(async () => {
+            const info = await AgendaPanel.queryRenderedInfoForTesting();
+            return info?.gitGroups.includes('conflicted') === true;
+        }, 'the conflict group to appear');
+
+        const info = await AgendaPanel.queryRenderedInfoForTesting();
+        assert.ok(info);
+        assert.strictEqual(info.gitGroups[0], 'conflicted', 'the conflict must be the first thing in the dropdown');
+        assert.deepStrictEqual(info.gitActions, ['push'], 'a conflict must leave no way to commit from the panel');
+        // The count reaches the chip, so the header says something is wrong
+        // without the dropdown being opened.
+        assert.match(info.gitChip, /!/, info.gitChip);
     });
 
     test('a source row opens its file', async function () {
