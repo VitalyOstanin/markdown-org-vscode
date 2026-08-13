@@ -431,7 +431,7 @@ suite('CLOCK Timestamp Editing Integration Tests', () => {
             editor.selection = new vscode.Selection(1, 49, 1, 49);
             await vscode.commands.executeCommand('markdown-org.timestampUp');
             assert.ok(editor.document.lineAt(1).text.includes('--<2025-12-09 Вт 21:31>'));
-            assert.ok(editor.document.lineAt(1).text.includes('=> -1:-29'));
+            assert.ok(editor.document.lineAt(1).text.includes('=> -0:29'));
         });
 
         test('<> - Fix by decrementing start minute', async () => {
@@ -439,7 +439,7 @@ suite('CLOCK Timestamp Editing Integration Tests', () => {
             editor.selection = new vscode.Selection(1, 26, 1, 26);
             await vscode.commands.executeCommand('markdown-org.timestampDown');
             assert.ok(editor.document.lineAt(1).text.includes('<2025-12-09 Вт 21:59>'));
-            assert.ok(editor.document.lineAt(1).text.includes('=> -1:-29'));
+            assert.ok(editor.document.lineAt(1).text.includes('=> -0:29'));
         });
     });
 
