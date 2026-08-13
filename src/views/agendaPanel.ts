@@ -947,12 +947,16 @@ export class AgendaPanel {
                     await pushAgendaSources(files, strings, language);
                 }
             } finally {
+                // Two messages, and the order matters for neither: the page
+                // keeps the buttons out of service until `gitActionDone`
+                // arrives, whatever statuses reach it in between -- and one
+                // does, because staging alone moves the repository's resource
+                // groups. In `finally` because a failure that skipped it would
+                // leave the panel unable to try again.
+                void AgendaPanel.currentPanel?.webview.postMessage({ command: 'gitActionDone' });
                 // The repository events that follow will refresh the chip on
                 // their own; this covers the case where nothing changed (a
-                // cancelled prompt) and no event is coming. In `finally`
-                // because the page disables both buttons on the click and
-                // waits for this message to get them back -- a failure that
-                // skipped it would leave the panel unable to try again.
+                // cancelled prompt) and no event is coming.
                 AgendaPanel.requestGitStatus();
             }
         } else if (message.command === 'groupAction') {

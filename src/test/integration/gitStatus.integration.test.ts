@@ -610,6 +610,57 @@ function conflictedStatus(): AgendaGitStatus {
  * tracked) rather than the temporary repository above.
  */
 suite('agenda panel git chip', () => {
+    const panelRepos: string[] = [];
+
+    suiteTeardown(() => {
+        for (const dir of panelRepos) {
+            try {
+                fs.rmSync(dir, { recursive: true, force: true, maxRetries: 10, retryDelay: 200 });
+            } catch {
+                /* a leftover temp directory is not a test result */
+            }
+        }
+    });
+
+    /**
+     * Render an agenda whose only source file is an uncommitted note in a
+     * repository of this test's own.
+     *
+     * Needed by the two tests that hold the host at its commit-message prompt:
+     * the panel's own workspace is gitignored, so a commit started against it
+     * finds nothing changed and returns before any prompt is raised. The chip
+     * itself is still driven by a posted status -- what these tests read is
+     * what the page does, not what this repository happens to contain.
+     */
+    async function renderOverPendingRepository(name: string): Promise<void> {
+        const dir = fs.realpathSync.native(fs.mkdtempSync(path.join(os.tmpdir(), `markdown-org-panel-${name}-`)));
+        panelRepos.push(dir);
+        const run = (args: string[]): void => {
+            execFileSync('git', [...GIT_ID, ...args], { cwd: dir, encoding: 'utf-8' });
+        };
+        run(['init', '--initial-branch=master']);
+        run(['config', 'user.name', 'Test']);
+        run(['config', 'user.email', 'test@example.invalid']);
+        const file = path.join(dir, 'note.md');
+        fs.writeFileSync(file, '# note\n');
+        run(['add', '.']);
+        run(['commit', '-m', 'initial']);
+        fs.appendFileSync(file, '- [ ] still being written\n');
+
+        AgendaPanel.render({
+            data: [{ file, line: 1, heading: 'note', content: 'note', task_type: 'TODO' }],
+            mode: 'tasks'
+        });
+        await waitForAgendaRender('tasks');
+        // Opening a repository VS Code has never seen costs a `rev-parse`, an
+        // `openRepository` and a first status pass. Paid here, so the click
+        // that follows measures the page rather than that first walk.
+        await waitUntil(async () => {
+            const status = await collectGitStatus([file]);
+            return status?.uncommittedCount === 1;
+        }, 'the new repository to be opened and read');
+    }
+
     test('the header carries a git chip once the status reaches the page', async function () {
         this.timeout(30000);
         await vscode.commands.executeCommand('markdown-org.showAgendaDay');
@@ -655,8 +706,7 @@ suite('agenda panel git chip', () => {
     // be in while the suite runs.
     test('pressing an action takes both buttons out of service and marks the pressed one', async function () {
         this.timeout(30000);
-        await vscode.commands.executeCommand('markdown-org.showAgendaDay');
-        await waitForAgendaRender('day');
+        await renderOverPendingRepository('busy');
         await AgendaPanel.postGitStatusForTesting(pendingStatus());
         await waitUntil(async () => {
             const info = await AgendaPanel.queryRenderedInfoForTesting();
@@ -691,12 +741,58 @@ suite('agenda panel git chip', () => {
         }
 
         // Dismissing the prompt commits nothing, and the buttons come back:
-        // the host answers even the cancelled case with a status, which is the
-        // only thing that re-enables them.
+        // the host answers even the cancelled case with `gitActionDone`, which
+        // is the only thing that re-enables them.
         await waitUntil(async () => {
             const info = await AgendaPanel.queryRenderedInfoForTesting();
             return info !== null && !info.gitActions.some((action) => action.includes('off'));
         }, 'the buttons to return to service');
+    });
+
+    // Staging is part of the commit, and it moves the repository's resource
+    // groups on its own -- so a status arrives while the commit is still
+    // running. Rebuilding the chip from it used to hand the buttons back
+    // mid-flight, which is a second commit one click away.
+    test('a status arriving mid-action leaves the buttons out of service', async function () {
+        this.timeout(30000);
+        await renderOverPendingRepository('mid-action');
+        await AgendaPanel.postGitStatusForTesting(pendingStatus());
+        await waitUntil(async () => {
+            const info = await AgendaPanel.queryRenderedInfoForTesting();
+            return info?.gitActions.join(' | ') === 'commit | push';
+        }, 'both actions to be offered');
+
+        let release: (value: string | undefined) => void = () => undefined;
+        const held = new Promise<string | undefined>((resolve) => {
+            release = resolve;
+        });
+        const originalInput = vscode.window.showInputBox;
+        (vscode.window as { showInputBox: unknown }).showInputBox = () => held;
+        try {
+            await AgendaPanel.clickGitActionForTesting('commit');
+            await waitUntil(async () => {
+                const info = await AgendaPanel.queryRenderedInfoForTesting();
+                return info?.gitActions.includes('commit (off, busy)') === true;
+            }, 'the pressed button to show it is working');
+
+            // The status the staging would have produced. Messages are handled
+            // in order, so the query that follows sees the page after it.
+            await AgendaPanel.postGitStatusForTesting(pendingStatus());
+            const info = await AgendaPanel.queryRenderedInfoForTesting();
+            assert.deepStrictEqual(
+                info?.gitActions,
+                ['commit (off, busy)', 'push (off)'],
+                'a status is not the end of the action and must not re-enable the buttons'
+            );
+        } finally {
+            release(undefined);
+            (vscode.window as { showInputBox: unknown }).showInputBox = originalInput;
+        }
+
+        await waitUntil(async () => {
+            const info = await AgendaPanel.queryRenderedInfoForTesting();
+            return info !== null && !info.gitActions.some((action) => action.includes('off'));
+        }, 'the buttons to return to service once the action is over');
     });
 
     test('a conflicted status offers no commit button and says where to resolve it', async function () {

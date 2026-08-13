@@ -17,8 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   "and N more". The group now appears whenever there is something to push, even
   when its only file is also uncommitted and listed above.
 - Git panel: commit and push run under a progress notification, and both
-  buttons go inert until the new status arrives, so a second click cannot
-  start on top of the first.
+  buttons go inert until the action is over, so a second click cannot start on
+  top of the first. A status that arrives mid-action -- staging alone produces
+  one -- no longer hands them back early.
 - Git panel: unresolved merge conflicts get their own group and chip counter
   ("! N"), and the commit button steps aside while they stand. Committing from
   the panel is refused before the message is asked for, naming the repository

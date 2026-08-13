@@ -667,6 +667,11 @@ type HostMessage =
     // `null` is "there is no git here", which removes the chip; it is distinct
     // from a status whose counters are zero, which shows the clean marker.
     | { command: 'gitStatus'; status?: AgendaGitStatus | null }
+    // The commit or push the page started has finished, one way or another.
+    // Sent by the host itself rather than inferred from a status: staging
+    // alone moves the repository's resource groups, so a status arrives
+    // mid-operation and says nothing about whether it is over.
+    | { command: 'gitActionDone' }
     | { command: 'getRenderedInfo' }
     // Integration-test hook: the host cannot scroll the page from outside, and
     // the clipping behaviour only exists at a non-zero scroll position.
@@ -808,6 +813,11 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
     // `gitStatus` message, so the header renders without a chip until then
     // rather than with an empty one.
     let gitStatus: AgendaGitStatus | null = null;
+
+    // The git action the user started, until the host reports it finished.
+    // Kept outside the chip's markup because the chip is replaced wholesale on
+    // every status, and a status arrives while the action is still running.
+    let gitBusyAction: 'commit' | 'push' | null = null;
 
     // Header layout: 'auto' | 'full' | 'compact' (markdown-org.agendaHeaderMode).
     // Only the resolved outcome reaches the DOM, as a class on <body>.
@@ -1166,6 +1176,8 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             applyHeaderModeMessage(message.headerMode);
         } else if (message.command === 'gitStatus') {
             applyGitStatus(message.status ?? null);
+        } else if (message.command === 'gitActionDone') {
+            applyGitActionDone();
         } else if (message.command === 'getRenderedInfo') {
             postRenderedInfo();
         } else if (message.command === 'setScrollForTesting') {
@@ -1910,6 +1922,11 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             controlRow.append(fresh);
         }
         attachGitMenuListeners();
+        // The buttons of the fresh node start enabled, and a status can arrive
+        // while the action that produced it is still running -- `git add` fires
+        // one on its own. Whatever the new node looks like, it stays out of
+        // service until the host says the action is over.
+        applyGitBusy();
     }
 
     function attachGitMenuListeners(): void {
@@ -1928,23 +1945,28 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         // would otherwise stay open behind it; the click that reaches document
         // closes it, so nothing extra is needed here beyond sending the intent.
         document.getElementById('gitCommitBtn')?.addEventListener('click', (ev) => {
-            markGitActionBusy(ev.currentTarget);
-            vscode.postMessage({ command: 'gitCommit' });
+            startGitAction('commit', ev.currentTarget);
         });
         document.getElementById('gitPushBtn')?.addEventListener('click', (ev) => {
-            markGitActionBusy(ev.currentTarget);
-            vscode.postMessage({ command: 'gitPush' });
+            startGitAction('push', ev.currentTarget);
         });
     }
 
+    /** Remember which action is running, take the buttons out, and send it. */
+    function startGitAction(action: 'commit' | 'push', target: EventTarget | null): void {
+        gitBusyAction = action;
+        markGitActionBusy(target);
+        vscode.postMessage({ command: action === 'commit' ? 'gitCommit' : 'gitPush' });
+    }
+
     /**
-     * Take both buttons out of service until the next status arrives.
+     * Take both buttons out of service for as long as an action is running.
      *
-     * Nothing here ever turns them back on: the host answers every one of these
-     * actions with a `gitStatus` message -- including the cancelled cases,
-     * where no repository event would come -- and that message rebuilds the
-     * menu with fresh buttons. Re-enabling them on a timer would be the way to
-     * get a second commit started on top of the first.
+     * Nothing here ever turns them back on: the host sends `gitActionDone` when
+     * the action is over -- including the cancelled cases, where no repository
+     * event would come -- and only that clears {@link gitBusyAction}.
+     * Re-enabling them on a status, or on a timer, would be the way to get a
+     * second commit started on top of the first.
      */
     function markGitActionBusy(target: EventTarget | null): void {
         document.querySelectorAll<HTMLButtonElement>('#gitMenu .git-action').forEach((btn) => {
@@ -1953,6 +1975,20 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
                 btn.setAttribute('data-busy', 'true');
             }
         });
+    }
+
+    /** Re-apply the running action's state to a chip that was just rebuilt. */
+    function applyGitBusy(): void {
+        if (!gitBusyAction) {
+            return;
+        }
+        markGitActionBusy(document.getElementById(gitBusyAction === 'push' ? 'gitPushBtn' : 'gitCommitBtn'));
+    }
+
+    /** The action is over: the next rebuild of the chip brings the buttons back. */
+    function applyGitActionDone(): void {
+        gitBusyAction = null;
+        refreshGitMenu();
     }
 
     function renderHeaderModeButton(): string {
