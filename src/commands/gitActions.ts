@@ -13,7 +13,7 @@
  */
 import * as vscode from 'vscode';
 import * as path from 'node:path';
-import { getGitApi, resolveRealPath, resolveRepositoryFor } from '../utils/git/gitApi';
+import { getGitApi, resolveRepositoryFor } from '../utils/git/gitApi';
 import type { GitRepository } from '../utils/git/gitApiTypes';
 import { formatError, notifyError, notifyStatus } from '../utils/notify';
 import { logDiagnostic } from '../utils/logChannel';
@@ -260,9 +260,11 @@ async function groupByRepository(files: readonly string[]): Promise<FilesByRepos
             continue;
         }
         const paths = grouped.get(resolved.repository) ?? [];
-        // `resolveRepositoryFor` already returns the path git will accept, but
-        // the cache is shared so the lookup costs nothing here.
-        paths.push(await resolveRealPath(resolved.realPath, realPathCache));
+        // Taken as returned: `resolveRepositoryFor` has already chosen which of
+        // the two spellings git will accept, and resolving it again would undo
+        // that choice for a committed symlink pointing out of its repository --
+        // there the link is the tracked path and its target is not.
+        paths.push(resolved.realPath);
         grouped.set(resolved.repository, paths);
     }
     return grouped;
