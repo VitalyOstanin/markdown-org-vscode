@@ -556,10 +556,12 @@
     - `unicorn/prefer-node-protocol` replaced the hand-written
       `no-restricted-imports` list, which only covered the built-ins someone
       remembered to add.
-    - Two rules stay off: `prefer-promise-with-resolvers` needs ES2024 and the
-      projects declare `lib: ES2022`; `prefer-includes` and
+    - Two rules stayed off at the time: `prefer-promise-with-resolvers` needs
+      ES2024 and the projects declared `lib: ES2022`; `prefer-includes` and
       `prefer-string-starts-ends-with` are left to typescript-eslint, which
-      reads types instead of guessing at the receiver.
+      reads types instead of guessing at the receiver. The first is on since
+      the minimum host became 1.101 (ADR-0018) and both projects moved to
+      `lib: ES2024`; the second pair stays with typescript-eslint.
     - `--fix` broke two things, both caught by `tsc -b`: a spread over a
       structurally-typed `ArrayLike` (now declared `Iterable`, which is what a
       NodeList is), and an `as HTMLElement` cast rewritten to `!`, which lost

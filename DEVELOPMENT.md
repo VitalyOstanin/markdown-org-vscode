@@ -324,6 +324,8 @@ src/
 │   ├── agenda*.ts            # Agenda rendering logic: click intent, scroll memory, day
 │   │                         # headers, sections, task groups, month cells, tooltips, i18n
 │   ├── gcal/                 # Google Calendar client, mapping and sync state
+│   ├── git/                  # The Git extension API slice: repository resolution, the
+│   │                         # status model and the paths git accepts (ADR-0016, ADR-0020)
 │   ├── extractor.ts, exec.ts # markdown-org-extract resolution and the execFile wrapper
 │   │                         # (centralised so tests can stub one place)
 │   ├── notify.ts, logChannel.ts  # User-facing messages, and the "Markdown Org" output channel
@@ -371,8 +373,11 @@ the [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) format.
 
 ### Steps and channels
 
-1. Check whether the README media still match the code, and re-shoot them if
-   they do not -- see [Demo media](#demo-media). Compare against when they were
+1. Check whether the README text and media still match the code, and redo them
+   if they do not -- see [Demo media](#demo-media). The text is the half that
+   goes stale quietly: a feature described by what it did two releases ago
+   reads as correct. Walk the features the release touched and read their
+   paragraphs against the code. Compare against when they were
    last taken (the `chore(media)` commit) rather than by eye: anything that
    changed the agenda's markup or stylesheet since then is a candidate, while a
    state the scenarios never enter (a spinner mid-operation, a merge conflict)

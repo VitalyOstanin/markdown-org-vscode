@@ -12,7 +12,10 @@
 
 Accepted. Amended by [ADR-0018](0018-minimum-host-follows-the-git-api.md) (2026-08-11): the
 chain below is unchanged, but step 3 requires a host of 1.101 or newer,
-which the manifest now declares.
+which the manifest now declares. Amended by
+[ADR-0020](0020-panel-does-not-resolve-conflicts.md) (2026-08-14) on what the
+chip shows: four counters rather than two, and the rules about a merge in
+progress and a file whose repository could not be read.
 
 ## Context
 

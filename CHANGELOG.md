@@ -16,6 +16,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is folded lasts as long as the panel is open, and a day rendered without
   headings (`markdown-org.agendaGrouping: "flat"`) folds nothing, since there
   would be nothing to unfold it by.
+- Week view: the overdue bands carry the group menu the day view gives them, so
+  the same band offers the same action in both views. The menu acts on the day
+  it stands under, not on the first day of the week.
+- `Markdown Org: Toggle Agenda Day Sections` switches
+  `markdown-org.agendaGrouping` between the named sections and the flat day,
+  which until now was only reachable through the settings editor -- the setting
+  answers a narrow panel, and that is decided while reading, not in settings.
 - Week view: a line down the left of each day, from its heading to its last
   row, so a band such as "All-day & upcoming" reads as part of the day above it
   rather than as a block of its own.
@@ -26,7 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Git panel: commit and push run under a progress notification, and both
   buttons go inert until the action is over, so a second click cannot start on
   top of the first. A status that arrives mid-action -- staging alone produces
-  one -- no longer hands them back early.
+  one -- no longer hands them back early. The press closes the dropdown, so
+  which of the two is running is said by the notification; reopening the chip
+  meanwhile shows it on the button as well.
 - Git panel: a commit is refused a second time before it happens when the
   repository holds staged changes this view does not name. Git commits the
   whole index and cannot be told otherwise, so the panel names the repository
@@ -62,6 +71,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instead of arriving half in English.
 - CLOCK lines: an entry whose end was stepped back past its start writes its
   duration as `-2:30` rather than `-3:-30`.
+- Git panel: a push that creates an upstream branch says so, naming the
+  repository and branch it created; it used to finish in silence, because the
+  count it reported is not defined for a branch that had no upstream. The
+  question that asks for that push names the repository too -- a view can span
+  several, and the branch is called the same in all of them.
+- Git panel: a repository git could not be asked about -- an ownership refusal,
+  a git that failed to start -- is asked about again on the next pass instead
+  of being remembered as "outside git" until the window is reloaded.
+- Agenda actions: the counts in what a commit, a push or a group action reports
+  are printed in the digits of `markdown-org.dateLocale`, like the counts on the
+  buttons that raise them -- pressing "Commit ٣" was answered with "Committed 3
+  files", one action in two numbering systems.
+- Notifications the extension raises start with a capital letter, so a message
+  reads as a sentence after the "Markdown Org: " prefix rather than as a
+  fragment.
+- Google Calendar: a rate-limited or timed-out token refresh (HTTP 429, 408) is
+  waited out and retried, as the calendar requests themselves already were.
+  Treated as a rejected grant, it ended the whole synchronisation.
 
 ## [0.15.0] - 2026-08-13
 
@@ -293,10 +320,11 @@ Ctrl+A` and Promote to Maintain is `Ctrl+K Ctrl+K Ctrl+P`. On macOS every one
   again. The summary bar, the section chip and both clipping markers now use
   the same formatter as the dates and the month cells.
 
-## [0.14.0] - 2026-08-09
+## 0.14.0 - 2026-08-09 (never released)
 
 Never released on its own: the tag was never cut, so there is no `v0.14.0` to
-install or compare against. Everything below reached users as part of 0.15.0.
+install or compare against, and the heading carries no link for that reason --
+everything below reached users as part of 0.15.0.
 
 Four things this release is about: a Tasks view that says which day each of its
 rows belongs to, org syntax that is coloured in the editor and not only in the

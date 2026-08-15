@@ -10,7 +10,9 @@
 
 ## Status
 
-Accepted
+Accepted. Amended by [ADR-0019](0019-panel-action-notifications-follow-the-ui-language.md) on
+the scope of notifications: those raised by an action started from the panel
+follow the setting.
 
 ## Context
 
