@@ -7,10 +7,16 @@
  * counting rules -- which are the part that can be quietly wrong -- are unit
  * testable without a host.
  *
- * The two counters answer different questions and are deliberately both in
- * files: "how many of the files I am looking at are not saved to git" and "how
- * many of them are saved but not sent". The commit count is carried alongside
- * for the wording in the expanded list, not for the header chip.
+ * Four counters, each answering a different question about the files on screen:
+ * how many carry unresolved conflicts (from the repository's `mergeChanges`,
+ * and counted over the whole repository -- what they block is the commit
+ * button, which is refused for the repository), how many are not saved to git,
+ * how many are saved but not sent, and how many have no repository at all (no
+ * `repoRoot`: outside git, or in a repository VS Code declined to open --
+ * "clean" would be a claim about a file nothing looked at).
+ *
+ * The commit count and the list of commits are carried alongside for the
+ * wording of the expanded list, not for the header chip.
  */
 // The three result types are payload contracts with the page, so they live
 // in src/types.ts alongside `Task` -- the webview project cannot import a

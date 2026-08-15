@@ -49,6 +49,24 @@ function toTokenResponse(json: Record<string, unknown>, now: number): TokenRespo
     };
 }
 
+/**
+ * True when a token request should be tried again rather than reconnected.
+ *
+ * The same policy the Calendar requests use (`isTransientStatus`), plus 408:
+ * the two are kept apart because only this one decides between the two error
+ * types, and reading it from `calendarClient` would point a module the whole
+ * client depends on at one that depends on it.
+ */
+function isRetryableTokenStatus(status: number): boolean {
+    if (status === 408 || status === 429) {
+        return true;
+    }
+    // Only the rest of 4xx says the grant itself was rejected; anything else
+    // that is not a success (5xx, and a redirect that was never followed) is
+    // the endpoint, not the credentials.
+    return status < 400 || status >= 500;
+}
+
 async function postToken(fetchFn: FetchFn, body: URLSearchParams, now: number): Promise<TokenResponse> {
     const res = await fetchFn(TOKEN_ENDPOINT, {
         method: 'POST',
@@ -62,8 +80,11 @@ async function postToken(fetchFn: FetchFn, body: URLSearchParams, now: number): 
         // A rejected grant (`invalid_grant`, a wrong client secret, a revoked
         // consent) is answered by connecting again, not by trying again -- the
         // caller's retry loop is told which of the two this is by the type.
-        // 5xx is the token endpoint being unwell, which a retry does fix.
-        throw res.status >= 400 && res.status < 500 ? new GcalAuthError(message) : new Error(message);
+        // 5xx is the token endpoint being unwell, and so are the two 4xx codes
+        // that mean "not now" rather than "not you": 429 is the rate limit this
+        // endpoint answers with under a sync that refreshes per request, and 408
+        // is a timed-out request. Both used to end the sync outright.
+        throw isRetryableTokenStatus(res.status) ? new Error(message) : new GcalAuthError(message);
     }
     return toTokenResponse(json, now);
 }

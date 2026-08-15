@@ -156,12 +156,52 @@ suite('agenda git status against a real repository', () => {
         const repo = status.repos[0];
         assert.ok(repo, 'expected the repository in the model');
         const commits = repo.unpushedCommitList ?? [];
-        assert.deepStrictEqual(
-            commits.map((c) => c.subject),
-            ['local only'],
-            JSON.stringify(repo)
+        // Presence, not the whole list: this repository is shared with the
+        // tests after it and one of them commits into it, so an exact list
+        // would depend on the order mocha happens to run them in.
+        const local = commits.find((c) => c.subject === 'local only');
+        assert.ok(local, `expected the unpushed commit in ${JSON.stringify(repo)}`);
+        assert.match(local.hash, /^[0-9a-f]{7}$/);
+    });
+
+    test('a long backlog is cut to what the dropdown lists, and the count stays whole', async function () {
+        this.timeout(30000);
+        // Its own repository: the shared one is written to by the tests around
+        // this, and what is asserted here is a number of commits.
+        const manyDir = path.join(workDir, 'many-commits-repo');
+        const manyRemote = path.join(workDir, 'many-commits-remote.git');
+        fs.mkdirSync(manyDir);
+        const run = (args: string[]): string =>
+            execFileSync('git', [...GIT_ID, ...args], { cwd: manyDir, encoding: 'utf-8' });
+        execFileSync('git', ['init', '--bare', manyRemote], { encoding: 'utf-8' });
+        run(['init', '--initial-branch=master']);
+        const target = path.join(manyDir, 'log.md');
+        fs.writeFileSync(target, '# log\n');
+        run(['add', '.']);
+        run(['commit', '-m', 'initial']);
+        run(['remote', 'add', 'origin', manyRemote]);
+        run(['push', '-u', 'origin', 'master']);
+        // Nine unpushed commits, one more than the dropdown lists. The last of
+        // them carries a body, which is what the subject is cut from.
+        for (let i = 1; i <= 9; i++) {
+            fs.appendFileSync(target, `entry ${i}\n`);
+            run(['add', 'log.md']);
+            run(['commit', '-m', i === 9 ? 'Ninth entry\n\nWhy: the body must not reach the row.' : `entry ${i}`]);
+        }
+
+        const status = await collectGitStatus([target]);
+        assert.ok(status);
+        const repo = status.repos[0];
+        assert.ok(repo);
+        assert.strictEqual(repo.aheadCommits, 9, 'the count is the whole truth');
+        assert.strictEqual(status.unpushedCommits, 9);
+        const listed = repo.unpushedCommitList ?? [];
+        assert.strictEqual(listed.length, 8, 'the list is cut to what the dropdown shows');
+        assert.strictEqual(
+            listed[0]?.subject,
+            'Ninth entry',
+            'the newest commit leads, and its body stays out of the row'
         );
-        assert.match(commits[0]?.hash ?? '', /^[0-9a-f]{7}$/);
     });
 
     test('an edit outside the view is never counted', async function () {
@@ -316,6 +356,68 @@ suite('agenda git status against a real repository', () => {
         assert.strictEqual(status.repos[0]?.upstream, undefined);
         assert.strictEqual(status.unpushedCount, 0);
         assert.strictEqual(status.unpushedCommits, 0);
+    });
+
+    test('accepting the prompt creates the upstream and says so', async function () {
+        this.timeout(30000);
+        // A repository with a remote but no upstream: the branch was never
+        // pushed, so `ahead` is absent and there is nothing to count -- the
+        // outcome has to be reported by name or it is not reported at all.
+        const freshDir = path.join(workDir, 'fresh-upstream-repo');
+        const freshRemote = path.join(workDir, 'fresh-remote.git');
+        fs.mkdirSync(freshDir);
+        const run = (args: string[]): string =>
+            execFileSync('git', [...GIT_ID, ...args], { cwd: freshDir, encoding: 'utf-8' });
+        execFileSync('git', ['init', '--bare', freshRemote], { encoding: 'utf-8' });
+        run(['init', '--initial-branch=master']);
+        run(['config', 'user.name', 'Test']);
+        run(['config', 'user.email', 'test@example.invalid']);
+        fs.writeFileSync(path.join(freshDir, 'plans.md'), '# plans\n');
+        run(['add', '.']);
+        run(['commit', '-m', 'initial']);
+        run(['remote', 'add', 'origin', freshRemote]);
+        assert.strictEqual(run(['branch', '--list', '--format=%(upstream)']).trim(), '', 'precondition: no upstream');
+
+        let prompt = '';
+        let reported = '';
+        const originalWarning = vscode.window.showWarningMessage;
+        const originalStatus = vscode.window.setStatusBarMessage;
+        (vscode.window as { showWarningMessage: unknown }).showWarningMessage = (
+            message: string,
+            _options: unknown,
+            confirm: string
+        ) => {
+            prompt = message;
+            return Promise.resolve(confirm);
+        };
+        (vscode.window as { setStatusBarMessage: unknown }).setStatusBarMessage = (message: string) => {
+            reported = message;
+            return { dispose: () => undefined };
+        };
+        try {
+            await pushAgendaSources([path.join(freshDir, 'plans.md')], AGENDA_STRINGS.en, 'en');
+        } finally {
+            (vscode.window as { showWarningMessage: unknown }).showWarningMessage = originalWarning;
+            (vscode.window as { setStatusBarMessage: unknown }).setStatusBarMessage = originalStatus;
+        }
+
+        assert.ok(prompt.includes('fresh-upstream-repo'), `the prompt must name the repository:\n${prompt}`);
+        const local = run(['rev-parse', 'HEAD']).trim();
+        await waitUntil(
+            () =>
+                execFileSync('git', ['--git-dir', freshRemote, 'rev-parse', 'master'], {
+                    encoding: 'utf-8'
+                }).trim() === local,
+            'the remote to receive the new branch'
+        );
+        assert.strictEqual(
+            run(['branch', '--list', '--format=%(upstream:short)']).trim(),
+            'origin/master',
+            'the push must have set the upstream, not just sent the commits'
+        );
+        // Silence here was the defect: the count is zero for this outcome, so a
+        // message keyed off the count reported nothing at all.
+        assert.ok(reported.includes('fresh-upstream-repo/master'), `unexpected status message: "${reported}"`);
     });
 
     // Its own repository again: a merge left unresolved in the shared one would
@@ -831,12 +933,9 @@ suite('agenda panel git chip', () => {
         // The commit flow is held at its message prompt, which is what makes
         // the intermediate state readable at all: released too early and the
         // fresh status would already have rebuilt the buttons.
-        let release: (value: string | undefined) => void = () => undefined;
-        const held = new Promise<string | undefined>((resolve) => {
-            release = resolve;
-        });
+        const prompt = Promise.withResolvers<string | undefined>();
         const originalInput = vscode.window.showInputBox;
-        (vscode.window as { showInputBox: unknown }).showInputBox = () => held;
+        (vscode.window as { showInputBox: unknown }).showInputBox = () => prompt.promise;
         try {
             await AgendaPanel.clickGitActionForTesting('commit');
             await waitUntil(async () => {
@@ -851,7 +950,7 @@ suite('agenda panel git chip', () => {
                 'the other button must be out of service too, and without a spinner of its own'
             );
         } finally {
-            release(undefined);
+            prompt.resolve(undefined);
             (vscode.window as { showInputBox: unknown }).showInputBox = originalInput;
         }
 
@@ -877,12 +976,9 @@ suite('agenda panel git chip', () => {
             return info?.gitActions.join(' | ') === 'commit | push';
         }, 'both actions to be offered');
 
-        let release: (value: string | undefined) => void = () => undefined;
-        const held = new Promise<string | undefined>((resolve) => {
-            release = resolve;
-        });
+        const prompt = Promise.withResolvers<string | undefined>();
         const originalInput = vscode.window.showInputBox;
-        (vscode.window as { showInputBox: unknown }).showInputBox = () => held;
+        (vscode.window as { showInputBox: unknown }).showInputBox = () => prompt.promise;
         try {
             await AgendaPanel.clickGitActionForTesting('commit');
             await waitUntil(async () => {
@@ -900,7 +996,7 @@ suite('agenda panel git chip', () => {
                 'a status is not the end of the action and must not re-enable the buttons'
             );
         } finally {
-            release(undefined);
+            prompt.resolve(undefined);
             (vscode.window as { showInputBox: unknown }).showInputBox = originalInput;
         }
 

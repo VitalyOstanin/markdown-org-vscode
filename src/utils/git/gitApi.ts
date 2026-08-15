@@ -35,9 +35,19 @@ let reportedUnavailable = false;
  */
 const repositoryByDirectory = new KeyedResolutionCache<GitRepository | undefined>();
 
-/** Drop the remembered directory-to-repository answers. */
+/** Roots whose first status pass has already been forced (see below). */
+const primedRoots = new Set<string>();
+
+/**
+ * Drop everything this module remembers about repositories.
+ *
+ * Both caches, not just the directory answers: a repository that was closed and
+ * is opened again arrives with empty change groups exactly like the first time,
+ * so the forced status pass has to run again as well (see {@link primedRoots}).
+ */
 export function forgetResolvedRepositories(): void {
     repositoryByDirectory.clear();
+    primedRoots.clear();
 }
 
 /**
@@ -73,9 +83,6 @@ export async function getGitApi(): Promise<GitApi | null> {
     return cachedApi;
 }
 
-/** Roots whose first status pass has already been forced (see below). */
-const primedRoots = new Set<string>();
-
 /**
  * Run one status pass on a repository the workspace did not open.
  *
@@ -83,7 +90,9 @@ const primedRoots = new Set<string>();
  * fills them from its own scan, which has not happened at the moment
  * `openRepository` resolves, and a status read right after would report a clean
  * tree that is not clean. Forced once per root -- from then on the extension's
- * own watchers keep `state` current and the events feed the refresh.
+ * own watchers keep `state` current and the events feed the refresh, until the
+ * repository is closed and {@link forgetResolvedRepositories} takes the root
+ * back out of {@link primedRoots}.
  */
 async function primeRepositoryState(repository: GitRepository, root: string): Promise<void> {
     if (primedRoots.has(root)) {
@@ -175,57 +184,71 @@ export async function resolveRepositoryFor(
  * view and stays there -- which is the accepted cost of supporting agenda files
  * that live outside the workspace folders (ADR-0016).
  */
-function repositoryForPath(api: GitApi, filePath: string): Promise<GitRepository | undefined> {
+async function repositoryForPath(api: GitApi, filePath: string): Promise<GitRepository | undefined> {
     // Keyed by the directory: every note of one directory has the same answer,
     // and the answer is what costs a `git rev-parse`. The negative one is
     // cached along with the rest -- a notes directory outside git used to pay
     // one process per file on every recomputation, and the status is
     // recomputed on each save and each repository event.
-    return repositoryByDirectory.resolve(path.dirname(filePath), () => resolveRepositoryUncached(api, filePath));
+    try {
+        return await repositoryByDirectory.resolve(path.dirname(filePath), () =>
+            resolveRepositoryUncached(api, filePath)
+        );
+    } catch (error) {
+        // "git could not be asked" is caught here rather than inside the cached
+        // computation, so the cache drops the entry instead of serving the
+        // failure for the rest of the session: an unsafe-ownership refusal the
+        // user then fixes must not leave the panel reporting "outside git"
+        // until the window is reloaded. The pass itself degrades as it does for
+        // every other git failure -- the file lands in the "outside git" group.
+        logDiagnostic(`agenda git status: cannot resolve a repository for ${filePath}: ${formatError(error)}`);
+        return undefined;
+    }
 }
 
+/**
+ * Ask git where the repository of `filePath` is, opening it when needed.
+ *
+ * Throws when git could not be asked at all; answers `undefined` when the
+ * answer is "no repository here". The difference is what decides whether the
+ * result is remembered -- see {@link repositoryForPath}.
+ */
 async function resolveRepositoryUncached(api: GitApi, filePath: string): Promise<GitRepository | undefined> {
     const open = api.getRepository(vscode.Uri.file(filePath));
     if (open) {
         return open;
     }
-    try {
-        // A directory, not the file: `getRepositoryRoot` runs
-        // `git rev-parse --show-toplevel` with the given path as the process
-        // working directory, and spawning in a file fails with ENOTDIR.
-        const root = await api.getRepositoryRoot(vscode.Uri.file(path.dirname(filePath)));
-        if (!root) {
-            return undefined;
-        }
-        await api.openRepository(vscode.Uri.file(root.fsPath));
-        // `openRepository` returns the repository only when the model accepted
-        // it as newly opened; an already-known root answers null while
-        // `getRepository` finds it. Asking again covers both.
-        const repository =
-            api.getRepository(vscode.Uri.file(filePath)) ?? api.getRepository(vscode.Uri.file(root.fsPath));
-        if (!repository) {
-            // Git has a repository here and VS Code still refused to open it.
-            // The Git extension does that silently (at trace level) for a root
-            // outside every workspace folder unless
-            // `git.openRepositoryInParentFolders` is "always" or that root was
-            // allowed once before. The file then reaches the panel with no
-            // repository at all, so the reason belongs in the log -- otherwise
-            // the only visible trace is a "?" in the header.
-            logDiagnostic(
-                `agenda git status: git reports a repository at ${root.fsPath} for ${filePath}, ` +
-                    'but VS Code did not open it -- a repository outside the workspace folders is only opened ' +
-                    'when git.openRepositoryInParentFolders is "always" or the root was allowed once through ' +
-                    '"Git: Open Repositories In Parent Folders"'
-            );
-            return undefined;
-        }
-        await primeRepositoryState(repository, root.fsPath);
-        return repository;
-    } catch (error) {
-        // `getRepositoryRoot` answers null for "not a repository"; anything that
-        // throws is a real failure (a broken git binary, an unsafe repository
-        // ownership refusal) and is worth a line in the log.
-        logDiagnostic(`agenda git status: cannot resolve a repository for ${filePath}: ${formatError(error)}`);
+    // A directory, not the file: `getRepositoryRoot` runs
+    // `git rev-parse --show-toplevel` with the given path as the process
+    // working directory, and spawning in a file fails with ENOTDIR. It answers
+    // null for "not a repository" -- a real failure (a broken git binary, an
+    // unsafe repository ownership refusal) throws, and that throw is left to
+    // travel: only the caller can tell the cache which of the two happened.
+    const root = await api.getRepositoryRoot(vscode.Uri.file(path.dirname(filePath)));
+    if (!root) {
         return undefined;
     }
+    await api.openRepository(vscode.Uri.file(root.fsPath));
+    // `openRepository` returns the repository only when the model accepted
+    // it as newly opened; an already-known root answers null while
+    // `getRepository` finds it. Asking again covers both.
+    const repository = api.getRepository(vscode.Uri.file(filePath)) ?? api.getRepository(vscode.Uri.file(root.fsPath));
+    if (!repository) {
+        // Git has a repository here and VS Code still refused to open it.
+        // The Git extension does that silently (at trace level) for a root
+        // outside every workspace folder unless
+        // `git.openRepositoryInParentFolders` is "always" or that root was
+        // allowed once before. The file then reaches the panel with no
+        // repository at all, so the reason belongs in the log -- otherwise
+        // the only visible trace is a "?" in the header.
+        logDiagnostic(
+            `agenda git status: git reports a repository at ${root.fsPath} for ${filePath}, ` +
+                'but VS Code did not open it -- a repository outside the workspace folders is only opened ' +
+                'when git.openRepositoryInParentFolders is "always" or the root was allowed once through ' +
+                '"Git: Open Repositories In Parent Folders"'
+        );
+        return undefined;
+    }
+    await primeRepositoryState(repository, root.fsPath);
+    return repository;
 }

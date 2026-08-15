@@ -180,11 +180,11 @@ export interface AgendaStrings {
         /** Word next to the checkmark when nothing is pending. */
         clean: string;
         cleanTitle: string;
-        /** Chip tooltip halves; `{0}` is a counted noun from `files`. */
+        /** Parts of the chip tooltip; `{0}` is a counted noun from `files`. */
         uncommittedTitle: string;
         unpushedTitle: string;
         /**
-         * The third half: files whose state could not be read at all, either
+         * Files whose state could not be read at all, either
          * because they are outside git or because the repository holding them
          * is one VS Code declined to open. "Clean" would be a claim about them
          * that nothing checked.
@@ -196,7 +196,7 @@ export interface AgendaStrings {
          * button is refused for the repository.
          */
         conflictedTitle: string;
-        /** Joins the two halves above. */
+        /** Joins the parts above, in the order `gitCounters` lists them. */
         titleSeparator: string;
         /** Group headings; `{0}` is a counted noun from `files`. */
         uncommittedGroup: string;
@@ -268,7 +268,12 @@ export interface AgendaStrings {
         pushFailed: string;
         /** Push from a detached HEAD: there is no branch to send anywhere. */
         pushDetachedHead: string;
-        /** Push with no upstream: `{0}` branch, `{1}` the upstream to create. */
+        /**
+         * Push with no upstream: `{0}` repository, `{1}` branch, `{2}` the
+         * upstream to create. The repository is named because such a branch is
+         * absent from the counter on the push button -- the question would
+         * otherwise be about a repository the panel never showed.
+         */
         setUpstreamPrompt: string;
         setUpstreamConfirm: string;
         /** Status-bar confirmation; `{0}` is a counted noun from `files`. */
@@ -279,6 +284,13 @@ export interface AgendaStrings {
          * ahead.
          */
         pushed: string;
+        /**
+         * Push that created an upstream; `{0}` names the branches as
+         * `repository/branch`, joined by `titleSeparator`. Not counted in
+         * commits: a branch with no upstream has no `ahead` to count, which is
+         * exactly why this outcome used to pass in silence.
+         */
+        pushedUpstream: string;
     };
     /** Panel tab title; `{0}` is the mode label. */
     tabTitle: string;
@@ -393,10 +405,11 @@ const EN: AgendaStrings = {
         commitFailed: 'Commit failed: {0}',
         pushFailed: 'Push failed: {0}',
         pushDetachedHead: 'Push cancelled: HEAD is not on a branch',
-        setUpstreamPrompt: 'Branch "{0}" has no upstream. Push it and set "{1}"?',
+        setUpstreamPrompt: '"{0}": branch "{1}" has no upstream. Push it and set "{2}"?',
         setUpstreamConfirm: 'Push',
         committed: 'Committed {0}',
-        pushed: 'Pushed {0}'
+        pushed: 'Pushed {0}',
+        pushedUpstream: 'Pushed to a new upstream: {0}'
     },
     tabTitle: 'Agenda: {0}'
 };
@@ -519,10 +532,11 @@ const RU: AgendaStrings = {
         commitFailed: 'Коммит не выполнен: {0}',
         pushFailed: 'Отправка не выполнена: {0}',
         pushDetachedHead: 'Отправка отменена: HEAD не на ветке',
-        setUpstreamPrompt: 'У ветки «{0}» нет upstream. Отправить и установить «{1}»?',
+        setUpstreamPrompt: 'В «{0}» у ветки «{1}» нет upstream. Отправить и установить «{2}»?',
         setUpstreamConfirm: 'Отправить',
         committed: 'Закоммичено: {0}',
-        pushed: 'Отправлено: {0}'
+        pushed: 'Отправлено: {0}',
+        pushedUpstream: 'Отправлено в новый upstream: {0}'
     },
     tabTitle: 'Агенда: {0}'
 };

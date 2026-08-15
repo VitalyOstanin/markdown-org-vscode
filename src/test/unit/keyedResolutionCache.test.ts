@@ -47,18 +47,16 @@ suite('KeyedResolutionCache', () => {
         // two files of one directory can be in flight at once; storing the
         // promise rather than the value is what keeps that to one process.
         let runs = 0;
-        let release: (value: string) => void = () => undefined;
+        const held = Promise.withResolvers<string>();
         const cache = new KeyedResolutionCache<string>();
         const compute = () => {
             runs++;
-            return new Promise<string>((resolve) => {
-                release = resolve;
-            });
+            return held.promise;
         };
 
         const first = cache.resolve('/a', compute);
         const second = cache.resolve('/a', compute);
-        release('repo');
+        held.resolve('repo');
 
         assert.deepEqual(await Promise.all([first, second]), ['repo', 'repo']);
         assert.equal(runs, 1);
@@ -74,6 +72,30 @@ suite('KeyedResolutionCache', () => {
 
         await assert.rejects(() => cache.resolve('/a', compute), /git is gone/);
         assert.equal(await cache.resolve('/a', compute), 'repo', 'the failure was not cached');
+        assert.equal(runs, 2);
+    });
+
+    test('a failure that lands after clear() leaves the newer answer alone', async () => {
+        // The panel clears the cache on every repository event, so a slow
+        // failure can come back to a key that has since been answered again.
+        // Deleting by key alone would throw that answer away and cost another
+        // `git rev-parse` for a directory already resolved.
+        let runs = 0;
+        const slow = Promise.withResolvers<string>();
+        const cache = new KeyedResolutionCache<string>();
+        const compute = () => {
+            runs++;
+            return runs === 1 ? slow.promise : Promise.resolve('repo');
+        };
+
+        const failing = cache.resolve('/a', compute);
+        cache.clear();
+        const replacement = cache.resolve('/a', compute);
+        slow.reject(new Error('git is gone'));
+
+        await assert.rejects(() => failing, /git is gone/);
+        assert.equal(await replacement, 'repo');
+        assert.equal(await cache.resolve('/a', compute), 'repo', 'the newer entry survived the older failure');
         assert.equal(runs, 2);
     });
 

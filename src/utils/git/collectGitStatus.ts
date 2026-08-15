@@ -4,8 +4,10 @@
  *
  * This is the only place that reads the Git extension's live state. It resolves
  * each unique source file to its repository (gitApi.ts), then asks every
- * repository involved two questions: which of its paths are uncommitted, and
- * which were touched by commits upstream does not have.
+ * repository involved four things: which of its paths are uncommitted, which
+ * were touched by commits upstream does not have, which a merge left
+ * unresolved, and -- through `repository.log` -- what those unpushed commits
+ * are, so the panel can list them above the files they touched.
  *
  * Path canonicalisation -- the rule that makes a symlinked root and a real one
  * meet in one alphabet -- lives in `repositoryPaths.ts`, because the commit
@@ -15,10 +17,12 @@ import type { AgendaGitStatus, GitCommitState } from '../../types';
 import { formatError } from '../formatError';
 import { logDiagnostic } from '../logChannel';
 import { getGitApi, resolveRealPath, resolveRepositoryFor } from './gitApi';
-import type { GitApi, GitRepository } from './gitApiTypes';
+import type { GitRepository } from './gitApiTypes';
 import { pathKey } from './gitPathMatch';
 import { canonicalPath, repositoryRoots } from './repositoryPaths';
 import type { RepositoryRoots } from './repositoryPaths';
+import { commitSubject } from './commitSubject';
+import { upstreamRef } from './upstreamRef';
 import { buildGitStatus } from './gitStatusModel';
 import type { GitRepoSnapshot, GitSourceFile } from './gitStatusModel';
 
@@ -74,11 +78,6 @@ export async function collectGitStatus(files: readonly string[]): Promise<Agenda
     return buildGitStatus(sources, snapshots);
 }
 
-/** The API handle, for callers that need to subscribe to repository events. */
-export async function gitApiForEvents(): Promise<GitApi | null> {
-    return getGitApi();
-}
-
 /** Preserve the order of first appearance; the page lists files in view order. */
 function uniquePaths(files: readonly string[]): string[] {
     const seen = new Set<string>();
@@ -115,7 +114,16 @@ async function repositoryContext(
 async function snapshotRepository(context: RepositoryContext): Promise<GitRepoSnapshot> {
     const state = context.repository.state;
     const head = state.HEAD;
-    const upstream = head?.upstream ? `${head.upstream.remote}/${head.upstream.name}` : undefined;
+    // A ref git would read as an option is dropped here rather than passed on:
+    // both the log and the diff below hand it to git as a bare argument
+    // (see upstreamRef.ts). The rest of the status is unaffected.
+    const upstream = upstreamRef(head?.upstream);
+    if (head?.upstream && upstream === undefined) {
+        logDiagnostic(
+            `agenda git status: ignoring the upstream of ${context.roots.rootReal} -- ` +
+                `"${head.upstream.remote}/${head.upstream.name}" would be read by git as an option`
+        );
+    }
 
     const uncommitted = [...state.workingTreeChanges, ...state.indexChanges, ...(state.untrackedChanges ?? [])].map(
         (change) => canonicalPath(change.uri.fsPath, context.roots)
@@ -146,6 +154,11 @@ async function snapshotRepository(context: RepositoryContext): Promise<GitRepoSn
  * extension appends either the range or `-n`, never both -- so the list is cut
  * here. The whole count still reaches the page as `aheadCommits`, which is
  * what the "and N more" line is computed from.
+ *
+ * The argument is kept deliberately: it is what the API asks for, it costs
+ * nothing, and a host that learns to combine the range with `-n` would then
+ * stop reading the whole log. The `slice` stays either way -- it is the part
+ * that is guaranteed.
  */
 async function unpushedCommits(
     context: RepositoryContext,
@@ -162,7 +175,7 @@ async function unpushedCommits(
         });
         return commits.slice(0, MAX_UNPUSHED_COMMITS).map((commit) => ({
             hash: commit.hash.slice(0, SHORT_HASH_LENGTH),
-            subject: firstLine(commit.message)
+            subject: commitSubject(commit.message)
         }));
     } catch (error) {
         // Same degradation as the diff above: the counts survive, only the
@@ -172,12 +185,6 @@ async function unpushedCommits(
         );
         return [];
     }
-}
-
-/** The subject of a commit message: everything up to the first line break. */
-function firstLine(message: string): string {
-    const end = message.search(/[\r\n]/);
-    return (end === -1 ? message : message.slice(0, end)).trim();
 }
 
 /**

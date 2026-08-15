@@ -106,6 +106,25 @@ suite('gcal/oauth', () => {
         );
     });
 
+    test('a rate limit and a timeout are waited out, not treated as a rejected grant', async () => {
+        // 429 is the token endpoint's own rate limit, and a sync refreshes the
+        // token per request, so it arrives under exactly the load this project
+        // creates. Typed as a final error it would end the whole sync -- and
+        // every task of it in turn -- instead of costing one backoff pause.
+        for (const status of [429, 408]) {
+            await assert.rejects(
+                () =>
+                    refreshAccessToken(fakeFetch(status, { error: 'rateLimitExceeded' }), {
+                        clientId: 'c',
+                        clientSecret: 's',
+                        refreshToken: 'rt'
+                    }),
+                (err: unknown) => err instanceof Error && !(err instanceof GcalAuthError),
+                `HTTP ${status} must stay retryable`
+            );
+        }
+    });
+
     test('non-2xx throws with error description', async () => {
         await assert.rejects(
             () =>

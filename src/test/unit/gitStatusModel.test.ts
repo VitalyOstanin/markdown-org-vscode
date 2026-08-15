@@ -185,6 +185,31 @@ suite('buildGitStatus', () => {
         assert.strictEqual(status.files.length, 1);
     });
 
+    // The list the dropdown prints above the files it is about; the count in
+    // `aheadCommits` stays the whole truth, so a shorter list is what the
+    // "and N more" line is computed from.
+    test('the commits of a repository reach the model in order', () => {
+        const ahead: GitRepoSnapshot = {
+            ...REPO,
+            commits: [
+                { hash: 'aaaaaaa', subject: 'Newest' },
+                { hash: 'bbbbbbb', subject: 'Older' }
+            ]
+        };
+        const status = buildGitStatus([source('/repo/home.md')], [ahead], 'linux');
+        assert.deepStrictEqual(status.repos[0]?.unpushedCommitList, [
+            { hash: 'aaaaaaa', subject: 'Newest' },
+            { hash: 'bbbbbbb', subject: 'Older' }
+        ]);
+    });
+
+    test('a repository with no listed commits carries no list at all', () => {
+        // Not an empty array: the page tells "no commits to show" from "the
+        // collector could not read them" by the key being absent.
+        const status = buildGitStatus([source('/repo/home.md')], [REPO], 'linux');
+        assert.strictEqual(status.repos[0]?.unpushedCommitList, undefined);
+    });
+
     test('a repository with no merge in progress reports no conflict count at all', () => {
         const status = buildGitStatus([source('/repo/work.md')], [REPO], 'linux');
         assert.strictEqual(status.conflictCount, 0);

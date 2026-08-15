@@ -27,7 +27,13 @@ export class KeyedResolutionCache<T> {
         const pending = compute();
         this.entries.set(key, pending);
         return pending.catch((error: unknown) => {
-            this.entries.delete(key);
+            // Only if the entry is still this one: `clear()` plus a fresh
+            // computation can both happen while this promise is in flight, and
+            // deleting by key alone would throw away that newer answer -- a
+            // second `git rev-parse` for a directory already resolved.
+            if (this.entries.get(key) === pending) {
+                this.entries.delete(key);
+            }
             throw error;
         });
     }

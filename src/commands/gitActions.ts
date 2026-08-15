@@ -22,10 +22,13 @@ import * as path from 'node:path';
 import { getGitApi, resolveRepositoryFor } from '../utils/git/gitApi';
 import type { GitRepository } from '../utils/git/gitApiTypes';
 import { pathKey } from '../utils/git/gitPathMatch';
+import { isPushRejected } from '../utils/git/pushRejection';
 import { canonicalPath, changeKeys, repositoryRoots } from '../utils/git/repositoryPaths';
 import { formatError, notifyError, notifyStatus } from '../utils/notify';
 import { logDiagnostic } from '../utils/logChannel';
-import { formatString, pluralIndex } from '../utils/agendaI18n';
+import { formatString } from '../utils/agendaI18n';
+import { countedNoun } from '../utils/countedNoun';
+import { currentDateLocale } from '../utils/hostLocale';
 import type { AgendaStrings, UiLanguage } from '../utils/agendaI18n';
 import { toIsoDate } from '../utils/isoDate';
 
@@ -40,20 +43,6 @@ interface CommitTarget {
     /** Staged paths this view does not name -- the ones it would carry anyway. */
     foreignStaged: number;
 }
-
-/**
- * The error code the built-in extension attaches when the remote refuses a
- * non-fast-forward update. Read as a plain property because the API surface we
- * declare describes calls, not the errors they throw.
- */
-const PUSH_REJECTED_CODE = 'PushRejected';
-
-/**
- * Text of the same refusal, for the paths that do not carry the code -- an
- * older host, or a rejection reported by the remote's own hook rather than by
- * git's ref check. Same reason the mobile client watches two signals for it.
- */
-const PUSH_REJECTED_TEXT = /!\s*\[rejected]|non-fast-forward|fetch first|failed to push some refs/i;
 
 /**
  * Stage the given source files and commit them under one message.
@@ -129,7 +118,12 @@ export async function commitAgendaSources(
         return done;
     });
     if (committed !== undefined) {
-        notifyStatus(formatString(strings.git.committed, counted(committed, strings.git.files, language)));
+        notifyStatus(
+            formatString(
+                strings.git.committed,
+                countedNoun(committed, strings.git.files, language, currentDateLocale())
+            )
+        );
     }
 }
 
@@ -155,17 +149,25 @@ export async function pushAgendaSources(
     if (grouped.size === 0) {
         return;
     }
-    const pushed = await withGitProgress(strings.git.pushProgress, async () => {
+    const result = await withGitProgress(strings.git.pushProgress, async () => {
         // Counted in commits, like the button that starts this: a repository
         // count reports "1" for a branch ten commits ahead. Read before the
         // push, which is when the number is still true.
         let commits = 0;
+        const upstreams: string[] = [];
         for (const repository of grouped.keys()) {
             const head = repository.state.HEAD;
-            const ahead = head?.ahead ?? 0;
             try {
                 if (head?.upstream) {
+                    // Level with its upstream: pushing it would be a network
+                    // round trip for nothing, and the button that started this
+                    // did not count it either.
+                    const ahead = head.ahead ?? 0;
+                    if (ahead === 0) {
+                        continue;
+                    }
                     await repository.push();
+                    commits += ahead;
                 } else {
                     if (!(await confirmSetUpstream(repository, strings))) {
                         continue;
@@ -174,18 +176,39 @@ export async function pushAgendaSources(
                     // what turns this into the equivalent of `push -u`. There is
                     // no fourth one here -- force stays off.
                     await repository.push('origin', head?.name, true);
+                    // Not counted in commits: `ahead` is absent for a branch
+                    // with no upstream (there is nothing to count against), so
+                    // this outcome is reported by name instead of by number.
+                    upstreams.push(repositoryBranch(repository, head?.name));
                 }
-                commits += ahead;
             } catch (error) {
                 reportPushFailure(error, repository, head?.name, head?.upstream, strings);
                 return undefined;
             }
         }
-        return commits;
+        return { commits, upstreams };
     });
-    if (pushed !== undefined && pushed > 0) {
-        notifyStatus(formatString(strings.git.pushed, counted(pushed, strings.git.commits, language)));
+    if (!result) {
+        return;
     }
+    // A created upstream outranks the count: it is the rarer outcome and the
+    // one the user just consented to, so it is what the confirmation names.
+    // The commits of the same round are still in the log line above.
+    if (result.upstreams.length > 0) {
+        notifyStatus(formatString(strings.git.pushedUpstream, result.upstreams.join(strings.git.titleSeparator)));
+    } else if (result.commits > 0) {
+        notifyStatus(
+            formatString(
+                strings.git.pushed,
+                countedNoun(result.commits, strings.git.commits, language, currentDateLocale())
+            )
+        );
+    }
+}
+
+/** `notes/master`: the repository directory and the branch inside it. */
+function repositoryBranch(repository: GitRepository, branch: string | undefined): string {
+    return `${path.basename(repository.rootUri.fsPath)}/${branch ?? 'HEAD'}`;
 }
 
 /**
@@ -215,16 +238,6 @@ function reportPushFailure(
     notifyError(formatString(strings.git.pushFailed, reason));
 }
 
-/** Two signals for one refusal: the error code, then its text. */
-function isPushRejected(error: unknown): boolean {
-    const carrier = error as { gitErrorCode?: unknown; stderr?: unknown } | null | undefined;
-    if (carrier?.gitErrorCode === PUSH_REJECTED_CODE) {
-        return true;
-    }
-    const text = `${formatError(error)}\n${typeof carrier?.stderr === 'string' ? carrier.stderr : ''}`;
-    return PUSH_REJECTED_TEXT.test(text);
-}
-
 /**
  * Run a git operation under a progress notification.
  *
@@ -237,11 +250,6 @@ function withGitProgress<T>(title: string, run: () => Promise<T>): Thenable<T> {
         { location: vscode.ProgressLocation.Notification, title, cancellable: false },
         () => run()
     );
-}
-
-/** `3 files` / `3 файла`: the plural rule of the UI language, digits as typed. */
-function counted(n: number, forms: readonly string[], language: UiLanguage): string {
-    return `${n} ${forms[pluralIndex(n, language)] ?? ''}`.trim();
 }
 
 /** Is the repository mid-merge, with paths still unresolved? */
@@ -295,7 +303,11 @@ async function confirmForeignStaged(
     }
     const names = affected.map((target) => path.basename(target.repository.rootUri.fsPath)).join(', ');
     const total = affected.reduce((sum, target) => sum + target.foreignStaged, 0);
-    const prompt = formatString(strings.git.commitForeignStaged, names, counted(total, strings.git.files, language));
+    const prompt = formatString(
+        strings.git.commitForeignStaged,
+        names,
+        countedNoun(total, strings.git.files, language, currentDateLocale())
+    );
     const choice = await vscode.window.showWarningMessage(prompt, { modal: true }, strings.git.commitForeignConfirm);
     return choice === strings.git.commitForeignConfirm;
 }
@@ -307,6 +319,11 @@ async function confirmForeignStaged(
  * to a remote, and a toast that can be missed is not consent. `origin` is named
  * explicitly in the prompt so a repository whose only remote is called
  * something else is visibly the wrong case to accept.
+ *
+ * The repository is named too: a view can span several of them, the branches
+ * are routinely called the same in all, and a repository with no upstream is
+ * absent from the counter on the button that raised this -- so without its name
+ * the question is about a repository the panel never mentioned.
  */
 async function confirmSetUpstream(repository: GitRepository, strings: AgendaStrings): Promise<boolean> {
     const branch = repository.state.HEAD?.name;
@@ -315,7 +332,12 @@ async function confirmSetUpstream(repository: GitRepository, strings: AgendaStri
         notifyError(strings.git.pushDetachedHead);
         return false;
     }
-    const prompt = formatString(strings.git.setUpstreamPrompt, branch, `origin/${branch}`);
+    const prompt = formatString(
+        strings.git.setUpstreamPrompt,
+        path.basename(repository.rootUri.fsPath),
+        branch,
+        `origin/${branch}`
+    );
     const choice = await vscode.window.showWarningMessage(prompt, { modal: true }, strings.git.setUpstreamConfirm);
     return choice === strings.git.setUpstreamConfirm;
 }
