@@ -1,12 +1,16 @@
 import * as assert from 'node:assert/strict';
 import { SingleFlight, type RunHandle } from '../../../utils/gcal/mutex';
 
-function deferred(): { p: Promise<void>; resolve: () => void } {
-    let resolve!: () => void;
-    const p = new Promise<void>((r) => {
-        resolve = r;
-    });
-    return { p, resolve };
+function deferred(): { p: Promise<undefined>; resolve: () => void } {
+    // `undefined`, not `void`: the resolver of a `Promise<void>` is typed
+    // `(value: void) => void`, which the linter reads as a misplaced `void`.
+    const { promise, resolve } = Promise.withResolvers<undefined>();
+    return {
+        p: promise,
+        resolve: () => {
+            resolve(undefined);
+        }
+    };
 }
 const tick = () => new Promise((r) => setTimeout(r, 0));
 

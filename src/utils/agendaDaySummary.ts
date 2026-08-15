@@ -125,10 +125,16 @@ export function buildDaySections(day: DayAgenda, labels: DaySectionLabels): DayS
     const noTime = b('scheduled_no_time').map((task): DaySectionItem => ({ task, kind: 'notime' }));
     const upcoming = b('upcoming').map((task): DaySectionItem => ({ task, kind: 'upcoming' }));
     const overdue = b('overdue').map((task): DaySectionItem => ({ task, kind: 'overdue' }));
-    // Inlined for the same reason as the accessor above. A repeater wins over
-    // the age on purpose: whether its missed occurrence was yesterday or last
-    // spring, what to do with it is the same — the next occurrence is the work,
-    // and the dates behind it are gone whatever happens.
+    // Inlined for the same reason as the accessor above -- and for the same
+    // reason the two thresholds are written out as literals here: a module-level
+    // constant is not carried into the page. `OVERDUE_RECENT_DAYS` and
+    // `OVERDUE_LONG_AGO_DAYS` are where those numbers are named and explained,
+    // and the tests read them from there; the two copies have to be changed
+    // together, which nothing but this note enforces.
+    //
+    // A repeater wins over the age on purpose: whether its missed occurrence
+    // was yesterday or last spring, what to do with it is the same — the next
+    // occurrence is the work, and the dates behind it are gone whatever happens.
     const band = (item: DaySectionItem): DaySectionKey => {
         const off = item.task.days_offset ?? 0;
         if ((item.task.timestamp_repeater ?? '') !== '') {

@@ -9,6 +9,7 @@ import { namedGroups } from '../utils/regexGroups';
 import { planCompletion, type CompletionPlan } from '../utils/completeRepeatingTask';
 import { notifyError } from '../utils/notify';
 import { formatError } from '../utils/formatError';
+import { applyEditOrReport } from '../utils/applyEdit';
 
 function formatActiveTimestamp(date: Date): string {
     return formatOrgTimestamp(date, 'angle');
@@ -65,12 +66,16 @@ export async function setTaskStatus(status: TaskStatus) {
                 title
             });
 
-            return editor.edit((editBuilder) => {
-                editBuilder.replace(line.range, reopened);
-                for (const shifted of plan.planning) {
-                    editBuilder.replace(editor.document.lineAt(shifted.line).range, shifted.text);
-                }
-            });
+            return applyEditOrReport(
+                editor,
+                (editBuilder) => {
+                    editBuilder.replace(line.range, reopened);
+                    for (const shifted of plan.planning) {
+                        editBuilder.replace(editor.document.lineAt(shifted.line).range, shifted.text);
+                    }
+                },
+                'the repeating task'
+            );
         }
     }
 
@@ -81,9 +86,13 @@ export async function setTaskStatus(status: TaskStatus) {
         title
     });
 
-    return editor.edit((editBuilder) => {
-        editBuilder.replace(line.range, newText);
-    });
+    return applyEditOrReport(
+        editor,
+        (editBuilder) => {
+            editBuilder.replace(line.range, newText);
+        },
+        'the task keyword'
+    );
 }
 
 /**
@@ -134,9 +143,13 @@ export async function togglePriority() {
         return;
     }
 
-    return editor.edit((editBuilder) => {
-        editBuilder.replace(line.range, newText);
-    });
+    return applyEditOrReport(
+        editor,
+        (editBuilder) => {
+            editBuilder.replace(line.range, newText);
+        },
+        'the priority'
+    );
 }
 
 /** Insert a `CREATED:` timestamp under the heading. No-op if any CREATED line already exists in the timestamp block. */
@@ -166,9 +179,13 @@ export async function insertCreatedTimestamp() {
     const timestamp = formatInactiveTimestamp(new Date());
     const insertPosition = new vscode.Position(headingLine + 1, 0);
 
-    return editor.edit((editBuilder) => {
-        editBuilder.insert(insertPosition, `${indent}\`CREATED: ${timestamp}\`\n`);
-    });
+    return applyEditOrReport(
+        editor,
+        (editBuilder) => {
+            editBuilder.insert(insertPosition, `${indent}\`CREATED: ${timestamp}\`\n`);
+        },
+        'the CREATED timestamp'
+    );
 }
 
 /** Insert a `SCHEDULED:` timestamp; repeating the call removes it (toggle). DEADLINE on the heading is preserved. */
@@ -213,11 +230,15 @@ async function insertOrReplaceTimestamp(type: 'SCHEDULED' | 'DEADLINE') {
         // editor.edit applies the supplied deletes atomically against the
         // original document positions, so the indices don't need to be
         // compensated as previous lines disappear.
-        return editor.edit((editBuilder) => {
-            for (const lineNum of existingLines) {
-                editBuilder.delete(new vscode.Range(lineNum, 0, lineNum + 1, 0));
-            }
-        });
+        return applyEditOrReport(
+            editor,
+            (editBuilder) => {
+                for (const lineNum of existingLines) {
+                    editBuilder.delete(new vscode.Range(lineNum, 0, lineNum + 1, 0));
+                }
+            },
+            `the ${type} timestamp`
+        );
     }
 
     const indent = getTimestampIndent(editor, headingLine);
@@ -225,7 +246,11 @@ async function insertOrReplaceTimestamp(type: 'SCHEDULED' | 'DEADLINE') {
     const timestamp = formatActiveTimestamp(new Date());
     const insertPosition = new vscode.Position(blockEnd, 0);
 
-    return editor.edit((editBuilder) => {
-        editBuilder.insert(insertPosition, `${indent}\`${type}: ${timestamp}\`\n`);
-    });
+    return applyEditOrReport(
+        editor,
+        (editBuilder) => {
+            editBuilder.insert(insertPosition, `${indent}\`${type}: ${timestamp}\`\n`);
+        },
+        `the ${type} timestamp`
+    );
 }

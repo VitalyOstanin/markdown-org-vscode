@@ -1,3 +1,14 @@
+/**
+ * The extension's own notifications, all wearing the same prefix.
+ *
+ * House style for the text passed in: it starts with a capital and reads as a
+ * sentence ("No heading found", "Moved to inbox.md"); the technical detail
+ * follows a colon ("Agenda refresh failed: ENOENT"). The prefix ends in a colon
+ * of its own, so a message starting lower-case renders as
+ * "Markdown Org: could not …" -- a fragment where the one beside it in the
+ * notification list is a sentence. The dictionary strings (agendaI18n.ts) are
+ * written the same way.
+ */
 import * as vscode from 'vscode';
 
 const ORG_PREFIX = 'Markdown Org: ';

@@ -52,7 +52,7 @@ export function wireDayHeaderNavigation(
         }
         el.classList.add('day-header-link');
         el.setAttribute('title', title);
-        el.addEventListener('click', function () {
+        el.addEventListener('click', () => {
             onNavigate(date);
         });
         wired++;

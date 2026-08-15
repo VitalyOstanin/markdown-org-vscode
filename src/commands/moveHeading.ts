@@ -23,7 +23,7 @@ async function refuseIfSymlink(filePath: string): Promise<boolean> {
     try {
         const stat = await lstat(filePath);
         if (stat.isSymbolicLink()) {
-            notifyError(`refused to follow symlink at ${filePath}`);
+            notifyError(`Refused to follow symlink at ${filePath}`);
             return true;
         }
     } catch (err) {
@@ -139,7 +139,7 @@ async function cutBlockThenWrite(
     const cut = new vscode.WorkspaceEdit();
     cut.delete(document.uri, range);
     if (!(await vscode.workspace.applyEdit(cut))) {
-        notifyError(`the edit was rejected for ${path.basename(document.uri.fsPath)}; nothing was moved`);
+        notifyError(`The edit was rejected for ${path.basename(document.uri.fsPath)}; nothing was moved`);
         return false;
     }
 
@@ -149,7 +149,7 @@ async function cutBlockThenWrite(
         const restore = new vscode.WorkspaceEdit();
         restore.insert(document.uri, range.start, removed);
         if (!(await vscode.workspace.applyEdit(restore))) {
-            notifyError(`could not put the block back into ${path.basename(document.uri.fsPath)}; undo restores it`);
+            notifyError(`Could not put the block back into ${path.basename(document.uri.fsPath)}; undo restores it`);
         }
         throw error;
     }
@@ -177,7 +177,7 @@ function buildArchiveContent(ancestors: HeadingInfo[], heading: HeadingInfo): st
  */
 export async function moveToArchive() {
     if (!vscode.workspace.isTrusted) {
-        notifyWarn('archive is disabled in untrusted workspaces');
+        notifyWarn('Archive is disabled in untrusted workspaces');
         return;
     }
     const editor = requireActiveEditor();
@@ -223,7 +223,7 @@ export async function moveToArchive() {
  */
 export async function promoteToMaintain() {
     if (!vscode.workspace.isTrusted) {
-        notifyWarn('maintain promotion is disabled in untrusted workspaces');
+        notifyWarn('Maintain promotion is disabled in untrusted workspaces');
         return;
     }
     const editor = requireActiveEditor();

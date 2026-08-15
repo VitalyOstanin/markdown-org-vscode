@@ -78,7 +78,7 @@ export const HEADING_REGEX =
 // The cookie on its own, for finding one inside a title. Same accepted values
 // as above, so `[#65]` and `[#01]` are text in both places rather than a
 // priority here and text there.
-export const PRIORITY_COOKIE_REGEX = /\[#(?<priority>[A-Z]|6[0-4]|[1-5][0-9]|[0-9])\]/;
+const PRIORITY_COOKIE_REGEX = /\[#(?<priority>[A-Z]|6[0-4]|[1-5][0-9]|[0-9])\]/;
 
 /** Where a priority cookie sits inside `text`, and what it says. */
 export interface PriorityCookie {

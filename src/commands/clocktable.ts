@@ -46,7 +46,7 @@ export function buildClockTable(rows: ClockTableRow[]): string {
  */
 export async function insertClockTable() {
     if (!vscode.workspace.isTrusted) {
-        notifyWarn('clock table is disabled in untrusted workspaces');
+        notifyWarn('Clock table is disabled in untrusted workspaces');
         return;
     }
     const editor = requireActiveEditor();

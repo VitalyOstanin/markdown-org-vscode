@@ -78,7 +78,7 @@ function pushGroup(spans: HighlightSpan[], match: RegExpExecArray, name: string,
     if (!span) {
         return;
     }
-    spans.push({ kind: kind, start: span[0], end: span[1] });
+    spans.push({ kind, start: span[0], end: span[1] });
 }
 
 /**
@@ -131,7 +131,7 @@ function collectHeadingSpans(lineText: string, spans: HighlightSpan[]): void {
     if (status && statusSpan) {
         const kind = STATUS_KINDS[status];
         if (kind) {
-            spans.push({ kind: kind, start: statusSpan[0], end: statusSpan[1] });
+            spans.push({ kind, start: statusSpan[0], end: statusSpan[1] });
         }
     }
 
@@ -143,7 +143,7 @@ function collectHeadingSpans(lineText: string, spans: HighlightSpan[]): void {
             // The captured group is the letter alone; the cookie the agenda
             // shows as a chip is `[#A]`, so the span grows over the brackets
             // the pattern already vouched for.
-            spans.push({ kind: kind, start: prioritySpan[0] - 2, end: prioritySpan[1] + 1 });
+            spans.push({ kind, start: prioritySpan[0] - 2, end: prioritySpan[1] + 1 });
         }
         return;
     }
@@ -172,7 +172,7 @@ function pushLateCookie(lineText: string, match: RegExpExecArray, spans: Highlig
     }
 
     // Offsets are relative to the title; the framing is already inside them.
-    spans.push({ kind: kind, start: titleSpan[0] + cookie.start, end: titleSpan[0] + cookie.end });
+    spans.push({ kind, start: titleSpan[0] + cookie.start, end: titleSpan[0] + cookie.end });
 }
 
 function collectPlanningSpans(lineText: string, spans: HighlightSpan[]): void {
@@ -182,7 +182,7 @@ function collectPlanningSpans(lineText: string, spans: HighlightSpan[]): void {
         const keyword = match[0];
         const kind = PLANNING_KINDS[keyword];
         if (kind) {
-            spans.push({ kind: kind, start: match.index, end: match.index + keyword.length });
+            spans.push({ kind, start: match.index, end: match.index + keyword.length });
         }
     }
 }

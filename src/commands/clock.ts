@@ -140,7 +140,7 @@ export async function insertClockFinish() {
 
     const now = new Date();
     if (now < startDate) {
-        notifyWarn('open CLOCK starts in the future; finishing anyway');
+        notifyWarn('Open CLOCK starts in the future; finishing anyway');
     }
     const endDate = roundEndTime(startDate, now, roundMinutes);
     const endTimestamp = formatTimestamp(endDate);

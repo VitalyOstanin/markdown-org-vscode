@@ -70,9 +70,9 @@ function shiftClockHalf(
     }
 
     return {
-        date: date,
+        date,
         timestamp: buildOrgTimestamp({
-            date: date,
+            date,
             bracket: g[`${half}OpenBracket`] === '<' ? 'angle' : 'square',
             weekday: getWeekdayName(date, g[`${half}Weekday`])
         })

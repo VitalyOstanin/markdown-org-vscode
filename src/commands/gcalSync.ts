@@ -588,7 +588,7 @@ export async function syncNow(context: vscode.ExtensionContext, opts: { trigger?
                     }
                 });
                 if (!lock) {
-                    await notifyWarn('another Google Calendar sync is already running');
+                    await notifyWarn('Another Google Calendar sync is already running');
                     return;
                 }
                 try {

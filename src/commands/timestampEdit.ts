@@ -11,6 +11,7 @@ import { cycleTimestampKeyword, normaliseBracket } from '../utils/toggleTimestam
 import { collectSiblingKeywords } from '../utils/headingScan';
 import { namedGroups } from '../utils/regexGroups';
 import { notifyWarn, notifyStatus } from '../utils/notify';
+import { applyEditOrReport } from '../utils/applyEdit';
 
 const PRIORITY_A_CODE = 'A'.codePointAt(0) ?? 0;
 const PRIORITY_Z_CODE = 'Z'.codePointAt(0) ?? 0;
@@ -158,9 +159,18 @@ async function replaceAndCollapseSelection(
     range: vscode.Range,
     newText: string
 ): Promise<void> {
-    await editor.edit((editBuilder) => {
-        editBuilder.replace(range, newText);
-    });
+    // Only after the edit landed: collapsing the selection over a refused edit
+    // acknowledges a change that was never written.
+    const applied = await applyEditOrReport(
+        editor,
+        (editBuilder) => {
+            editBuilder.replace(range, newText);
+        },
+        'the value'
+    );
+    if (!applied) {
+        return;
+    }
     const position = editor.selection.active;
     editor.selection = new vscode.Selection(position, position);
 }

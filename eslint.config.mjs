@@ -59,9 +59,11 @@ const unicornModernApiRules = [
     'prefer-node-protocol',
     'prefer-number-properties',
     'prefer-object-from-entries',
-    // `prefer-promise-with-resolvers` stays off: `Promise.withResolvers` is
-    // ES2024 and the projects declare `lib: ES2022`.
     'prefer-optional-catch-binding',
+    // On since the minimum host became 1.101 (ADR-0018): its Electron carries
+    // Chromium 134 and Node 22.15, both of which have
+    // `Promise.withResolvers`, and both projects now declare `lib: ES2024`.
+    'prefer-promise-with-resolvers',
     'prefer-regexp-test',
     'prefer-set-has',
     'prefer-spread',
@@ -175,7 +177,15 @@ export default tseslint.config(
             // `null: 'ignore'` keeps the deliberate `value == null` idiom (one
             // check covering null and undefined) and rejects every other loose
             // comparison.
-            eqeqeq: ['error', 'always', { null: 'ignore' }]
+            eqeqeq: ['error', 'always', { null: 'ignore' }],
+            // `{ kind }`, not `{ kind: kind }`. Properties only: the method
+            // form is a separate question, and shorthand methods cannot be
+            // handed to `Function.prototype.toString()` injection the way the
+            // webview helpers are.
+            'object-shorthand': ['error', 'properties'],
+            // A callback that uses no `this` of its own is an arrow, which is
+            // what the rest of the code already writes.
+            'prefer-arrow-callback': 'error'
         }
     },
     {

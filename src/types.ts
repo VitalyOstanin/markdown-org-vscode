@@ -178,3 +178,52 @@ export interface AgendaGitStatus {
      */
     conflictCount: number;
 }
+
+/**
+ * What the page reports about the view it has just rendered.
+ *
+ * Declared here because both projects need it: the page builds it
+ * (`postRenderedInfo` in the webview client) and the host reads it
+ * (`AgendaPanel.queryRenderedInfoForTesting`). It used to be written out by
+ * hand in both places plus a third time as the handler's parameter type, so a
+ * field added to the page reached the host as `undefined` with nothing to say
+ * so.
+ *
+ * Test-facing rather than production data: nothing in the shipped flow reads
+ * it, and it exists because a webview cannot be inspected from a test any other
+ * way.
+ */
+export interface AgendaRenderedInfo {
+    dayHeaders: string[];
+    mode: string;
+    flags: string[];
+    /** Section-panel titles, in document order. */
+    sections: string[];
+    /** Section keys that offer a group action, in document order. */
+    sectionMenus: string[];
+    /** Every foldable head as its key, plus ` (folded)` while it is folded. */
+    sectionFolds: string[];
+    /** How many task rows the page is showing; a folded section renders none. */
+    taskRows: number;
+    /** Tooltip of each collection dot, in row order; empty with one directory. */
+    collectionMarks: string[];
+    /** Directory chips, each as its name plus ` (off)` while it is hidden. */
+    collectionChips: string[];
+    headerLayout: string;
+    heroSharesControlRow: boolean;
+    heroSub: string;
+    dayNumbers: string[];
+    /** Text of the git chip, or empty when the header carries none. */
+    gitChip: string;
+    /** Dropdown actions, each as `commit` / `push` plus ` (off, busy)`. */
+    gitActions: string[];
+    /** `data-group` of each dropdown group, in document order. */
+    gitGroups: string[];
+    /** Rows hidden above/below per day header, aligned with `dayHeaders`. */
+    clipAbove: number[];
+    clipBelow: number[];
+    /** Whether today's first task row sits behind its own sticky header. */
+    todayFirstRowHidden: boolean;
+    /** Where the page ended up after the render decided its scroll. */
+    scrollY: number;
+}
