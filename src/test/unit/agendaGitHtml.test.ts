@@ -2,7 +2,16 @@ import * as assert from 'node:assert';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { suite, test } from 'mocha';
-import { gitChipTitle, renderGitChip, renderGitMenu } from '../../utils/agendaGitHtml';
+import {
+    gitChipStats,
+    gitUnpushedGroupTitle,
+    gitChipTitle,
+    gitCounters,
+    gitFileMark,
+    gitGlyph,
+    renderGitChip,
+    renderGitMenu
+} from '../../utils/agendaGitHtml';
 import type { GitHtmlContext } from '../../utils/agendaGitHtml';
 import { AGENDA_STRINGS, formatString, pluralIndex } from '../../utils/agendaI18n';
 import { escapeHtml } from '../../utils/agendaEscapeHtml';
@@ -153,6 +162,20 @@ suite('renderGitChip', () => {
             file({ file: `/repo/f${i}.md`, label: `f${i}.md`, uncommitted: true })
         );
         assert.strictEqual(gitChipTitle(status({ files }), ru), 'не закоммичено: 5 файлов');
+    });
+
+    test('russian counts commits by their own three forms', () => {
+        // The commit count has its own set of forms, and a missing one shows
+        // as a number with nothing after it rather than as "5 undefined".
+        const ru: GitHtmlContext = { ...CTX, git: AGENDA_STRINGS.ru.git, uiLang: 'ru', locale: 'ru-RU' };
+        const unpushed = [file({ file: '/repo/a.md', label: 'a.md', unpushed: true })];
+        const title = (commits: number): string =>
+            gitUnpushedGroupTitle(1, status({ files: unpushed, unpushedCommits: commits }), ru);
+        // `includes`, not a word-boundary regex: `\b` is an ASCII rule and
+        // never matches at the end of a Cyrillic word.
+        assert.ok(title(1).includes('1 коммит '), title(1));
+        assert.ok(title(2).includes('2 коммита '), title(2));
+        assert.ok(title(5).includes('5 коммитов '), title(5));
     });
 });
 
@@ -403,6 +426,39 @@ suite('renderGitMenu', () => {
  * the panel. The check reads the two sources rather than a rendered page, so it
  * fails in the unit suite, seconds after the omission is made.
  */
+suite('one set of state marks', () => {
+    test('a file row wears the mark its counter wears in the chip', () => {
+        // The two used to be two sets of literals, so a chip counting "!" and a
+        // row marked "⚠" was a valid state of the code.
+        const cases: { file: GitFileState; kind: string }[] = [
+            { file: file({ file: '/repo/c.md', label: 'c.md', conflicted: true }), kind: 'conflicted' },
+            { file: file({ file: '/repo/u.md', label: 'u.md', uncommitted: true }), kind: 'uncommitted' },
+            { file: file({ file: '/repo/p.md', label: 'p.md', unpushed: true }), kind: 'unpushed' },
+            { file: outsideFile('/loose/o.md', 'o.md'), kind: 'outside' }
+        ];
+        for (const { file: state, kind } of cases) {
+            const counter = gitCounters(
+                status({
+                    files: [state],
+                    conflictCount: state.conflicted ? 1 : 0,
+                    uncommittedCount: state.uncommitted ? 1 : 0,
+                    unpushedCount: state.unpushed ? 1 : 0,
+                    outsideGitCount: state.repoRoot === undefined ? 1 : 0
+                }),
+                CTX
+            ).find((c) => c.kind === kind);
+            assert.ok(counter, `no counter for ${kind}`);
+            assert.strictEqual(gitFileMark(state), counter.mark, `${kind}: row and chip disagree`);
+        }
+    });
+
+    test('a file with nothing pending is the clean mark, as the chip is', () => {
+        const clean = file({ file: '/repo/ok.md', label: 'ok.md' });
+        assert.strictEqual(gitFileMark(clean), gitGlyph('clean'));
+        assert.match(gitChipStats(status({ files: [clean] }), CTX), new RegExp(gitGlyph('clean')));
+    });
+});
+
 suite('agendaGitHtml is fully handed to the page', () => {
     test('every exported function is listed in the panel INLINED_HELPERS', () => {
         const root = path.join(__dirname, '..', '..', '..');

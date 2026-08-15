@@ -15,7 +15,7 @@ import {
 } from '../../commands/groupActions';
 import { AGENDA_STRINGS } from '../../utils/agendaI18n';
 import { makeExtractorFake } from '../_execFake';
-import { waitForAgendaRender } from './_helpers';
+import { waitForAgendaRender, waitUntil } from './_helpers';
 
 /**
  * Acting on a whole band of overdue entries.
@@ -135,6 +135,61 @@ suite('Group actions on an overdue band', () => {
         assert.deepStrictEqual(info.sectionMenus, ['overdue-repeat', 'overdue-recent']);
         // The day's own work is rendered as a section too, and carries none.
         assert.ok(info.sections.includes('Scheduled today'), `sections were: ${info.sections.join(', ')}`);
+    });
+
+    test('the week offers the same action, and it lands on the day it was opened from', async function () {
+        this.timeout(15000);
+        // Two days, each with a backlog of its own. The band keys repeat across
+        // the week, so the menu has to say which day it stands under -- without
+        // that the first day of the payload answers for all seven.
+        const monday = writeNote('week-monday.md', ['## TODO Monday task', '`SCHEDULED: <2026-05-04 Mon>`']);
+        const wednesday = writeNote('week-wednesday.md', ['## TODO Wednesday task', '`SCHEDULED: <2026-05-06 Wed>`']);
+        const overdueOn = (date: string, file: string, heading: string) => ({
+            date,
+            overdue: [
+                {
+                    file,
+                    line: 1,
+                    heading,
+                    content: '',
+                    task_type: 'TODO',
+                    timestamp_type: 'SCHEDULED',
+                    days_offset: -3
+                }
+            ],
+            scheduled_timed: [],
+            scheduled_no_time: [],
+            upcoming: []
+        });
+        const week = [
+            overdueOn('2026-08-10', monday, 'Monday task'),
+            overdueOn('2026-08-12', wednesday, 'Wednesday task')
+        ];
+        execFileStub.callsFake(makeExtractorFake({ day: [], week, month: [], tasks: [], holidays: [] }));
+
+        await vscode.commands.executeCommand('markdown-org.showAgendaWeek');
+        await waitForAgendaRender('week');
+
+        const info = await AgendaPanel.queryRenderedInfoForTesting();
+        assert.ok(info);
+        assert.deepStrictEqual(
+            info.sectionMenus,
+            ['overdue-recent', 'overdue-recent'],
+            'both days offer the action on their own backlog'
+        );
+
+        await AgendaPanel.clickGroupActionForTesting('overdue-recent', 'drop-planning', '2026-08-12');
+        // The write goes through the extension host, so the file is read back
+        // once it has landed rather than immediately.
+        await waitUntil(
+            () => readNote(wednesday)[1] === '',
+            'the planning line of the day the menu was opened on to be dropped'
+        );
+        assert.deepStrictEqual(
+            readNote(monday),
+            ['## TODO Monday task', '`SCHEDULED: <2026-05-04 Mon>`', ''],
+            'the other day of the week must be untouched'
+        );
     });
 
     test('the tasks view offers none: its groups are priorities, not a backlog', async function () {

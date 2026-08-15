@@ -58,7 +58,7 @@ export function countClippedRows(rows: ClipRectLike[], headerBottom: number, vie
             below++;
         }
     }
-    return { above: above, below: below };
+    return { above, below };
 }
 
 /** The two chips a day header carries, empty until a measurement fills them. */
@@ -99,20 +99,27 @@ export interface ClipRootLike {
  * day's `.task-line` rows, then the next header -- so a day's rows are the
  * siblings up to the next header rather than children of a wrapper.
  *
- * `countRows` and `format` arrive as parameters because this function is
- * inlined into the page, where module bindings do not exist; the webview
- * passes its own embedded copies of `countClippedRows` and `formatString`.
+ * The counting and formatting functions arrive in `ctx` because this function
+ * is inlined into the page, where module bindings do not exist; the webview
+ * passes its own embedded copies of `countClippedRows` and `formatString`. They
+ * are named fields rather than a tail of positional arguments -- three of the
+ * six used to be functions, two of them called `format` and `formatCount`, and
+ * the call site showed neither name.
+ *
  * Headers whose day has no hidden rows keep both chips hidden, so the marker
  * only appears when it has something to report.
  */
 export function updateDayClipMarkers(
     root: ClipRootLike,
     viewportHeight: number,
-    titles: { above: string; below: string },
-    countRows: (rows: ClipRectLike[], headerBottom: number, viewportHeight: number) => ClipCounts,
-    format: (template: string, ...values: string[]) => string,
-    formatCount: (n: number) => string
+    ctx: {
+        titles: { above: string; below: string };
+        countRows: (rows: ClipRectLike[], headerBottom: number, viewportHeight: number) => ClipCounts;
+        format: (template: string, ...values: string[]) => string;
+        formatCount: (n: number) => string;
+    }
 ): void {
+    const { titles, countRows, format, formatCount } = ctx;
     const headers = root.querySelectorAll('.day-header[data-date]');
     for (const header of headers) {
         const rows: ClipRectLike[] = [];

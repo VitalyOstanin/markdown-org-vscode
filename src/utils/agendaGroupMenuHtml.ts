@@ -28,11 +28,18 @@ export interface GroupMenuStrings {
  * `data-section` and `data-action` are what the page's delegated click handler
  * reads; the extension side turns them back into the band's tasks, so the page
  * never carries the file list of a move.
+ *
+ * `dateIso` names the day the band belongs to, and only the week view passes it:
+ * there the same band key stands under seven day headers, and without the date
+ * the host would rebuild the band from the first day of the payload -- the wrong
+ * rows, silently. The day view leaves it out, and the host falls back to the one
+ * day it rendered.
  */
 export function renderGroupMenu(
     sectionKey: string,
     sectionTitle: string,
-    ctx: { strings: GroupMenuStrings; escapeHtml: EscapeHtml; formatString: FormatString }
+    ctx: { strings: GroupMenuStrings; escapeHtml: EscapeHtml; formatString: FormatString },
+    dateIso?: string
 ): string {
     const s = ctx.strings;
     const items: { action: string; label: string; hint: string }[] = [
@@ -50,8 +57,9 @@ export function renderGroupMenu(
     // The mark is one glyph and says nothing about what is behind it, least of
     // all that what is behind it writes to every note of the band -- which is
     // what the tooltip is for.
+    const dateAttr = dateIso === undefined ? '' : ` data-date="${ctx.escapeHtml(dateIso)}"`;
     return (
-        `<div class="group-menu" data-section="${ctx.escapeHtml(sectionKey)}">` +
+        `<div class="group-menu" data-section="${ctx.escapeHtml(sectionKey)}"${dateAttr}>` +
         `<button type="button" class="group-menu-btn" title="${ctx.escapeHtml(
             ctx.formatString(s.menuTitle, sectionTitle)
         )}">⋮</button>` +

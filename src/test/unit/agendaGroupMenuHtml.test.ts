@@ -34,6 +34,16 @@ suite('agendaGroupMenuHtml.renderGroupMenu', () => {
         assert.match(html, /<button type="button" class="group-menu-btn" title="Act on “Missed repeats”">⋮<\/button>/);
     });
 
+    test('the week view adds the day, the day view leaves it out', () => {
+        // Without the date, seven identical band keys reach the host and the
+        // first day of the payload answers for all of them.
+        assert.match(
+            renderGroupMenu('overdue-recent', 'Overdue this week', ctx, '2026-08-12'),
+            /data-section="overdue-recent" data-date="2026-08-12">/
+        );
+        assert.ok(!renderGroupMenu('overdue-recent', 'Overdue this week', ctx).includes('data-date'));
+    });
+
     test('escapes a band title that carries markup', () => {
         const html = renderGroupMenu('overdue-recent', '<script>', ctx);
         assert.match(html, /&lt;script&gt;/);

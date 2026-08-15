@@ -304,10 +304,12 @@ export interface AgendaClientDeps {
     updateDayClipMarkers: (
         root: ClipRootLike,
         viewportHeight: number,
-        titles: { above: string; below: string },
-        countRows: (rows: ClipRectLike[], headerBottom: number, viewportHeight: number) => ClipCounts,
-        format: (template: string, ...values: string[]) => string,
-        formatCount: (n: number) => string
+        ctx: {
+            titles: { above: string; below: string };
+            countRows: (rows: ClipRectLike[], headerBottom: number, viewportHeight: number) => ClipCounts;
+            format: (template: string, ...values: string[]) => string;
+            formatCount: (n: number) => string;
+        }
     ) => void;
     resolveHeadingClass: (task: HeadingTintInput) => string;
     toIsoDate: (date: Date) => string;
@@ -434,7 +436,8 @@ export interface AgendaClientDeps {
             formatString: (template: string, ...values: string[]) => string;
             formatNumber: (value: number, locale: string) => string;
             pluralIndex: (n: number, lang: string) => number;
-        }
+        },
+        actionsHtml: string
     ) => string;
     renderGroupMenu: (
         sectionKey: string,
@@ -443,7 +446,8 @@ export interface AgendaClientDeps {
             strings: AgendaStrings['group'];
             escapeHtml: (text: string | number | boolean | undefined | null) => string;
             formatString: (template: string, ...values: string[]) => string;
-        }
+        },
+        dateIso?: string
     ) => string;
     renderDayHeaderHtml: (parts: DayHeaderParts) => string;
     renderModeSwitch: (
@@ -629,9 +633,13 @@ export interface AgendaClientDeps {
     gitFilesByRepository: (
         files: readonly GitFileState[],
         repos: readonly GitRepoState[],
-        ctx: GitHtmlContext
+        ctx: GitHtmlContext,
+        before?: (repo: GitRepoState) => string
     ) => string;
     gitFileRows: (files: readonly GitFileState[], kind: string, ctx: GitHtmlContext) => string;
+    /** Called by the two above; the client never invokes them itself. */
+    gitGlyph: (kind: string) => string;
+    gitFileMark: (file: GitFileState) => string;
     gitActions: (status: AgendaGitStatus, ctx: GitHtmlContext) => string;
 }
 
@@ -696,7 +704,7 @@ type HostMessage =
     // Integration-test hook: the band menu is opened and answered by clicks in
     // the page, and what the message carries is decided there -- so the item is
     // pressed rather than the message forged.
-    | { command: 'clickGroupActionForTesting'; section?: string; action?: string }
+    | { command: 'clickGroupActionForTesting'; section?: string; action?: string; date?: string }
     // Integration-test hook: folding a section is a page-side state and a
     // re-render of the view around it, so the head is pressed for real.
     | { command: 'clickSectionFoldForTesting'; section?: string }
@@ -889,7 +897,7 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         const compact =
             resolveHeaderLayout(headerMode, window.innerHeight, {
                 headerHeight: fullHeaderHeight,
-                current: current
+                current
             }) === 'compact';
         document.body.classList.toggle('compact-header', compact);
     }
@@ -937,7 +945,7 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         // one it would reach the global unhandledrejection listener, which
         // reports to the host -- a font that did not load is not a page
         // failure worth a line in the log.
-        void document.fonts.ready.then(syncHeaderOffset).catch(function () {
+        void document.fonts.ready.then(syncHeaderOffset).catch(() => {
             /* nothing to do: the next resize re-measures */
         });
     }
@@ -953,7 +961,7 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
      */
     function report(command: string, context: string, reason: unknown): void {
         const detail = reason instanceof Error ? reason.message : String(reason);
-        vscode.postMessage({ command: command, message: context + ': ' + detail });
+        vscode.postMessage({ command, message: context + ': ' + detail });
     }
 
     /** A render the page could not finish: the host toasts the first one per panel. */
@@ -1175,11 +1183,22 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         chip?.click();
     }
 
-    /** Click one item of a section's group menu, as `clickGroupActionForTesting` asks. */
-    function clickGroupAction(section: string, action: string): void {
+    /**
+     * Click one item of a section's group menu, as `clickGroupActionForTesting`
+     * asks.
+     *
+     * A selector here, unlike in `clickCollectionChip` above: these values are
+     * section keys and action names from a fixed set, not filesystem paths, so
+     * there are no backslashes for the selector parser to read as escapes.
+     */
+    function clickGroupAction(section: string, action: string, date?: string): void {
         const quote = (value: string) => value.replaceAll('"', '\\"');
+        // `date` narrows to one day of the week view, where every day carries
+        // the same band keys; without it the first menu on the page answers,
+        // which is what the day view wants and all it has.
+        const menu = date === undefined ? '' : `[data-date="${quote(date)}"]`;
         const item = document.querySelector<HTMLElement>(
-            `.group-menu[data-section="${quote(section)}"] .group-menu-item[data-action="${quote(action)}"]`
+            `.group-menu[data-section="${quote(section)}"]${menu} .group-menu-item[data-action="${quote(action)}"]`
         );
         item?.click();
     }
@@ -1223,7 +1242,7 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         } else if (message.command === 'clickCollectionChipForTesting') {
             clickCollectionChip(message.root ?? '');
         } else if (message.command === 'clickGroupActionForTesting') {
-            clickGroupAction(message.section ?? '', message.action ?? '');
+            clickGroupAction(message.section ?? '', message.action ?? '', message.date);
         } else if (message.command === 'clickSectionFoldForTesting') {
             clickSectionFold(message.section ?? '');
             // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- spelled out rather than a bare `else`, so the branch says which command it serves
@@ -1237,18 +1256,41 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
      * that renderAgenda produced the expected day-headers for the given anchor
      * date. Production code never sends this query, so it has no effect on
      * normal use.
+     *
+     * Collected in themed parts rather than one run: the snapshot grows with
+     * every question a test cannot ask any other way, and each measurement
+     * carries its own paragraph of why it is measured that way.
      */
     function postRenderedInfo(): void {
-        const headers = [...document.querySelectorAll('.day-header')]
+        vscode.postMessage({
+            command: 'renderedInfo',
+            mode: initialMode,
+            scrollY: window.scrollY,
+            // The bug this snapshot was extended for: after a mode switch
+            // the day's first row sat behind its own sticky header, which
+            // no other field here would show.
+            todayFirstRowHidden: measureTodayFirstRowHidden(),
+            ...collectViewInfo(),
+            ...collectHeaderInfo(),
+            ...collectGitInfo(),
+            ...collectClipInfo()
+        });
+    }
+
+    /** The rendered plan: its days, rows, sections and directory chips. */
+    function collectViewInfo() {
+        const dayHeaders = [...document.querySelectorAll('.day-header')]
             .map((el) => el.getAttribute('data-date'))
-            .filter((d) => d !== null);
-        const flags = [...document.querySelectorAll('.flag')].map((el) => el.getAttribute('data-flag'));
+            .filter((d): d is string => d !== null);
+        const flags = [...document.querySelectorAll('.flag')].map((el) => el.getAttribute('data-flag') ?? '');
         // Section-panel titles in document order (Day and Tasks cards), so a
         // test can assert the grouping and its order.
         const sections = [...document.querySelectorAll('.day-section-name')].map((el) => el.textContent);
         // Which sections offer an action on the whole band: the key each
         // menu carries, which is also what a click on it would post back.
-        const sectionMenus = [...document.querySelectorAll('.group-menu')].map((el) => el.getAttribute('data-section'));
+        const sectionMenus = [...document.querySelectorAll('.group-menu')].map(
+            (el) => el.getAttribute('data-section') ?? ''
+        );
         // Every head that can fold, and whether it is folded now. The title
         // above says nothing about that -- a folded section keeps its heading,
         // which is the whole point of folding it rather than dropping it.
@@ -1264,8 +1306,8 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         // names its directory: with one directory scanned there are none,
         // which is the state a test has no other way to tell apart from
         // "the mark was rendered without a name".
-        const collectionMarks = [...document.querySelectorAll('.task-line .collection')].map((el) =>
-            el.getAttribute('title')
+        const collectionMarks = [...document.querySelectorAll('.task-line .collection')].map(
+            (el) => el.getAttribute('title') ?? ''
         );
         // The chip row, each chip as its directory name plus the state it is
         // in. The name alone would not tell a chip that is off from one
@@ -1273,6 +1315,20 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         const collectionChips = [...document.querySelectorAll('.collection-chip')].map(
             (el) => `${el.textContent}${el.classList.contains('off') ? ' (off)' : ''}`
         );
+        return {
+            dayHeaders,
+            flags,
+            sections,
+            sectionMenus,
+            sectionFolds,
+            taskRows,
+            collectionMarks,
+            collectionChips
+        };
+    }
+
+    /** The header: which layout it settled on, and what it is showing. */
+    function collectHeaderInfo() {
         // Measured, not inferred: the compact header is only compact if the
         // hero really shares a line with the control block. A class on
         // <body> proves nothing about the layout it was supposed to
@@ -1289,6 +1345,19 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         // non-Latin digits must reach the page as such, and nothing but the
         // rendered text proves it.
         const heroSub = document.querySelector('.hero-sub span')?.textContent ?? '';
+        const dayNumbers = [...document.querySelectorAll('.calendar-day .day-number')].map((el) => el.textContent);
+        return {
+            heroSharesControlRow,
+            heroSub,
+            dayNumbers,
+            // The header layout is a class on <body>, so this is how a test
+            // sees which of the two the page settled on.
+            headerLayout: document.body.classList.contains('compact-header') ? 'compact' : 'full'
+        };
+    }
+
+    /** The git chip and its dropdown: what it says and what it offers. */
+    function collectGitInfo() {
         // The git chip arrives on its own message, after the render; its
         // text is how a test sees that the whole path -- repository
         // resolution, the status message, the markup -- reached the page.
@@ -1309,44 +1378,23 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         const gitGroups = [...document.querySelectorAll('#gitMenu .git-group')].map(
             (el) => el.getAttribute('data-group') ?? ''
         );
-        const dayNumbers = [...document.querySelectorAll('.calendar-day .day-number')].map((el) => el.textContent);
-        // Clipping chips per day header, in the same order as `dayHeaders`.
-        // A hidden chip reports 0 rather than its stale text, which is what
-        // the page shows the user.
+        return { gitChip, gitActions, gitGroups };
+    }
+
+    /**
+     * Clipping chips per day header, in the same order as `dayHeaders`.
+     *
+     * A hidden chip reports 0 rather than its stale text, which is what the
+     * page shows the user.
+     */
+    function collectClipInfo() {
         const clipAbove: number[] = [];
         const clipBelow: number[] = [];
         for (const header of document.querySelectorAll('.day-header[data-date]')) {
             clipAbove.push(readChipCount(header.querySelector<HTMLElement>('.day-clip-above')));
             clipBelow.push(readChipCount(header.querySelector<HTMLElement>('.day-clip-below')));
         }
-        vscode.postMessage({
-            command: 'renderedInfo',
-            dayHeaders: headers,
-            heroSub,
-            dayNumbers,
-            gitChip,
-            gitActions,
-            gitGroups,
-            mode: initialMode,
-            flags,
-            sections,
-            sectionMenus,
-            sectionFolds,
-            taskRows,
-            collectionMarks,
-            collectionChips,
-            clipAbove,
-            clipBelow,
-            scrollY: window.scrollY,
-            // The bug this snapshot was extended for: after a mode switch
-            // the day's first row sat behind its own sticky header, which
-            // no other field here would show.
-            todayFirstRowHidden: measureTodayFirstRowHidden(),
-            // The header layout is a class on <body>, so this is how a test
-            // sees which of the two the page settled on.
-            headerLayout: document.body.classList.contains('compact-header') ? 'compact' : 'full',
-            heroSharesControlRow
-        });
+        return { clipAbove, clipBelow };
     }
 
     // Render the current mode into #content and wire its listeners. Shared by
@@ -1390,7 +1438,7 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
     }
 
     function navigateToDay(date: string): void {
-        vscode.postMessage({ command: 'navigate', date: date, switchToDay: true });
+        vscode.postMessage({ command: 'navigate', date, switchToDay: true });
     }
 
     // Toggle a nav-bar dropdown and collapse any other open one. #tagMenu is the
@@ -1400,7 +1448,7 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
     // renderTagMenu / attachTagMenuListeners, both hardcoded to #tagMenu).
     function toggleMenu(ev: Event, id: string): void {
         ev.stopPropagation();
-        document.querySelectorAll('.tag-menu').forEach(function (m) {
+        document.querySelectorAll('.tag-menu').forEach((m) => {
             if (m.id === id) {
                 m.classList.toggle('open');
             } else {
@@ -1408,14 +1456,14 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             }
         });
     }
-    document.addEventListener('click', function () {
-        document.querySelectorAll('.tag-menu.open').forEach(function (m) {
+    document.addEventListener('click', () => {
+        document.querySelectorAll('.tag-menu.open').forEach((m) => {
             m.classList.remove('open');
         });
         // Same rule for the band menus: a click anywhere else puts them away.
         // Their own handler stops the event before it reaches here, so opening
         // one does not immediately close it.
-        document.querySelectorAll('.group-menu.open').forEach(function (m) {
+        document.querySelectorAll('.group-menu.open').forEach((m) => {
             m.classList.remove('open');
         });
     });
@@ -1484,8 +1532,12 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         if (item) {
             e.stopPropagation();
             closeGroupMenus();
-            const section = item.closest('.group-menu')?.getAttribute('data-section');
+            const menuNode = item.closest('.group-menu');
+            const section = menuNode?.getAttribute('data-section');
             const action = item.getAttribute('data-action');
+            // Present in the week view only, where the key alone does not say
+            // which of the seven days the band belongs to.
+            const date = menuNode?.getAttribute('data-date') ?? undefined;
             if (section && action) {
                 // The chips that are off travel with the message. The host
                 // rebuilds the band from the payload the view was built from,
@@ -1493,8 +1545,9 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
                 // reach rows of a directory that is not on this screen.
                 vscode.postMessage({
                     command: 'groupAction',
-                    section: section,
-                    action: action,
+                    section,
+                    action,
+                    date,
                     hidden: [...hiddenCollections]
                 });
             }
@@ -1598,7 +1651,11 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
                 // day is the run of rows under its own header.
                 const headed = sec.key !== 'scheduled' && grouping !== 'flat';
                 if (headed) {
-                    parts.push(renderBand(sec.key, sec.title, sec.items.length));
+                    // The same rule as the day view: only the overdue bands
+                    // answer a group action. The menu carries the day it stands
+                    // under -- seven days share these keys here.
+                    const actions = sec.key.startsWith('overdue-') ? renderGroupMenu(sec.key, sec.title, day.date) : '';
+                    parts.push(renderBand(sec.key, sec.title, sec.items.length, actions));
                 }
                 // A band cannot be folded away while nothing says it is there:
                 // without its heading there would be nothing to unfold it by,
@@ -1607,9 +1664,7 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
                     return;
                 }
                 sec.items.forEach((it) => {
-                    const taskType =
-                        it.kind === 'overdue' ? 'overdue' : it.kind === 'upcoming' ? 'upcoming' : undefined;
-                    parts.push(renderTask(it.task, it.task.days_offset, taskType));
+                    parts.push(renderTask(it.task, it.task.days_offset, taskTypeOf(it.kind)));
                 });
             });
         });
@@ -1652,13 +1707,7 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
                 const folded = grouping !== 'flat' && foldedSections.has(sec.key);
                 const rows = folded
                     ? ''
-                    : sec.items
-                          .map((it) => {
-                              const taskType =
-                                  it.kind === 'overdue' ? 'overdue' : it.kind === 'upcoming' ? 'upcoming' : undefined;
-                              return renderTask(it.task, it.task.days_offset, taskType);
-                          })
-                          .join('');
+                    : sec.items.map((it) => renderTask(it.task, it.task.days_offset, taskTypeOf(it.kind))).join('');
                 // On `flat` the rows stand on their own: the panel is what
                 // carries the heading, the count and the group menu, and the
                 // setting asks for a day without them. The order is untouched —
@@ -1730,23 +1779,45 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         );
     }
 
-    /** A band's head in the week view; the panel's own head, without the panel. */
-    function renderBand(key: string, title: string, count: number): string {
-        return renderBandHeadingHtml(key, title, count, {
-            locale,
-            uiLang,
-            inSectionTemplate: UI.countChip.inSection,
-            taskForms: UI.countChip.tasks,
-            fold: sectionFold(key, title),
-            escapeHtml,
-            formatString,
-            formatNumber,
-            pluralIndex
-        });
+    /**
+     * How a row of a section is tinted: the same answer in the week and in the
+     * day, because it is the same row of the same plan. Written out twice
+     * before, so a third kind added to one view and not to the other would have
+     * coloured one task two ways.
+     */
+    function taskTypeOf(kind: string): 'overdue' | 'upcoming' | undefined {
+        if (kind === 'overdue') {
+            return 'overdue';
+        }
+        if (kind === 'upcoming') {
+            return 'upcoming';
+        }
+        return undefined;
     }
 
-    function renderGroupMenu(sectionKey: string, sectionTitle: string): string {
-        return renderGroupMenuHtml(sectionKey, sectionTitle, { strings: UI.group, escapeHtml, formatString });
+    /** A band's head in the week view; the panel's own head, without the panel. */
+    function renderBand(key: string, title: string, count: number, actionsHtml: string): string {
+        return renderBandHeadingHtml(
+            key,
+            title,
+            count,
+            {
+                locale,
+                uiLang,
+                inSectionTemplate: UI.countChip.inSection,
+                taskForms: UI.countChip.tasks,
+                fold: sectionFold(key, title),
+                escapeHtml,
+                formatString,
+                formatNumber,
+                pluralIndex
+            },
+            actionsHtml
+        );
+    }
+
+    function renderGroupMenu(sectionKey: string, sectionTitle: string, dateIso?: string): string {
+        return renderGroupMenuHtml(sectionKey, sectionTitle, { strings: UI.group, escapeHtml, formatString }, dateIso);
     }
 
     // The week view scrolls to today's header when today is in the visible
@@ -1800,9 +1871,12 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         clipTicking = true;
         requestAnimationFrame(() => {
             clipTicking = false;
-            updateDayClipMarkers(document, window.innerHeight, UI.clip, countClippedRows, formatString, (n) =>
-                formatNumber(n, locale)
-            );
+            updateDayClipMarkers(document, window.innerHeight, {
+                titles: UI.clip,
+                countRows: countClippedRows,
+                format: formatString,
+                formatCount: (n) => formatNumber(n, locale)
+            });
         });
     }
     window.addEventListener('scroll', refreshClipMarkers, { passive: true });
@@ -1967,14 +2041,14 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         // Mirror the live choice onto the collapsed button and the active marker
         // without waiting for the host round-trip; scoped to #tagMenu so no other
         // dropdown is touched.
-        document.querySelectorAll('#tagMenu .tag-menu-item').forEach(function (el) {
+        document.querySelectorAll('#tagMenu .tag-menu-item').forEach((el) => {
             el.classList.toggle('active', el.getAttribute('data-tag') === tag);
         });
         const btn = document.getElementById('tagMenuBtn');
         if (btn) {
             btn.textContent = tagButtonText(tag, { tagAll: UI.tagAll, tagButton: UI.tagButton, formatString });
         }
-        vscode.postMessage({ command: 'setTag', tag: tag });
+        vscode.postMessage({ command: 'setTag', tag });
     }
 
     function attachTagMenuListeners(): void {
@@ -2056,7 +2130,7 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             el.addEventListener('click', () => {
                 const file = el.getAttribute('data-file');
                 if (file) {
-                    vscode.postMessage({ command: 'openSourceFile', file: file });
+                    vscode.postMessage({ command: 'openSourceFile', file });
                 }
             });
         });

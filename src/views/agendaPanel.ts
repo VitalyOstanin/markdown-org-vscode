@@ -1,10 +1,12 @@
 import * as vscode from 'vscode';
 import { randomBytes } from 'node:crypto';
-import type { AgendaData, AgendaGitStatus } from '../types';
+import type { AgendaData, AgendaGitStatus, AgendaRenderedInfo } from '../types';
 import { isMeaningfulSelection, resolveTaskClickIntent, sanitizeTaskLine } from '../utils/agendaClick';
 import { escapeHtml } from '../utils/agendaEscapeHtml';
 import { DEFAULT_AGENDA_FONT_STACK, sanitizeFontFamily } from '../utils/agendaFontFamily';
 import { agendaModeCommand } from '../utils/agendaModeCommand';
+import { normalizeGrouping } from '../utils/agendaGrouping';
+import type { AgendaGrouping } from '../utils/agendaGrouping';
 import { rememberScroll, recallScroll, focusStickyAnchor } from '../utils/agendaScroll';
 import { countClippedRows, renderDayClipHtml, updateDayClipMarkers } from '../utils/agendaClipMarkers';
 import { resolveHeadingClass } from '../utils/agendaHeadingTint';
@@ -56,8 +58,10 @@ import {
     gitConflictedGroup,
     gitCount,
     gitCounters,
+    gitFileMark,
     gitFileRows,
     gitFilesByRepository,
+    gitGlyph,
     gitGroup,
     gitGroups,
     gitUnpushedByRepository,
@@ -70,8 +74,8 @@ import {
 import { agendaSourceFiles, agendaSourceRoots } from '../utils/git/agendaSourceFiles';
 import { buildCollectionMarks, collectionMarkHtml } from '../utils/agendaCollections';
 import { hideCollections, renderCollectionChips } from '../utils/agendaCollectionFilter';
-import { collectGitStatus, gitApiForEvents } from '../utils/git/collectGitStatus';
-import { forgetResolvedRepositories } from '../utils/git/gitApi';
+import { collectGitStatus } from '../utils/git/collectGitStatus';
+import { forgetResolvedRepositories, getGitApi } from '../utils/git/gitApi';
 import { commitAgendaSources, pushAgendaSources } from '../commands/gitActions';
 import { isCancelled } from '../utils/normalizeTaskType';
 import { shiftMonthAnchor } from '../utils/monthNav';
@@ -112,18 +116,6 @@ const WEBVIEW_READY_TIMEOUT_MS = 2000;
 const WEBVIEW_MAX_RETRIES = 2;
 type FirstDayOfWeek = 'monday' | 'sunday' | 'auto';
 
-/**
- * Whether a day is split into named sections or drawn as one list.
- *
- * Normalized here rather than trusted: the setting is a string a user can put
- * anything into, and the page decides what to draw from it.
- */
-export type AgendaGrouping = 'sections' | 'flat';
-
-function normalizeGrouping(value: string | undefined): AgendaGrouping {
-    return value === 'flat' ? 'flat' : 'sections';
-}
-
 function msUntilNextLocalMidnight(now: Date): number {
     const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0);
     return next.getTime() - now.getTime();
@@ -143,6 +135,7 @@ interface AgendaWebviewMessage {
     file?: string;
     line?: number;
     switchToDay?: boolean;
+    /** The day a click was about; on `groupAction` only the week view sets it. */
     date?: string;
     mode?: string;
     tag?: string;
@@ -307,7 +300,7 @@ export class AgendaPanel {
      */
     private static requestRefresh(shiftedToday?: string, userInitiated?: boolean): void {
         AgendaPanel.refreshCallback?.(shiftedToday, userInitiated).catch((err: unknown) =>
-            notifyError(`agenda refresh failed: ${formatError(err)}`)
+            notifyError(`Agenda refresh failed: ${formatError(err)}`)
         );
     }
 
@@ -530,7 +523,7 @@ export class AgendaPanel {
         // there before use.
         AgendaPanel.currentPanel.webview.onDidReceiveMessage((message: unknown) =>
             AgendaPanel.handleWebviewMessage(message as AgendaWebviewMessage).catch((err: unknown) =>
-                notifyError(`agenda action failed: ${formatError(err)}`)
+                notifyError(`Agenda action failed: ${formatError(err)}`)
             )
         );
 
@@ -809,7 +802,7 @@ export class AgendaPanel {
      * folders), which means the set is not known until after a status pass.
      */
     private static async ensureGitWatch(): Promise<void> {
-        const api = await gitApiForEvents();
+        const api = await getGitApi();
         if (!api || !AgendaPanel.currentPanel) {
             return;
         }
@@ -871,7 +864,7 @@ export class AgendaPanel {
             logDiagnostic(`agenda failed to render: ${reason}`);
             if (!AgendaPanel.reportedRenderError) {
                 AgendaPanel.reportedRenderError = true;
-                notifyError(`agenda failed to render: ${reason}`);
+                notifyError(`Agenda failed to render: ${reason}`);
             }
             return;
         }
@@ -961,7 +954,7 @@ export class AgendaPanel {
                 AgendaPanel.requestGitStatus();
             }
         } else if (message.command === 'groupAction') {
-            await AgendaPanel.handleGroupAction(message.section, message.action, message.hidden);
+            await AgendaPanel.handleGroupAction(message.section, message.action, message.hidden, message.date);
         }
     }
 
@@ -977,11 +970,16 @@ export class AgendaPanel {
      * `hidden` is the one part of the view the payload does not carry: the
      * directory chips are answered in the page, so the roots that are off come
      * with the message and narrow the band before it is turned into files.
+     *
+     * `date` comes from the week view, where the band key alone would name the
+     * same band on seven days; the day view leaves it out and gets the day it
+     * rendered.
      */
     private static async handleGroupAction(
         section: string | undefined,
         action: string | undefined,
-        hidden: unknown
+        hidden: unknown,
+        date: string | undefined
     ): Promise<void> {
         const args = AgendaPanel.lastRenderArgs;
         const bulkAction = asBulkAction(action);
@@ -992,7 +990,7 @@ export class AgendaPanel {
             ? hidden.filter((root): root is string => typeof root === 'string')
             : [];
         const { language, strings } = AgendaPanel.uiStrings();
-        const targets = groupTargets(args.data, section, strings.sections, hiddenRoots);
+        const targets = groupTargets(args.data, section, strings.sections, hiddenRoots, date);
         if (targets.length === 0) {
             return;
         }
@@ -1061,102 +1059,59 @@ export class AgendaPanel {
      * expected dates for a given anchor; production code never queries
      * this. Returns null when no panel is open.
      */
-    public static queryRenderedInfoForTesting(timeoutMs = 2000): Promise<{
-        dayHeaders: string[];
-        mode: string;
-        flags: string[];
-        sections: string[];
-        /** Section keys that offer a group action, in document order. */
-        sectionMenus: string[];
-        /** Every foldable head as its key, plus ` (folded)` while it is folded. */
-        sectionFolds: string[];
-        /** How many task rows the page is showing; a folded section renders none. */
-        taskRows: number;
-        /** Tooltip of each collection dot, in row order; empty with one directory. */
-        collectionMarks: string[];
-        /** Directory chips, each as its name plus ` (off)` while it is hidden. */
-        collectionChips: string[];
-        headerLayout: string;
-        heroSharesControlRow: boolean;
-        heroSub: string;
-        dayNumbers: string[];
-        /** Text of the git chip, or empty when the header carries none. */
-        gitChip: string;
-        /** Dropdown actions, each as `commit` / `push` plus ` (off, busy)`. */
-        gitActions: string[];
-        /** `data-group` of each dropdown group, in document order. */
-        gitGroups: string[];
-        /** Rows hidden above/below per day header, aligned with `dayHeaders`. */
-        clipAbove: number[];
-        clipBelow: number[];
-        /** Whether today's first task row sits behind its own sticky header. */
-        todayFirstRowHidden: boolean;
-        /** Where the page ended up after the render decided its scroll. */
-        scrollY: number;
-    } | null> {
+    public static queryRenderedInfoForTesting(timeoutMs = 2000): Promise<AgendaRenderedInfo | null> {
         const panel = AgendaPanel.currentPanel;
         if (!panel) {
             return Promise.resolve(null);
         }
         return new Promise((resolve, reject) => {
-            const sub = panel.webview.onDidReceiveMessage(
-                (m: {
-                    command: string;
-                    dayHeaders?: string[];
-                    mode?: string;
-                    flags?: string[];
-                    sections?: string[];
-                    sectionMenus?: string[];
-                    sectionFolds?: string[];
-                    taskRows?: number;
-                    collectionMarks?: string[];
-                    collectionChips?: string[];
-                    headerLayout?: string;
-                    heroSharesControlRow?: boolean;
-                    heroSub?: string;
-                    dayNumbers?: string[];
-                    gitChip?: string;
-                    gitActions?: string[];
-                    gitGroups?: string[];
-                    clipAbove?: number[];
-                    clipBelow?: number[];
-                    todayFirstRowHidden?: boolean;
-                    scrollY?: number;
-                }) => {
-                    if (m.command === 'renderedInfo') {
-                        clearTimeout(timer);
-                        sub.dispose();
-                        resolve({
-                            dayHeaders: m.dayHeaders ?? [],
-                            mode: m.mode ?? '',
-                            flags: m.flags ?? [],
-                            sections: m.sections ?? [],
-                            sectionMenus: m.sectionMenus ?? [],
-                            sectionFolds: m.sectionFolds ?? [],
-                            taskRows: m.taskRows ?? 0,
-                            collectionMarks: m.collectionMarks ?? [],
-                            collectionChips: m.collectionChips ?? [],
-                            headerLayout: m.headerLayout ?? '',
-                            heroSharesControlRow: m.heroSharesControlRow ?? false,
-                            heroSub: m.heroSub ?? '',
-                            dayNumbers: m.dayNumbers ?? [],
-                            gitChip: m.gitChip ?? '',
-                            gitActions: m.gitActions ?? [],
-                            gitGroups: m.gitGroups ?? [],
-                            clipAbove: m.clipAbove ?? [],
-                            clipBelow: m.clipBelow ?? [],
-                            todayFirstRowHidden: m.todayFirstRowHidden ?? false,
-                            scrollY: m.scrollY ?? 0
-                        });
-                    }
+            const sub = panel.webview.onDidReceiveMessage((m: Partial<AgendaRenderedInfo> & { command?: string }) => {
+                if (m.command === 'renderedInfo') {
+                    clearTimeout(timer);
+                    sub.dispose();
+                    resolve({
+                        dayHeaders: m.dayHeaders ?? [],
+                        mode: m.mode ?? '',
+                        flags: m.flags ?? [],
+                        sections: m.sections ?? [],
+                        sectionMenus: m.sectionMenus ?? [],
+                        sectionFolds: m.sectionFolds ?? [],
+                        taskRows: m.taskRows ?? 0,
+                        collectionMarks: m.collectionMarks ?? [],
+                        collectionChips: m.collectionChips ?? [],
+                        headerLayout: m.headerLayout ?? '',
+                        heroSharesControlRow: m.heroSharesControlRow ?? false,
+                        heroSub: m.heroSub ?? '',
+                        dayNumbers: m.dayNumbers ?? [],
+                        gitChip: m.gitChip ?? '',
+                        gitActions: m.gitActions ?? [],
+                        gitGroups: m.gitGroups ?? [],
+                        clipAbove: m.clipAbove ?? [],
+                        clipBelow: m.clipBelow ?? [],
+                        todayFirstRowHidden: m.todayFirstRowHidden ?? false,
+                        scrollY: m.scrollY ?? 0
+                    });
                 }
-            );
+            });
             const timer = setTimeout(() => {
                 sub.dispose();
                 reject(new Error(`webview did not respond to getRenderedInfo within ${timeoutMs}ms`));
             }, timeoutMs);
             panel.webview.postMessage({ command: 'getRenderedInfo' });
         });
+    }
+
+    /**
+     * Hand the page a message, or answer `false` when there is no page.
+     *
+     * The test helpers below all drive the panel the way a user does -- through
+     * the page -- and each of them needs the same two lines about a panel that
+     * is not open. That check is the whole of it, so it lives here rather than
+     * six times over.
+     */
+    private static postToPage(message: object): Thenable<boolean> {
+        const panel = AgendaPanel.currentPanel;
+        return panel ? panel.webview.postMessage(message) : Promise.resolve(false);
     }
 
     /**
@@ -1168,11 +1123,7 @@ export class AgendaPanel {
      * to false when no panel is open. Production code never calls this.
      */
     public static setScrollForTesting(y: number): Thenable<boolean> {
-        const panel = AgendaPanel.currentPanel;
-        if (!panel) {
-            return Promise.resolve(false);
-        }
-        return panel.webview.postMessage({ command: 'setScrollForTesting', y });
+        return AgendaPanel.postToPage({ command: 'setScrollForTesting', y });
     }
 
     /**
@@ -1184,11 +1135,7 @@ export class AgendaPanel {
      * way in from outside. Resolves to false when no panel is open.
      */
     public static clickCollectionChipForTesting(root: string): Thenable<boolean> {
-        const panel = AgendaPanel.currentPanel;
-        if (!panel) {
-            return Promise.resolve(false);
-        }
-        return panel.webview.postMessage({ command: 'clickCollectionChipForTesting', root });
+        return AgendaPanel.postToPage({ command: 'clickCollectionChipForTesting', root });
     }
 
     /**
@@ -1201,12 +1148,8 @@ export class AgendaPanel {
      * confirm nothing about the band the reader was looking at. Resolves to
      * false when no panel is open.
      */
-    public static clickGroupActionForTesting(section: string, action: string): Thenable<boolean> {
-        const panel = AgendaPanel.currentPanel;
-        if (!panel) {
-            return Promise.resolve(false);
-        }
-        return panel.webview.postMessage({ command: 'clickGroupActionForTesting', section, action });
+    public static clickGroupActionForTesting(section: string, action: string, date?: string): Thenable<boolean> {
+        return AgendaPanel.postToPage({ command: 'clickGroupActionForTesting', section, action, date });
     }
 
     /**
@@ -1219,11 +1162,7 @@ export class AgendaPanel {
      * under test. Resolves to false when no panel is open.
      */
     public static clickSectionFoldForTesting(section: string): Thenable<boolean> {
-        const panel = AgendaPanel.currentPanel;
-        if (!panel) {
-            return Promise.resolve(false);
-        }
-        return panel.webview.postMessage({ command: 'clickSectionFoldForTesting', section });
+        return AgendaPanel.postToPage({ command: 'clickSectionFoldForTesting', section });
     }
 
     /**
@@ -1237,11 +1176,7 @@ export class AgendaPanel {
      * Resolves to false when no panel is open.
      */
     public static clickGitActionForTesting(action: 'commit' | 'push'): Thenable<boolean> {
-        const panel = AgendaPanel.currentPanel;
-        if (!panel) {
-            return Promise.resolve(false);
-        }
-        return panel.webview.postMessage({ command: 'clickGitActionForTesting', action });
+        return AgendaPanel.postToPage({ command: 'clickGitActionForTesting', action });
     }
 
     /**
@@ -1255,11 +1190,10 @@ export class AgendaPanel {
      * false when no panel is open.
      */
     public static postGitStatusForTesting(status: AgendaGitStatus | null): Thenable<boolean> {
-        const panel = AgendaPanel.currentPanel;
-        if (!panel) {
-            return Promise.resolve(false);
-        }
-        return panel.webview.postMessage({ command: 'gitStatus', status });
+        // The production command, not one of the `*ForTesting` pair: what is
+        // under test here is the page's rendering of a status, and a command of
+        // its own would exercise a path production never takes.
+        return AgendaPanel.postToPage({ command: 'gitStatus', status });
     }
 
     /**
@@ -1414,6 +1348,8 @@ export class AgendaPanel {
         gitUnpushedByRepository,
         gitCommitRows,
         gitConflictedGroup,
+        gitGlyph,
+        gitFileMark,
         gitFileRows,
         gitFilesByRepository,
         gitGroup,

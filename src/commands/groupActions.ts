@@ -15,7 +15,9 @@ import * as vscode from 'vscode';
 import { planGroupEdit } from '../utils/bulkGroupEdit';
 import type { BulkAction, BulkRefusal, BulkTarget } from '../utils/bulkGroupEdit';
 import type { AgendaStrings, UiLanguage } from '../utils/agendaI18n';
-import { formatString, pluralIndex } from '../utils/agendaI18n';
+import { formatString } from '../utils/agendaI18n';
+import { countedNoun } from '../utils/countedNoun';
+import { currentDateLocale } from '../utils/hostLocale';
 import { formatError, notifyError, notifyStatus } from '../utils/notify';
 import { logDiagnostic } from '../utils/logChannel';
 
@@ -76,7 +78,7 @@ export async function applyGroupAction(
             // carries on.
             const reason = formatError(error);
             logDiagnostic(`group action failed on ${file}: ${reason}`);
-            notifyError(`group action failed: ${reason}`);
+            notifyError(`Group action failed: ${reason}`);
         }
     }
 
@@ -213,9 +215,9 @@ export function clearGroupRollbackForTesting(): void {
 }
 
 function countTasks(n: number, strings: AgendaStrings, uiLang: UiLanguage): string {
-    return `${n} ${strings.summary.tasks[pluralIndex(n, uiLang)] ?? ''}`;
+    return countedNoun(n, strings.summary.tasks, uiLang, currentDateLocale());
 }
 
 function countFiles(n: number, strings: AgendaStrings, uiLang: UiLanguage): string {
-    return `${n} ${strings.git.files[pluralIndex(n, uiLang)] ?? ''}`;
+    return countedNoun(n, strings.git.files, uiLang, currentDateLocale());
 }

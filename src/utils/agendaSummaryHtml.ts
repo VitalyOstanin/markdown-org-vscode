@@ -185,16 +185,22 @@ export function renderBandHeading(
         formatString: FormatString;
         formatNumber: FormatNumber;
         pluralIndex: PluralIndex;
-    }
+    },
+    actionsHtml: string
 ): string {
     const chipTitle = ctx.escapeHtml(ctx.formatString(ctx.inSectionTemplate, countLabel(count, ctx.taskForms, ctx)));
     const chipCount = ctx.escapeHtml(ctx.formatNumber(count, ctx.locale));
     const foldedCls = ctx.fold.folded ? ' day-section-is-folded' : '';
+    // The menu is the panel's too: a band offering an action in one view and
+    // not in the other would read as two different things. It is positioned
+    // against this head, so it needs no wrapper of its own -- which is what
+    // keeps the sibling walk above intact.
     return (
         `<div class="day-band day-section-${key} day-section-head${foldedCls}" data-section="${ctx.escapeHtml(key)}">` +
         sectionFoldHtml(ctx.fold, ctx.escapeHtml) +
         `<span class="day-section-name">${ctx.escapeHtml(title)}</span>` +
         `<span class="day-section-count" title="${chipTitle}">${chipCount}</span>` +
+        actionsHtml +
         '</div>'
     );
 }

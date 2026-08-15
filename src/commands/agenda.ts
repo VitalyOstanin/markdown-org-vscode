@@ -9,6 +9,7 @@ import { EXTRACTOR_MAX_BUFFER_BYTES, EXTRACTOR_TIMEOUT_MS, extractor } from '../
 import { formatError, notifyError, notifyInfo, notifyWarn } from '../utils/notify';
 import { buildTagCycle, computeNextTag, resolveRequestedTag } from '../utils/cycleTag';
 import { nextHeaderMode } from '../utils/agendaHeaderMode';
+import { nextGrouping } from '../utils/agendaGrouping';
 import { buildExecError } from '../utils/execError';
 import { currentConfigTarget } from '../utils/configTarget';
 import { resolveAgendaDirectories } from '../utils/agendaDirectories';
@@ -28,7 +29,7 @@ export async function showAgenda(
     initialDate?: string
 ) {
     if (!vscode.workspace.isTrusted) {
-        notifyWarn('agenda is disabled in untrusted workspaces');
+        notifyWarn('Agenda is disabled in untrusted workspaces');
         return;
     }
 
@@ -222,6 +223,22 @@ export async function cycleAgendaHeaderMode() {
     const config = vscode.workspace.getConfiguration('markdown-org');
     const next = nextHeaderMode(config.get<string>('agendaHeaderMode'));
     await config.update('agendaHeaderMode', next, currentConfigTarget());
+}
+
+/**
+ * Switch `markdown-org.agendaGrouping` between `sections` and `flat`.
+ *
+ * The other half of the same question the header mode answers -- how much of a
+ * short panel goes to chrome -- and it is asked at the same moment, when the
+ * panel is resized. Without this the setting is reachable only through the
+ * settings editor, which is a long way round for something toggled while
+ * reading. No toast: the day redraws with or without its headings on the spot,
+ * and the configuration listener carries the change to an open panel.
+ */
+export async function cycleAgendaGrouping() {
+    const config = vscode.workspace.getConfiguration('markdown-org');
+    const next = nextGrouping(config.get<string>('agendaGrouping'));
+    await config.update('agendaGrouping', next, currentConfigTarget());
 }
 
 /**

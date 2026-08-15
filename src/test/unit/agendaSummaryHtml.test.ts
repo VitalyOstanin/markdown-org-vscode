@@ -166,7 +166,7 @@ suite('agendaSummaryHtml.renderBandHeading', () => {
     };
 
     test('renders the head alone, with no panel and no body around it', () => {
-        const html = renderBandHeading('overdue-recent', 'Overdue this week', 3, ctx);
+        const html = renderBandHeading('overdue-recent', 'Overdue this week', 3, ctx, '');
         assert.strictEqual(
             html,
             '<div class="day-band day-section-overdue-recent day-section-head" data-section="overdue-recent">' +
@@ -180,7 +180,7 @@ suite('agendaSummaryHtml.renderBandHeading', () => {
 
     test('a folded band says so on the head both views share', () => {
         const fold = { folded: true, label: 'Show the section' };
-        const html = renderBandHeading('overdue-long', 'Overdue long ago', 9, { ...ctx, fold });
+        const html = renderBandHeading('overdue-long', 'Overdue long ago', 9, { ...ctx, fold }, '');
         assert.match(html, /class="day-band day-section-overdue-long day-section-head day-section-is-folded"/);
         assert.match(html, /aria-expanded="false"[^>]*>▸<\/button>/);
         assert.match(html, /<span class="day-section-count" title="9 tasks in this section">9<\/span>/);
@@ -190,24 +190,31 @@ suite('agendaSummaryHtml.renderBandHeading', () => {
         // The week's chips walk the siblings of a day header and count
         // `.task-line` among them (agendaClipMarkers). A band that wrapped its
         // rows would hide them from that walk, so the heading must be a leaf.
-        const html = renderBandHeading('overdue-long', 'Overdue long ago', 1, ctx);
+        const html = renderBandHeading('overdue-long', 'Overdue long ago', 1, ctx, '');
         assert.ok(!html.includes('day-section-body'), `expected no body element, got: ${html}`);
         assert.ok(!html.includes('<section'), `expected no section wrapper, got: ${html}`);
     });
 
     test('escapes the band title', () => {
-        assert.match(renderBandHeading('x', '<script>', 0, ctx), /&lt;script&gt;/);
+        assert.match(renderBandHeading('x', '<script>', 0, ctx, ''), /&lt;script&gt;/);
     });
 
     test('the chip and its tooltip use the same digits', () => {
-        const html = renderBandHeading('overdue-repeat', 'Missed repeats', 3, { ...ctx, locale: 'ar-EG' });
+        const html = renderBandHeading('overdue-repeat', 'Missed repeats', 3, { ...ctx, locale: 'ar-EG' }, '');
         assert.match(html, /<span class="day-section-count" title="«3» tasks in this section">«3»<\/span>/, html);
+    });
+
+    test('the group menu goes inside the head, where the panel puts it', () => {
+        // Same band, same offer: an overdue band that acts on itself in the day
+        // view and not in the week would be two things wearing one heading.
+        const html = renderBandHeading('overdue-recent', 'Overdue this week', 3, ctx, '<div class="group-menu"></div>');
+        assert.match(html, /count"[^>]*>3<\/span><div class="group-menu"><\/div><\/div>$/, html);
     });
 
     test('carries the same band class the panel uses, so both views tint alike', () => {
         // The red name and chip come from `.day-section-overdue-*`; a band that
         // named its class differently would read as an ordinary heading.
-        assert.match(renderBandHeading('overdue-repeat', 'Missed repeats', 2, ctx), /class="day-band day-sect/);
+        assert.match(renderBandHeading('overdue-repeat', 'Missed repeats', 2, ctx, ''), /class="day-band day-sect/);
     });
 });
 

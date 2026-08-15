@@ -192,6 +192,11 @@
         "category": "Markdown Org"
       },
       {
+        "command": "markdown-org.cycleAgendaGrouping",
+        "title": "Toggle Agenda Day Sections",
+        "category": "Markdown Org"
+      },
+      {
         "command": "markdown-org.gcalSync.connect",
         "title": "Connect Google Calendar",
         "category": "Markdown Org"
@@ -393,7 +398,7 @@
             "Russian"
           ],
           "default": "auto",
-          "description": "Language of the agenda interface (buttons, section titles, tooltips). Notification messages, command names and these setting descriptions stay in English."
+          "description": "Language of the agenda panel: its interface (buttons, section titles, tooltips) and the messages of actions started from it (group actions, commit and push). Notifications of the other commands, command names and these setting descriptions stay in English."
         },
         "markdown-org.highlightInEditor": {
           "type": "boolean",

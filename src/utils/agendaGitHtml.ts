@@ -62,11 +62,61 @@ export interface GitCounter {
 export function gitCounters(status: AgendaGitStatus, ctx: GitHtmlContext): GitCounter[] {
     const g = ctx.git;
     return [
-        { kind: 'conflicted', mark: '!', count: status.conflictCount, title: g.conflictedTitle },
-        { kind: 'uncommitted', mark: '●', count: status.uncommittedCount, title: g.uncommittedTitle },
-        { kind: 'unpushed', mark: '↑', count: status.unpushedCount, title: g.unpushedTitle },
-        { kind: 'outside', mark: '?', count: status.outsideGitCount, title: g.outsideTitle }
+        { kind: 'conflicted', mark: gitGlyph('conflicted'), count: status.conflictCount, title: g.conflictedTitle },
+        {
+            kind: 'uncommitted',
+            mark: gitGlyph('uncommitted'),
+            count: status.uncommittedCount,
+            title: g.uncommittedTitle
+        },
+        { kind: 'unpushed', mark: gitGlyph('unpushed'), count: status.unpushedCount, title: g.unpushedTitle },
+        { kind: 'outside', mark: gitGlyph('outside'), count: status.outsideGitCount, title: g.outsideTitle }
     ].filter((counter) => counter.count > 0);
+}
+
+/**
+ * The mark that stands for a git state, wherever it is drawn.
+ *
+ * One place for the five: the chip's counters and the marker on a file row say
+ * the same thing about the same file, and they used to say it from two sets of
+ * literals -- changing "!" for "⚠" meant finding both, and nothing failed when
+ * only one was found.
+ */
+export function gitGlyph(kind: string): string {
+    if (kind === 'conflicted') {
+        return '!';
+    }
+    if (kind === 'uncommitted') {
+        return '●';
+    }
+    if (kind === 'unpushed') {
+        return '↑';
+    }
+    if (kind === 'outside') {
+        return '?';
+    }
+    return '✓';
+}
+
+/**
+ * Which state a file row shows, in the order the panel ranks them: what blocks
+ * the commit, then what is waiting for one, then what is waiting for a push,
+ * then what could not be read at all.
+ */
+export function gitFileMark(file: GitFileState): string {
+    if (file.conflicted) {
+        return gitGlyph('conflicted');
+    }
+    if (file.uncommitted) {
+        return gitGlyph('uncommitted');
+    }
+    if (file.unpushed) {
+        return gitGlyph('unpushed');
+    }
+    if (file.repoRoot === undefined) {
+        return gitGlyph('outside');
+    }
+    return gitGlyph('clean');
 }
 
 /**
@@ -87,13 +137,14 @@ export function renderGitChip(status: AgendaGitStatus, ctx: GitHtmlContext): str
 }
 
 /**
- * The stat spans inside the chip: up to three counters, or the clean marker.
+ * The stat spans inside the chip: up to four counters, or the clean marker.
  *
- * The third counter is what keeps the first two honest. A file whose
- * repository could not be read reports neither uncommitted nor unpushed, and a
- * chip built from those two alone then says "clean" about a file nothing
- * looked at -- which is how a notes repository VS Code declines to open (see
- * gitApi.ts) passed for a tidy one.
+ * `!` leads because it is the state that takes the commit button away, then
+ * `●` and `↑` for what is waiting to be committed and pushed. `?` is what keeps
+ * the rest honest: a file whose repository could not be read reports neither
+ * uncommitted nor unpushed, and a chip built from those alone then says "clean"
+ * about a file nothing looked at -- which is how a notes repository VS Code
+ * declines to open (see gitApi.ts) passed for a tidy one.
  */
 export function gitChipStats(status: AgendaGitStatus, ctx: GitHtmlContext): string {
     const g = ctx.git;
@@ -272,25 +323,20 @@ export function gitUnpushedGroup(files: readonly GitFileState[], status: AgendaG
     );
 }
 
-/** Per repository: its heading, its commits, then its files. */
+/**
+ * Per repository: its heading, its commits, then its files.
+ *
+ * The same walk as {@link gitFilesByRepository} with the commit rows put
+ * between the heading and the files -- so it is that function, called with
+ * them. Written as two loops before, and the two had drifted: only one of them
+ * printed the files that belong to no repository at all.
+ */
 export function gitUnpushedByRepository(
     files: readonly GitFileState[],
     status: AgendaGitStatus,
     ctx: GitHtmlContext
 ): string {
-    let html = '';
-    for (const repo of status.repos) {
-        const own = files.filter((f) => f.repoRoot === repo.root);
-        const commits = gitCommitRows(repo, ctx);
-        if (own.length === 0 && commits === '') {
-            continue;
-        }
-        html +=
-            `<div class="git-repo-title" title="${ctx.escapeHtml(repo.root)}">${ctx.escapeHtml(repo.name)}</div>` +
-            commits +
-            gitFileRows(own, 'repo', ctx);
-    }
-    return html;
+    return gitFilesByRepository(files, status.repos, ctx, (repo) => gitCommitRows(repo, ctx));
 }
 
 /**
@@ -343,20 +389,30 @@ export function gitGroup(
     );
 }
 
-/** Sub-headings per repository, in the model's (root-sorted) order. */
+/**
+ * Sub-headings per repository, in the model's (root-sorted) order.
+ *
+ * `before` puts something of the repository's own between its heading and its
+ * files -- the unpushed group passes its commit rows -- and a repository with
+ * nothing but that is still worth a heading, which is why it also decides
+ * whether an otherwise empty repository is skipped.
+ */
 export function gitFilesByRepository(
     files: readonly GitFileState[],
     repos: readonly GitRepoState[],
-    ctx: GitHtmlContext
+    ctx: GitHtmlContext,
+    before?: (repo: GitRepoState) => string
 ): string {
     let html = '';
     for (const repo of repos) {
         const own = files.filter((f) => f.repoRoot === repo.root);
-        if (own.length === 0) {
+        const extra = before ? before(repo) : '';
+        if (own.length === 0 && extra === '') {
             continue;
         }
         html +=
             `<div class="git-repo-title" title="${ctx.escapeHtml(repo.root)}">${ctx.escapeHtml(repo.name)}</div>` +
+            extra +
             gitFileRows(own, 'repo', ctx);
     }
     // Files outside git have no repository to sit under and would vanish here.
@@ -372,15 +428,7 @@ export function gitFilesByRepository(
 export function gitFileRows(files: readonly GitFileState[], kind: string, ctx: GitHtmlContext): string {
     return files
         .map((file) => {
-            const mark = file.conflicted
-                ? '!'
-                : file.uncommitted
-                  ? '●'
-                  : file.unpushed
-                    ? '↑'
-                    : file.repoRoot === undefined
-                      ? '?'
-                      : '✓';
+            const mark = gitFileMark(file);
             const title = file.realPath
                 ? ctx.formatString(ctx.git.realPathTitle, file.realPath)
                 : ctx.formatString(ctx.git.openFileTitle, file.file);

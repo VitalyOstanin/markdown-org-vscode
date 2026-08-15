@@ -6,6 +6,14 @@ import { AGENDA_STRINGS, formatString } from '../../utils/agendaI18n';
 
 const CLIP_TITLES = AGENDA_STRINGS.en.clip;
 
+/** What the page hands the marker pass: its own copies of the two helpers. */
+const CLIP_CTX = {
+    titles: CLIP_TITLES,
+    countRows: countClippedRows,
+    format: formatString,
+    formatCount: String
+};
+
 // The webview embeds all three helpers via `.toString()`, so these tests
 // transitively cover what the week view does on every scroll frame.
 suite('countClippedRows', () => {
@@ -137,7 +145,7 @@ suite('updateDayClipMarkers (jsdom)', () => {
     /** jsdom lays nothing out, so every measured box is planted by hand. */
     function setRect(document: Document, selector: string, top: number, bottom: number): void {
         const el = document.querySelector(selector)!;
-        el.getBoundingClientRect = () => ({ top: top, bottom: bottom }) as DOMRect;
+        el.getBoundingClientRect = () => ({ top, bottom }) as DOMRect;
     }
 
     function chip(document: Document, date: string, side: 'above' | 'below'): HTMLElement {
@@ -153,7 +161,7 @@ suite('updateDayClipMarkers (jsdom)', () => {
         setRect(document, '.day-header[data-date="2025-12-09"]', 900, 920);
         setRect(document, '#b1', 940, 960);
 
-        updateDayClipMarkers(document, 500, CLIP_TITLES, countClippedRows, formatString, String);
+        updateDayClipMarkers(document, 500, CLIP_CTX);
 
         const above = chip(document, '2025-12-08', 'above');
         const below = chip(document, '2025-12-08', 'below');
@@ -176,7 +184,7 @@ suite('updateDayClipMarkers (jsdom)', () => {
         setRect(document, '.day-header[data-date="2025-12-09"]', 900, 920);
         setRect(document, '#b1', 940, 960);
 
-        updateDayClipMarkers(document, 500, CLIP_TITLES, countClippedRows, formatString, (n) => `«${n}»`);
+        updateDayClipMarkers(document, 500, { ...CLIP_CTX, formatCount: (n: number) => `«${n}»` });
 
         const above = chip(document, '2025-12-08', 'above');
         assert.strictEqual(above.textContent, '↑ «1»');
@@ -192,7 +200,7 @@ suite('updateDayClipMarkers (jsdom)', () => {
         setRect(document, '.day-header[data-date="2025-12-09"]', 200, 220);
         setRect(document, '#b1', 230, 250);
 
-        updateDayClipMarkers(document, 500, CLIP_TITLES, countClippedRows, formatString, String);
+        updateDayClipMarkers(document, 500, CLIP_CTX);
 
         assert.strictEqual(chip(document, '2025-12-08', 'above').hidden, true);
         assert.strictEqual(chip(document, '2025-12-08', 'below').hidden, true);
@@ -212,7 +220,7 @@ suite('updateDayClipMarkers (jsdom)', () => {
         setRect(document, '.day-header[data-date="2025-12-09"]', 200, 220);
         setRect(document, '#b1', 800, 820);
 
-        updateDayClipMarkers(document, 500, CLIP_TITLES, countClippedRows, formatString, String);
+        updateDayClipMarkers(document, 500, CLIP_CTX);
 
         assert.strictEqual(chip(document, '2025-12-08', 'below').hidden, true, 'day 8 owns no hidden row');
         assert.strictEqual(chip(document, '2025-12-09', 'below').textContent, '↓ 1');
@@ -229,13 +237,13 @@ suite('updateDayClipMarkers (jsdom)', () => {
         setRect(document, '.day-header[data-date="2025-12-09"]', 900, 920);
         setRect(document, '#b1', 940, 960);
 
-        updateDayClipMarkers(document, 500, CLIP_TITLES, countClippedRows, formatString, String);
+        updateDayClipMarkers(document, 500, CLIP_CTX);
 
         const header = document.querySelector('.day-header[data-date="2025-12-08"]')!;
         assert.strictEqual(header.classList.contains('day-header-clipped'), false);
 
         setRect(document, '#a1', 40, 60);
-        updateDayClipMarkers(document, 500, CLIP_TITLES, countClippedRows, formatString, String);
+        updateDayClipMarkers(document, 500, CLIP_CTX);
         assert.strictEqual(header.classList.contains('day-header-clipped'), true);
     });
 
@@ -249,11 +257,11 @@ suite('updateDayClipMarkers (jsdom)', () => {
         setRect(document, '#a3', 700, 720);
         setRect(document, '.day-header[data-date="2025-12-09"]', 900, 920);
         setRect(document, '#b1', 940, 960);
-        updateDayClipMarkers(document, 500, CLIP_TITLES, countClippedRows, formatString, String);
+        updateDayClipMarkers(document, 500, CLIP_CTX);
 
         setRect(document, '#a1', 110, 130);
         setRect(document, '#a3', 300, 320);
-        updateDayClipMarkers(document, 500, CLIP_TITLES, countClippedRows, formatString, String);
+        updateDayClipMarkers(document, 500, CLIP_CTX);
 
         const header = document.querySelector('.day-header[data-date="2025-12-08"]')!;
         assert.strictEqual(chip(document, '2025-12-08', 'above').hidden, true);
@@ -276,7 +284,7 @@ suite('updateDayClipMarkers (jsdom)', () => {
         setRect(document, '.day-header', 80, 100);
         setRect(document, '#x1', 40, 60);
 
-        updateDayClipMarkers(document, 500, CLIP_TITLES, countClippedRows, formatString, String);
+        updateDayClipMarkers(document, 500, CLIP_CTX);
 
         assert.strictEqual(document.querySelector('.day-header')!.classList.contains('day-header-clipped'), false);
     });

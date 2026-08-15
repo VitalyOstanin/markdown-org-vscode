@@ -7,7 +7,14 @@ import {
     insertScheduledTimestamp,
     insertDeadlineTimestamp
 } from './commands/taskStatus';
-import { showAgenda, cycleTag, setTag, cycleAgendaHeaderMode, showTagDictionary } from './commands/agenda';
+import {
+    showAgenda,
+    cycleTag,
+    setTag,
+    cycleAgendaHeaderMode,
+    cycleAgendaGrouping,
+    showTagDictionary
+} from './commands/agenda';
 import { AgendaPanel } from './views/agendaPanel';
 import { adjustTimestamp, toggleTimestampActive } from './commands/timestampEdit';
 import { moveToArchive, promoteToMaintain } from './commands/moveHeading';
@@ -60,6 +67,7 @@ export function activate(context: vscode.ExtensionContext) {
     registerOrgCommand(context, 'markdown-org.cycleTag', () => cycleTag(context));
     registerOrgCommand(context, 'markdown-org.showTagDictionary', () => showTagDictionary());
     registerOrgCommand(context, 'markdown-org.cycleAgendaHeaderMode', () => cycleAgendaHeaderMode());
+    registerOrgCommand(context, 'markdown-org.cycleAgendaGrouping', () => cycleAgendaGrouping());
     // Internal: invoked by the agenda tag dropdown with the picked tag. Not in
     // package.json contributes.commands, so it stays out of the command palette
     // (it is meaningless without the tag argument).

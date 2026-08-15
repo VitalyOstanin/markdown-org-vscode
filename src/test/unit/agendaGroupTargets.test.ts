@@ -95,6 +95,43 @@ suite('agendaGroupTargets.groupTargets', () => {
         assert.deepStrictEqual(groupTargets([], 'overdue-recent', LABELS), []);
     });
 
+    test('the named day is the one acted on, not the first of the week', () => {
+        // The week view stands the same band under seven day headers, so the
+        // key alone would answer with the first day's rows -- other files, and
+        // no way for the reader to tell before the edit was made.
+        const week: DayAgenda[] = [
+            {
+                date: '2026-08-10',
+                overdue: [task({ file: '/notes/monday.md', heading: 'Monday' })],
+                scheduled_timed: [],
+                scheduled_no_time: [],
+                upcoming: []
+            },
+            {
+                date: '2026-08-12',
+                overdue: [task({ file: '/notes/wednesday.md', heading: 'Wednesday' })],
+                scheduled_timed: [],
+                scheduled_no_time: [],
+                upcoming: []
+            }
+        ];
+
+        assert.deepStrictEqual(
+            groupTargets(week, 'overdue-recent', LABELS, [], '2026-08-12').map((t) => t.heading),
+            ['Wednesday']
+        );
+        assert.deepStrictEqual(
+            groupTargets(week, 'overdue-recent', LABELS).map((t) => t.heading),
+            ['Monday'],
+            'the day view names no date and gets the single day it rendered'
+        );
+        assert.deepStrictEqual(
+            groupTargets(week, 'overdue-recent', LABELS, [], '2026-08-13'),
+            [],
+            'a day the payload no longer holds is answered with nothing, not with another day'
+        );
+    });
+
     test('a row of a hidden directory is not a target, because it is not on screen', () => {
         const data = day([
             task({ root: '/a', file: '/a/inbox.md', line: 3, heading: 'Shown' }),

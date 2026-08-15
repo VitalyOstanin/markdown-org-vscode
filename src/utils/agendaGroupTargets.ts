@@ -39,9 +39,10 @@ export function groupTargets(
     data: AgendaData,
     sectionKey: string,
     labels: DaySectionLabels,
-    hidden: readonly string[] = []
+    hidden: readonly string[] = [],
+    date?: string
 ): BulkTarget[] {
-    const day = firstDay(hideCollections(data, hidden));
+    const day = dayOf(hideCollections(data, hidden), date);
     if (!day) {
         return [];
     }
@@ -74,12 +75,23 @@ function planningKeyword(task: TaskWithOffset): 'SCHEDULED' | 'DEADLINE' | undef
     return undefined;
 }
 
-function firstDay(data: AgendaData): DayAgenda | undefined {
-    const first: DayAgenda | Task | undefined = Array.isArray(data) ? data[0] : undefined;
-    if (!first || 'file' in first) {
-        // A day agenda carries a `date`; a task carries a `file`. The two
-        // shapes share the wire, and the tasks view sends the second.
-        return undefined;
+/**
+ * The day the band stood under.
+ *
+ * The week view names it, because seven days there carry the same band keys and
+ * the first of them is rarely the one the menu was opened on. The day view sends
+ * nothing and gets the single day it rendered. A named date that is not in the
+ * payload yields nothing rather than the wrong day -- it means the view moved on
+ * between the press and this.
+ */
+function dayOf(data: AgendaData, date: string | undefined): DayAgenda | undefined {
+    const days: (DayAgenda | Task)[] = Array.isArray(data) ? data : [];
+    // A day agenda carries a `date`; a task carries a `file`. The two shapes
+    // share the wire, and the tasks view sends the second.
+    const isDay = (entry: DayAgenda | Task): entry is DayAgenda => !('file' in entry) && typeof entry.date === 'string';
+    if (date === undefined) {
+        const first = days[0];
+        return first && isDay(first) ? first : undefined;
     }
-    return typeof first.date === 'string' ? first : undefined;
+    return days.filter(isDay).find((day) => day.date === date);
 }

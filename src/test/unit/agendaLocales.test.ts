@@ -16,6 +16,7 @@ import { buildMonthGrid } from '../../utils/agendaMonthCells';
 import type { MonthDayIndex } from '../../utils/agendaMonthCells';
 import type { OverdueBandIndex } from '../../utils/agendaDaySummary';
 import { countClippedRows, renderDayClipHtml, updateDayClipMarkers } from '../../utils/agendaClipMarkers';
+import { renderGitMenu } from '../../utils/agendaGitHtml';
 import { escapeHtml } from '../../utils/agendaEscapeHtml';
 import { formatNumber } from '../../utils/formatNumber';
 
@@ -79,7 +80,16 @@ suite('agenda localization across locales', () => {
     test('counted nouns resolve for every count in every shipped language', () => {
         for (const lang of UI_LANGUAGES) {
             const strings = AGENDA_STRINGS[lang];
-            for (const forms of [strings.summary.tasks, strings.countChip.tasks]) {
+            // Every set of counted nouns the interface has, not a sample:
+            // a form missing from `git.commits` shows as "отправлено 5", a
+            // number with nothing after it, which reads as a truncation
+            // rather than as a missing translation.
+            for (const forms of [
+                strings.summary.tasks,
+                strings.countChip.tasks,
+                strings.git.files,
+                strings.git.commits
+            ]) {
                 for (let n = 0; n <= 120; n++) {
                     const form = forms[pluralIndex(n, lang)];
                     assert.ok(form, `${lang}: no plural form for ${n}`);
@@ -160,6 +170,74 @@ suite('agenda counters share one numbering system', () => {
         assert.ok(!ASCII_DIGIT.test(text), `an ASCII digit reached the screen: "${text}"`);
     });
 
+    test('the git menu -- the densest numbers in the header -- follows it too', () => {
+        // Four chip counters, five group headings, the commit count and the
+        // "and N more" line: the surface where a new counter written as `${n}`
+        // would slip through unnoticed.
+        const files = [
+            {
+                file: '/repo/a.md',
+                label: 'a.md',
+                repoRoot: '/repo',
+                uncommitted: true,
+                unpushed: false,
+                conflicted: false
+            },
+            {
+                file: '/repo/b.md',
+                label: 'b.md',
+                repoRoot: '/repo',
+                uncommitted: false,
+                unpushed: true,
+                conflicted: false
+            },
+            {
+                file: '/repo/c.md',
+                label: 'c.md',
+                repoRoot: '/repo',
+                uncommitted: false,
+                unpushed: false,
+                conflicted: true
+            },
+            {
+                file: '/repo/d.md',
+                label: 'd.md',
+                repoRoot: '/repo',
+                uncommitted: false,
+                unpushed: false,
+                conflicted: false
+            },
+            { file: '/loose/e.md', label: 'e.md', uncommitted: false, unpushed: false, conflicted: false }
+        ];
+        const html = renderGitMenu(
+            {
+                repos: [
+                    {
+                        root: '/repo',
+                        name: 'repo',
+                        branch: 'master',
+                        upstream: 'origin/master',
+                        aheadCommits: 12,
+                        // A hash with no digit in it: `abc1234` is an
+                        // identifier, not a number, and would fail this check
+                        // for saying so.
+                        unpushedCommitList: [{ hash: 'abcdeff', subject: 'Sort the backlog' }]
+                    }
+                ],
+                files,
+                uncommittedCount: 1,
+                unpushedCount: 1,
+                outsideGitCount: 1,
+                unpushedCommits: 12,
+                conflictCount: 1
+            },
+            { ...base, git: EN.git }
+        );
+
+        const text = readable(new JSDOM(`<!DOCTYPE html><body>${html}</body>`).window.document);
+        assert.ok(!ASCII_DIGIT.test(text), `an ASCII digit reached the screen: "${text}"`);
+    });
+
     test('the week view clipping chips follow the same system', () => {
         const document = new JSDOM(
             `<!DOCTYPE html><body>
@@ -173,14 +251,19 @@ suite('agenda counters share one numbering system', () => {
             { pretendToBeVisual: true }
         ).window.document;
         const setRect = (selector: string, top: number, bottom: number): void => {
-            document.querySelector(selector)!.getBoundingClientRect = () => ({ top: top, bottom: bottom }) as DOMRect;
+            document.querySelector(selector)!.getBoundingClientRect = () => ({ top, bottom }) as DOMRect;
         };
         setRect('.day-header', 80, 100);
         setRect('#hidden-above', 40, 60);
         setRect('#visible', 200, 220);
         setRect('#hidden-below', 700, 720);
 
-        updateDayClipMarkers(document, 500, EN.clip, countClippedRows, formatString, (n) => formatNumber(n, locale));
+        updateDayClipMarkers(document, 500, {
+            titles: EN.clip,
+            countRows: countClippedRows,
+            format: formatString,
+            formatCount: (n: number) => formatNumber(n, locale)
+        });
 
         const text = readable(document);
         assert.ok(!ASCII_DIGIT.test(text), `an ASCII digit reached the screen: "${text}"`);

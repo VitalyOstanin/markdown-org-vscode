@@ -338,7 +338,13 @@ export const AGENDA_STYLES = `
         }
         /* Pending work is the signal worth colouring; a clean tree stays in the
            muted description colour so the header does not shout when there is
-           nothing to do. */
+           nothing to do.
+
+           Which dictionary a counter is coloured from follows one rule: a state
+           the theme already has a git colour for is taken from gitDecoration,
+           so a file reads the same here and in Source Control -- which is where
+           the conflict note sends the reader. A state git has no colour for
+           ("could not be read") falls back to the agenda's own palette. */
         .git-chip-stat[data-kind='uncommitted'] {
             color: var(--vscode-gitDecoration-modifiedResourceForeground);
         }
@@ -350,14 +356,17 @@ export const AGENDA_STYLES = `
         }
         /* "? N": files whose state could not be read. Amber rather than the
            modified colour -- there is nothing to commit here, only an answer
-           the panel does not have. */
+           the panel does not have, and git has no colour for that. */
         .git-chip-stat[data-kind='outside'] {
             color: var(--accent-yellow);
         }
         /* "! N": paths a merge left unresolved. Red, and first in the chip:
-           this is the state that takes the commit button away. */
+           this is the state that takes the commit button away. The theme's own
+           conflict colour, so the same file is the same colour in the view this
+           chip points at; the agenda's red stands in for a theme that skipped
+           the token. */
         .git-chip-stat[data-kind='conflicted'] {
-            color: var(--accent-red);
+            color: var(--vscode-gitDecoration-conflictingResourceForeground, var(--accent-red));
         }
         /* The clean state spells itself out ("✓ clean") instead of leaving a
            bare checkmark to be guessed at. It is not dropped in the compact
@@ -452,9 +461,10 @@ export const AGENDA_STYLES = `
             color: var(--vscode-descriptionForeground);
         }
         /* The one marker that is not a state but a demand: a conflicted row
-           needs the user before anything else in this menu can proceed. */
+           needs the user before anything else in this menu can proceed. Same
+           colour as the counter above it, from the same theme token. */
         .git-file[data-kind='conflicted'] .git-file-mark {
-            color: var(--accent-red);
+            color: var(--vscode-gitDecoration-conflictingResourceForeground, var(--accent-red));
         }
         /* The sentence under the conflict group. A caption, not a control:
            resolving happens in Source Control, and this row says so rather
@@ -503,9 +513,11 @@ export const AGENDA_STYLES = `
         .git-action[disabled]:hover {
             background: var(--vscode-button-background);
         }
-        /* The spinner marks which of the two is running. The host also raises a
-           progress notification, but that appears in the corner of the window,
-           away from the button the user just pressed. */
+        /* The spinner marks which of the two is running, for a reader who opens
+           the chip again while it still is: the press itself closes the
+           dropdown, because both actions raise host UI the menu would sit
+           behind. What the main path answers with is the progress notification
+           the host raises; this is what the menu says when it comes back. */
         .git-action[data-busy='true']::before {
             content: '';
             display: inline-block;

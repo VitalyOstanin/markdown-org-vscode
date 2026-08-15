@@ -179,7 +179,7 @@ suite('Agenda Show Integration Tests', () => {
         await waitUntil(() => showErrorStub.called, 'a render failure to be reported', 4000);
         const messages = showErrorStub.getCalls().map((c) => String(c.args[0]));
         assert.ok(
-            messages.some((m) => m.includes('agenda failed to render')),
+            messages.some((m) => m.includes('Agenda failed to render')),
             `expected a render failure to be reported, got: ${messages.join('; ') || '(no message)'}`
         );
     });
