@@ -134,7 +134,7 @@ suite('Group actions on an overdue band', () => {
         assert.ok(info);
         assert.deepStrictEqual(info.sectionMenus, ['overdue-repeat', 'overdue-recent']);
         // The day's own work is rendered as a section too, and carries none.
-        assert.ok(info.sections.includes('Scheduled today'), `sections were: ${info.sections.join(', ')}`);
+        assert.ok(info.sections.includes('At a set time'), `sections were: ${info.sections.join(', ')}`);
     });
 
     test('the week offers the same action, and it lands on the day it was opened from', async function () {

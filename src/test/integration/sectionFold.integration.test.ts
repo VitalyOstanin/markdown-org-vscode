@@ -157,9 +157,17 @@ suite('Folding an agenda section', () => {
         await render('week', 12);
 
         const before = await snapshot();
-        // Two days, each with a heading for the same two bands. The timed rows
-        // have no heading of their own here -- the day header above names them.
-        assert.deepStrictEqual(before.sectionFolds, ['allday', 'overdue-long', 'allday', 'overdue-long']);
+        // Two days, each with a heading for the same three bands -- the timed
+        // rows included, since the band is named for the hour a task is set
+        // for rather than for the day it falls on.
+        assert.deepStrictEqual(before.sectionFolds, [
+            'scheduled',
+            'allday',
+            'overdue-long',
+            'scheduled',
+            'allday',
+            'overdue-long'
+        ]);
 
         // Three rows per day, folded on both: the state is held by band, the
         // way the Android client holds it for a screen rather than per day.
@@ -167,10 +175,31 @@ suite('Folding an agenda section', () => {
 
         const folded = await snapshot();
         assert.deepStrictEqual(folded.sectionFolds, [
+            'scheduled',
             'allday',
             'overdue-long (folded)',
+            'scheduled',
             'allday',
             'overdue-long (folded)'
+        ]);
+    });
+
+    test('the week folds the timed band as well, now that it has a head to press', async function () {
+        this.timeout(20000);
+        await render('week', 12);
+
+        // One timed row per day: folding the band takes both away and leaves
+        // the other five of each day standing.
+        await fold('scheduled', 10);
+
+        const folded = await snapshot();
+        assert.deepStrictEqual(folded.sectionFolds, [
+            'scheduled (folded)',
+            'allday',
+            'overdue-long',
+            'scheduled (folded)',
+            'allday',
+            'overdue-long'
         ]);
     });
 

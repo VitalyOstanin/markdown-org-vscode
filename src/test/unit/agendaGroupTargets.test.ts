@@ -4,7 +4,7 @@ import { asBulkAction, groupTargets } from '../../utils/agendaGroupTargets';
 import type { DayAgenda, Task, TaskWithOffset } from '../../types';
 
 const LABELS = {
-    scheduled: 'Scheduled today',
+    scheduled: 'At a set time',
     allday: 'All-day & upcoming',
     overdueRepeat: 'Missed repeats',
     overdueRecent: 'Overdue this week',

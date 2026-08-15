@@ -316,7 +316,7 @@ const EN: AgendaStrings = {
     headerModeTitle: 'Agenda header: {0} (click for {1})',
     headerModes: { auto: 'Auto', full: 'Full', compact: 'Compact' },
     sections: {
-        scheduled: 'Scheduled today',
+        scheduled: 'At a set time',
         allday: 'All-day & upcoming',
         overdueRepeat: 'Missed repeats',
         overdueRecent: 'Overdue this week',
@@ -434,7 +434,7 @@ const RU: AgendaStrings = {
     headerModeTitle: 'Шапка агенды: {0} (нажмите, чтобы включить «{1}»)',
     headerModes: { auto: 'Авто', full: 'Полная', compact: 'Компактная' },
     sections: {
-        scheduled: 'Запланировано на сегодня',
+        scheduled: 'Ко времени',
         allday: 'Весь день и предстоящие',
         overdueRepeat: 'Пропущенные повторы',
         overdueRecent: 'Просрочено на этой неделе',

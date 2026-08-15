@@ -1644,12 +1644,12 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             // overdue bands at the bottom. A week read one way and a day read
             // another is the same plan told twice.
             buildDaySections(day, UI.sections).forEach((sec) => {
-                // Every band announces itself except the first: its title
-                // ("Scheduled today") names today, which holds for one of the
-                // seven days here, and the day header above already says which
-                // day the rows belong to. On `flat` none of them do, and the
-                // day is the run of rows under its own header.
-                const headed = sec.key !== 'scheduled' && grouping !== 'flat';
+                // Every band announces itself, the first one included: its
+                // title names the hour a task is set for rather than the day it
+                // falls on, so it holds under any of the seven. On `flat` none
+                // of them do, and the day is the run of rows under its own
+                // header.
+                const headed = grouping !== 'flat';
                 if (headed) {
                     // The same rule as the day view: only the overdue bands
                     // answer a group action. The menu carries the day it stands
@@ -1672,7 +1672,7 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
     }
 
     // Day view (Nav "A" companion): a single day rendered as a summary bar plus
-    // stacked section panels (Scheduled today / All-day & upcoming / Overdue),
+    // stacked section panels (At a set time / All-day & upcoming / Overdue),
     // with Overdue LAST at the bottom. computeDaySummary and buildDaySections
     // are the inlined, unit-tested source of truth for the counts and section
     // order. Task rows still go through renderTask, so click handling carries

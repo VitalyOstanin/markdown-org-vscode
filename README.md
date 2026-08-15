@@ -716,7 +716,7 @@ The chip in the agenda control row cycles the three values (`auto` -> `full` -> 
 **Type:** `"sections" | "flat"`
 **Default:** `"sections"`
 
-How a day is grouped in the Day and Week views. `sections` splits it under named headings: what is scheduled for the day, what has no hour of its own, and the overdue bands (a missed repeat, this week's slippage, earlier this year, longer ago). Each heading carries the count of the rows under it, and the overdue ones carry the group menu.
+How a day is grouped in the Day and Week views. `sections` splits it under named headings: what is set for an hour of that day, what has no hour of its own, and the overdue bands (a missed repeat, this week's slippage, earlier this year, longer ago). Each heading carries the count of the rows under it, and the overdue ones carry the group menu.
 
 `flat` drops the headings, and with them the counts, the group menus and the folding described below, leaving one list per day. The rows and the order they are read in are the same either way — what is set for an hour, then what has no hour, then the overdue at the bottom — so switching does not move a row past another. What the headings said is still legible in a row's own colour and in the date it carries.
 

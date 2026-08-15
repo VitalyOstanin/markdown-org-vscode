@@ -960,7 +960,7 @@ export const AGENDA_STYLES = `
         .collection-chip[data-tone="4"] .collection-chip-dot { background: var(--vscode-charts-yellow); }
         /* ============ agenda card (Day and Tasks views) ============
            A card is a sticky summary bar plus stacked section panels. The Day
-           view fills it with schedule buckets (Scheduled today / All-day &
+           view fills it with schedule buckets (At a set time / All-day &
            upcoming / Overdue, marked data-card="day"); the date-less Tasks view
            fills it with priority groups (data-card="tasks"). The task rows
            inside stay standard .task-line elements, so the table styling and

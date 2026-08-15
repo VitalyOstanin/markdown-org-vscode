@@ -254,7 +254,7 @@ suite('Agenda Show Integration Tests', () => {
         assert.ok(info, 'expected AgendaPanel to be open after showAgendaDay');
         // fullDay carries a single scheduled-with-time task; the empty
         // all-day/overdue buckets must not produce panels.
-        assert.deepStrictEqual(info.sections, ['Scheduled today']);
+        assert.deepStrictEqual(info.sections, ['At a set time']);
     });
 
     test('Tasks mode groups by priority, highest first and backlog last', async function () {
@@ -330,7 +330,7 @@ suite('Agenda Show Integration Tests', () => {
             await waitForAgendaRender('day');
             const info = await AgendaPanel.queryRenderedInfoForTesting();
             assert.ok(info, 'expected AgendaPanel to be open after showAgendaDay');
-            assert.deepStrictEqual(info.sections, ['Scheduled today']);
+            assert.deepStrictEqual(info.sections, ['At a set time']);
         } finally {
             await config.update('dateLocale', undefined, vscode.ConfigurationTarget.Workspace);
         }

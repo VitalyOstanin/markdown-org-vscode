@@ -168,11 +168,7 @@ suite('buildDaySections', () => {
     test('section titles come from the supplied labels, not from the helper', () => {
         const d = day({ overdue: [task()], scheduled_timed: [task()], scheduled_no_time: [task()] });
         const titles = buildDaySections(d, AGENDA_STRINGS.ru.sections).map((s) => s.title);
-        assert.deepStrictEqual(titles, [
-            'Запланировано на сегодня',
-            'Весь день и предстоящие',
-            'Просрочено на этой неделе'
-        ]);
+        assert.deepStrictEqual(titles, ['Ко времени', 'Весь день и предстоящие', 'Просрочено на этой неделе']);
     });
 
     test('item count matches the source bucket sizes', () => {

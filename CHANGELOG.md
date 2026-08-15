@@ -5,6 +5,22 @@ All notable changes to the "Markdown Org" extension will be documented in this f
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- The band of tasks set for an hour is called "At a set time" -- «Ко времени» --
+  instead of "Scheduled today". The old name held for one day in seven: the
+  week draws the band under every day of it, and the day view draws it for
+  whichever day was stepped to. The new one names the hour rather than the day,
+  so it holds wherever the band is drawn, and it reads as a pair with "All-day
+  & upcoming" beside it.
+- Week view: the band announces itself there as well. It was left without a
+  heading because its title named today; with a title that holds for any day,
+  the reason is gone, and a band that has a heading can be folded away from it
+  like every other. The sibling client on Android draws and names it the same
+  way.
+
 ## [0.16.0] - 2026-08-15
 
 ### Added

@@ -104,7 +104,7 @@ export function computeDaySummary(day: DayAgenda): DaySummary {
 
 /**
  * Ordered, non-empty sections for the card. Order is fixed:
- *   1. Scheduled today    (scheduled_timed)
+ *   1. At a set time      (scheduled_timed)
  *   2. All-day & upcoming (scheduled_no_time + upcoming)
  *   3. The overdue bands  (overdue) -- LAST, at the bottom.
  * Empty sections are dropped so the card never shows a "(0)" panel.
