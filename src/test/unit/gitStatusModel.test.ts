@@ -216,6 +216,23 @@ suite('buildGitStatus', () => {
         assert.strictEqual(status.repos[0]?.conflictCount, undefined);
     });
 
+    test('a file whose repository sent no snapshot reads as clean, not as unknown', () => {
+        // `repoRoot` is set, so the file is inside git; the snapshot list simply
+        // holds nothing for that root -- a repository with no changes at all.
+        const status = buildGitStatus([source('/other/work.md', '/other/work.md', '/other')], [REPO], 'linux');
+        const file = status.files[0];
+        assert.ok(file);
+        assert.deepStrictEqual([file.uncommitted, file.unpushed, file.conflicted], [false, false, false]);
+        assert.strictEqual(file.repoRoot, '/other');
+    });
+
+    test('a file resolved outside its own repository is labelled by name alone', () => {
+        // A committed symlink can point outside the root; the relative path
+        // would be a `../` chain, which reads worse than the bare name.
+        const status = buildGitStatus([source('/repo/link.md', '/elsewhere/target.md')], [REPO], 'linux');
+        assert.strictEqual(status.files[0]?.label, 'link.md');
+    });
+
     test('the label keeps windows separators when the platform is windows', () => {
         const winRepo: GitRepoSnapshot = { ...REPO, root: 'C:\\repo', uncommitted: [], unpushed: [] };
         const status = buildGitStatus(

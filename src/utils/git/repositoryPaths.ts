@@ -12,10 +12,9 @@
  * Shared by the status collector, which counts these paths, and by the commit
  * action, which narrows the files it stages to them.
  */
-import * as path from 'node:path';
-import { resolveRealPath } from './gitApi';
+import { resolveRealPath } from './realPath';
 import type { GitRepository } from './gitApiTypes';
-import { isInside, pathKey } from './gitPathMatch';
+import { isInside, pathApi, pathKey } from './gitPathMatch';
 
 /** A repository root as it was opened, and as the file system spells it. */
 export interface RepositoryRoots {
@@ -39,13 +38,22 @@ export async function repositoryRoots(
  * root. Paths already under the real root are left alone; paths under the root
  * as opened are re-anchored; anything outside both is returned unchanged and
  * simply will not match.
+ *
+ * `platform` decides the path grammar, as it does for the comparisons in
+ * `gitPathMatch`: separators and case folding differ, and a Windows path must
+ * canonicalise the same way whatever host is running.
  */
-export function canonicalPath(value: string, roots: RepositoryRoots): string {
-    if (isInside(roots.rootReal, value)) {
+export function canonicalPath(
+    value: string,
+    roots: RepositoryRoots,
+    platform: NodeJS.Platform = process.platform
+): string {
+    if (isInside(roots.rootReal, value, platform)) {
         return value;
     }
-    if (isInside(roots.root, value)) {
-        return path.join(roots.rootReal, path.relative(roots.root, value));
+    if (isInside(roots.root, value, platform)) {
+        const api = pathApi(platform);
+        return api.join(roots.rootReal, api.relative(roots.root, value));
     }
     return value;
 }
@@ -59,9 +67,13 @@ export interface RepositoryChangeKeys {
 }
 
 /** Read the repository's change lists into keys comparable with agenda paths. */
-export function changeKeys(repository: GitRepository, roots: RepositoryRoots): RepositoryChangeKeys {
+export function changeKeys(
+    repository: GitRepository,
+    roots: RepositoryRoots,
+    platform: NodeJS.Platform = process.platform
+): RepositoryChangeKeys {
     const state = repository.state;
-    const key = (fsPath: string): string => pathKey(canonicalPath(fsPath, roots));
+    const key = (fsPath: string): string => pathKey(canonicalPath(fsPath, roots, platform), platform);
     const staged = new Set(state.indexChanges.map((change) => key(change.uri.fsPath)));
     const changed = new Set([
         ...state.workingTreeChanges.map((change) => key(change.uri.fsPath)),

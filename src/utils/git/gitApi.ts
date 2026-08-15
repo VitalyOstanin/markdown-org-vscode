@@ -15,11 +15,11 @@
  * still render.
  */
 import * as vscode from 'vscode';
-import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { formatError } from '../formatError';
 import { KeyedResolutionCache } from '../keyedResolutionCache';
 import { logDiagnostic } from '../logChannel';
+import { resolveRealPath } from './realPath';
 import type { GitApi, GitExtensionExports, GitRepository } from './gitApiTypes';
 
 /** Resolved once per session; `null` records "asked, not available". */
@@ -116,29 +116,6 @@ function reportUnavailable(reason: string): void {
     }
     reportedUnavailable = true;
     logDiagnostic(`agenda git status unavailable: ${reason}`);
-}
-
-/**
- * Real path of `file`, with the original returned when it cannot be resolved.
- *
- * A missing file is expected rather than exceptional: the agenda payload is a
- * snapshot, and a task can outlive the file it was read from by the time the
- * status is recomputed. Falling back to the original path keeps such a file in
- * the "outside git" group instead of aborting the whole pass.
- */
-export async function resolveRealPath(file: string, cache: Map<string, string>): Promise<string> {
-    const cached = cache.get(file);
-    if (cached !== undefined) {
-        return cached;
-    }
-    let resolved = file;
-    try {
-        resolved = await fs.promises.realpath(file);
-    } catch {
-        // ENOENT (deleted since the agenda was built) and EACCES both land here.
-    }
-    cache.set(file, resolved);
-    return resolved;
 }
 
 /** A file placed in its repository, with the path git will accept for it. */

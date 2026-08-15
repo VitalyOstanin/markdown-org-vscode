@@ -16,7 +16,8 @@
 import type { AgendaGitStatus, GitCommitState } from '../../types';
 import { formatError } from '../formatError';
 import { logDiagnostic } from '../logChannel';
-import { getGitApi, resolveRealPath, resolveRepositoryFor } from './gitApi';
+import { getGitApi, resolveRepositoryFor } from './gitApi';
+import { resolveRealPath } from './realPath';
 import type { GitRepository } from './gitApiTypes';
 import { pathKey } from './gitPathMatch';
 import { canonicalPath, repositoryRoots } from './repositoryPaths';
