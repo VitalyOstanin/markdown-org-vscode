@@ -392,6 +392,7 @@ for `Set TODO` (the `Shift+Up`/`Shift+Down` bindings are unchanged).
 | `Markdown Org: Go Forward in Agenda`       | `Alt+Shift+=`          | Step forward again after going back                      |
 | `Markdown Org: Cycle Tag Filter`           | `Ctrl+K Ctrl+K Ctrl+T` | Cycle the active file tag filter (e.g. ALL/WORK/PRIVATE) |
 | `Markdown Org: Cycle Agenda Header Layout` | --                     | Step the header layout: auto -> full -> compact          |
+| `Markdown Org: Toggle Agenda Day Sections` | --                     | Switch a day between named sections and one flat list    |
 
 All four view commands work both in a Markdown editor and while the agenda panel has focus, so you can switch views from the panel with the keyboard as well as with the mode buttons.
 
@@ -720,6 +721,8 @@ How a day is grouped in the Day and Week views. `sections` splits it under named
 `flat` drops the headings, and with them the counts, the group menus and the folding described below, leaving one list per day. The rows and the order they are read in are the same either way — what is set for an hour, then what has no hour, then the overdue at the bottom — so switching does not move a row past another. What the headings said is still legible in a row's own colour and in the date it carries.
 
 The Month view is unaffected: it draws counts and no rows. Changing the setting re-renders an open agenda; no reopen needed.
+
+`Markdown Org: Toggle Agenda Day Sections` switches between the two values from the Command Palette. The setting answers a panel too short for its headings, and that is noticed while reading rather than in the settings editor.
 
 ### `markdown-org.clockRoundMinutes`
 
