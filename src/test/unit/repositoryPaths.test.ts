@@ -151,7 +151,10 @@ suite('repositoryPaths.repositoryRoots', () => {
         try {
             const roots = await repositoryRoots(repo(dir), new Map());
             assert.strictEqual(roots.root, dir);
-            assert.strictEqual(roots.rootReal, fs.realpathSync(dir));
+            // Resolved the same way the module does: on Windows the temp path
+            // is a short 8.3 name that `fs.promises.realpath` expands and
+            // `fs.realpathSync` does not.
+            assert.strictEqual(roots.rootReal, await fs.promises.realpath(dir));
         } finally {
             fs.rmSync(dir, { recursive: true, force: true });
         }
@@ -166,7 +169,7 @@ suite('repositoryPaths.repositoryRoots', () => {
             fs.symlinkSync(real, link);
             const roots = await repositoryRoots(repo(link), new Map());
             assert.strictEqual(roots.root, link);
-            assert.strictEqual(roots.rootReal, fs.realpathSync(real));
+            assert.strictEqual(roots.rootReal, await fs.promises.realpath(real));
         } finally {
             fs.rmSync(base, { recursive: true, force: true });
         }

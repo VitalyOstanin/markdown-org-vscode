@@ -13,7 +13,11 @@ suite('resolveRealPath', () => {
             const link = path.join(base, 'link.md');
             fs.writeFileSync(real, '# work\n');
             fs.symlinkSync(real, link);
-            assert.strictEqual(await resolveRealPath(link, new Map()), fs.realpathSync(real));
+            // Both sides through the same call on purpose: on Windows the temp
+            // directory arrives as a short 8.3 name, and `fs.promises.realpath`
+            // expands it while `fs.realpathSync` leaves it alone -- comparing
+            // across the two would fail on the spelling, not on the symlink.
+            assert.strictEqual(await resolveRealPath(link, new Map()), await fs.promises.realpath(real));
         } finally {
             fs.rmSync(base, { recursive: true, force: true });
         }
