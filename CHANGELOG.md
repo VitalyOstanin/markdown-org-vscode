@@ -24,6 +24,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Bundled extractor bumped to 0.16.0
+  (`package.json` `x-markdown-org.extractorVersion`), which stops reporting a
+  keyword-less date that has passed as overdue: only `SCHEDULED:` and
+  `DEADLINE:` carry a missed date into today, as upstream Org-mode does. A
+  weekly class written as `` `<2025-09-01 Mon 19:00 +1w>` `` is on the agenda
+  on Mondays instead of standing as a year of arrears in between.
 - A keyword-less timestamp line counts as part of the planning block. The walk
   over that block stopped at the first line it did not recognise, so on a
   heading whose first line was such a timestamp, `Insert SCHEDULED Timestamp`
