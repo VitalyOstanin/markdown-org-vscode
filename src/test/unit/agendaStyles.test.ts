@@ -109,6 +109,29 @@ suite('AGENDA_STYLES theming invariant', () => {
         }
     });
 
+    // The week is read by where one day ends and the next begins, and that
+    // boundary is a single line down the left edge. At a third of the link
+    // colour it was missed on a light theme, so the mix and the width it is
+    // drawn at are stated rather than left to whoever edits the block next.
+    test('the day line is drawn heavy enough to mark the boundary of a day', () => {
+        assert.ok(
+            /--day-line:\s*color-mix\(in srgb, var\(--vscode-textLink-foreground\) 60%, transparent\);/.test(
+                AGENDA_STYLES
+            ),
+            'the day line must be mixed at 60% of the link colour'
+        );
+        assert.ok(
+            /#content > \.day-header::before\s*\{[^}]*width:\s*3px;/s.test(AGENDA_STYLES),
+            "the day-header's own segment of the line must be 3px wide"
+        );
+        assert.ok(
+            /#content > \.day-header ~ \.task-line,\s*#content > \.day-header ~ \.day-band\s*\{[^}]*border-left:\s*3px solid var\(--day-line\);/s.test(
+                AGENDA_STYLES
+            ),
+            'rows and bands under a day header must carry the same 3px line'
+        );
+    });
+
     // The agenda has a single look; the body attribute that used to select
     // between presets is gone, and with it every selector that scoped a rule to
     // one preset.

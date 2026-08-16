@@ -61,10 +61,12 @@ export const AGENDA_STYLES = `
             --accent-blue: color-mix(in srgb, var(--vscode-charts-blue) 65%, var(--vscode-editor-foreground) 35%);
             --accent-blue-strong: color-mix(in srgb, var(--vscode-charts-blue) 82%, var(--vscode-editor-foreground) 18%);
             /* The line that ties a week-view day together (see the .day-line
-               rules): the day-header's own colour, faded to the weight of a
-               rule rather than of a mark -- it says where a day starts and
-               ends, and competes with nothing inside it. */
-            --day-line: color-mix(in srgb, var(--vscode-textLink-foreground) 32%, transparent);
+               rules): the day-header's own colour, kept below the weight of the
+               coloured bar a row carries so it says where a day starts and ends
+               without competing with what is inside it. At 32% it was faint
+               enough to be missed on a light theme, which is the boundary the
+               week is read by. */
+            --day-line: color-mix(in srgb, var(--vscode-textLink-foreground) 60%, transparent);
         }
         body {
             padding: var(--space-5);
@@ -1078,12 +1080,12 @@ export const AGENDA_STYLES = `
             left: 0;
             top: var(--space-5);
             bottom: 0;
-            width: 2px;
+            width: 3px;
             background: var(--day-line);
         }
         #content > .day-header ~ .task-line,
         #content > .day-header ~ .day-band {
-            border-left: 2px solid var(--day-line);
+            border-left: 3px solid var(--day-line);
             padding-left: var(--space-2);
         }
         #content > .day-header ~ .task-line {

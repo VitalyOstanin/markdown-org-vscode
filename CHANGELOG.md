@@ -50,6 +50,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Week view: the line that runs down the left of a day is drawn heavier -- 60%
+  of the link colour instead of a third of it, and 3px instead of 2px. It marks
+  where one day ends and the next begins, which is how the week is read at a
+  glance, and at the old weight it was easy to miss on a light theme.
 - The band of tasks set for an hour is called "At a set time" -- «Ко времени» --
   instead of "Scheduled today". The old name held for one day in seven: the
   week draws the band under every day of it, and the day view draws it for
