@@ -1,14 +1,20 @@
 import * as assert from 'node:assert';
 import { cycleTimestampKeyword, normaliseBracket, CYCLE_ORDER } from '../../utils/toggleTimestampType';
-import type { TimestampLineKeyword } from '../../orgPatterns';
+import type { KeywordTimestampLine, TimestampLineKeyword } from '../../orgPatterns';
 import { matchTimestampLine } from '../../orgPatterns';
 
-function matchOrThrow(line: string) {
+function matchOrThrow(line: string): KeywordTimestampLine {
     const hit = matchTimestampLine(line);
     if (!hit) {
         throw new Error(`fixture did not match TIMESTAMP_LINE_REGEX: ${line}`);
     }
-    return hit;
+    const { type } = hit;
+    if (type === 'PLAIN') {
+        // The cycle rewrites a keyword token; a line that has none never
+        // reaches it (the cursor-detector drops such a line first).
+        throw new Error(`fixture carries no keyword to cycle: ${line}`);
+    }
+    return { ...hit, type };
 }
 
 suite('cycleTimestampKeyword', () => {

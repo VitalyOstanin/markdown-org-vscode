@@ -327,6 +327,147 @@ suite('Task Status Integration Tests', () => {
             assert.strictEqual(document.lineAt(1).text, scheduled);
         });
     });
+
+    // The picker is host UI, so the tests drive it by answering its two
+    // prompts: the quick pick, and the input box behind "Other value…".
+    suite('Set Priority', () => {
+        const originalQuickPick = vscode.window.showQuickPick;
+        const originalInputBox = vscode.window.showInputBox;
+
+        interface PickItem {
+            label: string;
+            detail?: string;
+        }
+
+        /**
+         * Answer the quick pick with the item `choose` selects, or dismiss it
+         * when `choose` finds none.
+         *
+         * Items are selected by shape rather than by caption: the picker
+         * speaks the language `markdown-org.uiLanguage` resolved to, so
+         * matching the English wording would tie these tests to the editor's
+         * locale. Values (`A`, `12`) are not translated and are matched
+         * directly.
+         */
+        function answerQuickPick(choose: (items: PickItem[]) => PickItem | undefined): void {
+            (vscode.window as { showQuickPick: unknown }).showQuickPick = (items: unknown) =>
+                Promise.resolve(choose(items as PickItem[]));
+        }
+
+        /** The value entries: everything before "Other value…" and "No priority". */
+        const value = (label: string) => (items: PickItem[]) => items.find((item) => item.label === label);
+        /** The only entry carrying a detail line is the free-input one. */
+        const other = (items: PickItem[]) => items.find((item) => item.detail !== undefined);
+        /** The clearing entry is last. */
+        const none = (items: PickItem[]) => items.at(-1);
+        const dismiss = () => undefined;
+
+        function answerInputBox(value: string | undefined): void {
+            (vscode.window as { showInputBox: unknown }).showInputBox = () => Promise.resolve(value);
+        }
+
+        teardown(() => {
+            (vscode.window as { showQuickPick: unknown }).showQuickPick = originalQuickPick;
+            (vscode.window as { showInputBox: unknown }).showInputBox = originalInputBox;
+        });
+
+        test('a letter picked from the list lands on the heading', async () => {
+            document = await vscode.workspace.openTextDocument({
+                content: '## TODO Task title',
+                language: 'markdown'
+            });
+            editor = await vscode.window.showTextDocument(document);
+            answerQuickPick(value('B'));
+
+            await vscode.commands.executeCommand('markdown-org.setPriority');
+
+            assert.strictEqual(document.lineAt(0).text, '## TODO [#B] Task title');
+        });
+
+        test('a number typed behind "Other value…" lands on the heading', async () => {
+            document = await vscode.workspace.openTextDocument({
+                content: '## TODO Task title',
+                language: 'markdown'
+            });
+            editor = await vscode.window.showTextDocument(document);
+            answerQuickPick(other);
+            answerInputBox('12');
+
+            await vscode.commands.executeCommand('markdown-org.setPriority');
+
+            assert.strictEqual(document.lineAt(0).text, '## TODO [#12] Task title');
+        });
+
+        test('a value out of range is refused and the heading is left alone', async () => {
+            document = await vscode.workspace.openTextDocument({
+                content: '## TODO [#A] Task title',
+                language: 'markdown'
+            });
+            editor = await vscode.window.showTextDocument(document);
+            answerQuickPick(other);
+            // The real input box would not return this (its validator blocks
+            // the value); the stub does, and the command has to refuse it too.
+            answerInputBox('65');
+
+            await vscode.commands.executeCommand('markdown-org.setPriority');
+
+            assert.strictEqual(document.lineAt(0).text, '## TODO [#A] Task title');
+        });
+
+        test('"No priority" clears the cookie', async () => {
+            document = await vscode.workspace.openTextDocument({
+                content: '## TODO [#12] Task title',
+                language: 'markdown'
+            });
+            editor = await vscode.window.showTextDocument(document);
+            answerQuickPick(none);
+
+            await vscode.commands.executeCommand('markdown-org.setPriority');
+
+            assert.strictEqual(document.lineAt(0).text, '## TODO Task title');
+        });
+
+        test('dismissing the picker leaves the heading alone', async () => {
+            document = await vscode.workspace.openTextDocument({
+                content: '## TODO [#A] Task title',
+                language: 'markdown'
+            });
+            editor = await vscode.window.showTextDocument(document);
+            answerQuickPick(dismiss);
+
+            await vscode.commands.executeCommand('markdown-org.setPriority');
+
+            assert.strictEqual(document.lineAt(0).text, '## TODO [#A] Task title');
+        });
+
+        test('a value the heading already carries is offered by the picker', async () => {
+            document = await vscode.workspace.openTextDocument({
+                content: '## TODO [#12] Task title',
+                language: 'markdown'
+            });
+            editor = await vscode.window.showTextDocument(document);
+            // `12` is not among the offered letters, so the picker has to list
+            // it separately -- otherwise it shows a value the heading contradicts.
+            answerQuickPick(value('12'));
+
+            await vscode.commands.executeCommand('markdown-org.setPriority');
+
+            assert.strictEqual(document.lineAt(0).text, '## TODO [#12] Task title');
+        });
+
+        test('the picked value replaces a cookie written inside the title', async () => {
+            document = await vscode.workspace.openTextDocument({
+                content: '## TODO Buy [#A] filter',
+                language: 'markdown'
+            });
+            editor = await vscode.window.showTextDocument(document);
+            answerQuickPick(value('C'));
+
+            await vscode.commands.executeCommand('markdown-org.setPriority');
+
+            assert.strictEqual(document.lineAt(0).text, '## TODO [#C] Buy filter');
+        });
+    });
 });
 
 /**

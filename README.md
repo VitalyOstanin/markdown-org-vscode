@@ -95,8 +95,8 @@ connect / select / sync demos and [ADR-0010](docs/adr/0010-google-calendar-sync.
 
 ### Core
 
-- **Task management** -- TODO / DONE / CANCELLED statuses with priorities (`[#A]` -- `[#Z]` or numeric `[#0]` -- `[#64]`). A CANCELLED task (both spellings `CANCELLED` and `CANCELED` are recognised) renders struck-through in the agenda and is excluded from Google Calendar sync -- its event is deleted if it had one.
-- **Timestamps** -- `CREATED`, `SCHEDULED`, `DEADLINE`, `CLOSED` with full date / time, in both active `<...>` and inactive `[...]` forms per [ADR-0005](docs/adr/0005-active-and-inactive-timestamps.md).
+- **Task management** -- TODO / DONE / CANCELLED statuses with priorities (`[#A]` -- `[#Z]` or numeric `[#0]` -- `[#64]`), the whole range reachable from `Set Priority`: a shortlist of letters, a field for any other value, and an entry that clears the cookie. A CANCELLED task (both spellings `CANCELLED` and `CANCELED` are recognised) renders struck-through in the agenda and is excluded from Google Calendar sync -- its event is deleted if it had one.
+- **Timestamps** -- `CREATED`, `SCHEDULED`, `DEADLINE`, `CLOSED` and the keyword-less one, with full date / time, in both active `<...>` and inactive `[...]` forms per [ADR-0005](docs/adr/0005-active-and-inactive-timestamps.md). A keyword-less timestamp is the appointment rather than a date somebody owes, which is what tells the two apart in the agenda: write a recurring appointment as `` `<2025-09-01 Mon 19:00 +1w>` `` and a recurring obligation as `SCHEDULED:` with `++1w`.
 - **Repeating tasks** -- Org-mode repeaters `+1d`, `+1w`, `+1m`, `.+1m`, `++1w`, and `+1wd` for workdays (skips weekends and Russian holidays). Marking such a task DONE moves it to its next occurrence and leaves it open, as Emacs does: `+N` takes one step, `++N` steps until it passes today, `.+N` restarts from today ([ADR-0017](docs/adr/0017-repeating-tasks-move-on-done.md)). A `wd` repeater is the exception -- the editor says so instead of moving it, because the working calendar it would need is not published by the extractor.
 - **CLOCK entries** -- Time tracking with start / finish events and an aggregated CLOCK table per file.
 - **Agenda views** -- Day, Week, Month and Tasks. Day and Tasks are cards (a sticky summary bar plus sections by time of day or by priority), the week groups overdue, scheduled and upcoming tasks under sticky day headers, and the month calendar shows a per-day task count that turns red when a day holds something overdue. A press on a section head folds it: the rows go, the heading keeps its count, and a second press brings them back — a band folded in the week is folded on every day of it, and the fold lasts as long as the panel is open. Views keep a browser-style history you can step through with the Back / Forward commands. In the week, a day header whose rows do not all fit shows how many are out of sight -- `↑ N` behind the pinned header, `↓ M` below the bottom of the panel -- so a day that continues past the edge is never mistaken for a short one. A row counts once less than half of it is visible, which is where its text stops being readable.
@@ -354,12 +354,13 @@ for `Set TODO` (the `Shift+Up`/`Shift+Down` bindings are unchanged).
 
 ### Task Status Commands
 
-| Command                         | Hotkey          | Description                                 |
-| ------------------------------- | --------------- | ------------------------------------------- |
-| `Markdown Org: Set TODO`        | `Ctrl+K Ctrl+T` | Mark heading as TODO                        |
-| `Markdown Org: Set DONE`        | `Ctrl+K Ctrl+D` | Mark heading as DONE                        |
-| `Markdown Org: Set CANCELLED`   | `Ctrl+K Ctrl+X` | Mark heading as CANCELLED (repeat to clear) |
-| `Markdown Org: Toggle Priority` | `Ctrl+K Ctrl+P` | Toggle priority: none → [#A] → none         |
+| Command                         | Hotkey                | Description                                             |
+| ------------------------------- | --------------------- | ------------------------------------------------------- |
+| `Markdown Org: Set TODO`        | `Ctrl+K Ctrl+T`       | Mark heading as TODO                                    |
+| `Markdown Org: Set DONE`        | `Ctrl+K Ctrl+D`       | Mark heading as DONE                                    |
+| `Markdown Org: Set CANCELLED`   | `Ctrl+K Ctrl+X`       | Mark heading as CANCELLED (repeat to clear)             |
+| `Markdown Org: Toggle Priority` | `Ctrl+K Ctrl+P`       | Toggle priority: none → [#A] → none                     |
+| `Markdown Org: Set Priority`    | `Ctrl+K Ctrl+Shift+P` | Pick the priority: a letter A–Z, a number 0–64, or none |
 
 ### Timestamp Commands
 
@@ -368,6 +369,7 @@ for `Set TODO` (the `Shift+Up`/`Shift+Down` bindings are unchanged).
 | `Markdown Org: Insert CREATED Timestamp`         | `Ctrl+K Ctrl+K Ctrl+C` | Insert CREATED timestamp under the heading (inactive `[...]` form)                                                                                     |
 | `Markdown Org: Insert SCHEDULED Timestamp`       | `Ctrl+K Ctrl+K Ctrl+S` | Insert SCHEDULED timestamp; repeating the command removes it (toggle off)                                                                              |
 | `Markdown Org: Insert DEADLINE Timestamp`        | `Ctrl+K Ctrl+K Ctrl+D` | Insert DEADLINE timestamp; repeating the command removes it (toggle off)                                                                               |
+| `Markdown Org: Insert Timestamp (no keyword)`    | `Ctrl+K Ctrl+K Ctrl+I` | Insert a plain timestamp -- the appointment rather than a planning date; repeating the command removes it (toggle off)                                 |
 | `Markdown Org: Timestamp Up`                     | `Shift+Up`             | Increment date / time / task status / timestamp type under cursor; with a non-adjustable caret or an active selection, extends the selection as usual  |
 | `Markdown Org: Timestamp Down`                   | `Shift+Down`           | Decrement date / time / task status / timestamp type under cursor; with a non-adjustable caret or an active selection, extends the selection as usual  |
 | `Markdown Org: Toggle Timestamp Active/Inactive` | -                      | Flip `<...>` ↔ `[...]` on a bare inline timestamp under the cursor (Command Palette only; see [ADR-0006](docs/adr/0006-bracket-toggle-keybindings.md)) |

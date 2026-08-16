@@ -1,4 +1,4 @@
-import type { TimestampLineMatch, TimestampLineKeyword } from '../orgPatterns';
+import type { KeywordTimestampLine, TimestampLineKeyword } from '../orgPatterns';
 import { at } from './exactIndex';
 
 export const CYCLE_ORDER: readonly TimestampLineKeyword[] = ['SCHEDULED', 'DEADLINE', 'CLOSED', 'CREATED'];
@@ -37,7 +37,7 @@ export interface CycleResult {
  * moved.
  */
 export function cycleTimestampKeyword(
-    hit: TimestampLineMatch,
+    hit: KeywordTimestampLine,
     usedKeywords: ReadonlySet<TimestampLineKeyword> = EMPTY_SET
 ): CycleResult {
     const { indent, type, timestamp } = hit;

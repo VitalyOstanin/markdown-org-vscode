@@ -144,6 +144,85 @@ suite('Timestamp Integration Tests', () => {
         assert.ok(document.lineAt(2).text.startsWith('`DEADLINE: <'));
     });
 
+    test('Insert a keyword-less timestamp', async () => {
+        document = await vscode.workspace.openTextDocument({
+            content: '## English class\n',
+            language: 'markdown'
+        });
+        editor = await vscode.window.showTextDocument(document);
+        editor.selection = new vscode.Selection(0, 0, 0, 0);
+
+        await vscode.commands.executeCommand('markdown-org.insertTimestamp');
+
+        const line1 = document.lineAt(1).text;
+        // The event, as opposed to the two planning keywords: no keyword, and
+        // the active form the agenda reads.
+        assert.strictEqual(line1.startsWith('`<'), true, `expected a bare timestamp, got: ${line1}`);
+        assert.strictEqual(line1.endsWith('>`'), true, `expected the active form, got: ${line1}`);
+        assert.strictEqual(/SCHEDULED|DEADLINE|CREATED/.test(line1), false, `expected no keyword, got: ${line1}`);
+    });
+
+    test('Toggle the keyword-less timestamp removes it', async () => {
+        document = await vscode.workspace.openTextDocument({
+            content: '## English class\n`<2025-09-01 Mon 19:00 +1w>`\n',
+            language: 'markdown'
+        });
+        editor = await vscode.window.showTextDocument(document);
+        editor.selection = new vscode.Selection(0, 0, 0, 0);
+
+        await vscode.commands.executeCommand('markdown-org.insertTimestamp');
+
+        assert.strictEqual(document.lineCount, 2);
+        assert.strictEqual(document.lineAt(0).text, '## English class');
+    });
+
+    test('The keyword-less timestamp preserves SCHEDULED and lands after it', async () => {
+        document = await vscode.workspace.openTextDocument({
+            content: '## TODO Task title\n`SCHEDULED: <2025-12-06 Fri>`\n',
+            language: 'markdown'
+        });
+        editor = await vscode.window.showTextDocument(document);
+        editor.selection = new vscode.Selection(0, 0, 0, 0);
+
+        await vscode.commands.executeCommand('markdown-org.insertTimestamp');
+
+        assert.strictEqual(document.lineAt(1).text, '`SCHEDULED: <2025-12-06 Fri>`');
+        assert.ok(document.lineAt(2).text.startsWith('`<'));
+    });
+
+    test('SCHEDULED lands after a keyword-less timestamp instead of above it', async () => {
+        // Regression: the block walk stopped at the first line it did not
+        // recognise, so a heading whose first planning line carried no keyword
+        // got the SCHEDULED line inserted above it -- and a second call did not
+        // find the line it had just written.
+        document = await vscode.workspace.openTextDocument({
+            content: '## English class\n`<2025-09-01 Mon 19:00 +1w>`\n',
+            language: 'markdown'
+        });
+        editor = await vscode.window.showTextDocument(document);
+        editor.selection = new vscode.Selection(0, 0, 0, 0);
+
+        await vscode.commands.executeCommand('markdown-org.insertScheduled');
+
+        assert.strictEqual(document.lineAt(1).text, '`<2025-09-01 Mon 19:00 +1w>`');
+        assert.ok(document.lineAt(2).text.startsWith('`SCHEDULED: <'));
+    });
+
+    test('Toggle Timestamp Active flips a keyword-less timestamp instead of refusing', async () => {
+        // Both forms are legal without a keyword (ADR-0014), so the command
+        // that refuses on SCHEDULED/CREATED has to write here.
+        document = await vscode.workspace.openTextDocument({
+            content: '`<2025-12-06 Fri>`',
+            language: 'markdown'
+        });
+        editor = await vscode.window.showTextDocument(document);
+        editor.selection = new vscode.Selection(0, 5, 0, 5);
+
+        await vscode.commands.executeCommand('markdown-org.toggleTimestampActive');
+
+        assert.strictEqual(document.lineAt(0).text, '`[2025-12-06 Fri]`');
+    });
+
     test('Timestamp Up increments day', async () => {
         document = await vscode.workspace.openTextDocument({
             content: '`SCHEDULED: <2025-12-06 Fri>`',

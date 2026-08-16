@@ -292,6 +292,27 @@ export interface AgendaStrings {
          */
         pushedUpstream: string;
     };
+    /**
+     * The priority picker raised by `Set Priority`. Host UI rather than page
+     * UI, like the git prompts above, and here for the same reason: the
+     * feature speaks the language `markdown-org.uiLanguage` picked.
+     */
+    priorityPicker: {
+        /** Quick-pick title. */
+        title: string;
+        /** Marks the value the heading already carries. */
+        current: string;
+        /** Escape hatch out of the offered letters, and what it accepts. */
+        other: string;
+        otherDetail: string;
+        /** Clears the cookie. */
+        none: string;
+        /** Input box for the value behind `other`. */
+        prompt: string;
+        placeholder: string;
+        /** Refusal for a value outside `A`..`Z` and `0`..`64`. */
+        invalid: string;
+    };
     /** Panel tab title; `{0}` is the mode label. */
     tabTitle: string;
 }
@@ -410,6 +431,16 @@ const EN: AgendaStrings = {
         committed: 'Committed {0}',
         pushed: 'Pushed {0}',
         pushedUpstream: 'Pushed to a new upstream: {0}'
+    },
+    priorityPicker: {
+        title: 'Set priority',
+        current: 'current',
+        other: 'Other value…',
+        otherDetail: 'A letter A–Z or a number 0–64',
+        none: 'No priority',
+        prompt: 'Priority',
+        placeholder: 'A letter A–Z or a number 0–64',
+        invalid: 'Not a priority: use a letter A–Z or a number 0–64'
     },
     tabTitle: 'Agenda: {0}'
 };
@@ -537,6 +568,16 @@ const RU: AgendaStrings = {
         committed: 'Закоммичено: {0}',
         pushed: 'Отправлено: {0}',
         pushedUpstream: 'Отправлено в новый upstream: {0}'
+    },
+    priorityPicker: {
+        title: 'Приоритет',
+        current: 'текущий',
+        other: 'Другое значение…',
+        otherDetail: 'Буква A–Z или число 0–64',
+        none: 'Без приоритета',
+        prompt: 'Приоритет',
+        placeholder: 'Буква A–Z или число 0–64',
+        invalid: 'Не приоритет: нужна буква A–Z или число 0–64'
     },
     tabTitle: 'Агенда: {0}'
 };

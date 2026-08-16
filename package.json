@@ -92,6 +92,11 @@
         "category": "Markdown Org"
       },
       {
+        "command": "markdown-org.setPriority",
+        "title": "Set Priority",
+        "category": "Markdown Org"
+      },
+      {
         "command": "markdown-org.insertCreated",
         "title": "Insert CREATED Timestamp",
         "category": "Markdown Org"
@@ -104,6 +109,11 @@
       {
         "command": "markdown-org.insertDeadline",
         "title": "Insert DEADLINE Timestamp",
+        "category": "Markdown Org"
+      },
+      {
+        "command": "markdown-org.insertTimestamp",
+        "title": "Insert Timestamp (no keyword)",
         "category": "Markdown Org"
       },
       {
@@ -255,6 +265,12 @@
         "when": "editorTextFocus && editorLangId == markdown"
       },
       {
+        "command": "markdown-org.setPriority",
+        "key": "ctrl+k ctrl+shift+p",
+        "mac": "cmd+k cmd+shift+p",
+        "when": "editorTextFocus && editorLangId == markdown"
+      },
+      {
         "command": "markdown-org.insertCreated",
         "key": "ctrl+k ctrl+k ctrl+c",
         "mac": "cmd+k cmd+k cmd+c",
@@ -270,6 +286,12 @@
         "command": "markdown-org.insertDeadline",
         "key": "ctrl+k ctrl+k ctrl+d",
         "mac": "cmd+k cmd+k cmd+d",
+        "when": "editorTextFocus && editorLangId == markdown"
+      },
+      {
+        "command": "markdown-org.insertTimestamp",
+        "key": "ctrl+k ctrl+k ctrl+i",
+        "mac": "cmd+k cmd+k cmd+i",
         "when": "editorTextFocus && editorLangId == markdown"
       },
       {

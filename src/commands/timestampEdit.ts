@@ -1,5 +1,5 @@
 import * as vscode from 'vscode';
-import type { TimestampLineMatch } from '../orgPatterns';
+import type { KeywordTimestampLine } from '../orgPatterns';
 import { HEADING_REGEX, matchTimestampLine } from '../orgPatterns';
 import { incrementTimestamp } from '../utils/incrementTimestamp';
 import { adjustClockTimestamp } from '../utils/adjustClockTimestamp';
@@ -30,13 +30,19 @@ function getClockTimestampAtCursor(
     return getClockTimestampPartAt(lineText, position.character);
 }
 
-function getTimestampTypeAtCursor(editor: vscode.TextEditor): { hit: TimestampLineMatch; range: vscode.Range } | null {
+function getTimestampTypeAtCursor(
+    editor: vscode.TextEditor
+): { hit: KeywordTimestampLine; range: vscode.Range } | null {
     const position = editor.selection.active;
     const line = editor.document.lineAt(position.line);
     const lineText = line.text;
 
     const hit = matchTimestampLine(lineText);
     if (!hit) return null;
+    // A keyword-less line has no token to cycle: `lineText.indexOf('PLAIN')`
+    // would be -1 and the cycle would write the word into the file.
+    const { type } = hit;
+    if (type === 'PLAIN') return null;
 
     // Cycle covers every column on the keyword line that is OUTSIDE
     // the bracketed body: the leading backtick, the keyword token, the
@@ -54,10 +60,10 @@ function getTimestampTypeAtCursor(editor: vscode.TextEditor): { hit: TimestampLi
         }
     }
 
-    const typeStart = lineText.indexOf(hit.type);
-    const typeEnd = typeStart + hit.type.length;
+    const typeStart = lineText.indexOf(type);
+    const typeEnd = typeStart + type.length;
     const range = new vscode.Range(position.line, typeStart, position.line, typeEnd);
-    return { hit, range };
+    return { hit: { ...hit, type }, range };
 }
 
 // cycleTimestampKeyword lives in utils/toggleTimestampType.ts so that unit tests
@@ -261,7 +267,9 @@ export async function toggleTimestampActive() {
     const lineText = editor.document.lineAt(position.line).text;
 
     const keywordLine = matchTimestampLine(lineText);
-    if (keywordLine) {
+    // A line without a keyword is free to be either form (ADR-0014), so it
+    // falls through to the flip below instead of being refused.
+    if (keywordLine && keywordLine.type !== 'PLAIN') {
         const required = keywordLine.active ? 'active `<...>`' : 'inactive `[...]`';
         notifyWarn(
             `${keywordLine.type} allows only ${required} form (ADR-0014); ` +

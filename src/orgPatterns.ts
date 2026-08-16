@@ -29,32 +29,53 @@ export const CLOCK_LINE_LOOKALIKE_REGEX = /^\s*`CLOCK:/;
 // Strict per-keyword bracket policy from ADR-0014:
 //   SCHEDULED, DEADLINE -> active <...>
 //   CLOSED, CREATED     -> inactive [...]
+//   no keyword          -> either form
 // Any other combination (CLOSED: <...>, SCHEDULED: [...], mixed pairs)
 // is intentionally not matched by this regex. Editing flows fall back
 // to bare-timestamp handling, and the diagnostics layer (Quick Fix)
 // reports the violation. Use `matchTimestampLine` below for a typed,
 // unified shape that hides the per-keyword alternation.
+//
+// The keyword-less alternative is the event: a date that happens rather than a
+// date somebody owes (the extractor types it PLAIN and never carries it into a
+// later day). Its body has to open with a date so that an ordinary line of
+// inline code -- `` `[draft]` ``, `` `<div>` `` -- is not read as one, which
+// the keyword alternatives get for free from the keyword itself.
 export const TIMESTAMP_LINE_REGEX =
-    /^(?<indent>\s*)`(?:SCHEDULED: (?<schedTs><[^>]+>)|DEADLINE: (?<deadTs><[^>]+>)|CLOSED: (?<closedTs>\[[^\]]+\])|CREATED: (?<createdTs>\[[^\]]+\]))`$/;
+    /^(?<indent>\s*)`(?:SCHEDULED: (?<schedTs><[^>]+>)|DEADLINE: (?<deadTs><[^>]+>)|CLOSED: (?<closedTs>\[[^\]]+\])|CREATED: (?<createdTs>\[[^\]]+\])|(?<plainActiveTs><\d{4}-\d{2}-\d{2}[^>]*>)|(?<plainInactiveTs>\[\d{4}-\d{2}-\d{2}[^\]]*\]))`$/;
 
 export type TimestampLineKeyword = 'SCHEDULED' | 'DEADLINE' | 'CLOSED' | 'CREATED';
 
+/**
+ * What a timestamp line says it is. `PLAIN` is the line that names no keyword;
+ * it is not part of the keyword cycle (there is no token to cycle) and, unlike
+ * the four keywords, it is free to be active or inactive.
+ */
+export type TimestampLineType = TimestampLineKeyword | 'PLAIN';
+
 export interface TimestampLineMatch {
     indent: string;
-    type: TimestampLineKeyword;
+    type: TimestampLineType;
     timestamp: string;
-    /** `true` for SCHEDULED/DEADLINE (<...>), `false` for CLOSED/CREATED ([...]). */
+    /** `true` for SCHEDULED/DEADLINE (<...>), `false` for CLOSED/CREATED ([...]), either for PLAIN. */
     active: boolean;
+}
+
+/** A timestamp line that names a keyword -- the only kind the keyword cycle can rewrite. */
+export interface KeywordTimestampLine extends TimestampLineMatch {
+    type: TimestampLineKeyword;
 }
 
 export function matchTimestampLine(text: string): TimestampLineMatch | null {
     const m = TIMESTAMP_LINE_REGEX.exec(text);
     if (!m?.groups) return null;
-    const { indent, schedTs, deadTs, closedTs, createdTs } = m.groups;
+    const { indent, schedTs, deadTs, closedTs, createdTs, plainActiveTs, plainInactiveTs } = m.groups;
     if (schedTs) return { indent: indent ?? '', type: 'SCHEDULED', timestamp: schedTs, active: true };
     if (deadTs) return { indent: indent ?? '', type: 'DEADLINE', timestamp: deadTs, active: true };
     if (closedTs) return { indent: indent ?? '', type: 'CLOSED', timestamp: closedTs, active: false };
     if (createdTs) return { indent: indent ?? '', type: 'CREATED', timestamp: createdTs, active: false };
+    if (plainActiveTs) return { indent: indent ?? '', type: 'PLAIN', timestamp: plainActiveTs, active: true };
+    if (plainInactiveTs) return { indent: indent ?? '', type: 'PLAIN', timestamp: plainInactiveTs, active: false };
     return null;
 }
 

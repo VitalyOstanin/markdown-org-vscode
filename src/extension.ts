@@ -3,9 +3,11 @@ import {
     setTaskStatus,
     setCancelled,
     togglePriority,
+    setPriority,
     insertCreatedTimestamp,
     insertScheduledTimestamp,
-    insertDeadlineTimestamp
+    insertDeadlineTimestamp,
+    insertPlainTimestamp
 } from './commands/taskStatus';
 import {
     showAgenda,
@@ -43,9 +45,11 @@ export function activate(context: vscode.ExtensionContext) {
     registerOrgCommand(context, 'markdown-org.setDone', () => setTaskStatus('DONE'));
     registerOrgCommand(context, 'markdown-org.setCancelled', () => setCancelled());
     registerOrgCommand(context, 'markdown-org.togglePriority', () => togglePriority());
+    registerOrgCommand(context, 'markdown-org.setPriority', () => setPriority());
     registerOrgCommand(context, 'markdown-org.insertCreated', () => insertCreatedTimestamp());
     registerOrgCommand(context, 'markdown-org.insertScheduled', () => insertScheduledTimestamp());
     registerOrgCommand(context, 'markdown-org.insertDeadline', () => insertDeadlineTimestamp());
+    registerOrgCommand(context, 'markdown-org.insertTimestamp', () => insertPlainTimestamp());
     registerOrgCommand(context, 'markdown-org.insertClockStart', () => insertClockStart());
     registerOrgCommand(context, 'markdown-org.insertClockFinish', () => insertClockFinish());
     registerOrgCommand(context, 'markdown-org.insertClockTable', () => insertClockTable());

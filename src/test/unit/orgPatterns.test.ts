@@ -172,6 +172,37 @@ suite('orgPatterns named groups', () => {
         test('CREATED with active bracket (legacy form) is rejected', () => {
             assert.strictEqual('`CREATED: <2025-12-06 Fri>`'.match(TIMESTAMP_LINE_REGEX), null);
         });
+
+        test('a keyword-less active timestamp matches', () => {
+            const match = '  `<2025-12-06 Fri 10:00>`'.match(TIMESTAMP_LINE_REGEX);
+            assert.ok(match);
+            assert.ok(match.groups);
+            assert.strictEqual(match.groups.indent, '  ');
+            assert.strictEqual(match.groups.plainActiveTs, '<2025-12-06 Fri 10:00>');
+        });
+
+        test('a keyword-less inactive timestamp matches (both forms are legal without a keyword)', () => {
+            const match = '`[2025-12-06 Fri]`'.match(TIMESTAMP_LINE_REGEX);
+            assert.ok(match);
+            assert.ok(match.groups);
+            assert.strictEqual(match.groups.plainInactiveTs, '[2025-12-06 Fri]');
+        });
+
+        test('a keyword-less timestamp keeps its repeater', () => {
+            const match = '`<2025-09-01 Mon 19:00 +1w>`'.match(TIMESTAMP_LINE_REGEX);
+            assert.ok(match);
+            assert.ok(match.groups);
+            assert.strictEqual(match.groups.plainActiveTs, '<2025-09-01 Mon 19:00 +1w>');
+        });
+
+        test('inline code that is not a date is not a timestamp line', () => {
+            // The keyword alternatives are told apart by their keyword; the
+            // keyword-less one has only the date to go by, so a line of
+            // ordinary inline code must not pass for a planning line.
+            assert.strictEqual('`[draft]`'.match(TIMESTAMP_LINE_REGEX), null);
+            assert.strictEqual('`<div>`'.match(TIMESTAMP_LINE_REGEX), null);
+            assert.strictEqual('`[TODO: rewrite]`'.match(TIMESTAMP_LINE_REGEX), null);
+        });
     });
 
     suite('CLOCK_REGEX', () => {

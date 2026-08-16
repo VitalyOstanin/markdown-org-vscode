@@ -11,7 +11,9 @@ import {
     forceEnglishWeekdays,
     applyDemoTheme,
     maximizeVscodeWindow,
-    runCommandViaPalette
+    pressKeyInPicker,
+    runCommandViaPalette,
+    typeText
 } from './_helpers';
 
 async function moveCursorIntoPriorityCookie(editor: vscode.TextEditor, line: number): Promise<void> {
@@ -88,21 +90,26 @@ suite('Demo: Task Status', () => {
         await runCommandViaPalette('Markdown Org Set DONE');
         await sleep(1300);
 
-        // Task 2: TODO -> [#A] -> rewrite cookie to [#3] -> timestampUp -> [#4]
+        // Task 2: TODO -> Set Priority picks [#3] through its picker ->
+        // timestampUp -> [#4]. The numeric range is what the picker reaches
+        // and the toggle does not; before it existed this step had to rewrite
+        // the cookie with an editor edit, which showed nothing a user could
+        // repeat.
         const releaseLine = 4;
         await moveCursorTo(editor, releaseLine);
         await sleep(700);
         await runCommandViaPalette('Markdown Org Set TODO');
         await sleep(900);
-        await runCommandViaPalette('Markdown Org Toggle Priority');
+        await runCommandViaPalette('Markdown Org Set Priority');
+        await sleep(1200);
+        // The picker opens on the letters; the free-input entry is the one
+        // below them, and it takes the value as typed.
+        await pressKeyInPicker('Down Down Down');
         await sleep(900);
-
-        const releaseText = editor.document.lineAt(releaseLine).text;
-        const cookieStart = releaseText.indexOf('[#A]');
-        await editor.edit((eb) => {
-            eb.replace(new vscode.Range(releaseLine, cookieStart, releaseLine, cookieStart + 4), '[#3]');
-        });
+        await pressKeyInPicker('Return');
         await sleep(900);
+        await typeText('3', true);
+        await sleep(1200);
         await moveCursorIntoPriorityCookie(editor, releaseLine);
         await sleep(500);
         await runCommandViaPalette('Markdown Org Timestamp Up');

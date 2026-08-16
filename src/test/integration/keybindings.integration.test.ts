@@ -74,6 +74,29 @@ suite('Keybindings: package.json contract', () => {
         );
     });
 
+    test('markdown-org.insertTimestamp follows the same Ctrl+K Ctrl+K Ctrl+<letter> shape', () => {
+        const plain = findKeybinding(pkg, 'markdown-org.insertTimestamp');
+        assert.ok(plain, 'insertTimestamp keybinding must exist');
+        assert.strictEqual(plain.key, 'ctrl+k ctrl+k ctrl+i');
+    });
+
+    test('no two commands share a chord', () => {
+        // Cheaper to state once than to re-check per command: a duplicate
+        // makes one of the two unreachable, and which one is unreachable is
+        // not something the manifest says.
+        const all = pkg.contributes?.keybindings ?? [];
+        const byKey = new Map<string, string[]>();
+        for (const kb of all) {
+            byKey.set(kb.key, [...(byKey.get(kb.key) ?? []), kb.command]);
+        }
+        const collisions = [...byKey.entries()].filter(([, commands]) => commands.length > 1);
+        assert.deepStrictEqual(
+            collisions,
+            [],
+            `chords bound twice: ${collisions.map(([key, commands]) => `${key} -> ${commands.join(', ')}`).join('; ')}`
+        );
+    });
+
     test('the unified Ctrl+K Ctrl+K Ctrl+D chord does not collide with another command', () => {
         const all = pkg.contributes?.keybindings ?? [];
         const matches = all.filter((kb) => kb.key === 'ctrl+k ctrl+k ctrl+d');

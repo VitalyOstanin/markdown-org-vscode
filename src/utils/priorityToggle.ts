@@ -42,6 +42,43 @@ export function planPriorityToggle(text: string): string | undefined {
 }
 
 /**
+ * The heading line that carries `priority`, or `undefined` when `text` is not a
+ * heading and nothing should be written. A `priority` of `undefined` clears it.
+ *
+ * Unlike the toggle above, the value is chosen by the caller, so a cookie
+ * already on the line is replaced rather than removed: whatever the heading
+ * said, it says the new value afterwards, and it says it once. The old cookie
+ * is cut out wherever it was typed (the extractor reads it there too) and the
+ * new one is written in the canonical place, right after the keyword.
+ */
+export function planPrioritySet(text: string, priority: string | undefined): string | undefined {
+    const match = HEADING_REGEX.exec(text);
+    if (!match?.groups) {
+        return undefined;
+    }
+
+    const { hashes, title } = namedGroups(match, 'hashes', 'title');
+    const status = normalizeTaskType(match.groups.status);
+
+    // `match.groups.priority` covers only the canonical position, and
+    // buildHeading rewrites that one anyway; what has to go is a cookie that
+    // survived inside the title.
+    const cookie = findPriorityCookie(title);
+    const bareTitle = cookie ? withoutCookie(title, cookie.start, cookie.end) : title;
+
+    return buildHeading({ hashes, status, priority, title: bareTitle });
+}
+
+/** The priority the heading carries, wherever the cookie sits, or `undefined`. */
+export function readHeadingPriority(text: string): string | undefined {
+    const match = HEADING_REGEX.exec(text);
+    if (!match?.groups) {
+        return undefined;
+    }
+    return match.groups.priority ?? findPriorityCookie(namedGroups(match, 'title').title)?.value;
+}
+
+/**
  * `title` with the cookie at `[start, end)` taken out.
  *
  * One adjacent space goes with it -- the one that separated the cookie from

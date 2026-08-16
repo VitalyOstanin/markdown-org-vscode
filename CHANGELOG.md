@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `Markdown Org: Insert Timestamp (no keyword)` (`Ctrl+K Ctrl+K Ctrl+I`) writes
+  a plain timestamp -- `` `<2026-08-16 Sun>` `` -- under the heading, and
+  removes it when repeated, like the two planning commands beside it. This is
+  the appointment as opposed to the date somebody owes: a class every Monday is
+  `` `<2025-09-01 Mon 19:00 +1w>` ``, while a monthly bill is `SCHEDULED:` with
+  `++1m`. Until now the line had to be typed by hand.
+- `Markdown Org: Set Priority` (`Ctrl+K Ctrl+Shift+P`) picks the value: the
+  first letters as a shortlist, a field for anything else in the range
+  org-mode reads (`A`..`Z`, `0`..`64`), and an entry that clears the cookie.
+  The toggle beside it still writes `[#A]` and takes it back; a numeric
+  priority, which the agenda has always sorted by, previously had to be typed
+  as `[#12]` by hand.
+
+### Fixed
+
+- A keyword-less timestamp line counts as part of the planning block. The walk
+  over that block stopped at the first line it did not recognise, so on a
+  heading whose first line was such a timestamp, `Insert SCHEDULED Timestamp`
+  put its line above it, and `Toggle Timestamp Active/Inactive` refused to flip
+  a form that is legal there (ADR-0005: without a keyword, both are).
+
 ### Changed
 
 - The band of tasks set for an hour is called "At a set time" -- «Ко времени» --

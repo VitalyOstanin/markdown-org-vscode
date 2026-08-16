@@ -58,7 +58,10 @@ export function shouldGateTimestampAdjust(input: AdjustGateInput): boolean {
  */
 function isOnTimestampKeyword(lineText: string, character: number): boolean {
     const hit = matchTimestampLine(lineText);
-    if (!hit) return false;
+    // Same exclusion the cursor-detector makes: a keyword-less line has no
+    // keyword to cycle, so outside its body the keystroke belongs to the
+    // editor's own line motion.
+    if (!hit || hit.type === 'PLAIN') return false;
     const timestampStart = lineText.indexOf(hit.timestamp);
     if (timestampStart >= 0) {
         const timestampEnd = timestampStart + hit.timestamp.length;

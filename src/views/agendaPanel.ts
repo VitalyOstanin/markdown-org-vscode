@@ -17,7 +17,6 @@ import { isIsoDate, toIsoDate } from '../utils/isoDate';
 import { resolveDayRolloverAnchor } from '../utils/dayRolloverAnchor';
 import { formatNumber } from '../utils/formatNumber';
 import { formatIsoDate } from '../utils/formatIsoDate';
-import { explicitSettingValue } from '../utils/explicitSetting';
 import { resolveDateLocale } from '../utils/dateLocale';
 import { formatDayHeaderParts } from '../utils/agendaDayHeader';
 import {
@@ -89,7 +88,8 @@ import { buildMonthDayIndex, buildMonthGrid } from '../utils/agendaMonthCells';
 import type { AgendaHeaderMode } from '../utils/agendaHeaderMode';
 import { nextHeaderMode, normalizeHeaderMode, resolveHeaderLayout } from '../utils/agendaHeaderMode';
 import type { AgendaStrings, UiLanguage } from '../utils/agendaI18n';
-import { AGENDA_STRINGS, formatString, pluralIndex, resolveUiLanguage } from '../utils/agendaI18n';
+import { formatString, pluralIndex } from '../utils/agendaI18n';
+import { currentUiStrings } from '../utils/uiStrings';
 import type { AgendaViewState } from '../utils/agendaHistory';
 import { AgendaHistory } from '../utils/agendaHistory';
 import type { AgendaClientBootstrap, AgendaClientDeps } from '../webview/agendaClient';
@@ -393,22 +393,11 @@ export class AgendaPanel {
     /**
      * The UI language and its dictionary for the current settings. Read fresh
      * on every render so a `markdown-org.uiLanguage` (or `dateLocale`) change
-     * reaches the panel on the next Show Agenda, without reopening it.
+     * reaches the panel on the next Show Agenda, without reopening it. Shared
+     * with the commands that prompt outside the panel.
      */
     private static uiStrings(): { language: UiLanguage; strings: AgendaStrings } {
-        const config = vscode.workspace.getConfiguration('markdown-org');
-        // `inspect`, not `get`: the date locale only gets a vote here when the
-        // user actually chose one. `get` would fold in the `en-US` default and
-        // make the first step always match, leaving the editor-language step
-        // unreachable -- a Russian VS Code with untouched settings then showed
-        // an English agenda, contradicting what `uiLanguage: auto` promises.
-        const explicitLocale = explicitSettingValue(config.inspect<string>('dateLocale')) ?? '';
-        const language = resolveUiLanguage(
-            config.get<string>('uiLanguage', 'auto'),
-            explicitLocale,
-            vscode.env.language
-        );
-        return { language, strings: AGENDA_STRINGS[language] };
+        return currentUiStrings();
     }
 
     /**

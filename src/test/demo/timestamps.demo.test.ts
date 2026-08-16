@@ -74,7 +74,9 @@ suite('Demo: Timestamps', () => {
             '`SCHEDULED: <2026-05-22 Fri 16:00 ++1w>`\n' +
             '\n' +
             '## TODO Monthly retrospective\n' +
-            '`SCHEDULED: <2026-05-28 Thu 14:00 .+1m>`\n';
+            '`SCHEDULED: <2026-05-28 Thu 14:00 .+1m>`\n' +
+            '\n' +
+            '## English class\n';
         await fs.writeFile(demoFile, initialContent, 'utf-8');
 
         const document = await vscode.workspace.openTextDocument(demoFile);
@@ -180,6 +182,21 @@ suite('Demo: Timestamps', () => {
         await sleep(900);
         await vscode.commands.executeCommand('workbench.action.focusActiveEditorGroup');
         await pressKey('shift+Down');
-        await sleep(1800);
+        await sleep(1300);
+
+        // The appointment: a timestamp with no keyword at all. It is the date
+        // something happens rather than a date owed, which is what the two
+        // planning keywords above say instead.
+        const classLine = editor.document
+            .getText()
+            .split('\n')
+            .findIndex((l) => l.includes('English class'));
+        await moveCursorTo(editor, classLine);
+        await sleep(700);
+        await runCommandViaPalette('Markdown Org Insert Timestamp (no keyword)');
+        // Longer than the other holds: this is the last step, and the line it
+        // writes is what the step is about -- a shorter pause ends the
+        // recording while the screencast overlay still covers it.
+        await sleep(3500);
     });
 });

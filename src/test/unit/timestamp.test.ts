@@ -105,6 +105,26 @@ suite('Timestamp Tests', () => {
         assert.strictEqual(hit.active, false);
     });
 
+    test('Parse a keyword-less timestamp line (PLAIN, active)', () => {
+        const hit = matchTimestampLine('`<2025-09-01 Mon 19:00 +1w>`');
+        assert.ok(hit);
+        assert.strictEqual(hit.type, 'PLAIN');
+        assert.strictEqual(hit.timestamp, '<2025-09-01 Mon 19:00 +1w>');
+        assert.strictEqual(hit.active, true);
+    });
+
+    test('Parse a keyword-less timestamp line (PLAIN, inactive -- both forms are legal there)', () => {
+        const hit = matchTimestampLine('    `[2025-09-01 Mon]`');
+        assert.ok(hit);
+        assert.strictEqual(hit.indent, '    ');
+        assert.strictEqual(hit.type, 'PLAIN');
+        assert.strictEqual(hit.active, false);
+    });
+
+    test('Reject inline code that carries no date', () => {
+        assert.strictEqual(matchTimestampLine('`[draft]`'), null);
+    });
+
     test('Reject SCHEDULED with inactive bracket (ADR-0014 violation)', () => {
         assert.strictEqual(matchTimestampLine('`SCHEDULED: [2025-12-06 Fri]`'), null);
     });
