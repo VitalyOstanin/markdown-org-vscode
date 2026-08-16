@@ -5,6 +5,24 @@ All notable changes to the "Markdown Org" extension will be documented in this f
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- A month cell counts what is dated to that day and nothing else. The core
+  files a task under its own date and repeats it under today — as arrears, or
+  as a deadline coming up — so the chip counted the same task twice, once in
+  its own cell and once in today's, and today's number was the whole
+  collection's backlog rather than the day's work. The red tint now comes from
+  the cell's own date: it has gone by with planning still on it. A plain
+  timestamp that has been and gone leaves no debt behind, as the core has it,
+  so a meeting last Tuesday no longer colours the cell. The tooltip's
+  breakdown by age is read off each date's own rows too, so the bands now
+  describe the date under the pointer instead of the collection.
+- The chip's tooltip says "overdue" rather than a count of it. The count it
+  used to state was the doubled one, and the number the reader wants is
+  already on the chip.
+
 ## [0.17.0] - 2026-08-16
 
 ### Added

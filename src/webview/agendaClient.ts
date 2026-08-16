@@ -202,8 +202,10 @@ export interface TaskGroupLabels {
 
 /** Per-date counts behind the month calendar's cell chips. */
 export interface MonthCellCounts {
+    /** Tasks dated to this date -- the scheduled buckets, and nothing else. */
     total: number;
-    overdue: number;
+    /** The date has gone by with planned work still on it. */
+    overdue: boolean;
 }
 
 export type MonthDayIndex = Record<string, MonthCellCounts>;
@@ -353,8 +355,8 @@ export interface AgendaClientDeps {
     buildDaySections: (day: DayAgenda, labels: DaySectionLabels) => DaySection[];
     computeTasksSummary: (tasks: Task[]) => TasksSummary;
     buildTaskGroups: (tasks: Task[], labels: TaskGroupLabels) => TaskGroup[];
-    buildMonthDayIndex: (days: DayAgenda[]) => MonthDayIndex;
-    buildOverdueBandIndex: (days: DayAgenda[], labels: DaySectionLabels) => OverdueBandIndex;
+    buildMonthDayIndex: (days: DayAgenda[], todayIso: string) => MonthDayIndex;
+    buildOverdueBandIndex: (days: DayAgenda[], labels: DaySectionLabels, todayIso: string) => OverdueBandIndex;
     formatString: (template: string, ...values: string[]) => string;
     pluralIndex: (n: number, lang: string) => number;
     /** Cycle behind the header-layout button: auto -> full -> compact. */
@@ -585,7 +587,7 @@ export interface AgendaClientDeps {
             uiLang: string;
             openDayView: string;
             taskChipForms: string[];
-            overdueChipTemplate: string;
+            overdueChipLabel: string;
             index: MonthDayIndex;
             bands: OverdueBandIndex;
             isHoliday: (date: string) => boolean;
@@ -2028,12 +2030,15 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             uiLang,
             openDayView: UI.openDayView,
             taskChipForms: UI.countChip.tasks,
-            overdueChipTemplate: UI.countChip.overdue,
+            overdueChipLabel: UI.countChip.overdue,
             // date -> { total, overdue }; a missing date means an empty day.
-            index: buildMonthDayIndex(days),
+            // Both take today rather than the anchor: what is counted is what
+            // each date carries, and what tints the chip is that the date has
+            // gone by -- neither of which the month being paged through changes.
+            index: buildMonthDayIndex(days, todayIso),
             // date -> what its overdue count is made of, for the chip's
             // tooltip: the grid has room for the number and not for the bands.
-            bands: buildOverdueBandIndex(days, UI.sections),
+            bands: buildOverdueBandIndex(days, UI.sections, todayIso),
             isHoliday,
             escapeHtml,
             formatString,

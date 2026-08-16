@@ -28,7 +28,7 @@ function ctxFor(index: MonthDayIndex, holidays: string[] = [], locale = 'en-US',
         uiLang: 'en',
         openDayView: EN.openDayView,
         taskChipForms: EN.countChip.tasks,
-        overdueChipTemplate: EN.countChip.overdue,
+        overdueChipLabel: EN.countChip.overdue,
         index,
         bands,
         isHoliday: (date: string): boolean => holidays.includes(date),
@@ -101,7 +101,7 @@ suite('agendaCalendarHtml.renderMonthCalendar', () => {
     });
 
     test('a day with tasks gets the count chip and the has-tasks class', () => {
-        const doc = parse(renderMonthCalendar(cells, labels, ctxFor({ '2025-12-09': { total: 3, overdue: 0 } })));
+        const doc = parse(renderMonthCalendar(cells, labels, ctxFor({ '2025-12-09': { total: 3, overdue: false } })));
         const cell = doc.querySelector('[data-date="2025-12-09"]');
         assert.match(cell?.className ?? '', /\bhas-tasks\b/);
         assert.strictEqual(cell?.querySelector('.task-count')?.textContent, '3');
@@ -109,15 +109,15 @@ suite('agendaCalendarHtml.renderMonthCalendar', () => {
     });
 
     test('an empty day carries no chip at all', () => {
-        const doc = parse(renderMonthCalendar(cells, labels, ctxFor({ '2025-12-09': { total: 1, overdue: 0 } })));
+        const doc = parse(renderMonthCalendar(cells, labels, ctxFor({ '2025-12-09': { total: 1, overdue: false } })));
         assert.strictEqual(doc.querySelector('[data-date="2025-12-10"]')?.querySelector('.task-count'), null);
     });
 
     test('overdue work tints the chip and is named in its tooltip', () => {
-        const doc = parse(renderMonthCalendar(cells, labels, ctxFor({ '2025-12-09': { total: 4, overdue: 2 } })));
+        const doc = parse(renderMonthCalendar(cells, labels, ctxFor({ '2025-12-09': { total: 4, overdue: true } })));
         const chip = doc.querySelector('[data-date="2025-12-09"] .task-count');
         assert.match(chip?.className ?? '', /\btask-count-overdue\b/);
-        assert.strictEqual(chip?.getAttribute('title'), '4 tasks, 2 overdue');
+        assert.strictEqual(chip?.getAttribute('title'), '4 tasks, overdue');
     });
 
     test('the tooltip spells the overdue count out band by band', () => {
@@ -130,40 +130,48 @@ suite('agendaCalendarHtml.renderMonthCalendar', () => {
             ]
         };
         const doc = parse(
-            renderMonthCalendar(cells, labels, ctxFor({ '2025-12-09': { total: 8, overdue: 6 } }, [], 'en-US', bands))
+            renderMonthCalendar(
+                cells,
+                labels,
+                ctxFor({ '2025-12-09': { total: 8, overdue: true } }, [], 'en-US', bands)
+            )
         );
         assert.strictEqual(
             doc.querySelector('[data-date="2025-12-09"] .task-count')?.getAttribute('title'),
-            `8 tasks, 6 overdue (${EN.sections.overdueRepeat}: 2, ${EN.sections.overdueEarlier}: 4)`
+            `8 tasks, overdue (${EN.sections.overdueRepeat}: 2, ${EN.sections.overdueEarlier}: 4)`
         );
     });
 
     test('a day with nothing overdue keeps the plain count, bands or not', () => {
         const bands = { '2025-12-09': [{ title: EN.sections.overdueRepeat, count: 2 }] };
         const doc = parse(
-            renderMonthCalendar(cells, labels, ctxFor({ '2025-12-09': { total: 3, overdue: 0 } }, [], 'en-US', bands))
+            renderMonthCalendar(
+                cells,
+                labels,
+                ctxFor({ '2025-12-09': { total: 3, overdue: false } }, [], 'en-US', bands)
+            )
         );
         assert.strictEqual(doc.querySelector('[data-date="2025-12-09"] .task-count')?.getAttribute('title'), '3 tasks');
     });
 
-    test('a date the bands say nothing about still states its overdue count', () => {
+    test('a date the bands say nothing about is still named overdue', () => {
         // An older payload, or a date the index skipped: the chip says what it
-        // knows rather than dropping the count it does have.
-        const doc = parse(renderMonthCalendar(cells, labels, ctxFor({ '2025-12-09': { total: 4, overdue: 2 } })));
+        // knows rather than dropping the mark it does have.
+        const doc = parse(renderMonthCalendar(cells, labels, ctxFor({ '2025-12-09': { total: 4, overdue: true } })));
         assert.strictEqual(
             doc.querySelector('[data-date="2025-12-09"] .task-count')?.getAttribute('title'),
-            '4 tasks, 2 overdue'
+            '4 tasks, overdue'
         );
     });
 
     test('a single task is counted in the singular', () => {
-        const doc = parse(renderMonthCalendar(cells, labels, ctxFor({ '2025-12-09': { total: 1, overdue: 0 } })));
+        const doc = parse(renderMonthCalendar(cells, labels, ctxFor({ '2025-12-09': { total: 1, overdue: false } })));
         assert.strictEqual(doc.querySelector('[data-date="2025-12-09"] .task-count')?.getAttribute('title'), '1 task');
     });
 
     test('day numbers and counts follow the date locale', () => {
         const doc = parse(
-            renderMonthCalendar(cells, labels, ctxFor({ '2025-12-09': { total: 3, overdue: 0 } }, [], 'ar-EG'))
+            renderMonthCalendar(cells, labels, ctxFor({ '2025-12-09': { total: 3, overdue: false } }, [], 'ar-EG'))
         );
         const cell = doc.querySelector('[data-date="2025-12-09"]');
         assert.strictEqual(cell?.querySelector('.day-number')?.textContent, formatNumber(9, 'ar-EG'));

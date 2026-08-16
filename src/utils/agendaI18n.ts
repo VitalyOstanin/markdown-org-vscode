@@ -136,9 +136,9 @@ export interface AgendaStrings {
     summary: { tasks: string[]; overdue: string; done: string; priorityA: string };
     /**
      * Count-chip tooltips, shared by the month cell and the card section head
-     * (the two chips are the same component): counted noun, the overdue suffix
-     * (`{0}`) used by the month cell, and the section wording (`{0}` = the
-     * counted noun).
+     * (the two chips are the same component): counted noun, the word the month
+     * cell adds when its date has gone by with work still on it, and the
+     * section wording (`{0}` = the counted noun).
      */
     countChip: { tasks: string[]; overdue: string; inSection: string };
     /** Empty-state lines of the two cards. */
@@ -367,7 +367,7 @@ const EN: AgendaStrings = {
         undoNothing: 'The notes have changed since; nothing was put back'
     },
     summary: { tasks: ['task', 'tasks'], overdue: 'overdue', done: 'done', priorityA: 'priority A' },
-    countChip: { tasks: ['task', 'tasks'], overdue: '{0} overdue', inSection: '{0} in this section' },
+    countChip: { tasks: ['task', 'tasks'], overdue: 'overdue', inSection: '{0} in this section' },
     empty: { day: 'Nothing scheduled for this day.', tasks: 'No tasks to show.' },
     tooltips: {
         cancelled: 'Cancelled',
@@ -502,7 +502,7 @@ const RU: AgendaStrings = {
     },
     countChip: {
         tasks: ['задача', 'задачи', 'задач'],
-        overdue: 'из них просрочено: {0}',
+        overdue: 'просрочено',
         inSection: '{0} в этом разделе'
     },
     empty: { day: 'На этот день ничего не запланировано.', tasks: 'Задач нет.' },

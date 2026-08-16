@@ -1,14 +1,14 @@
-import type { DayAgenda } from '../types';
+import type { DayAgenda, TaskWithOffset } from '../types';
 
 /**
  * Month-calendar cell model: which dates the grid shows and how much work each
  * of them carries.
  *
  * The month payload is the same per-day bucket structure as the week agenda
- * (see `DayAgenda`), so a cell only needs two numbers: how many tasks fall on
- * that date and how many of them are overdue. The calendar renders the total
- * as a count chip and tints that chip when the day has overdue work, instead
- * of the earlier binary "has tasks" dot.
+ * (see `DayAgenda`), so a cell only needs a count and a mark: how many tasks
+ * fall on that date, and whether the date has gone by with work still on it.
+ * The calendar renders the count as a chip and tints that chip on a date in
+ * arrears, instead of the earlier binary "has tasks" dot.
  *
  * Pure and unit-tested here, then embedded into the webview via `.toString()`,
  * so these tests transitively cover the rendered chips. Keep it
@@ -18,10 +18,10 @@ import type { DayAgenda } from '../types';
  */
 
 export interface MonthCellCounts {
-    /** Tasks on this date across all four buckets. */
+    /** Tasks dated to this date -- the scheduled buckets, and nothing else. */
     total: number;
-    /** Tasks in this date's overdue bucket. */
-    overdue: number;
+    /** The date has gone by with planned work still on it. */
+    overdue: boolean;
 }
 
 /** Date (`YYYY-MM-DD`) -> counts, for every date the payload carries tasks on. */
@@ -89,12 +89,21 @@ export function buildMonthGrid(anchorIso: string, firstOffset: number, todayIso:
 }
 
 /**
- * Index a month payload by date. Dates with no tasks are omitted, so the
- * renderer can treat a missing key as "empty day". Month payloads may omit
- * empty buckets entirely (see `DayAgenda` docs), hence the defensive
- * array checks.
+ * Index a month payload by date, as of `todayIso`. Dates with no tasks are
+ * omitted, so the renderer can treat a missing key as "empty day". Month
+ * payloads may omit empty buckets entirely (see `DayAgenda` docs), hence the
+ * defensive array checks.
+ *
+ * Only the scheduled buckets are counted. The extractor files a task under the
+ * day it is dated to *and* repeats it under today -- as arrears in `overdue`,
+ * or as a deadline coming up in `upcoming` -- so counting those buckets counted
+ * the same task twice: once in its own cell, once in today's. The chip is
+ * tinted from the cell's own date instead: it has gone by, and something
+ * planned is still sitting on it. Only the planning keywords leave a debt
+ * behind, as the extractor has it (`keeps_a_missed_date`) -- a meeting that has
+ * been and gone is not one.
  */
-export function buildMonthDayIndex(days: DayAgenda[]): MonthDayIndex {
+export function buildMonthDayIndex(days: DayAgenda[], todayIso: string): MonthDayIndex {
     const index: MonthDayIndex = {};
     const list = Array.isArray(days) ? days : [];
     for (const day of list) {
@@ -103,11 +112,12 @@ export function buildMonthDayIndex(days: DayAgenda[]): MonthDayIndex {
         }
         // Inlined (not a module-scope helper) so the whole function survives
         // the `.toString()` injection into the webview.
-        const len = (bucket: unknown): number => (Array.isArray(bucket) ? bucket.length : 0);
-        const overdue = len(day.overdue);
-        const total = overdue + len(day.scheduled_timed) + len(day.scheduled_no_time) + len(day.upcoming);
-        if (total > 0) {
-            index[day.date] = { total, overdue };
+        const bucket = (name: 'scheduled_timed' | 'scheduled_no_time'): TaskWithOffset[] =>
+            Array.isArray(day[name]) ? day[name] : [];
+        const dated = [...bucket('scheduled_timed'), ...bucket('scheduled_no_time')];
+        if (dated.length > 0) {
+            const owes = dated.some((t) => t.timestamp_type === 'SCHEDULED' || t.timestamp_type === 'DEADLINE');
+            index[day.date] = { total: dated.length, overdue: day.date < todayIso && owes };
         }
     }
     return index;

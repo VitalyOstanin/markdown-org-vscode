@@ -91,11 +91,11 @@ suite('Month View Calendar', () => {
                 { date: '2025-12-06', scheduled_timed: [{}], scheduled_no_time: [{}], upcoming: [], overdue: [] }
             ] as unknown as DayAgenda[];
 
-            const daysMap = buildMonthDayIndex(mockDays);
+            const daysMap = buildMonthDayIndex(mockDays, '2025-12-01');
 
-            assert.deepStrictEqual(daysMap['2025-12-01'], { total: 1, overdue: 0 });
+            assert.deepStrictEqual(daysMap['2025-12-01'], { total: 1, overdue: false });
             assert.strictEqual(daysMap['2025-12-02'], undefined);
-            assert.deepStrictEqual(daysMap['2025-12-06'], { total: 2, overdue: 0 });
+            assert.deepStrictEqual(daysMap['2025-12-06'], { total: 2, overdue: false });
         });
     });
 

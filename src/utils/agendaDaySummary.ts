@@ -165,26 +165,43 @@ export function buildDaySections(day: DayAgenda, labels: DaySectionLabels): DayS
 }
 
 /**
- * The overdue bands of every date in a month payload, as counts.
+ * The overdue bands of every date in a month payload, as counts, as of
+ * `todayIso`.
  *
- * The month grid shows a number per day and no rows at all, so the bands
- * cannot be drawn there the way the day and week views draw them. What it can
- * carry is the breakdown behind its red chip: whether those six missed entries
- * are two repeats to redo and four dates from last spring, or six of the same
- * thing. The split comes from `buildDaySections`, so the grid and the two
- * views that list the rows can never disagree about which band an entry is in.
+ * The month grid shows a number per day and no rows at all, so the bands cannot
+ * be drawn there the way the day and week views draw them. What it can carry is
+ * the breakdown behind its red chip: whether those six missed entries are two
+ * repeats to redo and four dates from last spring, or six of the same thing.
+ *
+ * Read off each date's own rows rather than off the arrears bucket. The
+ * extractor gathers arrears under today and nowhere else, so the bucket
+ * described the whole month's backlog and the grid hung all of it on whichever
+ * cell today was -- and, once the reader paged elsewhere, on whichever cell the
+ * window happened to start from. Which band a row falls in is the same rule
+ * `buildDaySections` uses, so the grid and the views that list the rows still
+ * agree.
  *
  * Dates with nothing overdue are omitted, like `buildMonthDayIndex` omits the
  * empty ones -- a missing key means "nothing to break down".
  */
-export function buildOverdueBandIndex(days: DayAgenda[], labels: DaySectionLabels): OverdueBandIndex {
+export function buildOverdueBandIndex(days: DayAgenda[], labels: DaySectionLabels, todayIso: string): OverdueBandIndex {
     const index: OverdueBandIndex = {};
     const list = Array.isArray(days) ? days : [];
     for (const day of list) {
-        if (!day.date) {
+        if (!day.date || day.date >= todayIso) {
             continue;
         }
-        const bands = buildDaySections(day, labels)
+        // The rows dated to this day, put through the day's own sections as
+        // its arrears -- which is what a date gone by makes them. Their offset
+        // is restated as the age of the date itself: on their own day the
+        // extractor writes 0, and read as written every one of them would land
+        // in the "this week" band however old the date is.
+        const b = (name: BucketName): TaskWithOffset[] => (Array.isArray(day[name]) ? day[name] : []);
+        const age = Math.round((Date.parse(day.date) - Date.parse(todayIso)) / 86400000);
+        const owed = [...b('scheduled_timed'), ...b('scheduled_no_time')]
+            .filter((task) => task.timestamp_type === 'SCHEDULED' || task.timestamp_type === 'DEADLINE')
+            .map((task) => ({ ...task, days_offset: age }));
+        const bands = buildDaySections({ date: day.date, overdue: owed }, labels)
             .filter((section) => section.key.startsWith('overdue-'))
             .map((section) => ({ title: section.title, count: section.items.length }));
         if (bands.length > 0) {

@@ -29,21 +29,69 @@ function day(date: string, overrides: Partial<DayAgenda> = {}): DayAgenda {
 }
 
 suite('buildMonthDayIndex', () => {
-    test('sums every bucket into total and keeps overdue separate', () => {
-        const index = buildMonthDayIndex([
-            day('2025-12-09', {
-                overdue: [task(), task()],
-                scheduled_timed: [task()],
-                scheduled_no_time: [task()],
-                upcoming: [task()]
-            })
-        ]);
-        assert.deepStrictEqual(index, { '2025-12-09': { total: 5, overdue: 2 } });
+    test('only the rows dated to the day are counted', () => {
+        // The extractor repeats a missed task under today, as arrears in
+        // `overdue` and as an approaching deadline in `upcoming`. Counting
+        // those buckets would count the same task twice -- once in its own
+        // cell, once in today's -- and today's number would follow the anchor
+        // around as the reader pages through months.
+        const index = buildMonthDayIndex(
+            [
+                day('2025-12-09', {
+                    overdue: [task(), task()],
+                    scheduled_timed: [task()],
+                    scheduled_no_time: [task()],
+                    upcoming: [task()]
+                })
+            ],
+            '2025-12-09'
+        );
+        assert.deepStrictEqual(index, { '2025-12-09': { total: 2, overdue: false } });
     });
 
-    test('days without tasks are omitted, so a missing key means an empty day', () => {
-        const index = buildMonthDayIndex([day('2025-12-01'), day('2025-12-15', { upcoming: [task()] })]);
+    test('a date gone by with planning still on it is marked overdue', () => {
+        const index = buildMonthDayIndex(
+            [day('2025-12-02', { scheduled_no_time: [task({ timestamp_type: 'SCHEDULED' })] })],
+            '2025-12-09'
+        );
+        assert.deepStrictEqual(index, { '2025-12-02': { total: 1, overdue: true } });
+    });
+
+    test('a date gone by holding a plain timestamp owes nothing', () => {
+        // `keeps_a_missed_date` in the extractor: only SCHEDULED and DEADLINE
+        // leave a debt behind. A meeting that has been and gone does not.
+        const index = buildMonthDayIndex(
+            [day('2025-12-02', { scheduled_timed: [task({ timestamp_type: 'TIMESTAMP' })] })],
+            '2025-12-09'
+        );
+        assert.deepStrictEqual(index, { '2025-12-02': { total: 1, overdue: false } });
+    });
+
+    test('today and the days after it are never overdue', () => {
+        const index = buildMonthDayIndex(
+            [
+                day('2025-12-09', { scheduled_no_time: [task({ timestamp_type: 'DEADLINE' })] }),
+                day('2025-12-20', { scheduled_no_time: [task({ timestamp_type: 'DEADLINE' })] })
+            ],
+            '2025-12-09'
+        );
+        assert.deepStrictEqual(index, {
+            '2025-12-09': { total: 1, overdue: false },
+            '2025-12-20': { total: 1, overdue: false }
+        });
+    });
+
+    test('days without dated rows are omitted, so a missing key means an empty day', () => {
+        const index = buildMonthDayIndex(
+            [day('2025-12-01'), day('2025-12-15', { scheduled_timed: [task()] })],
+            '2025-12-09'
+        );
         assert.deepStrictEqual(Object.keys(index), ['2025-12-15']);
+    });
+
+    test('a day carrying only repeats of other days gets no chip', () => {
+        const index = buildMonthDayIndex([day('2025-12-09', { overdue: [task()], upcoming: [task()] })], '2025-12-09');
+        assert.deepStrictEqual(index, {});
     });
 
     test('sparse payloads that omit whole buckets are counted, not crashed on', () => {
@@ -51,20 +99,24 @@ suite('buildMonthDayIndex', () => {
         // of empty arrays (the v0.3.0 "Cannot read properties of undefined"
         // regression came from exactly this shape).
         const sparse = [{ date: '2025-12-15', scheduled_no_time: [task()] }] as unknown as DayAgenda[];
-        assert.deepStrictEqual(buildMonthDayIndex(sparse), { '2025-12-15': { total: 1, overdue: 0 } });
+        assert.deepStrictEqual(buildMonthDayIndex(sparse, '2025-12-09'), {
+            '2025-12-15': { total: 1, overdue: false }
+        });
     });
 
     test('entries without a date are skipped', () => {
         const broken = [
             { scheduled_timed: [task()] },
-            day('2025-12-02', { overdue: [task()] })
+            day('2025-12-02', { scheduled_timed: [task({ timestamp_type: 'SCHEDULED' })] })
         ] as unknown as DayAgenda[];
-        assert.deepStrictEqual(buildMonthDayIndex(broken), { '2025-12-02': { total: 1, overdue: 1 } });
+        assert.deepStrictEqual(buildMonthDayIndex(broken, '2025-12-09'), {
+            '2025-12-02': { total: 1, overdue: true }
+        });
     });
 
     test('an empty or missing payload yields an empty index', () => {
-        assert.deepStrictEqual(buildMonthDayIndex([]), {});
-        assert.deepStrictEqual(buildMonthDayIndex(undefined as unknown as DayAgenda[]), {});
+        assert.deepStrictEqual(buildMonthDayIndex([], '2025-12-09'), {});
+        assert.deepStrictEqual(buildMonthDayIndex(undefined as unknown as DayAgenda[], '2025-12-09'), {});
     });
 });
 
