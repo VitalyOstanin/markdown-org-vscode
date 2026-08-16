@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `Ctrl+F` searches the agenda panel: the editor's own find widget now opens
+  over it, with the usual highlighting and `Enter` / `Shift+Enter` between the
+  matches. A week holds enough rows that finding one by eye is the slow part.
+  The page takes the keyboard focus when it is shown, so the shortcut works on
+  the panel that has just opened rather than after a click into it. `F3` and
+  `Shift+F3` repeat the search the way they do in an editor, from anywhere in
+  the panel: VS Code binds the webview find actions to `Enter` alone, under a
+  condition that holds only while the widget itself is focused, so they are
+  reached through `Find Next in Agenda` / `Find Previous in Agenda` instead.
+  A widget that was dismissed is reopened by the same key rather than leaving
+  it dead. The search reads what is rendered, so a row inside a folded band is
+  out of its reach until the band is unfolded.
 - `Markdown Org: Insert Timestamp (no keyword)` (`Ctrl+K Ctrl+K Ctrl+I`) writes
   a plain timestamp -- `` `<2026-08-16 Sun>` `` -- under the heading, and
   removes it when repeated, like the two planning commands beside it. This is

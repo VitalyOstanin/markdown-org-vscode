@@ -80,14 +80,41 @@ suite('Keybindings: package.json contract', () => {
         assert.strictEqual(plain.key, 'ctrl+k ctrl+k ctrl+i');
     });
 
+    // F3 is what the editor uses to repeat a search, and the agenda panel gets
+    // the same key rather than a second convention. The binding goes to a
+    // command of ours, not to the built-in webview find action: bindings
+    // gated on the widget's own context key (`webviewFindWidgetVisible`) did
+    // not fire, so the panel's own context is the only condition here.
+    test('F3 repeats the search in the agenda panel, Shift+F3 walks it back', () => {
+        const all = pkg.contributes?.keybindings ?? [];
+        const expected: readonly (readonly [string, string])[] = [
+            ['f3', 'markdown-org.agendaFindNext'],
+            ['shift+f3', 'markdown-org.agendaFindPrevious']
+        ];
+        for (const [key, command] of expected) {
+            const binding = all.find((kb) => kb.command === command);
+            assert.ok(binding, `${command} must be bound`);
+            assert.strictEqual(binding.key, key, `${command} must be on ${key}`);
+            assert.strictEqual(
+                binding.when,
+                'markdown-org.agendaFocused',
+                `${command} must be scoped to the agenda panel`
+            );
+        }
+    });
+
     test('no two commands share a chord', () => {
         // Cheaper to state once than to re-check per command: a duplicate
         // makes one of the two unreachable, and which one is unreachable is
-        // not something the manifest says.
+        // not something the manifest says. Keyed by chord *and* condition: one
+        // chord may serve two commands as long as their `when` clauses cannot
+        // both hold -- F3 opens the find widget or steps to the next match,
+        // depending on whether it is already up.
         const all = pkg.contributes?.keybindings ?? [];
         const byKey = new Map<string, string[]>();
         for (const kb of all) {
-            byKey.set(kb.key, [...(byKey.get(kb.key) ?? []), kb.command]);
+            const slot = `${kb.key} [${kb.when ?? ''}]`;
+            byKey.set(slot, [...(byKey.get(slot) ?? []), kb.command]);
         }
         const collisions = [...byKey.entries()].filter(([, commands]) => commands.length > 1);
         assert.deepStrictEqual(

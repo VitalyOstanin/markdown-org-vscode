@@ -226,4 +226,11 @@ export interface AgendaRenderedInfo {
     todayFirstRowHidden: boolean;
     /** Where the page ended up after the render decided its scroll. */
     scrollY: number;
+    /**
+     * Tag name of what holds the keyboard focus inside the page, `''` when
+     * nothing does. The find widget only answers Ctrl+F once the focus is in
+     * the document, so this is what tells "the panel is open" from "the panel
+     * takes keys".
+     */
+    focusedTag: string;
 }

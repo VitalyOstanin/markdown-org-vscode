@@ -19,6 +19,7 @@ import {
 } from './commands/agenda';
 import { AgendaPanel } from './views/agendaPanel';
 import { adjustTimestamp, toggleTimestampActive } from './commands/timestampEdit';
+import { agendaFind } from './commands/agendaFind';
 import { moveToArchive, promoteToMaintain } from './commands/moveHeading';
 import { insertClockStart, insertClockFinish } from './commands/clock';
 import { insertClockTable } from './commands/clocktable';
@@ -63,6 +64,13 @@ export function activate(context: vscode.ExtensionContext) {
     // itself (see the note in agendaClient.ts), so they stay reassignable.
     registerOrgCommand(context, 'markdown-org.agendaBack', () => AgendaPanel.goBack());
     registerOrgCommand(context, 'markdown-org.agendaForward', () => AgendaPanel.goForward());
+    // F3 / Shift+F3 over the panel's find widget. Bound to commands of our own
+    // rather than straight to the built-in webview find actions: those are
+    // registered with a keybinding on Enter and a condition that holds only
+    // while the widget has the focus, and a contributed binding gated on the
+    // widget's own context key did not fire.
+    registerOrgCommand(context, 'markdown-org.agendaFindNext', () => agendaFind('next'));
+    registerOrgCommand(context, 'markdown-org.agendaFindPrevious', () => agendaFind('previous'));
     registerOrgCommand(context, 'markdown-org.timestampUp', () => adjustTimestamp(1));
     registerOrgCommand(context, 'markdown-org.timestampDown', () => adjustTimestamp(-1));
     registerOrgCommand(context, 'markdown-org.toggleTimestampActive', () => toggleTimestampActive());

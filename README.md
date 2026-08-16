@@ -99,7 +99,7 @@ connect / select / sync demos and [ADR-0010](docs/adr/0010-google-calendar-sync.
 - **Timestamps** -- `CREATED`, `SCHEDULED`, `DEADLINE`, `CLOSED` and the keyword-less one, with full date / time, in both active `<...>` and inactive `[...]` forms per [ADR-0005](docs/adr/0005-active-and-inactive-timestamps.md). A keyword-less timestamp is the appointment rather than a date somebody owes, which is what tells the two apart in the agenda: write a recurring appointment as `` `<2025-09-01 Mon 19:00 +1w>` `` and a recurring obligation as `SCHEDULED:` with `++1w`.
 - **Repeating tasks** -- Org-mode repeaters `+1d`, `+1w`, `+1m`, `.+1m`, `++1w`, and `+1wd` for workdays (skips weekends and Russian holidays). Marking such a task DONE moves it to its next occurrence and leaves it open, as Emacs does: `+N` takes one step, `++N` steps until it passes today, `.+N` restarts from today ([ADR-0017](docs/adr/0017-repeating-tasks-move-on-done.md)). A `wd` repeater is the exception -- the editor says so instead of moving it, because the working calendar it would need is not published by the extractor.
 - **CLOCK entries** -- Time tracking with start / finish events and an aggregated CLOCK table per file.
-- **Agenda views** -- Day, Week, Month and Tasks. Day and Tasks are cards (a sticky summary bar plus sections by time of day or by priority), the week groups overdue, scheduled and upcoming tasks under sticky day headers, and the month calendar shows a per-day task count that turns red when a day holds something overdue. A press on a section head folds it: the rows go, the heading keeps its count, and a second press brings them back — a band folded in the week is folded on every day of it, and the fold lasts as long as the panel is open. Views keep a browser-style history you can step through with the Back / Forward commands. In the week, a day header whose rows do not all fit shows how many are out of sight -- `↑ N` behind the pinned header, `↓ M` below the bottom of the panel -- so a day that continues past the edge is never mistaken for a short one. A row counts once less than half of it is visible, which is where its text stops being readable.
+- **Agenda views** -- Day, Week, Month and Tasks. Day and Tasks are cards (a sticky summary bar plus sections by time of day or by priority), the week groups overdue, scheduled and upcoming tasks under sticky day headers, and the month calendar shows a per-day task count that turns red when a day holds something overdue. A press on a section head folds it: the rows go, the heading keeps its count, and a second press brings them back — a band folded in the week is folded on every day of it, and the fold lasts as long as the panel is open. Views keep a browser-style history you can step through with the Back / Forward commands. In the week, a day header whose rows do not all fit shows how many are out of sight -- `↑ N` behind the pinned header, `↓ M` below the bottom of the panel -- so a day that continues past the edge is never mistaken for a short one. A row counts once less than half of it is visible, which is where its text stops being readable. `Ctrl+F` opens the editor's find widget over the panel, so a task is reached by its title instead of by scrolling; `F3` and `Shift+F3` step through the matches from anywhere in the panel, and reopen a widget that was dismissed. The search reads what is rendered, so unfold a band before searching inside it.
 - **Editor colouring** -- Planning keywords, the parts of a timestamp (date, weekday, time, repeater, warning cookie), status keywords and the `[#A]` / `[#B]` / `[#C]` cookies are coloured in markdown editors, in the same colours the agenda uses for the same things. It works at any indentation, including the four spaces that make markdown treat a line as a code block and stop highlighting it -- the indentation the extractor reads without complaint. Turn it off with [`markdown-org.highlightInEditor`](#markdown-orghighlightineditor).
 - **Interface language** -- The agenda panel speaks English or Russian, following [`markdown-org.uiLanguage`](#markdown-orguilanguage); by default it follows the date locale, then the VS Code display language.
 - **Tag filtering** -- Filter agenda by file-name patterns (e.g. `WORK` / `PRIVATE`), toggled from the agenda or by hotkey.
@@ -384,17 +384,19 @@ for `Set TODO` (the `Shift+Up`/`Shift+Down` bindings are unchanged).
 
 ### Agenda Commands
 
-| Command                                    | Hotkey                 | Description                                              |
-| ------------------------------------------ | ---------------------- | -------------------------------------------------------- |
-| `Markdown Org: Show Agenda (Day)`          | `Ctrl+K Ctrl+K Ctrl+Y` | Show today's tasks                                       |
-| `Markdown Org: Show Agenda (Week)`         | `Ctrl+K Ctrl+K Ctrl+W` | Show this week's tasks                                   |
-| `Markdown Org: Show Agenda (Month)`        | `Ctrl+K Ctrl+K Ctrl+M` | Show this month's tasks                                  |
-| `Markdown Org: Show Tasks`                 | `Ctrl+K Ctrl+K Ctrl+L` | Show all TODO tasks grouped by priority                  |
-| `Markdown Org: Go Back in Agenda`          | `Alt+Shift+-`          | Return to the previously shown agenda view               |
-| `Markdown Org: Go Forward in Agenda`       | `Alt+Shift+=`          | Step forward again after going back                      |
-| `Markdown Org: Cycle Tag Filter`           | `Ctrl+K Ctrl+K Ctrl+T` | Cycle the active file tag filter (e.g. ALL/WORK/PRIVATE) |
-| `Markdown Org: Cycle Agenda Header Layout` | --                     | Step the header layout: auto -> full -> compact          |
-| `Markdown Org: Toggle Agenda Day Sections` | --                     | Switch a day between named sections and one flat list    |
+| Command                                    | Hotkey                 | Description                                                             |
+| ------------------------------------------ | ---------------------- | ----------------------------------------------------------------------- |
+| `Markdown Org: Show Agenda (Day)`          | `Ctrl+K Ctrl+K Ctrl+Y` | Show today's tasks                                                      |
+| `Markdown Org: Show Agenda (Week)`         | `Ctrl+K Ctrl+K Ctrl+W` | Show this week's tasks                                                  |
+| `Markdown Org: Show Agenda (Month)`        | `Ctrl+K Ctrl+K Ctrl+M` | Show this month's tasks                                                 |
+| `Markdown Org: Show Tasks`                 | `Ctrl+K Ctrl+K Ctrl+L` | Show all TODO tasks grouped by priority                                 |
+| `Markdown Org: Go Back in Agenda`          | `Alt+Shift+-`          | Return to the previously shown agenda view                              |
+| `Markdown Org: Go Forward in Agenda`       | `Alt+Shift+=`          | Step forward again after going back                                     |
+| `Markdown Org: Find Next in Agenda`        | `F3`                   | Next match of the panel's find widget, reopening it if it was dismissed |
+| `Markdown Org: Find Previous in Agenda`    | `Shift+F3`             | Previous match of the panel's find widget                               |
+| `Markdown Org: Cycle Tag Filter`           | `Ctrl+K Ctrl+K Ctrl+T` | Cycle the active file tag filter (e.g. ALL/WORK/PRIVATE)                |
+| `Markdown Org: Cycle Agenda Header Layout` | --                     | Step the header layout: auto -> full -> compact                         |
+| `Markdown Org: Toggle Agenda Day Sections` | --                     | Switch a day between named sections and one flat list                   |
 
 All four view commands work both in a Markdown editor and while the agenda panel has focus, so you can switch views from the panel with the keyboard as well as with the mode buttons.
 

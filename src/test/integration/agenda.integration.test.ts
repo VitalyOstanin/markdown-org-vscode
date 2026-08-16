@@ -146,6 +146,34 @@ suite('Agenda Show Integration Tests', () => {
         assertNoError();
     });
 
+    // A week holds enough rows that finding one by eye is the slow part, and
+    // the editor already has a find widget for exactly that -- but a webview
+    // panel gets it only when it asks. The option defaults to false, so this
+    // states the intent rather than the default.
+    test('the panel carries the find widget, so Ctrl+F searches the rendered agenda', async function () {
+        this.timeout(10000);
+        await vscode.commands.executeCommand('markdown-org.showAgendaWeek');
+        await waitForAgendaRender('week');
+
+        const panel = (AgendaPanel as unknown as { currentPanel?: vscode.WebviewPanel }).currentPanel;
+        assert.ok(panel, 'expected AgendaPanel to be open');
+        assert.strictEqual(panel.options.enableFindWidget, true);
+    });
+
+    // The widget above is only half of it: opening the panel focuses the
+    // webview element, not the document inside it, so Ctrl+F went nowhere
+    // until a click landed somewhere in the agenda. The page takes the focus
+    // itself now, on the render that follows a user-initiated show.
+    test('the page takes the keyboard focus on show, so Ctrl+F needs no click first', async function () {
+        this.timeout(10000);
+        await vscode.commands.executeCommand('markdown-org.showAgendaWeek');
+        await waitForAgendaRender('week');
+
+        const info = await AgendaPanel.queryRenderedInfoForTesting();
+        assert.ok(info);
+        assert.strictEqual(info.focusedTag, 'BODY');
+    });
+
     // A render that throws used to leave the panel blank and the user with
     // nothing to go on: the exception reaches only the webview console, and the
     // ready handshake (sent when the script starts, before any render) had

@@ -1095,6 +1095,29 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         renderCurrentMode();
         scrollToWeekFocus();
         refreshClipMarkers();
+        takeKeyboardFocus();
+    }
+
+    /**
+     * Put the keyboard focus in the page, so Ctrl+F reaches the find widget
+     * without a click into the agenda first: opening the panel focuses the
+     * webview element, and the document inside it stays unfocused until
+     * something in it takes the focus.
+     *
+     * `preventScroll`, because every caller has just decided where the page
+     * should sit -- the week focus, a remembered position, the reader's own
+     * scroll -- and focusing must not move it.
+     *
+     * A control inside the page keeps the focus it already has: a re-render
+     * asked for from the header (Today, Prev/Next, a chip) must not pull the
+     * focus off the button that asked for it.
+     */
+    function takeKeyboardFocus(): void {
+        const active = document.activeElement;
+        if (active !== null && active !== document.body && active !== document.documentElement) {
+            return;
+        }
+        document.body.focus({ preventScroll: true });
     }
 
     /** A page already on screen: render it again and settle where to leave it. */
@@ -1143,6 +1166,12 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         // Every branch above lands the page on a scroll position, which is
         // what the chips are counted against.
         refreshClipMarkers();
+        if (userInitiated) {
+            // Show Agenda on an open panel reveals it, and the focus has to
+            // follow -- otherwise Ctrl+F still needs a click first, which is
+            // the very case this fixes.
+            takeKeyboardFocus();
+        }
     }
 
     /**
@@ -1352,7 +1381,8 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             dayNumbers,
             // The header layout is a class on <body>, so this is how a test
             // sees which of the two the page settled on.
-            headerLayout: document.body.classList.contains('compact-header') ? 'compact' : 'full'
+            headerLayout: document.body.classList.contains('compact-header') ? 'compact' : 'full',
+            focusedTag: document.activeElement?.tagName ?? ''
         };
     }
 

@@ -486,6 +486,11 @@ export class AgendaPanel {
             {
                 enableScripts: true,
                 retainContextWhenHidden: true,
+                // Ctrl+F over the rendered agenda: a long week is faster to
+                // read through the editor's own find widget than by eye. It
+                // searches the DOM, so a row inside a folded band is out of
+                // reach -- unfold it first.
+                enableFindWidget: true,
                 localResourceRoots: []
             }
         );
@@ -1078,7 +1083,8 @@ export class AgendaPanel {
                         clipAbove: m.clipAbove ?? [],
                         clipBelow: m.clipBelow ?? [],
                         todayFirstRowHidden: m.todayFirstRowHidden ?? false,
-                        scrollY: m.scrollY ?? 0
+                        scrollY: m.scrollY ?? 0,
+                        focusedTag: m.focusedTag ?? ''
                     });
                 }
             });
@@ -1389,7 +1395,12 @@ export class AgendaPanel {
         ${AGENDA_STYLES}
     </style>
 </head>
-<body>
+<!-- tabindex, so the page can take the keyboard focus itself (takeKeyboardFocus).
+     Opening the panel focuses the webview element, but not the document inside
+     it, and the find widget answers Ctrl+F only once the focus is in the
+     document -- until then a click somewhere in the agenda was the only way to
+     put it there. -1 keeps <body> out of the Tab order. -->
+<body tabindex="-1">
     <div class="agenda-header" id="agenda-header">
         <div class="agenda-hero" id="current-date"></div>
         <div class="nav-bar" id="nav-bar"></div>

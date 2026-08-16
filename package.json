@@ -162,6 +162,16 @@
         "category": "Markdown Org"
       },
       {
+        "command": "markdown-org.agendaFindNext",
+        "title": "Find Next in Agenda",
+        "category": "Markdown Org"
+      },
+      {
+        "command": "markdown-org.agendaFindPrevious",
+        "title": "Find Previous in Agenda",
+        "category": "Markdown Org"
+      },
+      {
         "command": "markdown-org.timestampUp",
         "title": "Timestamp Up",
         "category": "Markdown Org"
@@ -235,6 +245,14 @@
         },
         {
           "command": "markdown-org.agendaForward",
+          "when": "markdown-org.agendaFocused"
+        },
+        {
+          "command": "markdown-org.agendaFindNext",
+          "when": "markdown-org.agendaFocused"
+        },
+        {
+          "command": "markdown-org.agendaFindPrevious",
           "when": "markdown-org.agendaFocused"
         }
       ]
@@ -344,6 +362,16 @@
       {
         "command": "markdown-org.agendaForward",
         "key": "alt+shift+=",
+        "when": "markdown-org.agendaFocused"
+      },
+      {
+        "command": "markdown-org.agendaFindNext",
+        "key": "f3",
+        "when": "markdown-org.agendaFocused"
+      },
+      {
+        "command": "markdown-org.agendaFindPrevious",
+        "key": "shift+f3",
         "when": "markdown-org.agendaFocused"
       },
       {
