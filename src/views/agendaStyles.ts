@@ -780,9 +780,14 @@ export const AGENDA_STYLES = `
         }
         /* A deadline still ahead, inside the window Org warns over. Drawn as a
            ring rather than a fill: the fill is what a date in arrears takes,
-           and the two must not read as the same state. */
+           and the two must not read as the same state. The ring is held off the
+           chip by a hairline of the page behind it, because a theme whose badge
+           is itself a warm ochre (Solarized Light) leaves a ring laid straight
+           on the chip indistinguishable from its edge. */
         .task-count-due {
-            box-shadow: 0 0 0 1px var(--accent-yellow);
+            box-shadow:
+                0 0 0 1px var(--vscode-editor-background),
+                0 0 0 2px var(--accent-yellow);
         }
         /* ============ task rows and day headers ============ */
         body {
