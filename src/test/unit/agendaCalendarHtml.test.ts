@@ -29,6 +29,7 @@ function ctxFor(index: MonthDayIndex, holidays: string[] = [], locale = 'en-US',
         openDayView: EN.openDayView,
         taskChipForms: EN.countChip.tasks,
         overdueChipLabel: EN.countChip.overdue,
+        dueChipLabel: EN.countChip.due,
         index,
         bands,
         isHoliday: (date: string): boolean => holidays.includes(date),
@@ -101,7 +102,9 @@ suite('agendaCalendarHtml.renderMonthCalendar', () => {
     });
 
     test('a day with tasks gets the count chip and the has-tasks class', () => {
-        const doc = parse(renderMonthCalendar(cells, labels, ctxFor({ '2025-12-09': { total: 3, overdue: false } })));
+        const doc = parse(
+            renderMonthCalendar(cells, labels, ctxFor({ '2025-12-09': { total: 3, overdue: false, dueSoon: false } }))
+        );
         const cell = doc.querySelector('[data-date="2025-12-09"]');
         assert.match(cell?.className ?? '', /\bhas-tasks\b/);
         assert.strictEqual(cell?.querySelector('.task-count')?.textContent, '3');
@@ -109,12 +112,16 @@ suite('agendaCalendarHtml.renderMonthCalendar', () => {
     });
 
     test('an empty day carries no chip at all', () => {
-        const doc = parse(renderMonthCalendar(cells, labels, ctxFor({ '2025-12-09': { total: 1, overdue: false } })));
+        const doc = parse(
+            renderMonthCalendar(cells, labels, ctxFor({ '2025-12-09': { total: 1, overdue: false, dueSoon: false } }))
+        );
         assert.strictEqual(doc.querySelector('[data-date="2025-12-10"]')?.querySelector('.task-count'), null);
     });
 
     test('overdue work tints the chip and is named in its tooltip', () => {
-        const doc = parse(renderMonthCalendar(cells, labels, ctxFor({ '2025-12-09': { total: 4, overdue: true } })));
+        const doc = parse(
+            renderMonthCalendar(cells, labels, ctxFor({ '2025-12-09': { total: 4, overdue: true, dueSoon: false } }))
+        );
         const chip = doc.querySelector('[data-date="2025-12-09"] .task-count');
         assert.match(chip?.className ?? '', /\btask-count-overdue\b/);
         assert.strictEqual(chip?.getAttribute('title'), '4 tasks, overdue');
@@ -133,7 +140,7 @@ suite('agendaCalendarHtml.renderMonthCalendar', () => {
             renderMonthCalendar(
                 cells,
                 labels,
-                ctxFor({ '2025-12-09': { total: 8, overdue: true } }, [], 'en-US', bands)
+                ctxFor({ '2025-12-09': { total: 8, overdue: true, dueSoon: false } }, [], 'en-US', bands)
             )
         );
         assert.strictEqual(
@@ -148,7 +155,7 @@ suite('agendaCalendarHtml.renderMonthCalendar', () => {
             renderMonthCalendar(
                 cells,
                 labels,
-                ctxFor({ '2025-12-09': { total: 3, overdue: false } }, [], 'en-US', bands)
+                ctxFor({ '2025-12-09': { total: 3, overdue: false, dueSoon: false } }, [], 'en-US', bands)
             )
         );
         assert.strictEqual(doc.querySelector('[data-date="2025-12-09"] .task-count')?.getAttribute('title'), '3 tasks');
@@ -157,21 +164,51 @@ suite('agendaCalendarHtml.renderMonthCalendar', () => {
     test('a date the bands say nothing about is still named overdue', () => {
         // An older payload, or a date the index skipped: the chip says what it
         // knows rather than dropping the mark it does have.
-        const doc = parse(renderMonthCalendar(cells, labels, ctxFor({ '2025-12-09': { total: 4, overdue: true } })));
+        const doc = parse(
+            renderMonthCalendar(cells, labels, ctxFor({ '2025-12-09': { total: 4, overdue: true, dueSoon: false } }))
+        );
         assert.strictEqual(
             doc.querySelector('[data-date="2025-12-09"] .task-count')?.getAttribute('title'),
             '4 tasks, overdue'
         );
     });
 
+    test('a deadline still ahead rings the chip and is named in its tooltip', () => {
+        const doc = parse(
+            renderMonthCalendar(cells, labels, ctxFor({ '2025-12-09': { total: 3, overdue: false, dueSoon: true } }))
+        );
+        const chip = doc.querySelector('[data-date="2025-12-09"] .task-count');
+        assert.match(chip?.className ?? '', /\btask-count-due\b/);
+        assert.doesNotMatch(chip?.className ?? '', /\btask-count-overdue\b/);
+        assert.strictEqual(chip?.getAttribute('title'), '3 tasks, deadline');
+    });
+
+    test('a date that is both overdue and due reads as overdue alone', () => {
+        // Once the date has gone by, what it owes is the state worth naming --
+        // and one chip cannot carry two colours.
+        const doc = parse(
+            renderMonthCalendar(cells, labels, ctxFor({ '2025-12-09': { total: 2, overdue: true, dueSoon: true } }))
+        );
+        const chip = doc.querySelector('[data-date="2025-12-09"] .task-count');
+        assert.match(chip?.className ?? '', /\btask-count-overdue\b/);
+        assert.doesNotMatch(chip?.className ?? '', /\btask-count-due\b/);
+        assert.strictEqual(chip?.getAttribute('title'), '2 tasks, overdue');
+    });
+
     test('a single task is counted in the singular', () => {
-        const doc = parse(renderMonthCalendar(cells, labels, ctxFor({ '2025-12-09': { total: 1, overdue: false } })));
+        const doc = parse(
+            renderMonthCalendar(cells, labels, ctxFor({ '2025-12-09': { total: 1, overdue: false, dueSoon: false } }))
+        );
         assert.strictEqual(doc.querySelector('[data-date="2025-12-09"] .task-count')?.getAttribute('title'), '1 task');
     });
 
     test('day numbers and counts follow the date locale', () => {
         const doc = parse(
-            renderMonthCalendar(cells, labels, ctxFor({ '2025-12-09': { total: 3, overdue: false } }, [], 'ar-EG'))
+            renderMonthCalendar(
+                cells,
+                labels,
+                ctxFor({ '2025-12-09': { total: 3, overdue: false, dueSoon: false } }, [], 'ar-EG')
+            )
         );
         const cell = doc.querySelector('[data-date="2025-12-09"]');
         assert.strictEqual(cell?.querySelector('.day-number')?.textContent, formatNumber(9, 'ar-EG'));

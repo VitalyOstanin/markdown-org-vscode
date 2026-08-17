@@ -206,6 +206,8 @@ export interface MonthCellCounts {
     total: number;
     /** The date has gone by with planned work still on it. */
     overdue: boolean;
+    /** A deadline falls on this date and its warning window has opened. */
+    dueSoon: boolean;
 }
 
 export type MonthDayIndex = Record<string, MonthCellCounts>;
@@ -588,6 +590,7 @@ export interface AgendaClientDeps {
             openDayView: string;
             taskChipForms: string[];
             overdueChipLabel: string;
+            dueChipLabel: string;
             index: MonthDayIndex;
             bands: OverdueBandIndex;
             isHoliday: (date: string) => boolean;
@@ -2031,10 +2034,13 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             openDayView: UI.openDayView,
             taskChipForms: UI.countChip.tasks,
             overdueChipLabel: UI.countChip.overdue,
-            // date -> { total, overdue }; a missing date means an empty day.
-            // Both take today rather than the anchor: what is counted is what
-            // each date carries, and what tints the chip is that the date has
-            // gone by -- neither of which the month being paged through changes.
+            dueChipLabel: UI.countChip.due,
+            // date -> { total, overdue, dueSoon }; a missing date means an
+            // empty day. All three take today rather than the anchor: what is
+            // counted is what each date carries, what tints the chip is that
+            // the date has gone by, and what rings it is a deadline the
+            // extractor is already warning about -- none of which the month
+            // being paged through changes.
             index: buildMonthDayIndex(days, todayIso),
             // date -> what its overdue count is made of, for the chip's
             // tooltip: the grid has room for the number and not for the bands.

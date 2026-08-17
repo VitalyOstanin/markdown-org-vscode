@@ -22,6 +22,8 @@ export interface MonthCellCounts {
     total: number;
     /** The date has gone by with planned work still on it. */
     overdue: boolean;
+    /** A deadline falls on this date and its warning window has opened. */
+    dueSoon: boolean;
 }
 
 /** Date (`YYYY-MM-DD`) -> counts, for every date the payload carries tasks on. */
@@ -102,10 +104,30 @@ export function buildMonthGrid(anchorIso: string, firstOffset: number, todayIso:
  * planned is still sitting on it. Only the planning keywords leave a debt
  * behind, as the extractor has it (`keeps_a_missed_date`) -- a meeting that has
  * been and gone is not one.
+ *
+ * The date a deadline falls on is marked while it is still ahead, which is
+ * what Org does by warning about it in today's agenda for the last
+ * `org-deadline-warning-days` (or the `-Xd` the timestamp carries). The window
+ * is the extractor's to decide -- it is what put the task in today's
+ * `upcoming` -- and the mark goes on the date itself rather than on today,
+ * because a grid already shows the reader where that date is.
  */
 export function buildMonthDayIndex(days: DayAgenda[], todayIso: string): MonthDayIndex {
     const index: MonthDayIndex = {};
     const list = Array.isArray(days) ? days : [];
+    // Deadlines the extractor has decided are close enough to warn about,
+    // by file and line -- the same task in its own cell is the same two.
+    const warned = new Set<string>();
+    for (const day of list) {
+        if (day.date !== todayIso || !Array.isArray(day.upcoming)) {
+            continue;
+        }
+        for (const task of day.upcoming) {
+            if (task.timestamp_type === 'DEADLINE') {
+                warned.add(`${task.file}:${String(task.line)}`);
+            }
+        }
+    }
     for (const day of list) {
         if (!day.date) {
             continue;
@@ -117,7 +139,12 @@ export function buildMonthDayIndex(days: DayAgenda[], todayIso: string): MonthDa
         const dated = [...bucket('scheduled_timed'), ...bucket('scheduled_no_time')];
         if (dated.length > 0) {
             const owes = dated.some((t) => t.timestamp_type === 'SCHEDULED' || t.timestamp_type === 'DEADLINE');
-            index[day.date] = { total: dated.length, overdue: day.date < todayIso && owes };
+            const due = dated.some((t) => warned.has(`${t.file}:${String(t.line)}`));
+            index[day.date] = {
+                total: dated.length,
+                overdue: day.date < todayIso && owes,
+                dueSoon: day.date >= todayIso && due
+            };
         }
     }
     return index;

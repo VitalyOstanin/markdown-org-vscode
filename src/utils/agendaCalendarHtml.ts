@@ -92,6 +92,8 @@ export function renderMonthCalendar(
         taskChipForms: string[];
         /** Says the day is overdue; no count, because the chip is the count. */
         overdueChipLabel: string;
+        /** Says a deadline falls on this day and is close enough to warn about. */
+        dueChipLabel: string;
         index: MonthDayIndex;
         /**
          * Date -> its overdue bands (see `buildOverdueBandIndex`), which the
@@ -148,12 +150,17 @@ export function renderMonthCalendar(
                               .map((band) => `${band.title}: ${ctx.formatNumber(band.count, ctx.locale)}`)
                               .join(', ')})`
                         : '';
+                // A date still ahead that a deadline's warning window has
+                // reached. Overdue wins the chip: once the date has gone by,
+                // what it is owed matters more than what it was due.
+                const dueSuffix = !counts.overdue && counts.dueSoon ? `, ${ctx.dueChipLabel}` : '';
                 const title = ctx.escapeHtml(
-                    ctx.countLabel(counts.total, ctx.taskChipForms, ctx) + overdueSuffix + breakdown
+                    ctx.countLabel(counts.total, ctx.taskChipForms, ctx) + overdueSuffix + dueSuffix + breakdown
                 );
                 const overdueClass = counts.overdue ? ' task-count-overdue' : '';
+                const dueClass = !counts.overdue && counts.dueSoon ? ' task-count-due' : '';
                 chip =
-                    `<div class="task-count${overdueClass}" title="${title}">` +
+                    `<div class="task-count${overdueClass}${dueClass}" title="${title}">` +
                     `${ctx.escapeHtml(ctx.formatNumber(counts.total, ctx.locale))}</div>`;
             }
 

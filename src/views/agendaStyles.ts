@@ -778,6 +778,12 @@ export const AGENDA_STYLES = `
             color: var(--vscode-editor-background);
             background: var(--accent-red);
         }
+        /* A deadline still ahead, inside the window Org warns over. Drawn as a
+           ring rather than a fill: the fill is what a date in arrears takes,
+           and the two must not read as the same state. */
+        .task-count-due {
+            box-shadow: 0 0 0 1px var(--accent-yellow);
+        }
         /* ============ task rows and day headers ============ */
         body {
             font-family: var(--markdown-org-agenda-font);

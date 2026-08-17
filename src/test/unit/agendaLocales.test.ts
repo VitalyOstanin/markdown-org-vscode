@@ -134,7 +134,7 @@ suite('agenda counters share one numbering system', () => {
             // `{0}`, and the placeholder's digit is not one the reader sees.
             fold: { folded: false, label: formatString(EN.fold.collapse, EN.sections.overdueRecent) }
         };
-        const index: MonthDayIndex = { [iso]: { total: 12, overdue: true } };
+        const index: MonthDayIndex = { [iso]: { total: 12, overdue: true, dueSoon: false } };
         // The chip's tooltip spells the overdue count out band by band, and
         // those counts are numbers on the screen like any other.
         const bands: OverdueBandIndex = {
@@ -148,6 +148,7 @@ suite('agenda counters share one numbering system', () => {
             openDayView: EN.openDayView,
             taskChipForms: EN.countChip.tasks,
             overdueChipLabel: EN.countChip.overdue,
+            dueChipLabel: EN.countChip.due,
             index,
             bands,
             isHoliday: (): boolean => false,

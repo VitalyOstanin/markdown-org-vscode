@@ -46,7 +46,7 @@ suite('buildMonthDayIndex', () => {
             ],
             '2025-12-09'
         );
-        assert.deepStrictEqual(index, { '2025-12-09': { total: 2, overdue: false } });
+        assert.deepStrictEqual(index, { '2025-12-09': { total: 2, overdue: false, dueSoon: false } });
     });
 
     test('a date gone by with planning still on it is marked overdue', () => {
@@ -54,7 +54,7 @@ suite('buildMonthDayIndex', () => {
             [day('2025-12-02', { scheduled_no_time: [task({ timestamp_type: 'SCHEDULED' })] })],
             '2025-12-09'
         );
-        assert.deepStrictEqual(index, { '2025-12-02': { total: 1, overdue: true } });
+        assert.deepStrictEqual(index, { '2025-12-02': { total: 1, overdue: true, dueSoon: false } });
     });
 
     test('a date gone by holding a plain timestamp owes nothing', () => {
@@ -64,7 +64,7 @@ suite('buildMonthDayIndex', () => {
             [day('2025-12-02', { scheduled_timed: [task({ timestamp_type: 'TIMESTAMP' })] })],
             '2025-12-09'
         );
-        assert.deepStrictEqual(index, { '2025-12-02': { total: 1, overdue: false } });
+        assert.deepStrictEqual(index, { '2025-12-02': { total: 1, overdue: false, dueSoon: false } });
     });
 
     test('today and the days after it are never overdue', () => {
@@ -76,9 +76,59 @@ suite('buildMonthDayIndex', () => {
             '2025-12-09'
         );
         assert.deepStrictEqual(index, {
-            '2025-12-09': { total: 1, overdue: false },
-            '2025-12-20': { total: 1, overdue: false }
+            '2025-12-09': { total: 1, overdue: false, dueSoon: false },
+            '2025-12-20': { total: 1, overdue: false, dueSoon: false }
         });
+    });
+
+    test('a deadline the extractor is already warning about marks its own date', () => {
+        // The copy under today is what says the warning window has opened --
+        // the extractor applies `org-deadline-warning-days` and the `-Xd` a
+        // timestamp may carry, and the client has neither number. The mark
+        // goes on the date the deadline falls on, matched by file and line.
+        const deadline = task({ file: '/w/a.md', line: 12, timestamp_type: 'DEADLINE' });
+        const index = buildMonthDayIndex(
+            [
+                day('2025-12-09', { upcoming: [{ ...deadline, days_offset: 11 }] }),
+                day('2025-12-20', { scheduled_no_time: [deadline] })
+            ],
+            '2025-12-09'
+        );
+        assert.deepStrictEqual(index, { '2025-12-20': { total: 1, overdue: false, dueSoon: true } });
+    });
+
+    test('a deadline too far out for the warning to have opened is not marked', () => {
+        const index = buildMonthDayIndex(
+            [
+                day('2025-12-09'),
+                day('2025-12-31', { scheduled_no_time: [task({ line: 12, timestamp_type: 'DEADLINE' })] })
+            ],
+            '2025-12-09'
+        );
+        assert.deepStrictEqual(index, { '2025-12-31': { total: 1, overdue: false, dueSoon: false } });
+    });
+
+    test('a date gone by is marked overdue and not due, whatever today carries', () => {
+        const deadline = task({ line: 12, timestamp_type: 'DEADLINE' });
+        const index = buildMonthDayIndex(
+            [
+                day('2025-12-02', { scheduled_no_time: [deadline] }),
+                day('2025-12-09', { upcoming: [{ ...deadline, days_offset: -7 }] })
+            ],
+            '2025-12-09'
+        );
+        assert.deepStrictEqual(index, { '2025-12-02': { total: 1, overdue: true, dueSoon: false } });
+    });
+
+    test('a scheduled date in today’s upcoming does not mark anything', () => {
+        // Only a deadline opens a warning window; `upcoming` also carries the
+        // repeats of tasks scheduled ahead, which are simply future work.
+        const ahead = task({ line: 12, timestamp_type: 'SCHEDULED' });
+        const index = buildMonthDayIndex(
+            [day('2025-12-09', { upcoming: [ahead] }), day('2025-12-11', { scheduled_no_time: [ahead] })],
+            '2025-12-09'
+        );
+        assert.deepStrictEqual(index, { '2025-12-11': { total: 1, overdue: false, dueSoon: false } });
     });
 
     test('days without dated rows are omitted, so a missing key means an empty day', () => {
@@ -100,7 +150,7 @@ suite('buildMonthDayIndex', () => {
         // regression came from exactly this shape).
         const sparse = [{ date: '2025-12-15', scheduled_no_time: [task()] }] as unknown as DayAgenda[];
         assert.deepStrictEqual(buildMonthDayIndex(sparse, '2025-12-09'), {
-            '2025-12-15': { total: 1, overdue: false }
+            '2025-12-15': { total: 1, overdue: false, dueSoon: false }
         });
     });
 
@@ -110,7 +160,7 @@ suite('buildMonthDayIndex', () => {
             day('2025-12-02', { scheduled_timed: [task({ timestamp_type: 'SCHEDULED' })] })
         ] as unknown as DayAgenda[];
         assert.deepStrictEqual(buildMonthDayIndex(broken, '2025-12-09'), {
-            '2025-12-02': { total: 1, overdue: true }
+            '2025-12-02': { total: 1, overdue: true, dueSoon: false }
         });
     });
 

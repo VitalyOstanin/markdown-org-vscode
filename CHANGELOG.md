@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- The month calendar rings the chip of a date a deadline is coming due on,
+  and names it in the tooltip. Org warns about a deadline in today's agenda
+  for the last `org-deadline-warning-days` (or the `-Xd` the timestamp
+  carries); the grid already shows the reader where that date is, so the mark
+  goes on the date itself. A ring rather than a second fill: the fill is what
+  a date in arrears takes, and once a date has gone by what it owes is the
+  state worth naming. The window is the extractor's to decide — the mark
+  follows the copy it files under today.
+
 ### Fixed
 
 - A month cell counts what is dated to that day and nothing else. The core

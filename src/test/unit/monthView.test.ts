@@ -93,9 +93,9 @@ suite('Month View Calendar', () => {
 
             const daysMap = buildMonthDayIndex(mockDays, '2025-12-01');
 
-            assert.deepStrictEqual(daysMap['2025-12-01'], { total: 1, overdue: false });
+            assert.deepStrictEqual(daysMap['2025-12-01'], { total: 1, overdue: false, dueSoon: false });
             assert.strictEqual(daysMap['2025-12-02'], undefined);
-            assert.deepStrictEqual(daysMap['2025-12-06'], { total: 2, overdue: false });
+            assert.deepStrictEqual(daysMap['2025-12-06'], { total: 2, overdue: false, dueSoon: false });
         });
     });
 
