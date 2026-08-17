@@ -129,6 +129,7 @@ export interface FlagTooltipTask {
     timestamp_end_time?: string;
     timestamp_repeater?: string;
     timestamp_next?: string;
+    timestamp_next_after?: string;
 }
 
 /** One of several scanned directories, as a row refers to it. */
@@ -509,7 +510,7 @@ export interface AgendaClientDeps {
         ctx: { escapeHtml: (text: string | number | boolean | undefined | null) => string }
     ) => string;
     renderNavBarHtml: (parts: { modeSwitch: string; dateNav: string; chips: string }) => string;
-    buildMonthGrid: (anchorIso: string, firstOffset: number, todayIso: string) => MonthCellLike[];
+    buildMonthGrid: (days: DayAgenda[], anchorIso: string, todayIso: string) => MonthCellLike[];
     resolveFirstDayOffset: (firstDayOfWeek: string, locale: string) => number;
     buildWeekdayLabels: (firstOffset: number, locale: string) => string[];
     /** Called by `renderMonthCalendar`; not invoked directly by the client. */
@@ -1380,10 +1381,20 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         // rendered text proves it.
         const heroSub = document.querySelector('.hero-sub span')?.textContent ?? '';
         const dayNumbers = [...document.querySelectorAll('.calendar-day .day-number')].map((el) => el.textContent);
+        // The dates behind those numbers, so a test can hold the grid against
+        // the days the extractor sent. The column headings come with them:
+        // they are what the first-day-of-week setting still decides in the
+        // page, now that the dates themselves arrive decided.
+        const calendarDates = [...document.querySelectorAll('.calendar-day')].map(
+            (el) => el.getAttribute('data-date') ?? ''
+        );
+        const calendarHeaders = [...document.querySelectorAll('.calendar-header')].map((el) => el.textContent);
         return {
             heroSharesControlRow,
             heroSub,
             dayNumbers,
+            calendarDates,
+            calendarHeaders,
             // The header layout is a class on <body>, so this is how a test
             // sees which of the two the page settled on.
             headerLayout: document.body.classList.contains('compact-header') ? 'compact' : 'full',
@@ -2023,11 +2034,17 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
      * The month grid. Layout (buildMonthGrid) and markup (renderMonthCalendar)
      * are both inlined and unit-tested; this binds the page's live state to
      * them -- the anchor month, the holiday list and the task counts.
+     *
+     * The cells are the days the extractor sent: `--agenda month-grid` already
+     * covers the whole weeks the month touches, beginning on the day the
+     * `markdown-org.firstDayOfWeek` setting resolves to. That setting reaches
+     * the extractor resolved (`monday` or `sunday`, never `auto`), so the
+     * column headers below cannot disagree with the dates above them.
      */
     function renderMonth(days: DayAgenda[]): string {
         const todayIso = toIsoDate(new Date());
         const firstOffset = resolveFirstDayOffset(firstDayOfWeek, locale);
-        const cells = buildMonthGrid(shiftedToday || todayIso, firstOffset, todayIso);
+        const cells = buildMonthGrid(days, shiftedToday || todayIso, todayIso);
         return renderMonthCalendar(cells, buildWeekdayLabels(firstOffset, locale), {
             locale,
             uiLang,

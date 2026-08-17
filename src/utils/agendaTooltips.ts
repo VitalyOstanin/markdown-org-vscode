@@ -29,6 +29,11 @@ export interface FlagTooltipTask {
     // Next still-upcoming occurrence resolved by markdown-org-extract (ADR-0023);
     // the repeat tooltip prefers it over the stored (possibly overdue) anchor.
     timestamp_next?: string;
+    // The occurrence after the day this row is drawn on (extract ADR-0029),
+    // present only on a row that has a day of its own. Preferred over
+    // `timestamp_next`, which answers the same question from today wherever
+    // the row is read -- and so repeats one date down a whole week.
+    timestamp_next_after?: string;
 }
 
 /**
@@ -92,15 +97,22 @@ export function flagTooltip(
         case 'repeat': {
             const when = whenOf(t.timestamp_date ?? '');
             const rep = t.timestamp_repeater ? ' (' + t.timestamp_repeater + ')' : '';
-            if (t.timestamp_next) {
-                // markdown-org-extract resolved the next still-upcoming
-                // occurrence (timestamp_next, ADR-0023). An hour repeater is
+            // A row drawn on a day of its own carries the occurrence after
+            // that day (timestamp_next_after, extract ADR-0029); the copies
+            // borrowed into today -- arrears and deadlines coming up -- carry
+            // only the one after today. Preferring the former is what makes
+            // Tuesday's row of a daily task say Wednesday instead of repeating
+            // tomorrow's date on every day of the week.
+            const next = t.timestamp_next_after ?? t.timestamp_next;
+            if (next) {
+                // markdown-org-extract resolved the occurrence
+                // (ADR-0023, ADR-0029). An hour repeater is
                 // projected there onto a whole-day grid with its N ignored, so
                 // the stored clock time is not the time of that occurrence and
                 // is left out; every other unit keeps the time of day.
                 // Units are lower-case in the extractor's grammar, so the test is too.
                 const hourly = (t.timestamp_repeater ?? '').trim().endsWith('h');
-                const resolved = hourly ? fmtDate(t.timestamp_next) : whenOf(t.timestamp_next);
+                const resolved = hourly ? fmtDate(next) : whenOf(next);
                 return fill(strings.repeatingNext, rep, resolved);
             }
             // No resolved occurrence: the `tasks` scope, where the extractor

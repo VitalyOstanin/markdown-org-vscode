@@ -13,6 +13,7 @@ import { nextGrouping } from '../utils/agendaGrouping';
 import { buildExecError } from '../utils/execError';
 import { currentConfigTarget } from '../utils/configTarget';
 import { resolveAgendaDirectories } from '../utils/agendaDirectories';
+import { configuredWeekStart } from '../utils/agendaWeekStart';
 import { currentTagDictionary } from '../utils/agendaTags';
 import { renderTagDictionaryReport } from '../utils/tagDictionaryReport';
 import { getCachedHolidays } from '../utils/holidaysCache';
@@ -137,7 +138,16 @@ export async function showAgenda(
         if (mode === 'tasks') {
             args.push('--tasks');
         } else {
-            args.push('--agenda', mode);
+            // The month view asks for the grid it draws, not the month it is
+            // named after: `month-grid` answers with the whole weeks the month
+            // touches, so the padding cells carry the tasks dated to them
+            // instead of standing empty. The week it begins on is the setting's
+            // (extractor 0.17.0), and the same value heads the page's columns.
+            if (mode === 'month') {
+                args.push('--agenda', 'month-grid', '--week-start', configuredWeekStart());
+            } else {
+                args.push('--agenda', mode);
+            }
             // Two different things, hence two flags. `--date` is the window
             // anchor and follows Prev/Next; `--current-date` is "today" and
             // always the host's local date. Without the latter the extractor

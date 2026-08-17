@@ -11,6 +11,7 @@ export type ExecFileCallback = (error: Error | null, stdout: string, stderr: str
 export interface ExtractorPayloads {
     day: unknown;
     week: unknown;
+    /** Answer to `--agenda month-grid`, the call the month view makes. */
     month: unknown;
     tasks: unknown;
     /** Answer to `--holidays <year>`; an empty list when omitted. */
@@ -37,7 +38,9 @@ export function makeExtractorFake(payloads: ExtractorPayloads) {
             const mode = cliArgs[cliArgs.indexOf('--agenda') + 1];
             if (mode === 'day') response = payloads.day;
             else if (mode === 'week') response = payloads.week;
-            else if (mode === 'month') response = payloads.month;
+            // What the month view actually asks for: the grid the month is
+            // drawn on, whole weeks and all (extractor 0.17.0).
+            else if (mode === 'month-grid') response = payloads.month;
         }
         const stdout = JSON.stringify(response);
         queueMicrotask(() => {

@@ -33,6 +33,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The chip's tooltip says "overdue" rather than a count of it. The count it
   used to state was the doubled one, and the number the reader wants is
   already on the chip.
+- The days from the neighbouring months at the edges of the month calendar
+  carry their tasks. The panel asked the core for the month and then padded
+  the grid out to whole weeks itself, so those cells stood for dates the
+  payload said nothing about: a task on 30 November was missing from
+  December's first cell, and clicking it opened a day the count had denied.
+  The core now answers with the grid itself (`--agenda month-grid`, core
+  0.17.0), whole weeks and all, and the page lays out the days it was sent.
+  The week those weeks begin on is `markdown-org.firstDayOfWeek`, resolved
+  before the call -- `auto` is answered from the date locale, where the core
+  reads none -- so the column headings cannot disagree with the dates under
+  them.
+
+- The repeat tooltip on a dated row names the occurrence after that row's own
+  day. It read the next occurrence from today, which is the same date on every
+  row of the week: a daily task shown on Monday, Tuesday and Wednesday said
+  "next Tuesday" three times over. The core now resolves the occurrence after
+  each rendered day (`timestamp_next_after`, core 0.17.0) and fills it where
+  the row has a day of its own; the copies borrowed into today -- arrears, and
+  deadlines coming due -- keep answering from today, which is what they are
+  there to say.
+
+### Changed
+
+- The bundled `markdown-org-extract` is 0.17.0. A binary named by
+  `markdown-org.extractorPath` must be at least that: the month view asks for
+  a grid earlier ones do not offer, and the warning about an older binary now
+  says so.
 
 ## [0.17.0] - 2026-08-16
 

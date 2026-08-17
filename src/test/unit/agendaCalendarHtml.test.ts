@@ -5,7 +5,8 @@ import {
     buildWeekdayLabels,
     calendarCellOpenTag,
     renderMonthCalendar,
-    resolveFirstDayOffset
+    resolveFirstDayOffset,
+    resolveWeekStart
 } from '../../utils/agendaCalendarHtml';
 import { buildMonthGrid } from '../../utils/agendaMonthCells';
 import type { MonthDayIndex } from '../../utils/agendaMonthCells';
@@ -14,6 +15,7 @@ import { countLabel } from '../../utils/agendaSummaryHtml';
 import { AGENDA_STRINGS, formatString, pluralIndex } from '../../utils/agendaI18n';
 import { formatNumber } from '../../utils/formatNumber';
 import { escapeHtml } from '../../utils/agendaEscapeHtml';
+import { monthGridDays } from './_monthGridDays';
 
 const EN = AGENDA_STRINGS.en;
 
@@ -58,6 +60,32 @@ suite('agendaCalendarHtml.resolveFirstDayOffset', () => {
     });
 });
 
+suite('agendaCalendarHtml.resolveWeekStart', () => {
+    test('the setting is passed on as the weekday the extractor names', () => {
+        assert.strictEqual(resolveWeekStart('sunday', 'ru-RU'), 'sunday');
+        assert.strictEqual(resolveWeekStart('monday', 'en-US'), 'monday');
+    });
+
+    test('auto is answered here, because the extractor has no locale to answer it with', () => {
+        assert.strictEqual(resolveWeekStart('auto', 'en-US'), 'sunday');
+        assert.strictEqual(resolveWeekStart('auto', 'ru-RU'), 'monday');
+        assert.strictEqual(resolveWeekStart('auto', 'not a locale'), 'monday');
+    });
+
+    test('it agrees with the offset the column headers are drawn from', () => {
+        for (const setting of ['monday', 'sunday', 'auto', 'nonsense']) {
+            for (const locale of ['en-US', 'ru-RU', 'en-GB', '']) {
+                const offset = resolveFirstDayOffset(setting, locale);
+                assert.strictEqual(
+                    resolveWeekStart(setting, locale),
+                    offset === 0 ? 'sunday' : 'monday',
+                    `${setting} / ${locale}`
+                );
+            }
+        }
+    });
+});
+
 suite('agendaCalendarHtml.buildWeekdayLabels', () => {
     test('seven labels, starting on the configured day', () => {
         assert.deepStrictEqual(buildWeekdayLabels(1, 'en-US'), ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']);
@@ -82,7 +110,7 @@ suite('agendaCalendarHtml.calendarCellOpenTag', () => {
 });
 
 suite('agendaCalendarHtml.renderMonthCalendar', () => {
-    const cells = buildMonthGrid('2025-12-15', 1, '2025-12-09');
+    const cells = buildMonthGrid(monthGridDays('2025-12-01', 35), '2025-12-15', '2025-12-09');
     const labels = buildWeekdayLabels(1, 'en-US');
 
     test('a header row plus one button per grid cell', () => {

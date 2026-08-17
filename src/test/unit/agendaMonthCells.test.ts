@@ -2,6 +2,7 @@ import * as assert from 'node:assert';
 import { suite, test } from 'mocha';
 import { buildMonthDayIndex, buildMonthGrid } from '../../utils/agendaMonthCells';
 import type { DayAgenda, TaskWithOffset } from '../../types';
+import { monthGridDays } from './_monthGridDays';
 
 // The month calendar renders these counts as per-day chips. The webview
 // embeds buildMonthDayIndex via `.toString()`, so these tests transitively
@@ -170,53 +171,41 @@ suite('buildMonthDayIndex', () => {
     });
 });
 
-// The grid the calendar lays its cells on. December 2025 starts on a Monday
-// and has 31 days, which makes the two week-start variants easy to tell apart:
-// Monday-first needs no leading padding, Sunday-first needs one day.
+// The grid the calendar lays its cells on. Its dates now come from the
+// extractor's `--agenda month-grid`, which answers with whole weeks beginning
+// on the day `--week-start` names; the layout only reads them back. December
+// 2025 starts on a Monday, so a Monday-first grid needs no leading padding and
+// a Sunday-first one pads with 30 November.
 suite('buildMonthGrid', () => {
-    test('a Monday-first December 2025 starts on the 1st with no padding', () => {
-        const cells = buildMonthGrid('2025-12-15', 1, '2025-12-15');
+    test('the cells are the payload days, in the order they arrived', () => {
+        const cells = buildMonthGrid(monthGridDays('2025-12-01', 35), '2025-12-15', '2025-12-15');
+        assert.strictEqual(cells.length, 35);
         assert.strictEqual(cells[0]?.date, '2025-12-01');
         assert.strictEqual(cells[0].otherMonth, false);
+        assert.strictEqual(cells.at(-1)?.date, '2026-01-04');
     });
 
-    test('a Sunday-first week pads with the last day of November', () => {
-        const cells = buildMonthGrid('2025-12-15', 0, '2025-12-15');
+    test('a day outside the anchor month is padding, and prints its own number', () => {
+        const cells = buildMonthGrid(monthGridDays('2025-11-30', 42), '2025-12-15', '2025-12-15');
         assert.strictEqual(cells[0]?.date, '2025-11-30');
         assert.strictEqual(cells[0].otherMonth, true);
         assert.strictEqual(cells[0].dayNumber, 30, 'a padding cell prints its own month day number');
+        const own = cells.filter((c) => !c.otherMonth);
+        assert.strictEqual(own.length, 31, 'December 2025 has 31 days');
+        assert.strictEqual(own[0]?.date, '2025-12-01');
+        assert.strictEqual(own.at(-1)?.date, '2025-12-31');
     });
 
-    test('the cell count is always a whole number of weeks', () => {
-        for (const anchor of ['2026-02-15', '2026-03-15', '2026-05-15', '2027-08-15']) {
-            for (const firstOffset of [0, 1]) {
-                const cells = buildMonthGrid(anchor, firstOffset, '2026-01-01');
-                assert.strictEqual(cells.length % 7, 0, `${anchor} offset ${firstOffset} gave ${cells.length} cells`);
-            }
-        }
-    });
-
-    test('every date of the anchor month appears exactly once, in order', () => {
-        const own = buildMonthGrid('2026-02-10', 1, '2026-01-01').filter((c) => !c.otherMonth);
-        assert.strictEqual(own.length, 28, 'February 2026 has 28 days');
-        assert.strictEqual(own[0]?.date, '2026-02-01');
-        assert.strictEqual(own.at(-1)?.date, '2026-02-28');
-    });
-
-    test('a leap February keeps the 29th', () => {
-        const own = buildMonthGrid('2028-02-01', 1, '2028-01-01').filter((c) => !c.otherMonth);
-        assert.strictEqual(own.length, 29);
-        assert.strictEqual(own.at(-1)?.date, '2028-02-29');
-    });
-
-    test('padding crosses the year boundary in both directions', () => {
-        assert.strictEqual(buildMonthGrid('2026-01-15', 1, '2026-01-01')[0]?.date, '2025-12-29');
-        assert.strictEqual(buildMonthGrid('2026-12-15', 1, '2026-01-01').at(-1)?.date, '2027-01-03');
+    test('padding is read off the anchor across a year boundary', () => {
+        const cells = buildMonthGrid(monthGridDays('2025-12-29', 35), '2026-01-15', '2026-01-01');
+        assert.strictEqual(cells[0]?.otherMonth, true, '29 December pads January');
+        assert.strictEqual(cells[3]?.date, '2026-01-01');
+        assert.strictEqual(cells[3].otherMonth, false);
     });
 
     test('weekends are marked by weekday, whichever day the week starts on', () => {
-        for (const firstOffset of [0, 1]) {
-            const cells = buildMonthGrid('2025-12-15', firstOffset, '2025-12-15');
+        for (const first of ['2025-12-01', '2025-11-30']) {
+            const cells = buildMonthGrid(monthGridDays(first, 35), '2025-12-15', '2025-12-15');
             const weekend = new Set(cells.filter((c) => c.weekend).map((c) => c.date));
             assert.ok(weekend.has('2025-12-06'), 'Saturday 6 Dec is a weekend');
             assert.ok(weekend.has('2025-12-07'), 'Sunday 7 Dec is a weekend');
@@ -225,19 +214,35 @@ suite('buildMonthGrid', () => {
     });
 
     test('exactly one cell is today, and only when today is on the grid', () => {
-        const withToday = buildMonthGrid('2025-12-15', 1, '2025-12-09').filter((c) => c.today);
+        const days = monthGridDays('2025-12-01', 35);
+        const withToday = buildMonthGrid(days, '2025-12-15', '2025-12-09').filter((c) => c.today);
         assert.deepStrictEqual(
             withToday.map((c) => c.date),
             ['2025-12-09']
         );
-        assert.strictEqual(buildMonthGrid('2025-12-15', 1, '2026-06-01').filter((c) => c.today).length, 0);
+        assert.strictEqual(buildMonthGrid(days, '2025-12-15', '2026-06-01').filter((c) => c.today).length, 0);
     });
 
     test('today is marked on a padding cell too -- it is still that date', () => {
-        const marked = buildMonthGrid('2026-01-15', 1, '2025-12-31').filter((c) => c.today);
+        const marked = buildMonthGrid(monthGridDays('2025-12-29', 35), '2026-01-15', '2025-12-31').filter(
+            (c) => c.today
+        );
         assert.deepStrictEqual(
             marked.map((c) => [c.date, c.otherMonth]),
             [['2025-12-31', true]]
+        );
+    });
+
+    test('a payload with no days lays out no cells', () => {
+        assert.deepStrictEqual(buildMonthGrid([], '2025-12-15', '2025-12-15'), []);
+        assert.deepStrictEqual(buildMonthGrid(undefined as unknown as DayAgenda[], '2025-12-15', '2025-12-15'), []);
+    });
+
+    test('a day with no date is skipped rather than laid out as a blank cell', () => {
+        const days = [day('2025-12-01'), { ...day('2025-12-02'), date: '' }, day('2025-12-03')];
+        assert.deepStrictEqual(
+            buildMonthGrid(days, '2025-12-15', '2025-12-15').map((c) => c.date),
+            ['2025-12-01', '2025-12-03']
         );
     });
 });

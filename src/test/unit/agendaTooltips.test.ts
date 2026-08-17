@@ -80,6 +80,34 @@ suite('agenda tooltips', () => {
         );
     });
 
+    test('flagTooltip repeat: a row drawn on its own day names the occurrence after that day', () => {
+        // The reader is looking at one day, so "next" has to mean "after this
+        // one". markdown-org-extract fills timestamp_next_after in the
+        // scheduled buckets for exactly that (extract ADR-0029), while
+        // timestamp_next answers from today and would print the same date on
+        // every day of the week.
+        assert.strictEqual(
+            flagTooltip('repeat', EN, formatString, fmtRu, {
+                timestamp_date: '2026-07-21',
+                timestamp_repeater: '+1d',
+                timestamp_next: '2026-07-22',
+                timestamp_next_after: '2026-07-25'
+            }),
+            'Repeating (+1d) — next 25.07.2026'
+        );
+        // The borrowed copies -- arrears and deadlines coming up -- have no day
+        // of their own and carry no such field, so they keep answering from
+        // today.
+        assert.strictEqual(
+            flagTooltip('repeat', EN, formatString, fmtRu, {
+                timestamp_date: '2026-07-21',
+                timestamp_repeater: '+1d',
+                timestamp_next: '2026-07-22'
+            }),
+            'Repeating (+1d) — next 22.07.2026'
+        );
+    });
+
     test('flagTooltip repeat: an hour repeater keeps the date but drops the clock time', () => {
         // markdown-org-extract projects `+Nh` onto a whole-day grid and ignores
         // N, so the resolved date is a day, not a slot: the stored 14:00 is not

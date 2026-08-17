@@ -45,8 +45,10 @@ import {
     buildWeekdayLabels,
     calendarCellOpenTag,
     renderMonthCalendar,
-    resolveFirstDayOffset
+    resolveFirstDayOffset,
+    resolveWeekStart
 } from '../utils/agendaCalendarHtml';
+import type { ResolvedWeekStart } from '../utils/agendaCalendarHtml';
 import { renderCard, renderTaskRow } from '../utils/agendaCardHtml';
 import { taskDateDirection } from '../utils/agendaDateDirection';
 import {
@@ -160,7 +162,12 @@ interface AgendaRenderArgs {
     currentTag: string | undefined;
     availableTags: string[];
     holidays: string[] | undefined;
-    firstDayOfWeek: FirstDayOfWeek;
+    /**
+     * Already resolved to a weekday: `auto` is answered in the host, where the
+     * locale is known, so the page's column headers cannot disagree with the
+     * dates the extractor put under them (it was told the same weekday).
+     */
+    firstDayOfWeek: ResolvedWeekStart;
     headerMode: AgendaHeaderMode;
     grouping: AgendaGrouping;
 }
@@ -334,10 +341,11 @@ export class AgendaPanel {
             AgendaPanel.history.record({ mode, date: AgendaPanel.shiftedToday });
         }
         const config = vscode.workspace.getConfiguration('markdown-org');
+        const locale = AgendaPanel.resolveLocaleSetting(config.get<string>('dateLocale'));
         const args: AgendaRenderArgs = {
             data,
             mode,
-            locale: AgendaPanel.resolveLocaleSetting(config.get<string>('dateLocale')),
+            locale,
             currentTag,
             // The tag dropdown lists the same rotation cycleTag walks: the
             // implicit "ALL" plus the names of the dictionary (dedup-safe).
@@ -345,7 +353,11 @@ export class AgendaPanel {
             // arriving with a sync is reflected without reopening.
             availableTags: buildTagCycle(request.tagNames ?? []),
             holidays,
-            firstDayOfWeek: config.get<FirstDayOfWeek>('firstDayOfWeek', 'monday'),
+            // Resolved here rather than in the page: the same weekday was sent
+            // to the extractor as `--week-start`, and a page that resolved
+            // `auto` again could answer differently (its own `Intl` data) and
+            // head columns the grid's dates do not line up with.
+            firstDayOfWeek: resolveWeekStart(config.get<FirstDayOfWeek>('firstDayOfWeek', 'monday'), locale),
             headerMode: normalizeHeaderMode(config.get<string>('agendaHeaderMode')),
             grouping: normalizeGrouping(config.get<string>('agendaGrouping'))
         };
@@ -1077,6 +1089,8 @@ export class AgendaPanel {
                         heroSharesControlRow: m.heroSharesControlRow ?? false,
                         heroSub: m.heroSub ?? '',
                         dayNumbers: m.dayNumbers ?? [],
+                        calendarDates: m.calendarDates ?? [],
+                        calendarHeaders: m.calendarHeaders ?? [],
                         gitChip: m.gitChip ?? '',
                         gitActions: m.gitActions ?? [],
                         gitGroups: m.gitGroups ?? [],

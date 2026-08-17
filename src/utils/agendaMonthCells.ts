@@ -44,48 +44,45 @@ export interface MonthCell {
 }
 
 /**
- * Lay out the month the anchor falls in: the leading padding days from the
- * previous month, the month itself, then enough trailing days to finish the
- * last week. That is what gives the grid its natural 4/5/6 rows.
+ * Lay the payload's days out as cells, in the order they arrived.
  *
- * `firstOffset` is 0 for a Sunday-first week and 1 for a Monday-first one (see
- * `resolveFirstDayOffset`). Padding cells carry a real date because they drill
- * down into the Day view like every other cell.
+ * The dates are the extractor's to choose: `--agenda month-grid` answers with
+ * the whole weeks the anchor month touches, beginning on the day
+ * `--week-start` names (extractor 0.17.0, its ADR-0028 and ADR-0030). Building
+ * the same dates a second time here would be a second implementation of that
+ * rule, free to disagree with the one that produced the tasks -- and it did:
+ * the padding cells used to be dates the payload said nothing about, so a task
+ * on 30 November was missing from December's leading cell.
+ *
+ * What is still read off the date itself is what the payload does not carry:
+ * the number to print, whether the date falls outside the anchor month (hence
+ * padding), whether it is a weekend, and whether it is today. Padding cells
+ * carry a real date because they drill down into the Day view like every other
+ * cell.
  */
-export function buildMonthGrid(anchorIso: string, firstOffset: number, todayIso: string): MonthCell[] {
-    const columns = 7;
-    // Local time throughout: the grid marks the user's today, not UTC's.
-    const iso = (d: Date): string => {
-        const pad = (n: number): string => (n < 10 ? `0${n}` : String(n));
-        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-    };
-    const year = Number(anchorIso.slice(0, 4));
-    const month = Number(anchorIso.slice(5, 7)) - 1;
-    const cell = (d: Date, otherMonth: boolean): MonthCell => {
-        const date = iso(d);
-        const weekday = d.getDay();
-        return {
+export function buildMonthGrid(days: DayAgenda[], anchorIso: string, todayIso: string): MonthCell[] {
+    const anchorMonth = anchorIso.slice(0, 7);
+    const list = Array.isArray(days) ? days : [];
+    const cells: MonthCell[] = [];
+    for (const day of list) {
+        const date = day.date;
+        if (!date) {
+            continue;
+        }
+        // Local time: the grid marks the user's today, not UTC's. Parsed part
+        // by part rather than through `new Date(date)`, which reads a bare
+        // `YYYY-MM-DD` as UTC and shifts the weekday west of Greenwich.
+        const year = Number(date.slice(0, 4));
+        const month = Number(date.slice(5, 7)) - 1;
+        const dayNumber = Number(date.slice(8, 10));
+        const weekday = new Date(year, month, dayNumber).getDay();
+        cells.push({
             date,
-            dayNumber: d.getDate(),
-            otherMonth,
+            dayNumber,
+            otherMonth: date.slice(0, 7) !== anchorMonth,
             weekend: weekday === 0 || weekday === 6,
             today: date === todayIso
-        };
-    };
-
-    // getDay(): 0=Sun..6=Sat, converted to the count of leading padding cells.
-    const startDay = (new Date(year, month, 1).getDay() - firstOffset + columns) % columns;
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const cells: MonthCell[] = [];
-    for (let i = startDay; i > 0; i--) {
-        cells.push(cell(new Date(year, month, 1 - i), true));
-    }
-    for (let day = 1; day <= daysInMonth; day++) {
-        cells.push(cell(new Date(year, month, day), false));
-    }
-    const trailing = (columns - ((startDay + daysInMonth) % columns)) % columns;
-    for (let i = 1; i <= trailing; i++) {
-        cells.push(cell(new Date(year, month + 1, i), true));
+        });
     }
     return cells;
 }

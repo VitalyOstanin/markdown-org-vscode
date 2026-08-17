@@ -139,6 +139,65 @@ suite('Agenda Show Integration Tests', () => {
         assert.notStrictEqual(args[currentDateIndex + 1], '2025-12-09');
     });
 
+    // The month view draws whole weeks, so it asks for whole weeks: the grid
+    // scope answers with the days the calendar actually shows, padding
+    // included, and the week it starts on is the setting's rather than the
+    // extractor's fixed Monday default. Asking for `month` and padding the
+    // grid here left those cells without data -- a task on 30 November was
+    // missing from December's first cell.
+    test('the month view asks the extractor for the grid it draws', async function () {
+        this.timeout(10000);
+        await vscode.commands.executeCommand('markdown-org.showAgendaMonth', '2025-12-09');
+        await waitForAgendaRender('month');
+        assertNoError();
+        const agendaCall = execFileStub.getCalls().find((c) => (c.args[1] as string[]).includes('--agenda'));
+        assert.ok(agendaCall, 'expected an --agenda invocation');
+        const args = agendaCall.args[1] as string[];
+        assert.strictEqual(args[args.indexOf('--agenda') + 1], 'month-grid');
+        const weekStartIndex = args.indexOf('--week-start');
+        assert.notStrictEqual(weekStartIndex, -1, `extractor args missing --week-start: ${args.join(' ')}`);
+        // Never `auto`: the extractor reads no locale, so the setting is
+        // resolved to a weekday before it gets here.
+        assert.ok(
+            ['monday', 'sunday'].includes(args[weekStartIndex + 1] ?? ''),
+            `--week-start must name a weekday, got ${args[weekStartIndex + 1]}`
+        );
+    });
+
+    test('the first-day-of-week setting is what the extractor is told', async function () {
+        this.timeout(10000);
+        const config = vscode.workspace.getConfiguration('markdown-org');
+        try {
+            await config.update('firstDayOfWeek', 'sunday', vscode.ConfigurationTarget.Workspace);
+            await vscode.commands.executeCommand('markdown-org.showAgendaMonth', '2025-12-09');
+            await waitForAgendaRender('month');
+            const agendaCall = execFileStub.getCalls().find((c) => (c.args[1] as string[]).includes('--week-start'));
+            assert.ok(agendaCall, 'expected a --week-start invocation');
+            const args = agendaCall.args[1] as string[];
+            assert.strictEqual(args[args.indexOf('--week-start') + 1], 'sunday');
+        } finally {
+            await config.update('firstDayOfWeek', undefined, vscode.ConfigurationTarget.Workspace);
+        }
+    });
+
+    // The cells are the payload's days, so a date from the neighbouring month
+    // is drawn -- and drawn with what it carries -- instead of being rebuilt
+    // empty by the page.
+    test('a grid day outside the anchor month is rendered as a cell of its own', async function () {
+        this.timeout(10000);
+        await vscode.commands.executeCommand('markdown-org.showAgendaMonth', '2025-12-09');
+        await waitForAgendaRender('month');
+        const panel = (AgendaPanel as unknown as { currentPanel?: { webview: vscode.Webview } }).currentPanel;
+        assert.ok(panel, 'expected AgendaPanel to be open after showAgendaMonth');
+        const info = await AgendaPanel.queryRenderedInfoForTesting();
+        assert.ok(info, 'expected rendered info from the open panel');
+        assert.deepStrictEqual(
+            info.calendarDates,
+            sparseMonth.map((d) => d.date),
+            'the grid must show the days the payload carries, in their order'
+        );
+    });
+
     test('Show Agenda (Week) loads sparse payload without error', async function () {
         this.timeout(10000);
         await vscode.commands.executeCommand('markdown-org.showAgendaWeek');

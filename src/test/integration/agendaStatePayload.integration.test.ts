@@ -40,6 +40,12 @@ suite('Agenda state payload: an update lands where a fresh panel would', () => {
         mode: string;
         dayHeaders: (string | null)[];
         dayNumbers: (string | null)[];
+        /**
+         * What the first-day-of-week setting still decides in the page: the
+         * grid's dates now arrive from the extractor, which was told the same
+         * setting, so the headings are where a changed value shows here.
+         */
+        calendarHeaders: (string | null)[];
         heroSub: string;
         sections: (string | null)[];
         headerLayout: string;
@@ -97,6 +103,7 @@ suite('Agenda state payload: an update lands where a fresh panel would', () => {
             mode: info.mode,
             dayHeaders: info.dayHeaders,
             dayNumbers: info.dayNumbers,
+            calendarHeaders: info.calendarHeaders,
             heroSub: info.heroSub,
             sections: info.sections,
             headerLayout: info.headerLayout

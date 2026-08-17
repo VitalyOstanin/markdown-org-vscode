@@ -48,6 +48,22 @@ export function resolveFirstDayOffset(firstDayOfWeek: string, locale: string): n
     return 1;
 }
 
+/** The two week starts the setting resolves to, as the extractor names them. */
+export type ResolvedWeekStart = 'monday' | 'sunday';
+
+/**
+ * The weekday the grid begins on, for `--agenda month-grid --week-start`.
+ *
+ * The extractor takes a weekday and no `auto`: it reads no locale of its own
+ * and its default is a fixed Monday, so `auto` has to be answered here, where
+ * the locale is known. Resolving it once, in the extension host, is also what
+ * keeps the grid honest -- the same value picks the dates the extractor sends
+ * and the column headers the page prints over them.
+ */
+export function resolveWeekStart(firstDayOfWeek: string, locale: string): ResolvedWeekStart {
+    return resolveFirstDayOffset(firstDayOfWeek, locale) === 0 ? 'sunday' : 'monday';
+}
+
 /** Column headers, in grid order. */
 export function buildWeekdayLabels(firstOffset: number, locale: string): string[] {
     const columns = 7;

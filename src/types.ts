@@ -56,6 +56,13 @@ export interface Task {
     // non-repeating tasks, and from an older extractor. The agenda repeat
     // tooltip prefers it so "next" never names a past occurrence.
     timestamp_next?: string;
+    // The occurrence following the day this row is drawn on (`YYYY-MM-DD`),
+    // computed by markdown-org-extract 0.17.0 (extractor ADR-0029). Filled
+    // only in the scheduled buckets, where the task has a day of its own; the
+    // `overdue` and `upcoming` copies borrowed into the reference day keep
+    // `timestamp_next` and leave this out. A reader looking at one day asks
+    // "and after this one?", which is what the repeat tooltip answers with it.
+    timestamp_next_after?: string;
     // Per-task key/value pairs parsed by markdown-org-extract from an
     // `org-properties` fenced code block. Absent when the task has no such
     // block. Optional and additive on the wire (extractor ADR-0015), so an
@@ -213,6 +220,14 @@ export interface AgendaRenderedInfo {
     heroSharesControlRow: boolean;
     heroSub: string;
     dayNumbers: string[];
+    /**
+     * The date each month-grid cell drills down into, in grid order. The grid
+     * is laid out from the days the extractor sent, so this is how a test sees
+     * that the page drew those days and not a set of its own.
+     */
+    calendarDates: string[];
+    /** The seven column headings of the grid, in the order they are printed. */
+    calendarHeaders: (string | null)[];
     /** Text of the git chip, or empty when the header carries none. */
     gitChip: string;
     /** Dropdown actions, each as `commit` / `push` plus ` (off, busy)`. */

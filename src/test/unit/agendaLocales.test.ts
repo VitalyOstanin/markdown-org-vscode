@@ -19,6 +19,7 @@ import { countClippedRows, renderDayClipHtml, updateDayClipMarkers } from '../..
 import { renderGitMenu } from '../../utils/agendaGitHtml';
 import { escapeHtml } from '../../utils/agendaEscapeHtml';
 import { formatNumber } from '../../utils/formatNumber';
+import { monthGridDays } from './_monthGridDays';
 
 /**
  * The agenda formats dates through `Intl` with whatever `markdown-org.dateLocale`
@@ -165,7 +166,11 @@ suite('agenda counters share one numbering system', () => {
                 panelCtx
             ) +
             renderSectionPanel('overdueRecent', EN.sections.overdueRecent, 12, '', panelCtx, '') +
-            renderMonthCalendar(buildMonthGrid(iso, 1, iso), buildWeekdayLabels(1, locale), calendarCtx);
+            renderMonthCalendar(
+                buildMonthGrid(monthGridDays(`${iso.slice(0, 8)}01`, 35), iso, iso),
+                buildWeekdayLabels(1, locale),
+                calendarCtx
+            );
 
         const text = readable(new JSDOM(`<!DOCTYPE html><body>${html}</body>`).window.document);
         assert.ok(!ASCII_DIGIT.test(text), `an ASCII digit reached the screen: "${text}"`);
