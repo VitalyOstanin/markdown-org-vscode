@@ -98,6 +98,27 @@ suite('buildMonthDayIndex', () => {
         assert.deepStrictEqual(index, { '2025-12-20': { total: 1, overdue: false, dueSoon: true } });
     });
 
+    test('a repeat is marked on the occurrence warned about and on no other', () => {
+        // Every occurrence of a repeating deadline is the same file and the
+        // same line, so matched by those alone the mark ran from the
+        // occurrence being warned about to every later one -- a deadline
+        // repeating weekly ringed the rest of the month. The copy under today
+        // says which occurrence it means: the offset counts the days to it.
+        const repeating = task({ file: '/w/a.md', line: 12, timestamp_type: 'DEADLINE' });
+        const index = buildMonthDayIndex(
+            [
+                day('2025-12-09', { upcoming: [{ ...repeating, days_offset: 11 }] }),
+                day('2025-12-20', { scheduled_no_time: [repeating] }),
+                day('2025-12-27', { scheduled_no_time: [repeating] })
+            ],
+            '2025-12-09'
+        );
+        assert.deepStrictEqual(index, {
+            '2025-12-20': { total: 1, overdue: false, dueSoon: true },
+            '2025-12-27': { total: 1, overdue: false, dueSoon: false }
+        });
+    });
+
     test('a deadline too far out for the warning to have opened is not marked', () => {
         const index = buildMonthDayIndex(
             [

@@ -108,21 +108,33 @@ export function buildMonthGrid(days: DayAgenda[], anchorIso: string, todayIso: s
  * is the extractor's to decide -- it is what put the task in today's
  * `upcoming` -- and the mark goes on the date itself rather than on today,
  * because a grid already shows the reader where that date is.
+ *
+ * Which date that is comes from the copy under today: its `days_offset` counts
+ * the days to the occurrence being warned about. Matched by file and line
+ * alone the mark spread across a repeating deadline's every occurrence, which
+ * are one file and one line all the way to the end of the grid -- a task
+ * repeating every two days lit a ring on half the month.
  */
 export function buildMonthDayIndex(days: DayAgenda[], todayIso: string): MonthDayIndex {
     const index: MonthDayIndex = {};
     const list = Array.isArray(days) ? days : [];
-    // Deadlines the extractor has decided are close enough to warn about,
-    // by file and line -- the same task in its own cell is the same two.
+    // The occurrences the extractor is warning about, as `date|file:line`:
+    // the date the warning is about, plus the task it belongs to.
     const warned = new Set<string>();
+    const midnight = Date.parse(`${todayIso}T00:00:00Z`);
     for (const day of list) {
-        if (day.date !== todayIso || !Array.isArray(day.upcoming)) {
+        if (day.date !== todayIso || !Array.isArray(day.upcoming) || Number.isNaN(midnight)) {
             continue;
         }
         for (const task of day.upcoming) {
-            if (task.timestamp_type === 'DEADLINE') {
-                warned.add(`${task.file}:${String(task.line)}`);
+            const offset = task.days_offset;
+            if (task.timestamp_type !== 'DEADLINE' || typeof offset !== 'number' || offset < 0) {
+                continue;
             }
+            // Inlined arithmetic (no module-scope helper) so the whole
+            // function survives the `.toString()` injection into the webview.
+            const dueDate = new Date(midnight + offset * 86400000).toISOString().slice(0, 10);
+            warned.add(`${dueDate}|${task.file}:${String(task.line)}`);
         }
     }
     for (const day of list) {
@@ -136,7 +148,7 @@ export function buildMonthDayIndex(days: DayAgenda[], todayIso: string): MonthDa
         const dated = [...bucket('scheduled_timed'), ...bucket('scheduled_no_time')];
         if (dated.length > 0) {
             const owes = dated.some((t) => t.timestamp_type === 'SCHEDULED' || t.timestamp_type === 'DEADLINE');
-            const due = dated.some((t) => warned.has(`${t.file}:${String(t.line)}`));
+            const due = dated.some((t) => warned.has(`${day.date}|${t.file}:${String(t.line)}`));
             index[day.date] = {
                 total: dated.length,
                 overdue: day.date < todayIso && owes,

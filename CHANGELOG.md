@@ -16,7 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   goes on the date itself. A ring rather than a second fill: the fill is what
   a date in arrears takes, and once a date has gone by what it owes is the
   state worth naming. The window is the extractor's to decide — the mark
-  follows the copy it files under today.
+  follows the copy it files under today, and the offset on that copy names
+  which occurrence is meant. Of a deadline that repeats, the ring goes on that
+  occurrence alone: every occurrence is the same line of the same file, so
+  matched by the task alone the ring ran to the end of the grid, and a weekly
+  deadline marked the rest of the month.
 
 ### Fixed
 
