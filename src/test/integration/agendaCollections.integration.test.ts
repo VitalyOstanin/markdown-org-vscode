@@ -111,6 +111,14 @@ suite('Agenda over several directories', () => {
     }
 
     before(() => {
+        // Wipe on the way in rather than on the way out. Windows keeps a
+        // handle on a file an editor has had open, so removing the tree after
+        // the suite trips on ENOTEMPTY -- the same EBUSY family the openTask
+        // suite documents, where retries only made the failure slower. At
+        // `before` nothing in this process has opened the tree yet, and what
+        // is left there is a residue of an interrupted run, which is exactly
+        // what the wipe is for.
+        fs.rmSync(path.dirname(workRoot), { recursive: true, force: true });
         for (const dir of [workRoot, homeRoot, ignoredRoot]) {
             fs.mkdirSync(dir, { recursive: true });
         }
@@ -136,10 +144,6 @@ suite('Agenda over several directories', () => {
         resolveExtractorStub.restore();
         showErrorStub.restore();
         await vscode.commands.executeCommand('workbench.action.closeAllEditors');
-    });
-
-    after(() => {
-        fs.rmSync(path.dirname(workRoot), { recursive: true, force: true });
     });
 
     test('every configured directory is scanned, and the single-directory setting steps aside', async function () {
