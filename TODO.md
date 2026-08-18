@@ -10,6 +10,24 @@
 
 ## Design
 
+- [ ] Find inside the agenda page, so the built-in webview find widget can be
+      switched off
+    - Why: while a webview is open in the editor area, "Maximize Panel Size"
+      undoes itself. Hiding the editor part releases the webview, which hides
+      its find widget, which focuses the webview back, which reactivates the
+      editor group -- and the layout restores the editor area it had just
+      hidden. Reported upstream as microsoft/vscode#248324 (open, Backlog),
+      with microsoft/vscode#305708 proposing the one-line fix; neither is in a
+      release.
+    - The widget is created eagerly and only under `enableFindWidget`, so
+      turning that option off breaks the chain -- at the cost of `Ctrl+F`, `F3`
+      and `Shift+F3` over the agenda, which run
+      `editor.action.webvieweditor.*` (`src/utils/agendaFindCommands.ts`).
+    - So the way to keep both is a find bar of the page's own: input,
+      highlighting, next/previous, a match count, both languages, tests. Then
+      `enableFindWidget: false` costs nothing.
+    - Not started, and not urgent: dragging the panel's edge still works.
+
 - [x] Redesign the visual language of the agenda/webview UI
     - Shipped as a selectable agenda style (`markdown-org.agendaStyle`:
       `monospace` | `native` | `hybrid` | `table`, default `table`) plus an
