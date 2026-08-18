@@ -853,10 +853,35 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
     // rather than with an empty one.
     let gitStatus: AgendaGitStatus | null = null;
 
+    /** The three presses the git dropdown offers. */
+    type GitAction = 'commit' | 'push' | 'sync';
+
+    // Which button each action is, and which message it sends. Written once
+    // rather than as a pair of conditionals per site: with two actions a
+    // ternary read as the whole set, with three it reads as a default.
+    const GIT_ACTION_BUTTONS: Record<GitAction, string> = {
+        commit: 'gitCommitBtn',
+        push: 'gitPushBtn',
+        sync: 'gitSyncBtn'
+    };
+    const GIT_ACTION_COMMANDS: Record<GitAction, string> = {
+        commit: 'gitCommit',
+        push: 'gitPush',
+        sync: 'gitSync'
+    };
+
+    /** Which action a button in the dropdown stands for. */
+    function gitActionOf(id: string): GitAction {
+        const found = (Object.keys(GIT_ACTION_BUTTONS) as GitAction[]).find(
+            (action) => GIT_ACTION_BUTTONS[action] === id
+        );
+        return found ?? 'commit';
+    }
+
     // The git action the user started, until the host reports it finished.
     // Kept outside the chip's markup because the chip is replaced wholesale on
     // every status, and a status arrives while the action is still running.
-    let gitBusyAction: 'commit' | 'push' | null = null;
+    let gitBusyAction: GitAction | null = null;
 
     // Header layout: 'auto' | 'full' | 'compact' (markdown-org.agendaHeaderMode).
     // Only the resolved outcome reaches the DOM, as a class on <body>.
@@ -1246,10 +1271,12 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         head?.querySelector<HTMLElement>('.day-section-fold')?.click();
     }
 
-    /** Press Commit or Push, as `clickGitActionForTesting` asks. */
+    /** Press Sync, Commit or Push, as `clickGitActionForTesting` asks. */
     function clickGitAction(action: string): void {
-        const id = action === 'push' ? 'gitPushBtn' : 'gitCommitBtn';
-        document.getElementById(id)?.click();
+        if (!(action in GIT_ACTION_BUTTONS)) {
+            return;
+        }
+        document.getElementById(GIT_ACTION_BUTTONS[action as GitAction])?.click();
     }
 
     function handleHostMessage(message: HostMessage): void {
@@ -1413,7 +1440,7 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         // the marker the pressed one carries -- the two together are the whole
         // feedback a press gives before the host answers.
         const gitActions = [...document.querySelectorAll<HTMLButtonElement>('#gitMenu .git-action')].map((btn) => {
-            const kind = btn.id === 'gitPushBtn' ? 'push' : 'commit';
+            const kind = gitActionOf(btn.id);
             const marks = [btn.disabled ? 'off' : '', btn.getAttribute('data-busy') === 'true' ? 'busy' : '']
                 .filter((mark) => mark !== '')
                 .join(', ');
@@ -2201,13 +2228,16 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         document.getElementById('gitPushBtn')?.addEventListener('click', (ev) => {
             startGitAction('push', ev.currentTarget);
         });
+        document.getElementById('gitSyncBtn')?.addEventListener('click', (ev) => {
+            startGitAction('sync', ev.currentTarget);
+        });
     }
 
     /** Remember which action is running, take the buttons out, and send it. */
-    function startGitAction(action: 'commit' | 'push', target: EventTarget | null): void {
+    function startGitAction(action: GitAction, target: EventTarget | null): void {
         gitBusyAction = action;
         markGitActionBusy(target);
-        vscode.postMessage({ command: action === 'commit' ? 'gitCommit' : 'gitPush' });
+        vscode.postMessage({ command: GIT_ACTION_COMMANDS[action] });
     }
 
     /**
@@ -2233,7 +2263,7 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         if (!gitBusyAction) {
             return;
         }
-        markGitActionBusy(document.getElementById(gitBusyAction === 'push' ? 'gitPushBtn' : 'gitCommitBtn'));
+        markGitActionBusy(document.getElementById(GIT_ACTION_BUTTONS[gitBusyAction]));
     }
 
     /** The action is over: the next rebuild of the chip brings the buttons back. */

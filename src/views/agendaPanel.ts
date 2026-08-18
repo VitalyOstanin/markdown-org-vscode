@@ -77,7 +77,7 @@ import { buildCollectionMarks, collectionMarkHtml } from '../utils/agendaCollect
 import { hideCollections, renderCollectionChips } from '../utils/agendaCollectionFilter';
 import { collectGitStatus } from '../utils/git/collectGitStatus';
 import { forgetResolvedRepositories, getGitApi } from '../utils/git/gitApi';
-import { commitAgendaSources, pushAgendaSources } from '../commands/gitActions';
+import { commitAgendaSources, pushAgendaSources, syncAgendaSources } from '../commands/gitActions';
 import { isCancelled } from '../utils/normalizeTaskType';
 import { shiftMonthAnchor } from '../utils/monthNav';
 import { wireDayHeaderNavigation } from '../utils/agendaDayHeaderNav';
@@ -933,7 +933,7 @@ export class AgendaPanel {
             if (typeof message.file === 'string') {
                 await AgendaPanel.openTaskInEditor(message.file, 1);
             }
-        } else if (message.command === 'gitCommit' || message.command === 'gitPush') {
+        } else if (message.command === 'gitCommit' || message.command === 'gitPush' || message.command === 'gitSync') {
             const args = AgendaPanel.lastRenderArgs;
             if (!args) {
                 return;
@@ -943,8 +943,10 @@ export class AgendaPanel {
             try {
                 if (message.command === 'gitCommit') {
                     await commitAgendaSources(files, strings, language);
-                } else {
+                } else if (message.command === 'gitPush') {
                     await pushAgendaSources(files, strings, language);
+                } else {
+                    await syncAgendaSources(files, strings, language);
                 }
             } finally {
                 // Two messages, and the order matters for neither: the page
@@ -1184,7 +1186,7 @@ export class AgendaPanel {
      * the host handler directly would step over exactly the part under test.
      * Resolves to false when no panel is open.
      */
-    public static clickGitActionForTesting(action: 'commit' | 'push'): Thenable<boolean> {
+    public static clickGitActionForTesting(action: 'commit' | 'push' | 'sync'): Thenable<boolean> {
         return AgendaPanel.postToPage({ command: 'clickGitActionForTesting', action });
     }
 

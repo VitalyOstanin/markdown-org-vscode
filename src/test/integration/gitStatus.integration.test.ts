@@ -7,7 +7,7 @@ import { execFileSync } from 'node:child_process';
 import { suite, test, suiteSetup, suiteTeardown } from 'mocha';
 import { collectGitStatus } from '../../utils/git/collectGitStatus';
 import { pathKey } from '../../utils/git/gitPathMatch';
-import { commitAgendaSources, pushAgendaSources } from '../../commands/gitActions';
+import { commitAgendaSources, pushAgendaSources, syncAgendaSources } from '../../commands/gitActions';
 import { AGENDA_STRINGS } from '../../utils/agendaI18n';
 import { AgendaPanel } from '../../views/agendaPanel';
 import type { AgendaGitStatus } from '../../types';
@@ -773,6 +773,146 @@ suite('agenda git status against a real repository', () => {
         assert.ok(last.includes('agenda-note.md'), last);
         assert.ok(last.includes('someone-else.md'), `the confirmed commit was supposed to carry it too:\n${last}`);
     });
+
+    // ---- sync: both directions under one press --------------------------
+
+    /**
+     * A repository, its remote, and a second clone standing in for the other
+     * device -- the arrangement every sync case is a variation of.
+     *
+     * One per test rather than one shared: the cases differ by which side has
+     * moved, and a repository carried between them would make each test's
+     * precondition depend on the order they run in.
+     */
+    function syncFixture(name: string) {
+        const remote = path.join(workDir, `${name}-remote.git`);
+        const dir = path.join(workDir, `${name}-repo`);
+        const other = path.join(workDir, `${name}-other`);
+        const run = (args: string[], cwd = dir): string =>
+            execFileSync('git', [...GIT_ID, ...args], { cwd, encoding: 'utf-8' });
+
+        execFileSync('git', ['init', '--bare', remote], { encoding: 'utf-8' });
+        fs.mkdirSync(dir);
+        run(['init', '--initial-branch=master']);
+        run(['config', 'user.name', 'Test']);
+        run(['config', 'user.email', 'test@example.invalid']);
+        fs.writeFileSync(path.join(dir, 'diary.md'), '# diary\n');
+        run(['add', '.']);
+        run(['commit', '-m', 'initial']);
+        run(['remote', 'add', 'origin', remote]);
+        run(['push', '-u', 'origin', 'master']);
+
+        return {
+            source: path.join(dir, 'diary.md'),
+            /** Run git in the repository under test. */
+            run,
+            /** Commit an edit here, without handing it over. */
+            edit: (text: string): void => {
+                fs.appendFileSync(path.join(dir, 'diary.md'), text);
+                run(['commit', '-am', 'local side']);
+            },
+            /** The other device commits and pushes, so the remote moves. */
+            elsewhere: (text: string): void => {
+                if (!fs.existsSync(other)) {
+                    execFileSync('git', [...GIT_ID, 'clone', remote, other], { encoding: 'utf-8' });
+                    run(['config', 'user.name', 'Other'], other);
+                    run(['config', 'user.email', 'other@example.invalid'], other);
+                }
+                fs.appendFileSync(path.join(other, 'diary.md'), text);
+                run(['commit', '-am', 'the other device'], other);
+                run(['push'], other);
+            },
+            head: (): string => run(['rev-parse', 'HEAD']).trim(),
+            remoteHead: (): string =>
+                execFileSync('git', ['--git-dir', remote, 'rev-parse', 'master'], { encoding: 'utf-8' }).trim()
+        };
+    }
+
+    /** Run a sync and return what it put in the status bar and in a dialog. */
+    async function runSync(source: string): Promise<{ said: string; reported: string }> {
+        let said = '';
+        let reported = '';
+        const originalStatus = vscode.window.setStatusBarMessage;
+        const originalError = vscode.window.showErrorMessage;
+        (vscode.window as { setStatusBarMessage: unknown }).setStatusBarMessage = (message: string) => {
+            said = message;
+            return { dispose: () => undefined };
+        };
+        (vscode.window as { showErrorMessage: unknown }).showErrorMessage = (message: string) => {
+            reported = message;
+            return Promise.resolve(undefined);
+        };
+        try {
+            await syncAgendaSources([source], AGENDA_STRINGS.en, 'en');
+        } finally {
+            (vscode.window as { setStatusBarMessage: unknown }).setStatusBarMessage = originalStatus;
+            (vscode.window as { showErrorMessage: unknown }).showErrorMessage = originalError;
+        }
+        return { said, reported };
+    }
+
+    // The half a push button cannot do: the commit is on the remote and
+    // nowhere else, and the press has to end with it in the working copy.
+    test('a sync brings in what the other device left on the remote', async function () {
+        this.timeout(30000);
+        const repo = syncFixture('sync-behind');
+        repo.elsewhere('from elsewhere\n');
+
+        const { said, reported } = await runSync(repo.source);
+
+        assert.strictEqual(reported, '', `nothing should have failed:\n${reported}`);
+        assert.match(said, /Brought in 1 commit/, said);
+        assert.strictEqual(repo.head(), repo.remoteHead(), 'the branch here must be level with the remote');
+        assert.match(fs.readFileSync(repo.source, 'utf-8'), /from elsewhere/);
+    });
+
+    // The other half, and the reason this is one button rather than two: the
+    // press that fetches also hands over what is owed.
+    test('a sync hands over what is here and not on the remote', async function () {
+        this.timeout(30000);
+        const repo = syncFixture('sync-ahead');
+        repo.edit('local work\n');
+        const local = repo.head();
+
+        const { said, reported } = await runSync(repo.source);
+
+        assert.strictEqual(reported, '', `nothing should have failed:\n${reported}`);
+        assert.match(said, /Pushed 1 commit/, said);
+        await waitUntil(() => repo.remoteHead() === local, 'the commit to reach the remote');
+    });
+
+    // Both sides moved. The mobile client refuses this too (`SyncError::
+    // Diverged`): merging is a decision with an author, and a button that made
+    // it silently would be the one place these clients write history nobody
+    // asked for.
+    test('a sync leaves a diverged branch exactly as it was', async function () {
+        this.timeout(30000);
+        const repo = syncFixture('sync-diverged');
+        repo.elsewhere('from elsewhere\n');
+        repo.edit('local work\n');
+        const local = repo.head();
+        const remote = repo.remoteHead();
+
+        const { said, reported } = await runSync(repo.source);
+
+        assert.match(reported, /have both moved/, reported);
+        assert.match(reported, /origin\/master/, reported);
+        assert.strictEqual(said, '', `a run that did nothing must not report work:\n${said}`);
+        assert.strictEqual(repo.head(), local, 'the branch here must be untouched');
+        assert.strictEqual(repo.remoteHead(), remote, 'the remote must be untouched');
+    });
+
+    // Nothing to do is an outcome, not a silence: the press has to answer, or
+    // it reads as a button that does not work.
+    test('a sync with nothing to move says the two sides agree', async function () {
+        this.timeout(30000);
+        const repo = syncFixture('sync-level');
+
+        const { said, reported } = await runSync(repo.source);
+
+        assert.strictEqual(reported, '', `nothing should have failed:\n${reported}`);
+        assert.match(said, /Already level with the remote/, said);
+    });
 });
 
 /**
@@ -927,8 +1067,8 @@ suite('agenda panel git chip', () => {
         await AgendaPanel.postGitStatusForTesting(pendingStatus());
         await waitUntil(async () => {
             const info = await AgendaPanel.queryRenderedInfoForTesting();
-            return info?.gitActions.join(' | ') === 'commit | push';
-        }, 'both actions to be offered');
+            return info?.gitActions.join(' | ') === 'sync | commit | push';
+        }, 'all three actions to be offered');
 
         // The commit flow is held at its message prompt, which is what makes
         // the intermediate state readable at all: released too early and the
@@ -946,8 +1086,8 @@ suite('agenda panel git chip', () => {
             assert.ok(info);
             assert.deepStrictEqual(
                 info.gitActions,
-                ['commit (off, busy)', 'push (off)'],
-                'the other button must be out of service too, and without a spinner of its own'
+                ['sync (off)', 'commit (off, busy)', 'push (off)'],
+                'the other buttons must be out of service too, and without a spinner of their own'
             );
         } finally {
             prompt.resolve(undefined);
@@ -973,8 +1113,8 @@ suite('agenda panel git chip', () => {
         await AgendaPanel.postGitStatusForTesting(pendingStatus());
         await waitUntil(async () => {
             const info = await AgendaPanel.queryRenderedInfoForTesting();
-            return info?.gitActions.join(' | ') === 'commit | push';
-        }, 'both actions to be offered');
+            return info?.gitActions.join(' | ') === 'sync | commit | push';
+        }, 'all three actions to be offered');
 
         const prompt = Promise.withResolvers<string | undefined>();
         const originalInput = vscode.window.showInputBox;
@@ -992,7 +1132,7 @@ suite('agenda panel git chip', () => {
             const info = await AgendaPanel.queryRenderedInfoForTesting();
             assert.deepStrictEqual(
                 info?.gitActions,
-                ['commit (off, busy)', 'push (off)'],
+                ['sync (off)', 'commit (off, busy)', 'push (off)'],
                 'a status is not the end of the action and must not re-enable the buttons'
             );
         } finally {
@@ -1019,7 +1159,11 @@ suite('agenda panel git chip', () => {
         const info = await AgendaPanel.queryRenderedInfoForTesting();
         assert.ok(info);
         assert.strictEqual(info.gitGroups[0], 'conflicted', 'the conflict must be the first thing in the dropdown');
-        assert.deepStrictEqual(info.gitActions, ['push'], 'a conflict must leave no way to commit from the panel');
+        assert.deepStrictEqual(
+            info.gitActions,
+            ['sync', 'push'],
+            'a conflict must leave no way to commit from the panel'
+        );
         // The count reaches the chip, so the header says something is wrong
         // without the dropdown being opened.
         assert.match(info.gitChip, /!/, info.gitChip);

@@ -35,6 +35,8 @@ suite('git repository resolution', () => {
             add: () => Promise.resolve(),
             commit: () => Promise.resolve(),
             push: () => Promise.resolve(),
+            fetch: () => Promise.resolve(),
+            pull: () => Promise.resolve(),
             diffBetween: () => Promise.resolve([]),
             log: () => Promise.resolve([])
         };

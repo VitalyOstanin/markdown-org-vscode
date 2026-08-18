@@ -47,8 +47,9 @@ was decided, and the trade-offs that came with it.
 | 0017 | [Marking a repeating task done moves it forward](0017-repeating-tasks-move-on-done.md)                                | Accepted                                                  |
 | 0018 | [Minimum VS Code version follows the Git API members we call](0018-minimum-host-follows-the-git-api.md)               | Accepted                                                  |
 | 0019 | [Panel-action notifications follow the agenda UI language](0019-panel-action-notifications-follow-the-ui-language.md) | Accepted                                                  |
-| 0020 | [The panel reports a merge but never resolves one](0020-panel-does-not-resolve-conflicts.md)                          | Accepted                                                  |
+| 0020 | [The panel reports a merge but never resolves one](0020-panel-does-not-resolve-conflicts.md)                          | Accepted (amended by 0022)                                |
 | 0021 | [The month grid is the core's answer, not the panel's reconstruction](0021-the-month-grid-is-the-core-s-answer.md)    | Accepted                                                  |
+| 0022 | [The panel syncs in one press, and fast-forwards rather than merges](0022-the-panel-syncs-but-never-merges.md)        | Accepted                                                  |
 
 ## Adding a new ADR
 

@@ -443,8 +443,15 @@ export function gitFileRows(files: readonly GitFileState[], kind: string, ctx: G
 }
 
 /**
- * Commit and push. Each button is dropped when its counter is zero -- an
- * always-visible "Commit 0 files" invites a click that can only fail.
+ * Sync, commit and push. The counted two are dropped when their counter is
+ * zero -- an always-visible "Commit 0 files" invites a click that can only
+ * fail -- and sync is offered wherever there is a repository at all, because
+ * what it is for is the commits on the other side, which no counter here can
+ * see.
+ *
+ * Sync comes first so that it stays put: the other two appear and vanish with
+ * the state of the view, and a button that moves under the pointer between one
+ * render and the next is a button pressed by accident.
  *
  * Commit is also dropped while a merge is unresolved. Git would refuse the
  * commit anyway, but the refusal arrives as its own message about paths the
@@ -456,6 +463,11 @@ export function gitFileRows(files: readonly GitFileState[], kind: string, ctx: G
 export function gitActions(status: AgendaGitStatus, ctx: GitHtmlContext): string {
     const g = ctx.git;
     let html = '';
+    if (status.repos.length > 0) {
+        html +=
+            `<button type="button" class="git-action" id="gitSyncBtn" title="${ctx.escapeHtml(g.syncButtonTitle)}">` +
+            `${ctx.escapeHtml(g.syncButton)}</button>`;
+    }
     if (status.uncommittedCount > 0 && status.conflictCount === 0) {
         const label = ctx.formatString(g.commitButton, ctx.formatNumber(status.uncommittedCount, ctx.locale));
         html +=

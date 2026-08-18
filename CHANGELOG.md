@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A **Sync** action in the agenda's git dropdown: one press fetches, moves the
+  branch onto its upstream when it is only behind, and pushes what is only
+  ahead. It is the control the phone has had since it shipped, and the two
+  clients share the repositories — an exchange one of them makes the reader
+  assemble by hand in Source Control is one that gets assembled wrongly, or
+  not at all. The fast-forward is the order rather than a flag: `pull` runs
+  only where the branch has nothing of its own, so there is nothing for a
+  merge to be made out of. A branch that is both behind and ahead is left
+  exactly as it stands and reported by name, because merging is a decision
+  with an author. Unlike the other two, the button is offered wherever there
+  is a repository at all: what it answers for is the other side, which none of
+  the counters here can see.
+
 - The month calendar rings the chip of a date a deadline is coming due on,
   and names it in the tooltip. Org warns about a deadline in today's agenda
   for the last `org-deadline-warning-days` (or the `-Xd` the timestamp

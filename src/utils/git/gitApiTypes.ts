@@ -88,6 +88,18 @@ export interface GitRepository {
     add: (paths: string[]) => Promise<void>;
     commit: (message: string) => Promise<void>;
     push: (remoteName?: string, branchName?: string, setUpstream?: boolean) => Promise<void>;
+    /**
+     * Bring the remote-tracking refs up to date without touching the working
+     * copy. Declared since the API's beginning, so naming it here does not
+     * move the floor `engines.vscode` states (ADR-0018).
+     */
+    fetch: (remote?: string, ref?: string, depth?: number) => Promise<void>;
+    /**
+     * Move the branch onto its upstream. Called only where the branch has
+     * nothing of its own ahead of it, which is what makes the move a
+     * fast-forward rather than the merge this extension does not do.
+     */
+    pull: (unshallow?: boolean) => Promise<void>;
     diffBetween: (ref1: string, ref2: string) => Promise<GitChange[]>;
     log: (options?: GitLogOptions) => Promise<GitCommit[]>;
 }

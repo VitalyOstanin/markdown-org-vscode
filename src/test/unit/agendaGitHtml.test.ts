@@ -315,7 +315,47 @@ suite('renderGitMenu', () => {
             CTX
         );
         assert.ok(!clean.includes('id="gitCommitBtn"'));
-        assert.ok(!clean.includes('git-actions'));
+        assert.ok(!clean.includes('id="gitPushBtn"'));
+    });
+
+    // Sync answers for the side no counter here can see, so it is offered
+    // wherever there is a repository -- including the state where the other
+    // two buttons are both gone because this side has nothing outstanding.
+    test('the sync button is offered whatever the counters say', () => {
+        const clean = renderGitMenu(
+            status({
+                repos: [LEVEL_REPO],
+                unpushedCommits: 0,
+                files: [file({ file: '/repo/notes.md', label: 'notes.md' })]
+            }),
+            CTX
+        );
+        assert.ok(clean.includes('id="gitSyncBtn"'), clean);
+
+        const conflicted = renderGitMenu(
+            status({
+                repos: [{ ...LEVEL_REPO, conflictCount: 2 }],
+                unpushedCommits: 0,
+                conflictCount: 2,
+                files: [file({ file: '/repo/work.md', label: 'work.md', uncommitted: true, conflicted: true })]
+            }),
+            CTX
+        );
+        // A merge stops the commit, not the fetch: taking what the remote has
+        // is exactly what an unresolved merge does not stand in the way of.
+        assert.ok(conflicted.includes('id="gitSyncBtn"'), conflicted);
+    });
+
+    // Files reachable from no repository at all: there is nothing to fetch
+    // for, and a button offering it would be a press that can only report
+    // that it did nothing.
+    test('no repository means no sync button', () => {
+        const html = renderGitMenu(
+            status({ repos: [], unpushedCommits: 0, files: [outsideFile('/loose/x.md', 'x.md')] }),
+            CTX
+        );
+        assert.ok(!html.includes('id="gitSyncBtn"'), html);
+        assert.ok(!html.includes('git-actions'), html);
     });
 
     // The button pushes the branch, so what gates it is the commit count. A

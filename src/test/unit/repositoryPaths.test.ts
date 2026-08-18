@@ -21,6 +21,8 @@ function repo(root: string, state: Partial<GitRepository['state']> = {}): GitRep
         add: () => Promise.resolve(),
         commit: () => Promise.resolve(),
         push: () => Promise.resolve(),
+        fetch: () => Promise.resolve(),
+        pull: () => Promise.resolve(),
         // Present because the interface declares them; this module never
         // reaches for either, so a call would be the test's own mistake.
         diffBetween: () => Promise.resolve([]),

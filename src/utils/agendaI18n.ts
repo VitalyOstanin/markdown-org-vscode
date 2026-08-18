@@ -292,6 +292,25 @@ export interface AgendaStrings {
          * exactly why this outcome used to pass in silence.
          */
         pushedUpstream: string;
+        /** The third action: one press for both directions. */
+        syncButton: string;
+        syncButtonTitle: string;
+        syncProgress: string;
+        /**
+         * What a sync brought in and what it handed over; `{0}` is a counted
+         * noun from `commits`. Two sentences rather than one with two numbers:
+         * a run usually moves in one direction only, and naming the direction
+         * that did nothing reads as a failure.
+         */
+        syncTook: string;
+        syncLevel: string;
+        /**
+         * Both sides moved, so nothing was done: `{0}` branch, `{1}` upstream.
+         * This extension does not merge, and the way out is a decision -- a
+         * merge or a rebase -- the user makes in Source Control.
+         */
+        syncDiverged: string;
+        syncFailed: string;
     };
     /**
      * The priority picker raised by `Set Priority`. Host UI rather than page
@@ -436,7 +455,15 @@ const EN: AgendaStrings = {
         setUpstreamConfirm: 'Push',
         committed: 'Committed {0}',
         pushed: 'Pushed {0}',
-        pushedUpstream: 'Pushed to a new upstream: {0}'
+        pushedUpstream: 'Pushed to a new upstream: {0}',
+        syncButton: 'Sync',
+        syncButtonTitle: 'Fetch, fast-forward, then push the agenda repositories',
+        syncProgress: 'Syncing the agenda repositories…',
+        syncTook: 'Brought in {0}',
+        syncLevel: 'Already level with the remote',
+        syncDiverged:
+            'Nothing done: "{0}" and "{1}" have both moved. Merge or rebase in Source Control, then sync again.',
+        syncFailed: 'Sync failed: {0}'
     },
     priorityPicker: {
         title: 'Set priority',
@@ -574,7 +601,15 @@ const RU: AgendaStrings = {
         setUpstreamConfirm: 'Отправить',
         committed: 'Закоммичено: {0}',
         pushed: 'Отправлено: {0}',
-        pushedUpstream: 'Отправлено в новый upstream: {0}'
+        pushedUpstream: 'Отправлено в новый upstream: {0}',
+        syncButton: 'Синхронизировать',
+        syncButtonTitle: 'Получить, перемотать ветку и отправить репозитории агенды',
+        syncProgress: 'Синхронизация репозиториев агенды…',
+        syncTook: 'Получено: {0}',
+        syncLevel: 'Уже совпадает с сервером',
+        syncDiverged:
+            'Ничего не сделано: «{0}» и «{1}» разошлись. Сведите их (merge или rebase) в Source Control и синхронизируйте снова.',
+        syncFailed: 'Синхронизация не выполнена: {0}'
     },
     priorityPicker: {
         title: 'Приоритет',

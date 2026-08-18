@@ -1,7 +1,7 @@
 /**
- * Commit and push the agenda's source files, from the panel's git dropdown.
+ * Commit, push and sync the agenda's source files, from the panel's git dropdown.
  *
- * Scope is the point of these two: the commit stages exactly the changed files
+ * Scope is the point of the first two: the commit stages exactly the changed files
  * the current view is built from, so an unrelated edit elsewhere in the same
  * repository is not swept into a commit the user thinks is about their notes.
  * That is why `repo.add()` is given an explicit path list rather than the
@@ -20,7 +20,7 @@
 import * as vscode from 'vscode';
 import * as path from 'node:path';
 import { getGitApi, resolveRepositoryFor } from '../utils/git/gitApi';
-import type { GitRepository } from '../utils/git/gitApiTypes';
+import type { GitBranch, GitRepository } from '../utils/git/gitApiTypes';
 import { pathKey } from '../utils/git/gitPathMatch';
 import { isPushRejected } from '../utils/git/pushRejection';
 import { canonicalPath, changeKeys, repositoryRoots } from '../utils/git/repositoryPaths';
@@ -203,6 +203,170 @@ export async function pushAgendaSources(
                 countedNoun(result.commits, strings.git.commits, language, currentDateLocale())
             )
         );
+    }
+}
+
+/** What one repository's sync did, in the two directions a run can move. */
+interface SyncOutcome {
+    /** Commits the fetch brought in and the fast-forward then applied. */
+    took: number;
+    /** Commits handed to the remote. */
+    handed: number;
+    /** Branch and upstream of a repository whose two sides have both moved. */
+    diverged?: readonly [string, string];
+    /** `repository/branch` of a branch whose upstream this run created. */
+    upstream?: string;
+}
+
+/**
+ * Both directions in one press: take what the remote has, then hand over what
+ * it does not.
+ *
+ * This is the mobile client's sync (`rust/markdown-org-ffi/src/sync.rs`) with
+ * the same refusals, because the two clients share the repositories and a rule
+ * one of them keeps alone is not a rule. A branch that is only behind is moved
+ * onto its upstream; one that is only ahead is pushed; one that is both is left
+ * exactly as it is and reported, since merging is a decision with an author and
+ * this panel is not it.
+ *
+ * The fast-forward is a property of the order, not of a flag: `pull` is called
+ * only where `ahead` is zero, so the branch has nothing of its own for a merge
+ * to be made of. Nothing here passes a force argument to `push` either.
+ */
+export async function syncAgendaSources(
+    files: readonly string[],
+    strings: AgendaStrings,
+    language: UiLanguage
+): Promise<void> {
+    const grouped = await groupByRepository(files, new Map());
+    if (grouped.size === 0) {
+        return;
+    }
+    const outcomes = await withGitProgress(strings.git.syncProgress, async () => {
+        const done: SyncOutcome[] = [];
+        for (const repository of grouped.keys()) {
+            const outcome = await syncRepository(repository, strings);
+            // A failure stops the round: the repositories after this one are
+            // the same notes, and reporting a sync that half happened under a
+            // single confirmation would be a worse account than none.
+            if (!outcome) {
+                return undefined;
+            }
+            done.push(outcome);
+        }
+        return done;
+    });
+    if (outcomes) {
+        reportSync(outcomes, strings, language);
+    }
+}
+
+/** Fetch, then move whichever side has something to move. */
+async function syncRepository(repository: GitRepository, strings: AgendaStrings): Promise<SyncOutcome | undefined> {
+    const nothing: SyncOutcome = { took: 0, handed: 0 };
+    const head = repository.state.HEAD;
+    try {
+        if (!head?.upstream) {
+            return await publishBranch(repository, head?.name, strings);
+        }
+        await repository.fetch();
+        // The counts live on `state`, and a fetch only moves the remote ref:
+        // without this the branch is read as it stood before the fetch, and a
+        // repository that just fell behind is reported as level.
+        await repository.status();
+        const fetched = repository.state.HEAD;
+        const behind = fetched?.behind ?? 0;
+        const ahead = fetched?.ahead ?? 0;
+        if (behind > 0 && ahead > 0) {
+            const upstream = `${head.upstream.remote}/${head.upstream.name}`;
+            return { ...nothing, diverged: [fetched?.name ?? 'HEAD', upstream] };
+        }
+        if (behind > 0) {
+            await repository.pull();
+            return { ...nothing, took: behind };
+        }
+        if (ahead > 0) {
+            await repository.push();
+            return { ...nothing, handed: ahead };
+        }
+        return nothing;
+    } catch (error) {
+        reportSyncFailure(error, repository, head, strings);
+        return undefined;
+    }
+}
+
+/**
+ * A branch with no upstream: there is nothing to fetch against, so the run is
+ * the push half alone, asked for the same way the push button asks.
+ */
+async function publishBranch(
+    repository: GitRepository,
+    branch: string | undefined,
+    strings: AgendaStrings
+): Promise<SyncOutcome> {
+    if (!(await confirmSetUpstream(repository, strings))) {
+        return { took: 0, handed: 0 };
+    }
+    await repository.push('origin', branch, true);
+    return { took: 0, handed: 0, upstream: repositoryBranch(repository, branch) };
+}
+
+/**
+ * Say what stopped the sync.
+ *
+ * A refusal from the remote keeps the push button's wording: it is the same
+ * event with the same next step, and the sync reaching it means the remote
+ * moved between the fetch a moment ago and the push. Everything else is quoted,
+ * because a fetch and a fast-forward fail for reasons this code cannot name.
+ */
+function reportSyncFailure(
+    error: unknown,
+    repository: GitRepository,
+    head: GitBranch | undefined,
+    strings: AgendaStrings
+): void {
+    if (isPushRejected(error)) {
+        reportPushFailure(error, repository, head?.name, head?.upstream, strings);
+        return;
+    }
+    const reason = formatError(error);
+    logDiagnostic(`agenda git sync failed in ${repository.rootUri.fsPath}: ${reason}`);
+    notifyError(formatString(strings.git.syncFailed, reason));
+}
+
+/**
+ * Report the round: what came in, what went out, what was left alone.
+ *
+ * A divergence is an error and the rest is a status line, and both are shown:
+ * the repository that could not move is the news, but a run that also brought
+ * commits into the other repositories has to say so, or the panel's counters
+ * change under an announcement that nothing happened.
+ */
+function reportSync(outcomes: readonly SyncOutcome[], strings: AgendaStrings, language: UiLanguage): void {
+    const locale = currentDateLocale();
+    const diverged = outcomes.find((outcome) => outcome.diverged)?.diverged;
+    if (diverged) {
+        notifyError(formatString(strings.git.syncDiverged, diverged[0], diverged[1]));
+    }
+    const total = (of: (outcome: SyncOutcome) => number): number => outcomes.reduce((sum, o) => sum + of(o), 0);
+    const took = total((outcome) => outcome.took);
+    const handed = total((outcome) => outcome.handed);
+    const upstreams = outcomes.map((outcome) => outcome.upstream).filter((name) => name !== undefined);
+    const said: string[] = [];
+    if (took > 0) {
+        said.push(formatString(strings.git.syncTook, countedNoun(took, strings.git.commits, language, locale)));
+    }
+    if (handed > 0) {
+        said.push(formatString(strings.git.pushed, countedNoun(handed, strings.git.commits, language, locale)));
+    }
+    if (upstreams.length > 0) {
+        said.push(formatString(strings.git.pushedUpstream, upstreams.join(strings.git.titleSeparator)));
+    }
+    if (said.length > 0) {
+        notifyStatus(said.join(strings.git.titleSeparator));
+    } else if (!diverged) {
+        notifyStatus(strings.git.syncLevel);
     }
 }
 
