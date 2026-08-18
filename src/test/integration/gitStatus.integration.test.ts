@@ -1064,8 +1064,13 @@ suite('agenda panel git chip', () => {
     test('pressing an action takes both buttons out of service and marks the pressed one', async function () {
         this.timeout(30000);
         await renderOverPendingRepository('busy');
-        await AgendaPanel.postGitStatusForTesting(pendingStatus());
+        // The panel collects the real status of the rendered files on its own
+        // and posts it when the walk is done. On a slow host that answer lands
+        // after the stand-in and rebuilds the buttons from a repository with
+        // nothing to push, so the stand-in is re-posted inside the wait: what
+        // the page ends up holding is then the last message either side sent.
         await waitUntil(async () => {
+            await AgendaPanel.postGitStatusForTesting(pendingStatus());
             const info = await AgendaPanel.queryRenderedInfoForTesting();
             return info?.gitActions.join(' | ') === 'sync | commit | push';
         }, 'all three actions to be offered');
@@ -1110,8 +1115,13 @@ suite('agenda panel git chip', () => {
     test('a status arriving mid-action leaves the buttons out of service', async function () {
         this.timeout(30000);
         await renderOverPendingRepository('mid-action');
-        await AgendaPanel.postGitStatusForTesting(pendingStatus());
+        // The panel collects the real status of the rendered files on its own
+        // and posts it when the walk is done. On a slow host that answer lands
+        // after the stand-in and rebuilds the buttons from a repository with
+        // nothing to push, so the stand-in is re-posted inside the wait: what
+        // the page ends up holding is then the last message either side sent.
         await waitUntil(async () => {
+            await AgendaPanel.postGitStatusForTesting(pendingStatus());
             const info = await AgendaPanel.queryRenderedInfoForTesting();
             return info?.gitActions.join(' | ') === 'sync | commit | push';
         }, 'all three actions to be offered');

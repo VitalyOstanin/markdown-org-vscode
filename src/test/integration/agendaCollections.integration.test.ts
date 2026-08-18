@@ -3,7 +3,7 @@ import * as assert from 'node:assert';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import * as sinon from 'sinon';
-import { suite, before, beforeEach, after, afterEach, test } from 'mocha';
+import { suite, before, beforeEach, afterEach, test } from 'mocha';
 import { exec } from '../../utils/exec';
 import { extractor } from '../../utils/extractor';
 import { AgendaPanel } from '../../views/agendaPanel';
