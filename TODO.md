@@ -183,20 +183,35 @@
     - Design-language principle recorded alongside the other agenda visual
       principles (design log, principle 7).
 
-- [ ] Tooltips on the rest of the agenda
-    - The elements carrying none, from a walk over the HTML builders on
-      2026-08-09: the time column (`.time-plain`, whose dash stands for an
-      all-day task), the heading (`.heading`, which already knows the file and
-      the line it came from through `data-file` / `data-line`), the offset
-      column (`.offset`, where overdue and upcoming read apart by styling
-      alone), the day summary counts (`.day-summary-stat`), the clip chips
-      (`.day-clip-count`, a bare number of rows past the top or the bottom
-      edge), the glyphs inside the git chip (`.git-chip-stat`) and the mark on
-      a file row (`.git-file-mark`, whose button title names the path rather
-      than the mark).
-    - The strings belong in `agendaI18n`, and the value-derived ones in the
-      `agendaTooltips` helpers, which is what puts them within reach of the
-      unit suite.
+- [x] Tooltips on the rest of the agenda
+    - Done. Every element the 2026-08-09 walk found bare now explains itself:
+      the time column (`.time-plain`) names the start, the span when the entry
+      has an end, and says "all day" where it draws nothing at all -- the empty
+      cell was the one statement nothing spelled out; the heading (`.heading`)
+      repeats what it says and adds the file and the line it is written on,
+      which is what tells two identical headings from two directories apart;
+      the offset column (`.offset`) names the distance and its direction, read
+      until now off colour alone; the summary counts (`.day-summary-stat`) say
+      what each number is a count of, since "3 overdue" never said overdue out
+      of what; each glyph inside the git chip (`.git-chip-stat`) carries the
+      clause it contributes to the chip's own tooltip; and the mark on a file
+      row (`.git-file-mark`) says what the glyph stands for, next to the
+      button's tooltip that names the path.
+    - `timeTooltip`, `headingTooltip` and `offsetTooltip` live in
+      `agendaTooltips.ts` with the three that were already there, so the
+      wording is unit-tested rather than asserted through the page; the strings
+      are in `agendaI18n.ts` in both languages, including the counted noun for
+      days and a distance-free wording for the Tasks card, which has no anchor
+      day to measure from.
+    - The clip chips (`.day-clip-count`) were already titled as they are
+      filled in (`agendaClipMarkers.ts`).
+    - Deliberately left bare: the day header (`.day-weekday` / `.day-num` /
+      `.day-rest`), the hero title and its TODAY badge, the section names, and
+      the day number inside a calendar cell. Each is plain text that says the
+      whole of what it means, and its container already answers for the rest --
+      the cell is a button titled "Open day view", the section carries a count
+      chip and a fold control that both explain themselves. A tooltip there
+      would repeat the label under the pointer.
 
 - [ ] A styled tooltip of our own instead of the native `title`
     - Raised out of the deferred note above. `title` gives one line, a delay

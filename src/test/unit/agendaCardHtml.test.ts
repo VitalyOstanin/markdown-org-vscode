@@ -10,7 +10,14 @@ import { isCancelled } from '../../utils/normalizeTaskType';
 import { resolveTaskFlag } from '../../utils/agendaTaskFlag';
 import { resolveAttentionLevel } from '../../utils/agendaAttention';
 import { resolveHeadingClass } from '../../utils/agendaHeadingTint';
-import { attentionTooltip, flagTooltip, priorityTooltip } from '../../utils/agendaTooltips';
+import {
+    attentionTooltip,
+    flagTooltip,
+    headingTooltip,
+    offsetTooltip,
+    priorityTooltip,
+    timeTooltip
+} from '../../utils/agendaTooltips';
 import { AGENDA_STRINGS, formatString } from '../../utils/agendaI18n';
 
 const EN = AGENDA_STRINGS.en;
@@ -34,7 +41,13 @@ const ctx: TaskRowContext = {
     resolveHeadingClass,
     attentionTooltip,
     flagTooltip,
-    priorityTooltip
+    priorityTooltip,
+    timeTooltip,
+    headingTooltip,
+    offsetTooltip,
+    // The page binds this to the locale-aware counter; a fixed English form is
+    // all the row needs, and it keeps the assertions readable.
+    countDays: (n: number): string => `${n} ${n === 1 ? 'day' : 'days'}`
 };
 
 function task(overrides: Partial<TaskWithOffset> = {}): TaskWithOffset {
@@ -138,6 +151,47 @@ suite('agendaCardHtml.renderTaskRow', () => {
         for (const sel of ['.status', '.flag', '.priority']) {
             assert.ok(el.querySelector(sel)?.getAttribute('title'), `${sel} must explain itself`);
         }
+    });
+
+    test('the text columns explain themselves too, glyphs or not', () => {
+        // The three that read as plain text: the clock, the heading and the
+        // date. Each is terse for the room it has -- an empty cell, a heading
+        // with its file left in an attribute, a date whose direction is a
+        // colour -- and the tooltip is where the rest of it goes.
+        const el = row(task({ timestamp_time: '09:30' }), -2, 'overdue');
+        assert.strictEqual(el.querySelector('.time-plain')?.getAttribute('title'), 'Starts at 09:30');
+        assert.strictEqual(
+            el.querySelector('.heading')?.getAttribute('title'),
+            'Write the report — /w/notes.md, line 12'
+        );
+        assert.strictEqual(el.querySelector('.offset')?.getAttribute('title'), 'Overdue by 2 days');
+    });
+
+    test('the time tooltip names the span when the entry has an end', () => {
+        const el = row(task({ timestamp_time: '09:30', timestamp_end_time: '11:00' }));
+        assert.strictEqual(el.querySelector('.time-plain')?.getAttribute('title'), 'From 09:30 to 11:00');
+    });
+
+    test('an all-day row says so where the column says nothing', () => {
+        const el = row(task());
+        assert.strictEqual(el.querySelector('.time-plain')?.textContent, '');
+        assert.strictEqual(el.querySelector('.time-plain')?.getAttribute('title'), 'All day — the entry names no time');
+    });
+
+    test('an undated row is not told it is late', () => {
+        // `data-dir` falls back to `overdue` for want of anything else to
+        // style, and a tooltip built from that would be a claim about a date
+        // the task does not have.
+        const undated = task();
+        delete undated.timestamp_date;
+        assert.strictEqual(alwaysDatedRow(undated).querySelector('.offset')?.getAttribute('title'), '');
+    });
+
+    test('a dated row with no offset to count still says which way it points', () => {
+        // The Tasks card: no anchor day, so the direction comes from the date
+        // and there is no distance to name.
+        const el = alwaysDatedRow(task(), 'upcoming');
+        assert.strictEqual(el.querySelector('.offset')?.getAttribute('title'), 'Dated after today');
     });
 
     test('the flag tooltip is given the same date formatter as the offset column', () => {

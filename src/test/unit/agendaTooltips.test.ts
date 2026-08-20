@@ -1,6 +1,13 @@
 import * as assert from 'node:assert';
 import { suite, test } from 'mocha';
-import { attentionTooltip, flagTooltip, priorityTooltip } from '../../utils/agendaTooltips';
+import {
+    attentionTooltip,
+    flagTooltip,
+    headingTooltip,
+    offsetTooltip,
+    priorityTooltip,
+    timeTooltip
+} from '../../utils/agendaTooltips';
 import { AGENDA_STRINGS, formatString } from '../../utils/agendaI18n';
 import { formatIsoDate } from '../../utils/formatIsoDate';
 
@@ -195,5 +202,64 @@ suite('agenda tooltips', () => {
         assert.strictEqual(priorityTooltip('', EN, formatString), '');
         // A stray lowercase letter should still read sensibly.
         assert.strictEqual(priorityTooltip('a', EN, formatString), 'Priority A (highest)');
+    });
+
+    test('timeTooltip names the start, the span, and the whole day', () => {
+        assert.strictEqual(timeTooltip('09:30', '', EN, formatString), 'Starts at 09:30');
+        assert.strictEqual(timeTooltip('09:30', '11:00', EN, formatString), 'From 09:30 to 11:00');
+        assert.strictEqual(timeTooltip('09:30', '11:00', RU, formatString), 'С 09:30 до 11:00');
+    });
+
+    test('timeTooltip explains the empty cell rather than leaving it bare', () => {
+        // The column draws nothing for an all-day entry, so the tooltip is the
+        // only place that says why -- and an end time without a start is not a
+        // span, it is the same missing statement.
+        assert.strictEqual(timeTooltip('', '', EN, formatString), 'All day — the entry names no time');
+        assert.strictEqual(timeTooltip('', '11:00', EN, formatString), 'All day — the entry names no time');
+    });
+
+    test('headingTooltip names what the entry says and where it is written', () => {
+        assert.strictEqual(
+            headingTooltip('Write the report', '/w/notes.md', 12, EN, formatString),
+            'Write the report — /w/notes.md, line 12'
+        );
+        assert.strictEqual(
+            headingTooltip('Write the report', '/w/notes.md', 12, RU, formatString),
+            'Write the report — /w/notes.md, строка 12'
+        );
+    });
+
+    test('headingTooltip falls back to the heading alone without a file', () => {
+        // Nothing in the agenda renders such a row, but a tooltip reading
+        // ", line 0" would be worse than one reading the heading twice.
+        assert.strictEqual(headingTooltip('Write the report', '', undefined, EN, formatString), 'Write the report');
+        assert.strictEqual(
+            headingTooltip('Write the report', '/w/notes.md', undefined, EN, formatString),
+            'Write the report — /w/notes.md, line 0'
+        );
+    });
+
+    test('offsetTooltip counts the distance in both directions', () => {
+        const days = (n: number): string => `${n} ${n === 1 ? 'day' : 'days'}`;
+        assert.strictEqual(offsetTooltip(-3, 'overdue', EN, formatString, days), 'Overdue by 3 days');
+        assert.strictEqual(offsetTooltip(2, 'upcoming', EN, formatString, days), 'Due in 2 days');
+        assert.strictEqual(offsetTooltip(-1, 'overdue', EN, formatString, days), 'Overdue by 1 day');
+        assert.strictEqual(offsetTooltip(0, 'today', EN, formatString, days), 'Dated today');
+    });
+
+    test('offsetTooltip states the direction where there is no offset to count', () => {
+        // The Tasks card: every date at once and no anchor, so the row carries
+        // a direction and no distance.
+        const days = (n: number): string => `${n} days`;
+        assert.strictEqual(offsetTooltip(undefined, 'overdue', EN, formatString, days), 'Dated before today');
+        assert.strictEqual(offsetTooltip(undefined, 'upcoming', EN, formatString, days), 'Dated after today');
+        assert.strictEqual(offsetTooltip(undefined, 'today', EN, formatString, days), 'Dated today');
+        assert.strictEqual(offsetTooltip(undefined, 'upcoming', RU, formatString, days), 'Дата позже сегодняшней');
+    });
+
+    test('offsetTooltip says nothing about a row with neither', () => {
+        const days = (n: number): string => `${n} days`;
+        assert.strictEqual(offsetTooltip(undefined, undefined, EN, formatString, days), '');
+        assert.strictEqual(offsetTooltip(undefined, 'whatever', EN, formatString, days), '');
     });
 });

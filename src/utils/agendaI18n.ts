@@ -132,8 +132,22 @@ export interface AgendaStrings {
         /** Every file had moved on: there was nothing left to put back. */
         undoNothing: string;
     };
-    /** Summary bar: the counted noun plus the two qualifier words. */
-    summary: { tasks: string[]; overdue: string; done: string; priorityA: string };
+    /**
+     * Summary bar: the counted noun, the two qualifier words, and what each
+     * count is a count of -- the bar says "3 overdue" without saying overdue
+     * out of what, and the tooltip is where that fits.
+     */
+    summary: {
+        tasks: string[];
+        overdue: string;
+        done: string;
+        priorityA: string;
+        totalDayTitle: string;
+        totalTasksTitle: string;
+        overdueTitle: string;
+        doneTitle: string;
+        priorityATitle: string;
+    };
     /**
      * Count-chip tooltips, shared by the month cell and the card section head
      * (the two chips are the same component): counted noun, the word the month
@@ -165,6 +179,36 @@ export interface AgendaStrings {
          * (`markdown-org.workspaceDirs`). `{0}` is the directory's name.
          */
         collection: string;
+        /**
+         * The time column. A row with a clock says when it starts, one with an
+         * end says the span, and a row with neither says that much: there the
+         * column is empty, and an empty cell explains itself to nobody.
+         */
+        timeAt: string;
+        timeRange: string;
+        timeAllDay: string;
+        /**
+         * The heading: what it says and where it is written, because the row
+         * shows the first and the file only through `data-file` / `data-line`.
+         * `{0}` heading, `{1}` file, `{2}` line.
+         */
+        headingSource: string;
+        /**
+         * The offset column, where a date on either side of the day being read
+         * differs by styling alone. `{0}` is a counted noun from `days`.
+         */
+        offsetOverdue: string;
+        offsetUpcoming: string;
+        offsetToday: string;
+        /**
+         * The same two without a distance, for the Tasks card: it holds every
+         * date at once and is anchored on none, so a row there has a direction
+         * and no offset to count.
+         */
+        offsetOverduePlain: string;
+        offsetUpcomingPlain: string;
+        /** Counted noun for the two above, in the order `pluralIndex` returns. */
+        days: string[];
     };
     /**
      * Git status of the agenda's source files: the header chip, the list it
@@ -230,6 +274,16 @@ export interface AgendaStrings {
         /** Row tooltips; `{0}` is the path. */
         openFileTitle: string;
         realPathTitle: string;
+        /**
+         * What the mark at the head of a file row stands for. The row's own
+         * tooltip names the path, which leaves the glyph -- the part that says
+         * what is wrong with that path -- unexplained.
+         */
+        markConflicted: string;
+        markUncommitted: string;
+        markUnpushed: string;
+        markOutside: string;
+        markClean: string;
         /** Commit prompt: title, placeholder, and the pre-filled message (`{0}` = date). */
         commitPrompt: string;
         commitPlaceholder: string;
@@ -386,7 +440,17 @@ const EN: AgendaStrings = {
         undoPartial: 'Some notes had changed and were left as they are.',
         undoNothing: 'The notes have changed since; nothing was put back'
     },
-    summary: { tasks: ['task', 'tasks'], overdue: 'overdue', done: 'done', priorityA: 'priority A' },
+    summary: {
+        tasks: ['task', 'tasks'],
+        overdue: 'overdue',
+        done: 'done',
+        priorityA: 'priority A',
+        totalDayTitle: 'Everything drawn on this day',
+        totalTasksTitle: 'Every task in the list',
+        overdueTitle: 'Of them, dated earlier and still open',
+        doneTitle: 'Of them, already done',
+        priorityATitle: 'Of them, carrying priority A'
+    },
     countChip: {
         tasks: ['task', 'tasks'],
         overdue: 'overdue',
@@ -410,7 +474,17 @@ const EN: AgendaStrings = {
         priority: 'Priority {0}',
         priorityHighest: 'Priority {0} (highest)',
         priorityLowest: 'Priority {0} (lowest)',
-        collection: 'From {0}'
+        collection: 'From {0}',
+        timeAt: 'Starts at {0}',
+        timeRange: 'From {0} to {1}',
+        timeAllDay: 'All day — the entry names no time',
+        headingSource: '{0} — {1}, line {2}',
+        offsetOverdue: 'Overdue by {0}',
+        offsetUpcoming: 'Due in {0}',
+        offsetToday: 'Dated today',
+        offsetOverduePlain: 'Dated before today',
+        offsetUpcomingPlain: 'Dated after today',
+        days: ['day', 'days']
     },
     git: {
         caption: 'Source files',
@@ -437,6 +511,11 @@ const EN: AgendaStrings = {
         pushButtonTitle: 'Push the current branch to its upstream',
         openFileTitle: 'Open {0}',
         realPathTitle: 'Real path: {0}',
+        markConflicted: 'A merge left this file unresolved',
+        markUncommitted: 'Changed and not committed',
+        markUnpushed: 'Committed and not pushed',
+        markOutside: 'Outside git, or in a repository that could not be read',
+        markClean: 'Committed and pushed',
         commitPrompt: 'Commit message',
         commitPlaceholder: 'What changed in these files',
         commitDefault: 'agenda: {0}',
@@ -531,7 +610,12 @@ const RU: AgendaStrings = {
         tasks: ['задача', 'задачи', 'задач'],
         overdue: 'просрочено',
         done: 'выполнено',
-        priorityA: 'с приоритетом A'
+        priorityA: 'с приоритетом A',
+        totalDayTitle: 'Всё, что показано на этот день',
+        totalTasksTitle: 'Все задачи списка',
+        overdueTitle: 'Из них с прошедшей датой и ещё не закрытые',
+        doneTitle: 'Из них уже выполненные',
+        priorityATitle: 'Из них с приоритетом A'
     },
     countChip: {
         tasks: ['задача', 'задачи', 'задач'],
@@ -556,7 +640,17 @@ const RU: AgendaStrings = {
         priority: 'Приоритет {0}',
         priorityHighest: 'Приоритет {0} (высший)',
         priorityLowest: 'Приоритет {0} (низший)',
-        collection: 'Из каталога {0}'
+        collection: 'Из каталога {0}',
+        timeAt: 'Начало в {0}',
+        timeRange: 'С {0} до {1}',
+        timeAllDay: 'Весь день — время в записи не указано',
+        headingSource: '{0} — {1}, строка {2}',
+        offsetOverdue: 'Просрочено на {0}',
+        offsetUpcoming: 'Осталось {0}',
+        offsetToday: 'Дата — сегодня',
+        offsetOverduePlain: 'Дата раньше сегодняшней',
+        offsetUpcomingPlain: 'Дата позже сегодняшней',
+        days: ['день', 'дня', 'дней']
     },
     git: {
         caption: 'Файлы-источники',
@@ -583,6 +677,11 @@ const RU: AgendaStrings = {
         pushButtonTitle: 'Отправить текущую ветку в upstream',
         openFileTitle: 'Открыть {0}',
         realPathTitle: 'Реальный путь: {0}',
+        markConflicted: 'Merge оставил файл неразрешённым',
+        markUncommitted: 'Изменён и не закоммичен',
+        markUnpushed: 'Закоммичен, но не отправлен',
+        markOutside: 'Вне git или в репозитории, который не удалось прочитать',
+        markClean: 'Закоммичен и отправлен',
         commitPrompt: 'Сообщение коммита',
         commitPlaceholder: 'Что изменилось в этих файлах',
         commitDefault: 'agenda: {0}',

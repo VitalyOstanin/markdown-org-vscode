@@ -120,6 +120,29 @@ export function gitFileMark(file: GitFileState): string {
 }
 
 /**
+ * What that mark says, in words.
+ *
+ * The row is a button whose tooltip names the path, so the glyph — the half
+ * that says what is wrong with the path — was the part with no wording at all.
+ * The order below is the order `gitFileMark` picks its glyph in, and it has to
+ * stay that way: a conflicted file is also uncommitted, and the two answers
+ * would disagree the moment they were resolved apart.
+ */
+export function gitFileMarkTitle(file: GitFileState, ctx: GitHtmlContext): string {
+    const g = ctx.git;
+    if (file.conflicted) {
+        return g.markConflicted;
+    }
+    if (file.uncommitted) {
+        return g.markUncommitted;
+    }
+    if (file.unpushed) {
+        return g.markUnpushed;
+    }
+    return file.repoRoot === undefined ? g.markOutside : g.markClean;
+}
+
+/**
  * The collapsed chip.
  *
  * The word next to the clean checkmark sits in its own span so the stylesheet
@@ -150,16 +173,22 @@ export function gitChipStats(status: AgendaGitStatus, ctx: GitHtmlContext): stri
     const g = ctx.git;
     if (isGitClean(status)) {
         return (
-            '<span class="git-chip-stat" data-kind="clean">✓' +
+            `<span class="git-chip-stat" data-kind="clean" title="${ctx.escapeHtml(g.cleanTitle)}">✓` +
             `<span class="git-chip-word">${ctx.escapeHtml(g.clean)}</span></span>`
         );
     }
+    // Each counter carries the same sentence it contributes to the chip's own
+    // tooltip. The chip names all of them at once, which is the answer to
+    // "what is the state"; a reader pointing at one glyph is asking about that
+    // glyph, and reading four clauses to find the one is not an answer.
     return gitCounters(status, ctx)
-        .map(
-            (counter) =>
-                `<span class="git-chip-stat" data-kind="${counter.kind}">${counter.mark}` +
+        .map((counter) => {
+            const title = ctx.escapeHtml(ctx.formatString(counter.title, gitCount(counter.count, g.files, ctx)));
+            return (
+                `<span class="git-chip-stat" data-kind="${counter.kind}" title="${title}">${counter.mark}` +
                 `<b>${ctx.escapeHtml(ctx.formatNumber(counter.count, ctx.locale))}</b></span>`
-        )
+            );
+        })
         .join('');
 }
 
@@ -435,7 +464,7 @@ export function gitFileRows(files: readonly GitFileState[], kind: string, ctx: G
             return (
                 `<button type="button" class="git-file" data-kind="${ctx.escapeHtml(kind)}" ` +
                 `data-file="${ctx.escapeHtml(file.file)}" title="${ctx.escapeHtml(title)}">` +
-                `<span class="git-file-mark">${mark}</span>` +
+                `<span class="git-file-mark" title="${ctx.escapeHtml(gitFileMarkTitle(file, ctx))}">${mark}</span>` +
                 `<span class="git-file-name">${ctx.escapeHtml(file.label)}</span></button>`
             );
         })

@@ -5,6 +5,29 @@ All notable changes to the "Markdown Org" extension will be documented in this f
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- The last of the agenda's terse columns say what they mean on hover. The time
+  column names the start, the span when the entry has an end, and says "all
+  day" where it draws nothing — an empty cell was the one statement the page
+  never made in words. The heading adds the file and the line it is written on,
+  which is what tells two identical headings from two scanned directories
+  apart. The offset column names the distance and its direction, until now
+  carried by colour alone, and says which way a Tasks row points where there is
+  no anchor day to measure from. The summary counts say what each number counts:
+  "3 overdue" never said overdue out of what. Every glyph inside the git chip
+  carries the clause it contributes to the chip's own tooltip, so a reader
+  asking about one counter is not handed all four. The mark at the head of a
+  file row says what the glyph stands for, next to the tooltip that names the
+  path.
+
+- The day header, the hero title and its TODAY badge, the section names and the
+  day number inside a calendar cell stay as they are: each is plain text that
+  says the whole of what it means, and the element around it already answers
+  for the rest.
+
 ## [0.18.0] - 2026-08-18
 
 ### Added

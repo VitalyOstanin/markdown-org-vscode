@@ -48,6 +48,11 @@ export function countLabel(
 /**
  * One `<b>N</b> word` stat for the summary bar. `word` is either a plain
  * qualifier ("overdue") or the plural forms of a counted noun.
+ *
+ * `title` says what the number counts. The bar reads "12 tasks · 3 overdue ·
+ * 2 done", where every qualifier after the first is a share of the first and
+ * nothing on the page says so; a stat with no title of its own passes none on,
+ * which is what the caller does for a count that needs no explaining.
  */
 export function summaryStat(
     n: number,
@@ -59,11 +64,16 @@ export function summaryStat(
         escapeHtml: EscapeHtml;
         formatNumber: FormatNumber;
         pluralIndex: PluralIndex;
-    }
+    },
+    title?: string
 ): string {
     const label = Array.isArray(word) ? word[ctx.pluralIndex(n, ctx.uiLang)] : word;
     const count = ctx.formatNumber(n, ctx.locale);
-    return `<span class="day-summary-stat${cls ? ` ${cls}` : ''}"><b>${count}</b> ${ctx.escapeHtml(label)}</span>`;
+    const titleAttr = title ? ` title="${ctx.escapeHtml(title)}"` : '';
+    return (
+        `<span class="day-summary-stat${cls ? ` ${cls}` : ''}"${titleAttr}>` +
+        `<b>${count}</b> ${ctx.escapeHtml(label)}</span>`
+    );
 }
 
 /**

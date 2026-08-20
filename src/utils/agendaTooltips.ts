@@ -158,3 +158,79 @@ export function priorityTooltip(letter: string, strings: TooltipStrings, fill: F
     }
     return fill(strings.priority, upper);
 }
+
+/**
+ * Tooltip for the `.time-plain` column.
+ *
+ * The column holds a bare `HH:MM`, an empty cell, and nothing else — an
+ * all-day entry draws no placeholder glyph, so the cell that says the most
+ * about the entry is the one with nothing in it. The tooltip is where that
+ * reads as a statement rather than as a gap, and where the end of a timed
+ * entry — which the column has no room for — is named.
+ */
+export function timeTooltip(time: string, endTime: string, strings: TooltipStrings, fill: FormatString): string {
+    if (!time) {
+        return strings.timeAllDay;
+    }
+    return endTime ? fill(strings.timeRange, time, endTime) : fill(strings.timeAt, time);
+}
+
+/**
+ * Tooltip for the `.heading` span: what the entry says, and the file and line
+ * it is written on.
+ *
+ * The row carries the source in `data-file` / `data-line` because a click has
+ * to open it, but nothing puts it in front of the reader — and with several
+ * directories scanned, two identical headings are told apart by their file
+ * alone. The heading is repeated in the tooltip because the column is the one
+ * that runs out of room first, and a truncated row is exactly when a reader
+ * reaches for the tooltip.
+ */
+export function headingTooltip(
+    heading: string,
+    file: string,
+    line: number | undefined,
+    strings: TooltipStrings,
+    fill: FormatString
+): string {
+    if (!file) {
+        return heading;
+    }
+    return fill(strings.headingSource, heading, file, String(line ?? 0));
+}
+
+/**
+ * Tooltip for the `.offset` column: how far the row's own date is from the day
+ * it is being read on.
+ *
+ * The column shows the date; the direction — overdue or still to come — is
+ * carried by `data-dir` and read out in colour alone, which leaves it unsaid
+ * for anyone the colour does not reach. `countDays` arrives already formatted
+ * ("3 days", "3 дня"): plural forms need the locale, and this module is
+ * inlined into the page, where it can import none of it.
+ *
+ * The distance is what the Day and Week cards can say, because the bucket a
+ * row sits in carries it. The Tasks card has no anchor and no offset — there
+ * the direction alone is the answer, and saying "overdue" without a number is
+ * better than saying nothing because the number is missing.
+ */
+export function offsetTooltip(
+    daysOffset: number | undefined,
+    direction: string | undefined,
+    strings: TooltipStrings,
+    fill: FormatString,
+    countDays: (n: number) => string
+): string {
+    if (daysOffset !== undefined && daysOffset !== 0) {
+        return daysOffset < 0
+            ? fill(strings.offsetOverdue, countDays(-daysOffset))
+            : fill(strings.offsetUpcoming, countDays(daysOffset));
+    }
+    if (daysOffset === 0 || direction === 'today') {
+        return strings.offsetToday;
+    }
+    if (direction === 'overdue') {
+        return strings.offsetOverduePlain;
+    }
+    return direction === 'upcoming' ? strings.offsetUpcomingPlain : '';
+}

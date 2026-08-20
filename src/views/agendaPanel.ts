@@ -60,6 +60,7 @@ import {
     gitCount,
     gitCounters,
     gitFileMark,
+    gitFileMarkTitle,
     gitFileRows,
     gitFilesByRepository,
     gitGlyph,
@@ -81,7 +82,14 @@ import { commitAgendaSources, pushAgendaSources, syncAgendaSources } from '../co
 import { isCancelled } from '../utils/normalizeTaskType';
 import { shiftMonthAnchor } from '../utils/monthNav';
 import { wireDayHeaderNavigation } from '../utils/agendaDayHeaderNav';
-import { attentionTooltip, flagTooltip, priorityTooltip } from '../utils/agendaTooltips';
+import {
+    attentionTooltip,
+    flagTooltip,
+    headingTooltip,
+    offsetTooltip,
+    priorityTooltip,
+    timeTooltip
+} from '../utils/agendaTooltips';
 import { buildTagCycle } from '../utils/cycleTag';
 import { resolveHeroModel } from '../utils/agendaHero';
 import { buildDaySections, buildOverdueBandIndex, computeDaySummary } from '../utils/agendaDaySummary';
@@ -1305,6 +1313,9 @@ export class AgendaPanel {
         flagTooltip,
         attentionTooltip,
         priorityTooltip,
+        timeTooltip,
+        headingTooltip,
+        offsetTooltip,
         resolveHeroModel,
         computeDaySummary,
         buildDaySections,
@@ -1361,6 +1372,7 @@ export class AgendaPanel {
         gitConflictedGroup,
         gitGlyph,
         gitFileMark,
+        gitFileMarkTitle,
         gitFileRows,
         gitFilesByRepository,
         gitGroup,

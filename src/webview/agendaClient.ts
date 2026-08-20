@@ -353,6 +353,26 @@ export interface AgendaClientDeps {
         strings: TooltipStrings,
         fill: (template: string, ...values: string[]) => string
     ) => string;
+    timeTooltip: (
+        time: string,
+        endTime: string,
+        strings: TooltipStrings,
+        fill: (template: string, ...values: string[]) => string
+    ) => string;
+    headingTooltip: (
+        heading: string,
+        file: string,
+        line: number | undefined,
+        strings: TooltipStrings,
+        fill: (template: string, ...values: string[]) => string
+    ) => string;
+    offsetTooltip: (
+        daysOffset: number | undefined,
+        direction: string | undefined,
+        strings: TooltipStrings,
+        fill: (template: string, ...values: string[]) => string,
+        countDays: (n: number) => string
+    ) => string;
     resolveHeroModel: (mode: string, shiftedToday: string, todayIso: string) => HeroModel;
     computeDaySummary: (day: DayAgenda) => DaySummary;
     buildDaySections: (day: DayAgenda, labels: DaySectionLabels) => DaySection[];
@@ -396,7 +416,8 @@ export interface AgendaClientDeps {
             escapeHtml: (text: string | number | boolean | undefined | null) => string;
             formatNumber: (value: number, locale: string) => string;
             pluralIndex: (n: number, lang: string) => number;
-        }
+        },
+        title?: string
     ) => string;
     renderSummaryBar: (
         dateIso: string,
@@ -551,6 +572,27 @@ export interface AgendaClientDeps {
                 strings: TooltipStrings,
                 fill: (template: string, ...values: string[]) => string
             ) => string;
+            timeTooltip: (
+                time: string,
+                endTime: string,
+                strings: TooltipStrings,
+                fill: (template: string, ...values: string[]) => string
+            ) => string;
+            headingTooltip: (
+                heading: string,
+                file: string,
+                line: number | undefined,
+                strings: TooltipStrings,
+                fill: (template: string, ...values: string[]) => string
+            ) => string;
+            offsetTooltip: (
+                daysOffset: number | undefined,
+                direction: string | undefined,
+                strings: TooltipStrings,
+                fill: (template: string, ...values: string[]) => string,
+                countDays: (n: number) => string
+            ) => string;
+            countDays: (n: number) => string;
             collectionMark?: ((root: string | undefined) => string) | undefined;
             showDate?: 'when-offset' | 'always' | undefined;
         }
@@ -646,6 +688,7 @@ export interface AgendaClientDeps {
     /** Called by the two above; the client never invokes them itself. */
     gitGlyph: (kind: string) => string;
     gitFileMark: (file: GitFileState) => string;
+    gitFileMarkTitle: (file: GitFileState, ctx: GitHtmlContext) => string;
     gitActions: (status: AgendaGitStatus, ctx: GitHtmlContext) => string;
 }
 
@@ -753,6 +796,9 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         flagTooltip,
         attentionTooltip,
         priorityTooltip,
+        timeTooltip,
+        headingTooltip,
+        offsetTooltip,
         resolveHeroModel,
         computeDaySummary,
         buildDaySections,
@@ -1761,12 +1807,14 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         const summary = computeDaySummary(day);
         const sections = buildDaySections(day, UI.sections);
 
-        const pieces = [summaryStat(summary.total, UI.summary.tasks, '')];
+        const pieces = [summaryStat(summary.total, UI.summary.tasks, '', UI.summary.totalDayTitle)];
         if (summary.overdue > 0) {
-            pieces.push(summaryStat(summary.overdue, UI.summary.overdue, 'day-summary-overdue'));
+            pieces.push(
+                summaryStat(summary.overdue, UI.summary.overdue, 'day-summary-overdue', UI.summary.overdueTitle)
+            );
         }
         if (summary.done > 0) {
-            pieces.push(summaryStat(summary.done, UI.summary.done, 'day-summary-done'));
+            pieces.push(summaryStat(summary.done, UI.summary.done, 'day-summary-done', UI.summary.doneTitle));
         }
         // The summary bar carries data-date: it is the day view's single
         // anchor-date element (getRenderedInfo contract). Its content is the
@@ -1805,8 +1853,18 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
     // their rows as standard .task-line elements, so the markup lives here once
     // instead of being duplicated per view.
 
-    function summaryStat(n: number, word: string | string[], cls: string): string {
-        return summaryStatHtml(n, word, cls, { locale, uiLang, escapeHtml, formatNumber, pluralIndex });
+    function summaryStat(n: number, word: string | string[], cls: string, title?: string): string {
+        return summaryStatHtml(n, word, cls, { locale, uiLang, escapeHtml, formatNumber, pluralIndex }, title);
+    }
+
+    /**
+     * "3 days" / "3 дня" for the offset tooltip. Bound here for the same
+     * reason the row's date formatter is: the plural form needs the UI
+     * language and the number needs the locale, and neither reaches a module
+     * inlined into the page.
+     */
+    function countDays(n: number): string {
+        return countLabelHtml(n, UI.tooltips.days, { locale, uiLang, formatNumber, pluralIndex });
     }
 
     function renderSummaryBar(dateIso: string, pieces: string[]): string {
@@ -1965,12 +2023,14 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         const summary = computeTasksSummary(tasks);
         const groups = buildTaskGroups(tasks, UI.groups);
 
-        const pieces = [summaryStat(summary.total, UI.summary.tasks, '')];
+        const pieces = [summaryStat(summary.total, UI.summary.tasks, '', UI.summary.totalTasksTitle)];
         if (summary.highPriority > 0) {
-            pieces.push(summaryStat(summary.highPriority, UI.summary.priorityA, 'day-summary-high'));
+            pieces.push(
+                summaryStat(summary.highPriority, UI.summary.priorityA, 'day-summary-high', UI.summary.priorityATitle)
+            );
         }
         if (summary.done > 0) {
-            pieces.push(summaryStat(summary.done, UI.summary.done, 'day-summary-done'));
+            pieces.push(summaryStat(summary.done, UI.summary.done, 'day-summary-done', UI.summary.doneTitle));
         }
         // This card holds tasks of every date at once, so a row states its own
         // date -- a bare 09:30 names no day -- and reads its direction off that
@@ -2019,6 +2079,10 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             attentionTooltip,
             flagTooltip,
             priorityTooltip,
+            timeTooltip,
+            headingTooltip,
+            offsetTooltip,
+            countDays,
             collectionMark: (root) =>
                 collectionMarkHtml(root, collections, {
                     collectionTooltip: UI.tooltips.collection,

@@ -8,6 +8,7 @@ import {
     gitChipTitle,
     gitCounters,
     gitFileMark,
+    gitFileMarkTitle,
     gitGlyph,
     renderGitChip,
     renderGitMenu
@@ -94,6 +95,28 @@ suite('renderGitChip', () => {
         // The word is a separate span so the compact header can hide it in CSS
         // without a second render pass.
         assert.ok(html.includes('<span class="git-chip-word">clean</span>'));
+    });
+
+    test('each counter explains itself, not only the chip as a whole', () => {
+        // The chip's own tooltip names every counter at once, which answers
+        // "what is the state". A reader pointing at one glyph is asking about
+        // that glyph, and four clauses to pick one out of is not an answer.
+        const html = renderGitChip(
+            status({
+                files: [
+                    file({ file: '/repo/work.md', label: 'work.md', uncommitted: true }),
+                    file({ file: '/repo/home.md', label: 'home.md', unpushed: true })
+                ]
+            }),
+            CTX
+        );
+        assert.ok(html.includes('data-kind="uncommitted" title="1 file not committed"'));
+        assert.ok(html.includes('data-kind="unpushed" title="1 file not pushed"'));
+    });
+
+    test('the clean marker carries the sentence the chip does', () => {
+        const html = renderGitChip(status({ files: [file({ file: '/repo/notes.md', label: 'notes.md' })] }), CTX);
+        assert.ok(html.includes(`title="${AGENDA_STRINGS.en.git.cleanTitle}"`));
     });
 
     // The regression this pair pins: a file whose repository could not be read
@@ -496,6 +519,44 @@ suite('one set of state marks', () => {
         const clean = file({ file: '/repo/ok.md', label: 'ok.md' });
         assert.strictEqual(gitFileMark(clean), gitGlyph('clean'));
         assert.match(gitChipStats(status({ files: [clean] }), CTX), new RegExp(gitGlyph('clean')));
+    });
+
+    test('the mark says in words what its glyph stands for', () => {
+        const g = AGENDA_STRINGS.en.git;
+        assert.strictEqual(
+            gitFileMarkTitle(file({ file: '/repo/a.md', label: 'a.md', conflicted: true }), CTX),
+            g.markConflicted
+        );
+        assert.strictEqual(
+            gitFileMarkTitle(file({ file: '/repo/b.md', label: 'b.md', uncommitted: true }), CTX),
+            g.markUncommitted
+        );
+        assert.strictEqual(
+            gitFileMarkTitle(file({ file: '/repo/c.md', label: 'c.md', unpushed: true }), CTX),
+            g.markUnpushed
+        );
+        assert.strictEqual(gitFileMarkTitle(outsideFile('/elsewhere/d.md', 'd.md'), CTX), g.markOutside);
+        assert.strictEqual(gitFileMarkTitle(file({ file: '/repo/e.md', label: 'e.md' }), CTX), g.markClean);
+    });
+
+    test('the wording follows the glyph when a file is in more than one state', () => {
+        // gitFileMark picks the conflicted glyph for a file that is also
+        // uncommitted; the two must not answer from different rules.
+        const both = file({ file: '/repo/f.md', label: 'f.md', conflicted: true, uncommitted: true });
+        assert.strictEqual(gitFileMark(both), gitGlyph('conflicted'));
+        assert.strictEqual(gitFileMarkTitle(both, CTX), AGENDA_STRINGS.en.git.markConflicted);
+    });
+
+    test('the row carries both tooltips: the path on the button, the state on the mark', () => {
+        const html = renderGitMenu(
+            status({ files: [file({ file: '/repo/work.md', label: 'work.md', uncommitted: true })] }),
+            CTX
+        );
+        assert.ok(html.includes('title="Open /repo/work.md"'), 'the row must still name the path');
+        assert.ok(
+            html.includes(`<span class="git-file-mark" title="${AGENDA_STRINGS.en.git.markUncommitted}">`),
+            'the mark must say what it stands for'
+        );
     });
 });
 

@@ -57,6 +57,23 @@ suite('agendaSummaryHtml.summaryStat', () => {
         assert.match(summaryStat(5, ['task', 'tasks'], '', base), /<\/b> tasks<\/span>/);
     });
 
+    test('says what the number counts when given the words for it', () => {
+        // "3 overdue" says nothing about overdue out of what, and the bar has
+        // no room to say it.
+        assert.strictEqual(
+            summaryStat(3, 'overdue', '', base, 'Of them, dated earlier and still open'),
+            '<span class="day-summary-stat" title="Of them, dated earlier and still open"><b>3</b> overdue</span>'
+        );
+    });
+
+    test('carries no empty title attribute when there is nothing to add', () => {
+        assert.ok(!summaryStat(2, 'overdue', '', base).includes('title'));
+    });
+
+    test('escapes the title as well as the label', () => {
+        assert.match(summaryStat(1, 'overdue', '', base, 'a "quoted" word'), /title="a &quot;quoted&quot; word"/);
+    });
+
     test('escapes the label', () => {
         assert.match(summaryStat(1, '<b>x</b>', '', base), /&lt;b&gt;x&lt;\/b&gt;/);
     });

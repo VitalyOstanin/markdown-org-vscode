@@ -48,6 +48,27 @@ export interface TaskRowContext {
         task?: TaskWithOffset
     ) => string;
     priorityTooltip: (letter: string, strings: TooltipStrings, fill: FormatString) => string;
+    timeTooltip: (time: string, endTime: string, strings: TooltipStrings, fill: FormatString) => string;
+    headingTooltip: (
+        heading: string,
+        file: string,
+        line: number | undefined,
+        strings: TooltipStrings,
+        fill: FormatString
+    ) => string;
+    offsetTooltip: (
+        daysOffset: number | undefined,
+        direction: string | undefined,
+        strings: TooltipStrings,
+        fill: FormatString,
+        countDays: (n: number) => string
+    ) => string;
+    /**
+     * A count of days already in words ("3 days", "3 дня"), for the offset
+     * tooltip. Plural forms need the locale and the number formatter, neither
+     * of which this module may reach from the page.
+     */
+    countDays: (n: number) => string;
     /**
      * The collection dot for this row, already rendered, or an empty string --
      * which is what a single scanned directory always yields. Supplied as a
@@ -96,14 +117,24 @@ export function renderTaskRow(
     // DEADLINE task; resolveHeadingClass still owns the DEADLINE > priority >
     // default precedence rule.
     const typeAttr = ctx.resolveHeadingClass(task).includes('deadline') ? 'deadline' : 'scheduled';
+    // A row with no date of its own gets no tooltip on the column: `dateDir`
+    // falls back to `overdue` for want of anything else to style, and a
+    // tooltip built from that would tell an undated task it is late.
+    const offsetTitle = task.timestamp_date
+        ? ctx.offsetTooltip(daysOffset, dateDir, ctx.tooltips, ctx.formatString, ctx.countDays)
+        : '';
 
     return (
         `<div class="task-line" data-status="${statusKind}" data-priority="${priorityAttr}"` +
         ` data-type="${typeAttr}" data-file="${ctx.escapeHtml(task.file)}"` +
         ` data-line="${ctx.sanitizeTaskLine(task.line)}">` +
         // The big-time column: a clean HH:MM, or empty for an all-day task --
-        // an empty column is the whole statement, no placeholder glyph.
-        `<span class="time-plain">${ctx.escapeHtml(task.timestamp_time ?? '')}</span>` +
+        // an empty column is the whole statement, no placeholder glyph. The
+        // tooltip is what says so in words, and what names the end of a timed
+        // entry, for which the column has no room.
+        `<span class="time-plain"` +
+        ` title="${ctx.escapeHtml(ctx.timeTooltip(task.timestamp_time ?? '', task.timestamp_end_time ?? '', ctx.tooltips, ctx.formatString))}">` +
+        `${ctx.escapeHtml(task.timestamp_time ?? '')}</span>` +
         `<span class="status" data-status="${statusKind}" data-attention="${attention}"` +
         ` title="${ctx.escapeHtml(ctx.attentionTooltip(attention, ctx.tooltips))}">${ctx.escapeHtml(status)}</span>` +
         // .flag: the type glyph (deadline/scheduled/repeat/cancelled).
@@ -116,9 +147,11 @@ export function renderTaskRow(
         // of its own: the row's six columns are sized for what every row has,
         // and an extra column would indent every agenda on the far more common
         // single-directory setup just to stay empty.
-        `<span class="heading">${ctx.collectionMark ? ctx.collectionMark(task.root) : ''}` +
-        `${ctx.escapeHtml(task.heading)}</span>` +
-        `<span class="offset" data-dir="${dateDir}">${dateDisplay}</span>` +
+        `<span class="heading"` +
+        ` title="${ctx.escapeHtml(ctx.headingTooltip(task.heading, task.file, task.line, ctx.tooltips, ctx.formatString))}">` +
+        `${ctx.collectionMark ? ctx.collectionMark(task.root) : ''}${ctx.escapeHtml(task.heading)}</span>` +
+        `<span class="offset" data-dir="${dateDir}"` +
+        ` title="${ctx.escapeHtml(offsetTitle)}">${dateDisplay}</span>` +
         '</div>'
     );
 }
