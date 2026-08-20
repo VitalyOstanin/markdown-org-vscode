@@ -145,6 +145,29 @@ suite('agenda git status against a real repository', () => {
         assert.ok(clean && !clean.uncommitted && !clean.unpushed, 'notes.md must read as clean');
     });
 
+    // The repository sits outside the workspace folders, and VS Code watches
+    // the files of a workspace folder. Nothing tells the Git extension that a
+    // file changed out there, so its state stays as the last pass left it --
+    // which is how the chip kept saying "clean" over a note that had just been
+    // written, until the Refresh button in Source Control was pressed by hand.
+    test('an edit outside the workspace reaches the chip without a manual refresh', async function () {
+        this.timeout(30000);
+        const clean = path.join(repoDir, 'watched.md');
+        fs.writeFileSync(clean, '# watched\n');
+        git(['add', 'watched.md']);
+        git(['commit', '-m', 'a file to edit later']);
+
+        const before = await collectGitStatus([linked('watched.md')]);
+        assert.ok(before);
+        assert.strictEqual(before.uncommittedCount, 0, 'the file starts committed');
+
+        fs.appendFileSync(clean, 'edited on disk\n');
+
+        const after = await collectGitStatus([linked('watched.md')]);
+        assert.ok(after);
+        assert.strictEqual(after.uncommittedCount, 1, JSON.stringify(after.files));
+    });
+
     // The reason this one is here rather than in the unit suite: `log` is
     // declared in our own copy of the Git API (gitApiTypes.ts), so nothing but
     // a real host proves the member exists. A missing one would be swallowed

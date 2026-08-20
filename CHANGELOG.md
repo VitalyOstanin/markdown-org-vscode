@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- The git chip reads the repository again before it answers. VS Code watches
+  the files of its workspace folders, and the Git extension builds its state
+  from what those watchers report — a notes repository outside every workspace
+  folder sends no such report, so the chip kept saying "clean" over a note that
+  had just been written until Refresh was pressed in Source Control by hand. A
+  repository the workspace does hold is left alone: there the watchers fire,
+  and a status pass per render would be work nobody asked for.
+
 ### Added
 
 - The last of the agenda's terse columns say what they mean on hover. The time

@@ -16,7 +16,7 @@
 import type { AgendaGitStatus, GitCommitState } from '../../types';
 import { formatError } from '../formatError';
 import { logDiagnostic } from '../logChannel';
-import { getGitApi, resolveRepositoryFor } from './gitApi';
+import { getGitApi, refreshRepositoryState, resolveRepositoryFor } from './gitApi';
 import { resolveRealPath } from './realPath';
 import type { GitRepository } from './gitApiTypes';
 import { pathKey } from './gitPathMatch';
@@ -75,6 +75,10 @@ export async function collectGitStatus(files: readonly string[]): Promise<Agenda
         });
     }
 
+    // Ask for the state again before reading it: outside the workspace folders
+    // nothing tells the Git extension a file changed, so what it holds is the
+    // last pass, not the tree (see refreshRepositoryState).
+    await Promise.all([...contexts.values()].map((context) => refreshRepositoryState(context.repository)));
     const snapshots = await Promise.all([...contexts.values()].map((context) => snapshotRepository(context)));
     return buildGitStatus(sources, snapshots);
 }

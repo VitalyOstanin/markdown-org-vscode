@@ -19,6 +19,7 @@ import * as path from 'node:path';
 import { formatError } from '../formatError';
 import { KeyedResolutionCache } from '../keyedResolutionCache';
 import { logDiagnostic } from '../logChannel';
+import { isInside, pathKey } from './gitPathMatch';
 import { resolveRealPath } from './realPath';
 import type { GitApi, GitExtensionExports, GitRepository } from './gitApiTypes';
 
@@ -39,6 +40,15 @@ const repositoryByDirectory = new KeyedResolutionCache<GitRepository | undefined
 const primedRoots = new Set<string>();
 
 /**
+ * Status passes in flight, one per root.
+ *
+ * Several agenda source files land in the same repository, and the collector
+ * asks for each of them: without this, one render would run `git status` as
+ * many times as it has files in that repository.
+ */
+const statusPasses = new Map<string, Promise<void>>();
+
+/**
  * Drop everything this module remembers about repositories.
  *
  * Both caches, not just the directory answers: a repository that was closed and
@@ -48,6 +58,7 @@ const primedRoots = new Set<string>();
 export function forgetResolvedRepositories(): void {
     repositoryByDirectory.clear();
     primedRoots.clear();
+    statusPasses.clear();
 }
 
 /**
@@ -99,14 +110,77 @@ async function primeRepositoryState(repository: GitRepository, root: string): Pr
         return;
     }
     primedRoots.add(root);
-    try {
-        await repository.status();
-    } catch (error) {
-        // A refresh that fails leaves the (empty) state in place; the agenda
-        // under-reports rather than failing to render.
+    if (!(await runStatusPass(repository, root))) {
         primedRoots.delete(root);
-        logDiagnostic(`agenda git status: initial refresh of ${root} failed: ${formatError(error)}`);
     }
+}
+
+/**
+ * Read a repository's state again when nothing else will.
+ *
+ * VS Code watches the files of its workspace folders, and the Git extension
+ * builds its resource groups from what those watchers report. A repository
+ * outside every workspace folder — the notes repository reached through a
+ * symlink, or any repository at all when a single file is open — gets no such
+ * report: its state stays as the last pass left it, and the chip went on
+ * saying "clean" over a note that had just been written until somebody pressed
+ * Refresh in Source Control by hand.
+ *
+ * A repository the workspace does hold is left alone: there the watchers fire,
+ * the state is already current, and a pass per render would be `git status`
+ * over a tree the user did not ask about.
+ */
+export async function refreshRepositoryState(repository: GitRepository): Promise<void> {
+    if (isWatchedByWorkspace(repository.rootUri.fsPath)) {
+        return;
+    }
+    await runStatusPass(repository, repository.rootUri.fsPath);
+}
+
+/**
+ * Whether a workspace folder holds this repository, and so whether VS Code
+ * watches the files in it.
+ *
+ * Compared by path rather than through `getWorkspaceFolder`: the Git API type
+ * this module is written against carries a root as a path, not as a `Uri` (see
+ * gitApiTypes.ts), and the comparison has to follow the platform's own case
+ * rules either way. A folder nested inside the repository counts as well: what
+ * matters is that something is watching the tree, and the source files of an
+ * agenda sit under the folder the user opened.
+ */
+function isWatchedByWorkspace(root: string): boolean {
+    const folders = vscode.workspace.workspaceFolders ?? [];
+    return folders.some((folder) => {
+        const folderPath = folder.uri.fsPath;
+        return pathKey(folderPath) === pathKey(root) || isInside(folderPath, root) || isInside(root, folderPath);
+    });
+}
+
+/**
+ * One `git status` per root at a time, shared by everyone who asks meanwhile.
+ *
+ * Returns whether it succeeded: a pass that fails leaves the state as it was,
+ * so the agenda under-reports rather than failing to render.
+ */
+async function runStatusPass(repository: GitRepository, root: string): Promise<boolean> {
+    const running = statusPasses.get(root);
+    if (running) {
+        await running;
+        return true;
+    }
+    let ok = true;
+    const pass = repository
+        .status()
+        .catch((error: unknown) => {
+            ok = false;
+            logDiagnostic(`agenda git status: refresh of ${root} failed: ${formatError(error)}`);
+        })
+        .then(() => {
+            statusPasses.delete(root);
+        });
+    statusPasses.set(root, pass);
+    await pass;
+    return ok;
 }
 
 /** Once per session: the agenda refreshes often and this answer never changes. */
