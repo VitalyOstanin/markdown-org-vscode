@@ -237,6 +237,27 @@ suite('Timestamp Integration Tests', () => {
         assert.ok(line.includes('2025-12-07'));
     });
 
+    // Holding Shift+Up sends the command again before the previous edit has
+    // landed. `TextEditor.edit` answers false for the second one, and the user
+    // is told the value was not written -- while holding the key is exactly
+    // how a date is walked several days along.
+    test('two adjustments in flight at once both land', async () => {
+        document = await vscode.workspace.openTextDocument({
+            content: '`SCHEDULED: <2025-12-06 Fri>`',
+            language: 'markdown'
+        });
+        editor = await vscode.window.showTextDocument(document);
+        editor.selection = new vscode.Selection(0, 22, 0, 22);
+
+        await Promise.all([
+            vscode.commands.executeCommand('markdown-org.timestampUp'),
+            vscode.commands.executeCommand('markdown-org.timestampUp')
+        ]);
+
+        const line = document.lineAt(0).text;
+        assert.ok(line.includes('2025-12-08'), `expected two days on, got: ${line}`);
+    });
+
     test('Timestamp Down decrements day', async () => {
         document = await vscode.workspace.openTextDocument({
             content: '`SCHEDULED: <2025-12-06 Fri>`',

@@ -12,6 +12,7 @@ import { collectSiblingKeywords } from '../utils/headingScan';
 import { namedGroups } from '../utils/regexGroups';
 import { notifyWarn, notifyStatus } from '../utils/notify';
 import { applyEditOrReport } from '../utils/applyEdit';
+import { queueEdit } from '../utils/editQueue';
 
 const PRIORITY_A_CODE = 'A'.codePointAt(0) ?? 0;
 const PRIORITY_Z_CODE = 'Z'.codePointAt(0) ?? 0;
@@ -187,6 +188,13 @@ async function replaceAndCollapseSelection(
  * or a TODO/priority on a heading. Falls back to cursor-select line motion.
  */
 export async function adjustTimestamp(delta: number) {
+    // Queued rather than run outright: a held key repeats faster than an edit
+    // lands, and the call that starts on a document another call is about to
+    // rewrite has its own edit refused (see editQueue.ts).
+    return queueEdit(() => adjustTimestampNow(delta));
+}
+
+async function adjustTimestampNow(delta: number) {
     const editor = vscode.window.activeTextEditor;
     if (!editor) {
         return;

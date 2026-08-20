@@ -17,6 +17,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   repository the workspace does hold is left alone: there the watchers fire,
   and a status pass per render would be work nobody asked for.
 
+- Holding Shift+Up or Shift+Down walks the date along instead of losing a
+  repeat. The command was sent again before the previous edit had landed, and
+  the second one read a document that was about to change: its edit was refused
+  and reported as "the value was not written", which is what a held key
+  produced every time. The adjust commands now run one after another.
+
 ### Added
 
 - The last of the agenda's terse columns say what they mean on hover. The time
