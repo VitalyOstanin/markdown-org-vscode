@@ -992,6 +992,14 @@ function conflictedStatus(): AgendaGitStatus {
 suite('agenda panel git chip', () => {
     const panelRepos: string[] = [];
 
+    // Released after every test, including the ones that never paused it: the
+    // tests further down read the status the panel collects itself, and a pause
+    // left behind by an earlier failure would leave them waiting for a chip
+    // nobody is going to compute.
+    teardown(() => {
+        AgendaPanel.pauseGitStatusForTesting(false);
+    });
+
     suiteTeardown(() => {
         for (const dir of panelRepos) {
             try {
@@ -1039,6 +1047,11 @@ suite('agenda panel git chip', () => {
             const status = await collectGitStatus([file]);
             return status?.uncommittedCount === 1;
         }, 'the new repository to be opened and read');
+        // From here the page holds only what the test posts. The panel watches
+        // every open repository, and this one is being written to, so without
+        // the pause a real status lands between the stand-in and the assertion
+        // and rebuilds the buttons from a repository with nothing to push.
+        AgendaPanel.pauseGitStatusForTesting(true);
     }
 
     test('the header carries a git chip once the status reaches the page', async function () {
@@ -1087,13 +1100,11 @@ suite('agenda panel git chip', () => {
     test('pressing an action takes both buttons out of service and marks the pressed one', async function () {
         this.timeout(30000);
         await renderOverPendingRepository('busy');
-        // The panel collects the real status of the rendered files on its own
-        // and posts it when the walk is done. On a slow host that answer lands
-        // after the stand-in and rebuilds the buttons from a repository with
-        // nothing to push, so the stand-in is re-posted inside the wait: what
-        // the page ends up holding is then the last message either side sent.
+        // Posted once, not in a loop: `renderOverPendingRepository` has paused
+        // the panel's own collection, so this stand-in is the last word on what
+        // the chip shows.
+        await AgendaPanel.postGitStatusForTesting(pendingStatus());
         await waitUntil(async () => {
-            await AgendaPanel.postGitStatusForTesting(pendingStatus());
             const info = await AgendaPanel.queryRenderedInfoForTesting();
             return info?.gitActions.join(' | ') === 'sync | commit | push';
         }, 'all three actions to be offered');
@@ -1138,13 +1149,11 @@ suite('agenda panel git chip', () => {
     test('a status arriving mid-action leaves the buttons out of service', async function () {
         this.timeout(30000);
         await renderOverPendingRepository('mid-action');
-        // The panel collects the real status of the rendered files on its own
-        // and posts it when the walk is done. On a slow host that answer lands
-        // after the stand-in and rebuilds the buttons from a repository with
-        // nothing to push, so the stand-in is re-posted inside the wait: what
-        // the page ends up holding is then the last message either side sent.
+        // Posted once, not in a loop: `renderOverPendingRepository` has paused
+        // the panel's own collection, so this stand-in is the last word on what
+        // the chip shows.
+        await AgendaPanel.postGitStatusForTesting(pendingStatus());
         await waitUntil(async () => {
-            await AgendaPanel.postGitStatusForTesting(pendingStatus());
             const info = await AgendaPanel.queryRenderedInfoForTesting();
             return info?.gitActions.join(' | ') === 'sync | commit | push';
         }, 'all three actions to be offered');

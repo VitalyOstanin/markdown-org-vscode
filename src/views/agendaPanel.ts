@@ -277,6 +277,13 @@ export class AgendaPanel {
     // result of anything but the newest request is dropped rather than
     // overwriting fresher numbers with older ones.
     private static gitRequestSeq = 0;
+    // Test-only: while set, the panel computes no status of its own. The two
+    // tests that drive the chip's buttons render over a repository of their
+    // own making, and a real status arriving mid-test rebuilds those buttons
+    // from what that repository actually holds -- which is not what they are
+    // asserting. Set through `pauseGitStatusForTesting`, which also retires the
+    // in-flight request so an answer already on its way is dropped as stale.
+    private static gitStatusPausedForTesting = false;
     // Whether a render failure inside the webview has already been reported for
     // the open panel. A broken payload fails on every refresh, and the
     // file-watcher refreshes on each save, so the report is once per panel.
@@ -786,7 +793,7 @@ export class AgendaPanel {
     private static async pushGitStatus(): Promise<void> {
         const panel = AgendaPanel.currentPanel;
         const args = AgendaPanel.lastRenderArgs;
-        if (!panel || !args) {
+        if (!panel || !args || AgendaPanel.gitStatusPausedForTesting) {
             return;
         }
         const seq = ++AgendaPanel.gitRequestSeq;
@@ -1196,6 +1203,23 @@ export class AgendaPanel {
      */
     public static clickGitActionForTesting(action: 'commit' | 'push' | 'sync'): Thenable<boolean> {
         return AgendaPanel.postToPage({ command: 'clickGitActionForTesting', action });
+    }
+
+    /**
+     * Test-only helper: stop the panel from computing a status of its own.
+     *
+     * A test that posts a stand-in status is otherwise racing the panel's own
+     * collection, which fires on every repository event and rebuilds the chip
+     * from the repository as it really is. Paused for the span of such a test
+     * and released afterwards, so the tests that do read the real status are
+     * unaffected.
+     */
+    public static pauseGitStatusForTesting(paused: boolean): void {
+        AgendaPanel.gitStatusPausedForTesting = paused;
+        // Retire whatever is in flight: a collection that started before the
+        // pause would otherwise finish afterwards and post its answer, which is
+        // the very race the pause exists to remove.
+        AgendaPanel.gitRequestSeq += 1;
     }
 
     /**
