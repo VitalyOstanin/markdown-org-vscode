@@ -24,8 +24,16 @@ export function buildOrgPropertiesBlock(props: Record<string, string>, indent = 
     return [`${indent}\`\`\`${ORG_PROPERTIES_INFO}`, ...body, `${indent}\`\`\``];
 }
 
-const OPEN_FENCE = /^\s*```org-properties\s*$/;
-const CLOSE_FENCE = /^\s*```\s*$/;
+// A fenced block as CommonMark defines it, which is what the extractor reads
+// through comrak: three or more backticks or tildes, an optional indent, and
+// an info string. The three clients have to agree on where a block is, or one
+// writes a key the other never reads back -- and with the exception keys of
+// the extractor's ADR-0031 that means a cancelled occurrence returning to the
+// agenda. This mirrors the extractor: every block of the heading's section
+// counts, whatever fences it, and the last one wins on a repeated key.
+const FENCE = /^(\s*)(`{3,}|~{3,})\s*(.*)$/;
+/** A markdown ATX heading, which ends the section a block can belong to. */
+const HEADING = /^\s{0,3}#{1,6}(\s|$)/;
 
 /** Half-open line range `[startLine, endLineExclusive)` of a found block. */
 export interface OrgPropertiesRange {
@@ -33,30 +41,78 @@ export interface OrgPropertiesRange {
     endLineExclusive: number;
 }
 
-/**
- * Locate an `org-properties` block that belongs to the heading at
- * `headingLine`: skip the consecutive planning-line run after the heading,
- * then require an opening `org-properties` fence and find its closing fence.
- * Returns the half-open line range, or `null` if there is no such block (or
- * it is unterminated, in which case the caller must not corrupt the file).
- */
-export function findOrgPropertiesBlock(lines: string[], headingLine: number): OrgPropertiesRange | null {
-    let i = headingLine + 1;
-    while (i < lines.length && matchTimestampLine(lines[i] ?? '')) {
-        i++;
-    }
-    if (i >= lines.length || !OPEN_FENCE.test(lines[i] ?? '')) {
+/** The opening fence of a block, or null when the line is not one. */
+function openingFence(line: string): { marker: string; info: string } | null {
+    const m = FENCE.exec(line);
+    if (!m) {
         return null;
     }
-    const startLine = i;
-    i++;
-    while (i < lines.length && !CLOSE_FENCE.test(lines[i] ?? '')) {
-        i++;
+    const marker = m[2] ?? '';
+    const info = (m[3] ?? '').trim();
+    // A backtick fence cannot carry a backtick in its info string
+    // (CommonMark); a tilde fence can carry anything.
+    if (marker.startsWith('`') && info.includes('`')) {
+        return null;
     }
-    if (i >= lines.length) {
-        return null; // unterminated: refuse to guess a range
+    return { marker, info };
+}
+
+/** Whether `line` closes a block opened with `marker`: same char, not shorter, no info. */
+function closesFence(line: string, marker: string): boolean {
+    const m = FENCE.exec(line);
+    if (!m) {
+        return false;
     }
-    return { startLine, endLineExclusive: i + 1 };
+    const found = m[2] ?? '';
+    return found.startsWith(marker[0] ?? '') && found.length >= marker.length && (m[3] ?? '').trim() === '';
+}
+
+/**
+ * Every `org-properties` block of the section headed at `headingLine`, in
+ * document order. The section runs to the next heading; a heading inside a
+ * fenced block is text, not a heading, so fences are tracked while scanning.
+ *
+ * An unterminated block ends the search: what follows it is inside it as far
+ * as any reader is concerned, and a caller must not edit a range it had to
+ * guess at.
+ */
+export function findOrgPropertiesBlocks(lines: string[], headingLine: number): OrgPropertiesRange[] {
+    const found: OrgPropertiesRange[] = [];
+    let i = headingLine + 1;
+    while (i < lines.length) {
+        const line = lines[i] ?? '';
+        const opening = openingFence(line);
+        if (!opening) {
+            if (HEADING.test(line)) {
+                break;
+            }
+            i++;
+            continue;
+        }
+        const startLine = i;
+        let j = i + 1;
+        while (j < lines.length && !closesFence(lines[j] ?? '', opening.marker)) {
+            j++;
+        }
+        if (j >= lines.length) {
+            break; // unterminated: refuse to guess a range
+        }
+        if (opening.info === ORG_PROPERTIES_INFO) {
+            found.push({ startLine, endLineExclusive: j + 1 });
+        }
+        i = j + 1;
+    }
+    return found;
+}
+
+/**
+ * The `org-properties` block a write to this heading has to land in: the last
+ * one of the section, because that is the one the extractor's reader ends up
+ * keeping when a key appears twice. `null` when the section holds none.
+ */
+export function findOrgPropertiesBlock(lines: string[], headingLine: number): OrgPropertiesRange | null {
+    const blocks = findOrgPropertiesBlocks(lines, headingLine);
+    return blocks.at(-1) ?? null;
 }
 
 /**

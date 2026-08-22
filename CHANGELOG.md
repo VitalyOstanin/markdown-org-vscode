@@ -56,6 +56,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the agenda already leaves empty. The calendar treats the two alike: the day
   loses the occurrence either way, and which of the two entries owes the
   arrears is a question the agenda answers, not the calendar.
+
+### Fixed
+
+- A property written to a note is no longer shadowed by an older copy of the
+  same key. The `org-properties` block was found only directly under the
+  planning lines and only inside exactly three backticks, so a note whose block
+  sits further down the body, or is fenced with tildes or a longer run, read as
+  a note with no block at all: a second block went in above the first, and the
+  extractor — which reads every block of the entry and keeps the last one —
+  handed back the stale value. The phone writes the same way this side now
+  reads: every block of the entry counts, whatever fences it, and a write lands
+  in the last one. With the exception keys of a repeating series this had
+  become a way to lose an `EXDATE`, putting a cancelled occurrence back on the
+  agenda.
 ## [0.18.0] - 2026-08-18
 
 ### Added
