@@ -73,10 +73,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- The bundled `markdown-org-extract` is 0.18.0. A binary named by
-  `markdown-org.extractorPath` older than that reports no exception keys at all,
-  so an occurrence cancelled or moved elsewhere still stands in the agenda and
-  in the export; the warning about an older binary now says so.
+- The bundled `markdown-org-extract` is 0.19.0. A binary named by
+  `markdown-org.extractorPath` older than 0.18.0 reports no exception keys at
+  all, so an occurrence cancelled or moved elsewhere still stands in the agenda
+  and in the export. 0.18.0 itself reads the keys but not the forms a calendar
+  export writes them in: an `EXDATE` carrying a time (`2026-08-20 15:00`, the
+  way RFC 5545 writes it for a timed series) is not read at all, leaving the
+  cancelled occurrence on the agenda, and a `RECURRENCE_ID` written with
+  seconds loses the time it names. The warning about an older binary now says
+  so.
 
 ## [0.18.0] - 2026-08-18
 

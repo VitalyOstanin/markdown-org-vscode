@@ -940,7 +940,9 @@ next run.
   the entry cancels itself (`EXDATE:` in its `org-properties`) and the days
   another entry stands in for (that entry's `SERIES_ID` naming this one's `ID`,
   and its `RECURRENCE_ID` naming the occurrence). It needs the bundled
-  extractor 0.18.0 or newer, which is where those keys come from. The entry
+  extractor 0.18.0 or newer, which is where those keys come from, and 0.19.0
+  or newer for the forms a calendar export writes them in -- an `EXDATE`
+  carrying a time, a `RECURRENCE_ID` written with seconds. The entry
   standing in has a heading, a file and a line of its own, so it is pushed as
   its own event rather than patched into the series through the calendar's
   `instances` collection -- which is what the agenda shows as well.
