@@ -128,4 +128,42 @@ suite('gcal/eventMapping', () => {
         const ev = mapTaskToEvent({ ...base, timestamp_time: '10:00', timestamp_repeater: '+2h' }, 'oid', opts);
         assert.deepEqual(ev.recurrence, ['RRULE:FREQ=HOURLY;INTERVAL=2']);
     });
+
+    test('occurrences the series does not have go out as an EXDATE line beside the rule', () => {
+        // Without it the calendar keeps drawing an occurrence the panel has
+        // stopped drawing -- and, when the occurrence moved, keeps it beside
+        // the entry that replaced it, so the day holds two.
+        const ev = mapTaskToEvent({ ...base, timestamp_time: '15:00', timestamp_repeater: '+1w' }, 'oid', opts, [
+            '2026-06-08',
+            '2026-06-15'
+        ]);
+
+        assert.deepEqual(ev.recurrence, [
+            'RRULE:FREQ=WEEKLY',
+            'EXDATE;TZID=Europe/Belgrade:20260608T150000,20260615T150000'
+        ]);
+    });
+
+    test('an all-day series excludes by date, the value type its start uses', () => {
+        // RFC 5545 requires the EXDATE value type to match DTSTART; a
+        // date-time here is rejected by Google on a date-only event.
+        const ev = mapTaskToEvent({ ...base, timestamp_repeater: '+1w' }, 'oid', opts, ['2026-06-08']);
+
+        assert.deepEqual(ev.recurrence, ['RRULE:FREQ=WEEKLY', 'EXDATE;VALUE=DATE:20260608']);
+    });
+
+    test('an entry with no rule of its own sends no EXDATE', () => {
+        // An EXDATE without an RRULE describes nothing, and Google rejects the
+        // event. The repeater here has no single-rule form (+2wd), so the
+        // event is one-shot and the exceptions have nothing to apply to.
+        const ev = mapTaskToEvent({ ...base, timestamp_repeater: '+2wd' }, 'oid', opts, ['2026-06-08']);
+
+        assert.deepEqual(ev.recurrence, []);
+    });
+
+    test('a series with no exceptions keeps the rule alone', () => {
+        const ev = mapTaskToEvent({ ...base, timestamp_repeater: '+1w' }, 'oid', opts, []);
+
+        assert.deepEqual(ev.recurrence, ['RRULE:FREQ=WEEKLY']);
+    });
 });

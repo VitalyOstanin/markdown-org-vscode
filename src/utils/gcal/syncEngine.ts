@@ -5,6 +5,7 @@ import type { FetchFn } from './oauth';
 import type { AccessTokenProvider } from './accessToken';
 import type { MapOptions } from './eventMapping';
 import { isSyncable, mapTaskToEvent } from './eventMapping';
+import { collectReplacedOccurrences, occurrencesMissingFrom } from './seriesExceptions';
 import { taskIdToEventId } from './eventId';
 import { insertEvent, patchEvent, deleteEvent } from './calendarClient';
 import type { RunHandle } from './mutex';
@@ -121,6 +122,12 @@ export async function runSync(deps: SyncDeps): Promise<SyncSummary> {
     // Order across files is irrelevant: edits and Google calls are independent.
     const ordered = [...deps.tasks].sort((a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : b.line - a.line));
 
+    // Built once from the list as it stands, for the reason the extractor
+    // builds its own once per run: which occurrences an entry is missing
+    // depends on the other entries, since a replacement lives in an entry of
+    // its own (extractor ADR-0031).
+    const replaced = collectReplacedOccurrences(deps.tasks);
+
     let consecutiveFailures = 0;
     const now = deps.now ?? Date.now;
 
@@ -170,7 +177,7 @@ export async function runSync(deps: SyncDeps): Promise<SyncSummary> {
                 }
             }
             const eventId = taskIdToEventId(orgId);
-            const event = mapTaskToEvent(task, orgId, deps.mapOptions(task));
+            const event = mapTaskToEvent(task, orgId, deps.mapOptions(task), occurrencesMissingFrom(task, replaced));
             event.id = eventId;
 
             const res = await insertEvent(deps.fetchFn, deps.getToken, deps.calendarId, event, { signal: deps.signal });

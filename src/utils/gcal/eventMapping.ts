@@ -49,8 +49,19 @@ function buildDescription(content: string | undefined, relPath: string, line: nu
     return body ? `${body}\n\n${footer}` : footer;
 }
 
-/** Map a syncable task to a Google Calendar event resource. */
-export function mapTaskToEvent(task: Task, orgId: string, opts: MapOptions): GcalEventResource {
+/**
+ * Map a syncable task to a Google Calendar event resource.
+ *
+ * `missingOccurrences` are the dates (`YYYY-MM-DD`) this entry's series does
+ * not have -- see `seriesExceptions.ts`, which answers that from the whole
+ * run. They leave as an EXDATE line beside the rule.
+ */
+export function mapTaskToEvent(
+    task: Task,
+    orgId: string,
+    opts: MapOptions,
+    missingOccurrences: readonly string[] = []
+): GcalEventResource {
     // `isSyncable` is the gate for this function and checks both fields; the
     // guard restates that contract for the type system, and for a caller that
     // ever forgets it.
@@ -100,6 +111,14 @@ export function mapTaskToEvent(task: Task, orgId: string, opts: MapOptions): Gca
     if (!task.timestamp_time && recurrence.some((r) => r.includes('FREQ=HOURLY'))) {
         recurrence = [];
     }
+    // The occurrences the entry does not have leave with the rule they are
+    // exceptions to, and only with it: an EXDATE beside no RRULE describes
+    // nothing and Google rejects the event. An entry whose repeater has no
+    // single-rule form is one-shot here, so there is no series to punch a hole
+    // in either.
+    if (recurrence.length > 0 && missingOccurrences.length > 0) {
+        recurrence = [...recurrence, exdateLine(missingOccurrences, task.timestamp_time, opts.timeZone)];
+    }
 
     return {
         // `id` is left out, not set to undefined: the caller fills it in from
@@ -117,6 +136,28 @@ export function mapTaskToEvent(task: Task, orgId: string, opts: MapOptions): Gca
         recurrence,
         extendedProperties: ext
     };
+}
+
+/**
+ * The EXDATE line for `dates`, in the value type the event's start uses.
+ *
+ * RFC 5545 requires the two to match, and Google enforces it: a date-time
+ * exception on an all-day event is rejected, and a bare date on a timed one
+ * takes out nothing. A timed series therefore excludes by its own start time,
+ * carried with the event's zone rather than in UTC -- the entry is written in
+ * local wall-clock, and that is the clock its exceptions are written in too.
+ */
+function exdateLine(dates: readonly string[], time: string | undefined, timeZone: string): string {
+    if (time === undefined) {
+        return `EXDATE;VALUE=DATE:${dates.map(compactDate).join(',')}`;
+    }
+    const clock = time.replace(':', '') + '00';
+    return `EXDATE;TZID=${timeZone}:${dates.map((date) => `${compactDate(date)}T${clock}`).join(',')}`;
+}
+
+/** `2026-08-20` -> `20260820`, the form RFC 5545 writes dates in. */
+function compactDate(date: string): string {
+    return date.replaceAll('-', '');
 }
 
 function toMinutes(time: string): number {

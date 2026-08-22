@@ -44,6 +44,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   says the whole of what it means, and the element around it already answers
   for the rest.
 
+- An occurrence a repeating entry does not have is withheld from the series
+  sent to Google Calendar. The core reports a cancelled or moved occurrence
+  through the `org-properties` keys of the series and of the entry replacing it
+  (`EXDATE`, `SERIES_ID`, `RECURRENCE_ID`, core 0.18.0); until now the export
+  read none of them, so a replacement went over as an event of its own while
+  the series kept expanding its rule over the day it was moved away from, and
+  the reader saw that day twice. The series now carries an `EXDATE` line beside
+  its `RRULE` for every occurrence it does not have -- the days it cancels
+  itself and the days another entry stands in for -- which are the same days
+  the agenda already leaves empty. The calendar treats the two alike: the day
+  loses the occurrence either way, and which of the two entries owes the
+  arrears is a question the agenda answers, not the calendar.
 ## [0.18.0] - 2026-08-18
 
 ### Added

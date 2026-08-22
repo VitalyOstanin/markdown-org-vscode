@@ -935,6 +935,15 @@ next run.
   `+Nwd` with `N > 1` ("every N-th workday"). The `+` / `++` / `.+` prefixes
   differ only in how org shifts the date on completion, which a calendar grid
   has no notion of, so they do not change the rule.
+- **A moved occurrence stays a separate event.** An occurrence a repeating
+  entry does not have leaves with the rule as an `EXDATE` line -- both the days
+  the entry cancels itself (`EXDATE:` in its `org-properties`) and the days
+  another entry stands in for (that entry's `SERIES_ID` naming this one's `ID`,
+  and its `RECURRENCE_ID` naming the occurrence). It needs the bundled
+  extractor 0.18.0 or newer, which is where those keys come from. The entry
+  standing in has a heading, a file and a line of its own, so it is pushed as
+  its own event rather than patched into the series through the calendar's
+  `instances` collection -- which is what the agenda shows as well.
 - **Second-window edits are invisible.** If the same file is open in a
   second VS Code window with unsaved edits, this extension cannot see
   that other window's in-memory state. A sync writing back to disk there

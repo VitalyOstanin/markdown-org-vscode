@@ -85,6 +85,46 @@ suite('gcal/syncEngine', () => {
         assert.ok(w.writes[1]!.props.GCAL_EVENT_ID);
     });
 
+    test('an occurrence another entry stands in for leaves the series as an EXDATE', async () => {
+        // The entry that replaced it is pushed as an event of its own, the way
+        // the agenda draws it as an entry of its own. Without the EXDATE the
+        // calendar would keep expanding the rule over that day and hold both.
+        const r = recorder((c) =>
+            c.method === 'POST' ? { status: 200, body: { id: 'x' } } : { status: 200, body: {} }
+        );
+        const w = recordingWriter();
+        const series = task({
+            file: '/w/a.md',
+            heading: 'English',
+            timestamp_date: '2026-08-13',
+            timestamp_time: '15:00',
+            timestamp_repeater: '+1w',
+            properties: { ID: '11111111-2222-3333-4444-555555555555' }
+        });
+        const moved = task({
+            file: '/w/b.md',
+            heading: 'English, moved',
+            timestamp_date: '2026-08-22',
+            timestamp_time: '18:00',
+            series_id: '11111111-2222-3333-4444-555555555555',
+            recurrence_id: '2026-08-20 15:00',
+            properties: {
+                ID: '22222222-3333-4444-5555-666666666666',
+                SERIES_ID: '11111111-2222-3333-4444-555555555555',
+                RECURRENCE_ID: '2026-08-20 15:00'
+            }
+        });
+
+        const summary = await runSync(baseDeps([series, moved], r.fn, w.writer));
+
+        assert.equal(summary.created, 2, 'both entries reach the calendar');
+        const bodies = r.calls.filter((c) => c.method === 'POST').map((c) => c.body);
+        const seriesBody = bodies.find((b) => b?.summary === 'English');
+        const movedBody = bodies.find((b) => b?.summary === 'English, moved');
+        assert.deepEqual(seriesBody?.recurrence, ['RRULE:FREQ=WEEKLY', `EXDATE;TZID=${TZ}:20260820T150000`]);
+        assert.deepEqual(movedBody?.recurrence, [], 'the replacement is one occurrence, not a series');
+    });
+
     test('insert conflict (409) becomes update', async () => {
         const r = recorder((c) => {
             if (c.method === 'POST') return { status: 409, body: {} };

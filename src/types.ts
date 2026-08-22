@@ -68,6 +68,21 @@ export interface Task {
     // block. Optional and additive on the wire (extractor ADR-0015), so an
     // older extractor that does not emit it simply leaves this undefined.
     properties?: Record<string, string>;
+    // The occurrences a repeating entry does not have, as `YYYY-MM-DD` dates
+    // read out of its `EXDATE` property by markdown-org-extract 0.18.0
+    // (extractor ADR-0031). Absent when the entry cancels none, and from an
+    // older extractor. The Google Calendar export turns them into the EXDATE
+    // line beside the event's rule; without it the calendar keeps drawing an
+    // occurrence the agenda has stopped drawing.
+    excluded_dates?: string[];
+    // The occurrence this entry stands in for, `YYYY-MM-DD` or
+    // `YYYY-MM-DD HH:MM`, from its `RECURRENCE_ID` property (extractor
+    // ADR-0031). Meaningful only together with `series_id`: the pair names one
+    // occurrence of one series, and half of it replaces nothing.
+    recurrence_id?: string;
+    // The `ID` of the series this entry replaces an occurrence of, from its
+    // `SERIES_ID` property (extractor ADR-0031). See `recurrence_id`.
+    series_id?: string;
 }
 
 export interface TaskWithOffset extends Task {
