@@ -70,6 +70,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   in the last one. With the exception keys of a repeating series this had
   become a way to lose an `EXDATE`, putting a cancelled occurrence back on the
   agenda.
+
+### Changed
+
+- The bundled `markdown-org-extract` is 0.18.0. A binary named by
+  `markdown-org.extractorPath` older than that reports no exception keys at all,
+  so an occurrence cancelled or moved elsewhere still stands in the agenda and
+  in the export; the warning about an older binary now says so.
+
 ## [0.18.0] - 2026-08-18
 
 ### Added

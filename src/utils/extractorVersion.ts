@@ -4,12 +4,13 @@
  * The extension bundles a pinned build, but `markdown-org.extractorPath` can
  * point at any binary on the machine. An older one mostly answers the calls the
  * agenda makes -- it simply omits fields added later (`timestamp_repeater` in
- * 0.10.0, `timestamp_next` in 0.11.0), and the panel then renders as if the
- * task had no repeater and no next occurrence. Nothing distinguishes that from
- * a task that genuinely has neither, which is why the version is checked and
- * reported rather than inferred from missing data. One call is not optional:
- * the month view asks for `--agenda month-grid` (0.17.0), which an older binary
- * rejects outright.
+ * 0.10.0, `timestamp_next` in 0.11.0, the exception keys of a repeating series
+ * in 0.18.0), and the panel then renders as if the task had no repeater, no
+ * next occurrence and no occurrence cancelled or moved. Nothing distinguishes
+ * that from a task that genuinely has neither, which is why the version is
+ * checked and reported rather than inferred from missing data. One call is not
+ * optional: the month view asks for `--agenda month-grid` (0.17.0), which an
+ * older binary rejects outright.
  *
  * Pure and vscode-free so it can be unit-tested; the wiring lives in
  * `extractor.ts`.
@@ -52,6 +53,8 @@ export function extractorVersionWarning(actual: string | undefined, required: st
         `older than the ${required} this version expects. The month view asks for a ` +
         'grid older binaries do not offer (--agenda month-grid, added in 0.17.0) and ' +
         'fails to open; repeat tooltips and the next-occurrence date may be missing ' +
-        'or wrong. Clear the setting to use the bundled binary.'
+        'or wrong. An occurrence cancelled or moved elsewhere (0.18.0) is not reported ' +
+        'at all, so the agenda still shows it and a Google Calendar export sends the ' +
+        'series over the entry standing in for it. Clear the setting to use the bundled binary.'
     );
 }
