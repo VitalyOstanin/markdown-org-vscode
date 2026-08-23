@@ -760,7 +760,8 @@ type HostMessage =
     // Integration-test hook: what a press of Commit or Push leaves behind --
     // both buttons out of service, the pressed one spinning -- exists only in
     // the page, and only a real click puts it there.
-    | { command: 'clickGitActionForTesting'; action?: string };
+    | { command: 'clickGitActionForTesting'; action?: string }
+    | { command: 'clickGitChipForTesting' };
 
 /** The payload that fills a page built from nothing. */
 type InitMessage = Extract<HostMessage, { command: 'init' }>;
@@ -898,6 +899,10 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
     // `gitStatus` message, so the header renders without a chip until then
     // rather than with an empty one.
     let gitStatus: AgendaGitStatus | null = null;
+
+    // The markup of the chip as it stands on the page, so a status that renders
+    // to the same thing can be recognised and left alone (see refreshGitMenu).
+    let lastGitMenuHtml: string | undefined;
 
     /** The three presses the git dropdown offers. */
     type GitAction = 'commit' | 'push' | 'sync';
@@ -1317,6 +1322,11 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         head?.querySelector<HTMLElement>('.day-section-fold')?.click();
     }
 
+    /** Press the chip itself, opening or closing its dropdown. */
+    function clickGitChip(): void {
+        document.getElementById('gitMenuBtn')?.click();
+    }
+
     /** Press Sync, Commit or Push, as `clickGitActionForTesting` asks. */
     function clickGitAction(action: string): void {
         if (!(action in GIT_ACTION_BUTTONS)) {
@@ -1353,6 +1363,8 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             clickGroupAction(message.section ?? '', message.action ?? '', message.date);
         } else if (message.command === 'clickSectionFoldForTesting') {
             clickSectionFold(message.section ?? '');
+        } else if (message.command === 'clickGitChipForTesting') {
+            clickGitChip();
             // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- spelled out rather than a bare `else`, so the branch says which command it serves
         } else if (message.command === 'clickGitActionForTesting') {
             clickGitAction(message.action ?? '');
@@ -1497,7 +1509,10 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         const gitGroups = [...document.querySelectorAll('#gitMenu .git-group')].map(
             (el) => el.getAttribute('data-group') ?? ''
         );
-        return { gitChip, gitActions, gitGroups };
+        // Whether the dropdown stands open, which is how a test sees that a
+        // status arriving underneath it left it alone.
+        const gitMenuOpen = document.getElementById('gitMenu')?.classList.contains('open') ?? false;
+        return { gitChip, gitActions, gitGroups, gitMenuOpen };
     }
 
     /**
@@ -2240,12 +2255,28 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
      * on the counters -- the stats, the groups, which action buttons exist. It
      * is inserted at the end of the control row when it was not there before,
      * which is the case on the first status after a panel opens.
+     *
+     * A status that reads the same as the one on screen replaces nothing. The
+     * host recomputes per render and per repository event, and most of those
+     * answers are the answer already shown; swapping the node for an identical
+     * one would drop whatever the user is doing with it -- the dropdown they
+     * just opened closes, and the chip flickers out from under the pointer.
      */
-    function refreshGitMenu(): void {
+    /** Note the chip markup the page now carries, whoever put it there. */
+    function rememberGitMenuHtml(html: string): string {
+        lastGitMenuHtml = html || undefined;
+        return html;
+    }
+
+    function refreshGitMenu(force = false): void {
         const existing = document.getElementById('gitMenu');
         const html = renderGitMenuHtml();
         if (!html) {
             existing?.remove();
+            lastGitMenuHtml = undefined;
+            return;
+        }
+        if (!force && existing && html === lastGitMenuHtml) {
             return;
         }
         const wrapper = document.createElement('div');
@@ -2254,7 +2285,15 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         if (!fresh) {
             return;
         }
+        rememberGitMenuHtml(html);
         if (existing) {
+            // The dropdown is open in the DOM, not in the status, so a rebuild
+            // has to carry it over: a save while the list is open changes the
+            // counters, and the user would be left staring at a chip that shut
+            // itself the moment the file they were reading about was written.
+            if (existing.classList.contains('open')) {
+                fresh.classList.add('open');
+            }
             existing.replaceWith(fresh);
         } else {
             const controlRow = document.querySelector('.control-row');
@@ -2330,10 +2369,18 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         markGitActionBusy(document.getElementById(GIT_ACTION_BUTTONS[gitBusyAction]));
     }
 
-    /** The action is over: the next rebuild of the chip brings the buttons back. */
+    /**
+     * The action is over: rebuild the chip so the buttons come back.
+     *
+     * Forced past the "same markup, leave it alone" check of `refreshGitMenu`:
+     * a disabled button is a property of the node, not of the markup the status
+     * renders to, and a commit that changed nothing the chip counts renders to
+     * exactly what is already there. Without the force the buttons would stay
+     * out of service until something else moved the counters.
+     */
     function applyGitActionDone(): void {
         gitBusyAction = null;
-        refreshGitMenu();
+        refreshGitMenu(true);
     }
 
     function renderHeaderModeButton(): string {
@@ -2401,8 +2448,9 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             }) +
             // Re-rendered with the rest of the header so a nav-bar rebuild does
             // not drop a status that already arrived; `refreshGitMenu` then
-            // handles the updates that come between rebuilds.
-            renderGitMenuHtml();
+            // handles the updates that come between rebuilds -- which is why
+            // what went in here is remembered as what stands on the page.
+            rememberGitMenuHtml(renderGitMenuHtml());
         // resolveHeroModel (inlined, unit-tested) decides the title shape and
         // whether the TODAY badge shows; Intl formatting of the actual text stays
         // here where the locale lives.

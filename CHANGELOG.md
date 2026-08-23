@@ -17,6 +17,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   repository the workspace does hold is left alone: there the watchers fire,
   and a status pass per render would be work nobody asked for.
 
+- That read no longer feeds itself. Reading a repository is what makes the Git
+  extension announce that its state changed, and the panel answered every such
+  announcement with another read: one `git status` per third of a second, for
+  as long as the agenda stayed open. The chip was rebuilt on each of them, so a
+  dropdown opened by hand shut itself immediately and the chip flickered under
+  the pointer. A pass answering a repository event now reads the state that
+  event delivered, and asks for nothing more.
+
+- A status that says what the chip already says leaves the chip alone, and a
+  status that does change something carries an open dropdown over to the
+  rebuilt one. The panel recomputes per render as well as per repository event,
+  and most of those answers are the answer already on screen.
+
 - Holding Shift+Up or Shift+Down walks the date along instead of losing a
   repeat. The command was sent again before the previous edit had landed, and
   the second one read a document that was about to change: its edit was refused

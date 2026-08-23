@@ -249,6 +249,8 @@ export interface AgendaRenderedInfo {
     gitActions: string[];
     /** `data-group` of each dropdown group, in document order. */
     gitGroups: string[];
+    /** Whether the chip's dropdown stands open. */
+    gitMenuOpen: boolean;
     /** Rows hidden above/below per day header, aligned with `dayHeaders`. */
     clipAbove: number[];
     clipBelow: number[];

@@ -45,6 +45,20 @@ interface RepositoryContext {
     roots: RepositoryRoots;
 }
 
+/** How a caller asks for the state to be read again, or taken as it stands. */
+export interface CollectGitStatusOptions {
+    /**
+     * Whether to ask the repositories for their state before reading it.
+     *
+     * True for a caller that has no idea how old the state is -- a render, the
+     * first status of a panel, the end of a git action. False for a caller
+     * answering a repository event: that event *is* the Git extension saying it
+     * has just rebuilt its state, and reading again would produce the next
+     * event, which would produce the next read.
+     */
+    refresh?: boolean;
+}
+
 /**
  * Build the status for `files`, or `undefined` when there is no git to ask.
  *
@@ -52,7 +66,10 @@ interface RepositoryContext {
  * counts, a file in the "outside git" group) with a line in the diagnostic log,
  * because the agenda renders with or without this.
  */
-export async function collectGitStatus(files: readonly string[]): Promise<AgendaGitStatus | undefined> {
+export async function collectGitStatus(
+    files: readonly string[],
+    options: CollectGitStatusOptions = {}
+): Promise<AgendaGitStatus | undefined> {
     const api = await getGitApi();
     if (!api) {
         return undefined;
@@ -77,8 +94,11 @@ export async function collectGitStatus(files: readonly string[]): Promise<Agenda
 
     // Ask for the state again before reading it: outside the workspace folders
     // nothing tells the Git extension a file changed, so what it holds is the
-    // last pass, not the tree (see refreshRepositoryState).
-    await Promise.all([...contexts.values()].map((context) => refreshRepositoryState(context.repository)));
+    // last pass, not the tree (see refreshRepositoryState). Skipped when the
+    // caller already knows the state is current -- see CollectGitStatusOptions.
+    if (options.refresh ?? true) {
+        await Promise.all([...contexts.values()].map((context) => refreshRepositoryState(context.repository)));
+    }
     const snapshots = await Promise.all([...contexts.values()].map((context) => snapshotRepository(context)));
     return buildGitStatus(sources, snapshots);
 }

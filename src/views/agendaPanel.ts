@@ -272,6 +272,12 @@ export class AgendaPanel {
     // set of repositories changes, disposed with the panel.
     private static gitListeners: vscode.Disposable[] = [];
     private static gitDebounceTimer?: NodeJS.Timeout | undefined;
+    // Whether the pass the debounce is holding should read the repositories
+    // again before it answers, or read the state the Git extension already
+    // holds. Requests coalesce into one pass, so the stronger of them wins:
+    // a render asking for a fresh read is not weakened by a repository event
+    // arriving behind it.
+    private static gitRefreshPending = false;
     // Monotonic id of the in-flight status computation. A recomputation is
     // async (it may spawn `git diff`), so a later one can finish first; the
     // result of anything but the newest request is dropped rather than
@@ -770,14 +776,23 @@ export class AgendaPanel {
      * Debounced rather than run per event: a single commit moves several of the
      * Git extension's resource groups and fires an event for each, and each
      * recomputation can spawn a `git diff`.
+     *
+     * `refresh` says whether the pass may read the repositories again. It must
+     * be false for a request a repository event caused: the read is what
+     * produced the event, so answering an event with another read is a loop
+     * that feeds itself for as long as the panel is open -- one `git status`
+     * per debounce, forever, closing the chip's dropdown on every pass.
      */
-    private static requestGitStatus(): void {
+    private static requestGitStatus(refresh = true): void {
+        AgendaPanel.gitRefreshPending ||= refresh;
         if (AgendaPanel.gitDebounceTimer) {
             clearTimeout(AgendaPanel.gitDebounceTimer);
         }
         AgendaPanel.gitDebounceTimer = setTimeout(() => {
             AgendaPanel.gitDebounceTimer = undefined;
-            void AgendaPanel.pushGitStatus();
+            const readAgain = AgendaPanel.gitRefreshPending;
+            AgendaPanel.gitRefreshPending = false;
+            void AgendaPanel.pushGitStatus(readAgain);
             void AgendaPanel.ensureGitWatch();
         }, GIT_STATUS_DEBOUNCE_MS);
     }
@@ -790,7 +805,7 @@ export class AgendaPanel {
      * would re-render the task list (and its scroll position) every time a
      * file is saved.
      */
-    private static async pushGitStatus(): Promise<void> {
+    private static async pushGitStatus(refresh = true): Promise<void> {
         const panel = AgendaPanel.currentPanel;
         const args = AgendaPanel.lastRenderArgs;
         if (!panel || !args || AgendaPanel.gitStatusPausedForTesting) {
@@ -798,7 +813,7 @@ export class AgendaPanel {
         }
         const seq = ++AgendaPanel.gitRequestSeq;
         try {
-            const status = await collectGitStatus(agendaSourceFiles(args.data));
+            const status = await collectGitStatus(agendaSourceFiles(args.data), { refresh });
             // A newer request started while this one was awaiting: its answer
             // is the current one, so this result is stale by definition.
             if (seq !== AgendaPanel.gitRequestSeq || AgendaPanel.currentPanel !== panel) {
@@ -828,8 +843,11 @@ export class AgendaPanel {
             return;
         }
         AgendaPanel.disposeGitListeners();
+        // The event says the Git extension has just rebuilt its state, so the
+        // pass that answers it reads what is already there. Asking for another
+        // read here would produce the next event, and that one the next.
         const onChange = (): void => {
-            AgendaPanel.requestGitStatus();
+            AgendaPanel.requestGitStatus(false);
         };
         // The set of repositories just changed, so which repository holds a
         // given directory can have changed with it: the remembered answers go,
@@ -1111,6 +1129,7 @@ export class AgendaPanel {
                         gitChip: m.gitChip ?? '',
                         gitActions: m.gitActions ?? [],
                         gitGroups: m.gitGroups ?? [],
+                        gitMenuOpen: m.gitMenuOpen ?? false,
                         clipAbove: m.clipAbove ?? [],
                         clipBelow: m.clipBelow ?? [],
                         todayFirstRowHidden: m.todayFirstRowHidden ?? false,
@@ -1203,6 +1222,17 @@ export class AgendaPanel {
      */
     public static clickGitActionForTesting(action: 'commit' | 'push' | 'sync'): Thenable<boolean> {
         return AgendaPanel.postToPage({ command: 'clickGitActionForTesting', action });
+    }
+
+    /**
+     * Test-only helper: press the git chip, opening or closing its dropdown.
+     *
+     * Through the page, like the action buttons above: whether the dropdown
+     * survives a status arriving underneath it is a question about the page's
+     * own DOM, and the host has no other way to ask it.
+     */
+    public static clickGitChipForTesting(): Thenable<boolean> {
+        return AgendaPanel.postToPage({ command: 'clickGitChipForTesting' });
     }
 
     /**

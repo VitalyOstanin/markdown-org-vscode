@@ -6,6 +6,7 @@ import * as path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { suite, test, suiteSetup, suiteTeardown } from 'mocha';
 import { collectGitStatus } from '../../utils/git/collectGitStatus';
+import { getGitApi, resolveRepositoryFor } from '../../utils/git/gitApi';
 import { pathKey } from '../../utils/git/gitPathMatch';
 import { commitAgendaSources, pushAgendaSources, syncAgendaSources } from '../../commands/gitActions';
 import { AGENDA_STRINGS } from '../../utils/agendaI18n';
@@ -166,6 +167,41 @@ suite('agenda git status against a real repository', () => {
         const after = await collectGitStatus([linked('watched.md')]);
         assert.ok(after);
         assert.strictEqual(after.uncommittedCount, 1, JSON.stringify(after.files));
+    });
+
+    // The other half of the same rule. A repository event means the Git
+    // extension has just rebuilt its state; a pass answering that event must
+    // read what is there rather than ask for another read, because the read is
+    // what produces the next event. Left unchecked the two fed each other one
+    // `git status` per debounce for as long as the panel stayed open, and the
+    // chip -- rebuilt on every one of them -- shut its own dropdown and
+    // flickered under the pointer.
+    test('a pass told the state is current does not read the repository again', async function () {
+        this.timeout(30000);
+        const api = await getGitApi();
+        assert.ok(api, 'the Git extension must be available for this test');
+        const resolved = await resolveRepositoryFor(api, linked('home.md'), new Map());
+        assert.ok(resolved, 'the source file must resolve to a repository');
+
+        const repository = resolved.repository as { status(): Promise<void> };
+        const original = repository.status.bind(repository);
+        // Counted in an array rather than a number: a counter starting at 0 is
+        // narrowed to that literal by the checker, which does not follow the
+        // stand-in below, and every later comparison would be a constant.
+        const reads: string[] = [];
+        repository.status = async () => {
+            reads.push('read');
+            await original();
+        };
+        try {
+            await collectGitStatus([linked('home.md')], { refresh: false });
+            assert.deepStrictEqual(reads, [], 'nothing should have been read again');
+
+            await collectGitStatus([linked('home.md')]);
+            assert.ok(reads.length > 0, 'the default pass still reads the repository');
+        } finally {
+            repository.status = original;
+        }
     });
 
     // The reason this one is here rather than in the unit suite: `log` is
@@ -1140,6 +1176,47 @@ suite('agenda panel git chip', () => {
             const info = await AgendaPanel.queryRenderedInfoForTesting();
             return info !== null && !info.gitActions.some((action) => action.includes('off'));
         }, 'the buttons to return to service');
+    });
+
+    // The host recomputes the status per render and per repository event, and
+    // most of those answers say what the chip already says. Rebuilding the node
+    // for one of them threw away what the user was doing with it: the dropdown
+    // they had just opened closed itself, and under a repeating status the chip
+    // flickered under the pointer.
+    test('a status that says what the chip already says leaves the dropdown open', async function () {
+        this.timeout(30000);
+        await renderOverPendingRepository('dropdown');
+        await AgendaPanel.postGitStatusForTesting(pendingStatus());
+        await waitUntil(async () => {
+            const info = await AgendaPanel.queryRenderedInfoForTesting();
+            return info?.gitActions.join(' | ') === 'sync | commit | push';
+        }, 'all three actions to be offered');
+
+        await AgendaPanel.clickGitChipForTesting();
+        await waitUntil(async () => {
+            const info = await AgendaPanel.queryRenderedInfoForTesting();
+            return info?.gitMenuOpen === true;
+        }, 'the dropdown to open');
+
+        // The same status again, as the host sends it after any render.
+        await AgendaPanel.postGitStatusForTesting(pendingStatus());
+        const afterSame = await AgendaPanel.queryRenderedInfoForTesting();
+        assert.ok(afterSame);
+        assert.strictEqual(afterSame.gitMenuOpen, true, 'an unchanged status must not close the dropdown');
+
+        // And a status that does change something rebuilds the chip -- but the
+        // dropdown is open in the DOM, not in the status, so it is carried over
+        // rather than lost with the node.
+        const changed = pendingStatus();
+        changed.uncommittedCount = 2;
+        await AgendaPanel.postGitStatusForTesting(changed);
+        await waitUntil(async () => {
+            const info = await AgendaPanel.queryRenderedInfoForTesting();
+            return info?.gitChip.includes('2') === true;
+        }, 'the chip to report the new count');
+        const afterChange = await AgendaPanel.queryRenderedInfoForTesting();
+        assert.ok(afterChange);
+        assert.strictEqual(afterChange.gitMenuOpen, true, 'a rebuild must carry the open dropdown over');
     });
 
     // Staging is part of the commit, and it moves the repository's resource
