@@ -11,7 +11,8 @@
  * from a task that genuinely has neither, which is why the version is checked
  * and reported rather than inferred from missing data. One call is not
  * optional: the month view asks for `--agenda month-grid` (0.17.0), which an
- * older binary rejects outright.
+ * older binary rejects outright, and writing a task from a phrase asks for
+ * `parse-phrase` (0.20.0), which one older has no subcommand for at all.
  *
  * Pure and vscode-free so it can be unit-tested; the wiring lives in
  * `extractor.ts`.
@@ -58,6 +59,8 @@ export function extractorVersionWarning(actual: string | undefined, required: st
         'at all, so the agenda still shows it and a Google Calendar export sends the ' +
         'series over the entry standing in for it, and the forms a calendar export ' +
         'writes those keys in -- an EXDATE carrying a time, a RECURRENCE_ID written ' +
-        'with seconds -- are read only from 0.19.0. Clear the setting to use the bundled binary.'
+        'with seconds -- are read only from 0.19.0. Insert Task from Phrase asks for a ' +
+        'subcommand that does not exist before 0.20.0 (parse-phrase) and reports its ' +
+        'refusal every time. Clear the setting to use the bundled binary.'
     );
 }
