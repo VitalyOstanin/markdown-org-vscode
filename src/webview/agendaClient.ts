@@ -2467,7 +2467,17 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             heroEl.innerHTML =
                 hero.kind === 'month'
                     ? renderHeroHtml(
-                          { title: d.toLocaleDateString(locale, { month: 'long' }), sub: year, badge },
+                          // The year stands beside the month rather than under
+                          // it: "August" alone does not say which August, and a
+                          // year set in the smaller subtitle type reads as a
+                          // footnote to the month rather than as half of the
+                          // same answer. The day and week views keep their
+                          // subtitle -- there the second line carries a date,
+                          // not one more word of the title.
+                          {
+                              title: `${d.toLocaleDateString(locale, { month: 'long' })} ${year}`,
+                              badge
+                          },
                           { escapeHtml }
                       )
                     : renderHeroHtml(

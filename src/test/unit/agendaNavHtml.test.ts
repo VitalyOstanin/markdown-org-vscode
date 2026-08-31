@@ -214,6 +214,18 @@ suite('agendaNavHtml.renderHeroHtml', () => {
         assert.strictEqual(without.querySelector('.hero-badge'), null);
     });
 
+    test('a badge without a subtitle still shows -- that is the month view', () => {
+        // The month carries its year in the title, so the second line holds
+        // nothing but the badge; without one there is no second line at all.
+        const doc = parse(renderHeroHtml({ title: 'July 2026', badge: 'TODAY' }, { escapeHtml }));
+        assert.strictEqual(doc.querySelector('.hero-title')?.textContent, 'July 2026');
+        assert.strictEqual(doc.querySelector('.hero-sub')?.textContent, 'TODAY');
+        assert.strictEqual(
+            renderHeroHtml({ title: 'July 2026', badge: '' }, { escapeHtml }),
+            '<div class="hero-title">July 2026</div>'
+        );
+    });
+
     test('the date text is escaped, not trusted', () => {
         const doc = parse(renderHeroHtml({ title: '<img>', sub: '<b>x</b>' }, { escapeHtml }));
         assert.strictEqual(doc.querySelectorAll('img, b').length, 0);

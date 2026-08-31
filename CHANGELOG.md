@@ -5,6 +5,16 @@ All notable changes to the "Markdown Org" extension will be documented in this f
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- The month view names its year beside the month, in the same type. "August"
+  alone does not say which August, and a year set in the smaller subtitle read
+  as a footnote to the month rather than as half of the same answer. The day
+  and week views are unchanged: their second line carries a date, not one more
+  word of the title.
+
 ## [0.19.0] - 2026-08-23
 
 ### Fixed

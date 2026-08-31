@@ -171,10 +171,12 @@ export function renderHeroHtml(
     ctx: { escapeHtml: EscapeHtml }
 ): string {
     const title = `<div class="hero-title">${ctx.escapeHtml(parts.title)}</div>`;
-    if (parts.sub === undefined) {
-        return title;
-    }
     const badge = parts.badge ? `<span class="hero-badge">${ctx.escapeHtml(parts.badge)}</span>` : '';
+    if (parts.sub === undefined) {
+        // A title with nothing under it is the Tasks view; a title with only a
+        // badge under it is the month, whose year stands in the title itself.
+        return badge ? `${title}<div class="hero-sub">${badge}</div>` : title;
+    }
     return `${title}<div class="hero-sub"><span>${ctx.escapeHtml(parts.sub)}</span>${badge}</div>`;
 }
 
