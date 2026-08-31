@@ -739,7 +739,7 @@ export const AGENDA_STYLES = `
            semantic colour so it tracks the active theme rather than a fixed
            hue. */
         .calendar-day.weekend .day-number {
-            color: color-mix(in srgb, var(--vscode-charts-red) 55%, var(--vscode-descriptionForeground));
+            color: color-mix(in srgb, var(--vscode-charts-red) 60%, var(--vscode-editor-foreground));
         }
         .calendar-day.holiday {
             border-color: color-mix(in srgb, var(--vscode-charts-red) 45%, transparent);
@@ -748,9 +748,8 @@ export const AGENDA_STYLES = `
             color: var(--vscode-charts-red);
         }
         /* A day with work keeps a plain border -- the chip already marks it --
-           and only lifts its day number out of the muted default. */
+           and only sets its day number in bold. */
         .calendar-day.has-tasks .day-number {
-            color: var(--vscode-editor-foreground);
             font-weight: bold;
         }
         /* Today is the one cell that is filled. Nothing else on the grid
@@ -777,10 +776,16 @@ export const AGENDA_STYLES = `
             opacity: 0.35;
         }
         .day-number {
-            /* Smaller than it was: the cell is 62px rather than 110px, and a
-               number set for the larger one crowds the chip beside it. */
-            font-size: var(--font-sm);
-            color: var(--vscode-descriptionForeground);
+            /* The number is what the cell is for, and a 62px cell holds it at
+               the top of the scale with room to spare -- the chip sits in the
+               corner below it, not beside it. */
+            font-size: var(--font-xl);
+            /* Set in the editor's own ink rather than the muted grey: at this
+               size the muted colour reads as a number fading into the
+               background instead of a quiet one. Days outside the month are
+               dimmed by the cell's opacity, so the muting that is wanted is
+               still there. */
+            color: var(--vscode-editor-foreground);
             font-variant-numeric: tabular-nums;
         }
         /* Count chip, declared once for both places that use it: the month
