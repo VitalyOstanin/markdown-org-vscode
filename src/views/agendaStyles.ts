@@ -680,13 +680,21 @@ export const AGENDA_STYLES = `
            Same visual language as the cards and the nav pill: rounded cells on
            a hairline border, colour reserved for meaning (today, holidays, task
            load) rather than for chrome. Task load is a count chip in the corner
-           -- how many tasks the day holds, red when any of them are overdue. */
+           -- how many tasks the day holds, red when any of them are overdue.
+           The cells carry no fill except today's: a grid of tinted squares
+           reads as a block of colour before it reads as a month, so a weekend
+           and a holiday are said by the colour of the number instead. */
         .calendar {
             display: grid;
             grid-template-columns: repeat(7, 1fr);
             gap: var(--space-1);
             margin: var(--space-3) 0 var(--space-5) 0;
-            max-width: 800px;
+            /* 460px rather than 800: the cells are square, so the width of the
+               grid is what sets their height, and a cell 110px tall holds a
+               day number and a count chip with the rest of it empty. At this
+               width the month is a calendar to glance at rather than a page to
+               scroll. */
+            max-width: 460px;
         }
         .calendar-header {
             text-align: center;
@@ -702,31 +710,42 @@ export const AGENDA_STYLES = `
            bordered cell. */
         .calendar-day {
             aspect-ratio: 1;
-            display: block;
+            display: flex;
+            /* The number sits in the middle of the cell and the chip is pinned
+               to a corner over it: at this size a number in the top-left
+               corner left the cell looking bottom-heavy, and centring it is
+               what a wall calendar does. */
+            align-items: center;
+            justify-content: center;
             width: 100%;
-            border: 1px solid var(--vscode-panel-border);
+            border: 1px solid color-mix(in srgb, var(--vscode-panel-border) 70%, transparent);
             border-radius: var(--radius-md);
-            padding: var(--space-2);
+            padding: var(--space-1);
             cursor: pointer;
             background: transparent;
             color: inherit;
             font-family: inherit;
             font-size: inherit;
-            text-align: left;
+            text-align: center;
             position: relative;
             transition: background 0.1s ease, border-color 0.1s ease;
         }
         .calendar-day:hover {
             background: var(--vscode-list-hoverBackground);
         }
-        /* weekend/holiday/today are subtle background tints with no exact theme
-           token, so they are mixed from a semantic colour over the editor
-           background -- this tracks the active theme instead of a fixed hue. */
-        .calendar-day.weekend {
-            background: color-mix(in srgb, var(--vscode-foreground) 5%, transparent);
+        /* No fills behind the days. A grid of tinted squares reads as a block
+           of colour before it reads as a month; what a weekend and a holiday
+           are is said by the colour of the number instead, mixed from a
+           semantic colour so it tracks the active theme rather than a fixed
+           hue. */
+        .calendar-day.weekend .day-number {
+            color: color-mix(in srgb, var(--vscode-charts-red) 55%, var(--vscode-descriptionForeground));
         }
         .calendar-day.holiday {
-            background: color-mix(in srgb, var(--vscode-charts-red) 12%, transparent);
+            border-color: color-mix(in srgb, var(--vscode-charts-red) 45%, transparent);
+        }
+        .calendar-day.holiday .day-number {
+            color: var(--vscode-charts-red);
         }
         /* A day with work keeps a plain border -- the chip already marks it --
            and only lifts its day number out of the muted default. */
@@ -734,23 +753,33 @@ export const AGENDA_STYLES = `
             color: var(--vscode-editor-foreground);
             font-weight: bold;
         }
-        /* Today: an accent ring drawn with an inset outline, so the 1px border
-           and the cell size stay identical to every other cell (a 2px border
-           shifted the grid by a pixel). */
+        /* Today is the one cell that is filled. Nothing else on the grid
+           carries a background, so the fill is unmistakable at a glance and
+           costs no second mark; the border matches it so the cell size stays
+           identical to every other one. */
         .calendar-day.today {
-            border-color: var(--vscode-focusBorder);
-            outline: 1px solid var(--vscode-focusBorder);
-            outline-offset: -2px;
+            background: var(--vscode-charts-blue);
+            border-color: var(--vscode-charts-blue);
         }
-        .calendar-day.today .day-number {
-            color: var(--vscode-textLink-activeForeground);
+        .calendar-day.today .day-number,
+        .calendar-day.today.weekend .day-number {
+            color: var(--vscode-editor-background);
             font-weight: bold;
+        }
+        /* The chip keeps its meaning over the fill: the badge colours are not
+           guaranteed to contrast with the accent, so it is drawn as the
+           background colour on the number's own ink. */
+        .calendar-day.today .task-count {
+            color: var(--vscode-charts-blue);
+            background: var(--vscode-editor-background);
         }
         .calendar-day.other-month {
             opacity: 0.35;
         }
         .day-number {
-            font-size: var(--font-lg);
+            /* Smaller than it was: the cell is 62px rather than 110px, and a
+               number set for the larger one crowds the chip beside it. */
+            font-size: var(--font-sm);
             color: var(--vscode-descriptionForeground);
             font-variant-numeric: tabular-nums;
         }

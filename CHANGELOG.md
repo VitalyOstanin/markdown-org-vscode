@@ -9,6 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The month grid is a calendar to glance at rather than a page to scroll. The
+  cells are square, so the width of the grid set their height, and at 800px
+  wide each day was 110px tall with a number and a count chip in it. The grid
+  now stops at 460px, the day number sits in the middle of its cell the way a
+  wall calendar sets it, and the number is sized for the smaller cell.
+
+- The days carry no fill except today's. A grid of tinted squares read as a
+  block of colour before it read as a month, so a weekend and a holiday are
+  said by the colour of the number instead — a holiday keeps a tinted border as
+  well — and today is the one filled cell, which needs no second mark to be
+  found. Both are mixed from theme colours, so they follow the active theme
+  rather than a fixed hue.
+
 - The month view names its year beside the month, in the same type. "August"
   alone does not say which August, and a year set in the smaller subtitle read
   as a footnote to the month rather than as half of the same answer. The day
