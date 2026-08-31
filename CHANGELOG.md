@@ -7,7 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A task written by saying it. `Insert Task from Phrase` (`Ctrl+K Ctrl+N`) takes
+  the sentence whoever is adding the task already has in mind — "позвонить врачу
+  завтра в 15:00, каждую неделю" — and writes the heading, the keyword, the
+  priority cookie and the planning line under it into the note the cursor stands
+  in. The rules that read the sentence are the extractor's, so this extension
+  and the Android client understand a phrase the same way, and both grammars are
+  consulted whatever language the editor is set to.
+
+    The box reopens after every phrase with the lines that would be written in its
+    title: an hour read wrong is corrected by saying "в 16:00" rather than by
+    editing the text afterwards, and nothing reaches the file until Enter on an
+    empty box. Every phrase said so far is handed to the extractor on each call,
+    because folding one phrase into what the earlier ones left is its rule to
+    apply, not a second copy of it here.
+
 ### Changed
+
+- The bundled extractor moves to 0.20.0, the release that reads a phrase. A
+  binary configured through `markdown-org.extractorPath` that is older has no
+  `parse-phrase` subcommand at all, which the version warning now names.
 
 - The month grid is a calendar to glance at rather than a page to scroll. The
   cells are square, so the width of the grid set their height, and at 800px

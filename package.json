@@ -117,6 +117,11 @@
         "category": "Markdown Org"
       },
       {
+        "command": "markdown-org.insertTaskFromPhrase",
+        "title": "Insert Task from Phrase",
+        "category": "Markdown Org"
+      },
+      {
         "command": "markdown-org.insertClockStart",
         "title": "Insert CLOCK Start",
         "category": "Markdown Org"
@@ -262,6 +267,12 @@
         "command": "markdown-org.setTodo",
         "key": "ctrl+k ctrl+t",
         "mac": "cmd+k cmd+t",
+        "when": "editorTextFocus && editorLangId == markdown"
+      },
+      {
+        "command": "markdown-org.insertTaskFromPhrase",
+        "key": "ctrl+k ctrl+n",
+        "mac": "cmd+k cmd+n",
         "when": "editorTextFocus && editorLangId == markdown"
       },
       {

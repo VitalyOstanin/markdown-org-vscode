@@ -367,6 +367,29 @@ export interface AgendaStrings {
         syncFailed: string;
     };
     /**
+     * The phrase box raised by `Insert Task from Phrase`. Host UI, and in the
+     * same language as everything else the feature says; the phrase itself is
+     * read by both grammars whichever language this is.
+     */
+    phrasePrompt: {
+        /** Input box title while nothing has been understood yet. */
+        title: string;
+        /** Prompt under the box on the first phrase. */
+        prompt: string;
+        placeholder: string;
+        /** Prompt under the box once there is something to add to. */
+        promptMore: string;
+        placeholderMore: string;
+        /** Reported when the entry was written; `{0}` is its heading. */
+        written: string;
+        /** The phrases said nothing at all, so nothing was written. */
+        empty: string;
+        /** The extractor refused or could not be read; `{0}` is the reason. */
+        failed: string;
+        /** No markdown file is open to write into. */
+        noEditor: string;
+    };
+    /**
      * The priority picker raised by `Set Priority`. Host UI rather than page
      * UI, like the git prompts above, and here for the same reason: the
      * feature speaks the language `markdown-org.uiLanguage` picked.
@@ -544,6 +567,17 @@ const EN: AgendaStrings = {
             'Nothing done: "{0}" and "{1}" have both moved. Merge or rebase in Source Control, then sync again.',
         syncFailed: 'Sync failed: {0}'
     },
+    phrasePrompt: {
+        title: 'New task from a phrase',
+        prompt: 'Say the task in one sentence',
+        placeholder: 'call the doctor tomorrow at 15:00, every week',
+        promptMore: 'Another phrase to refine it, or Enter to write it down',
+        placeholderMore: 'at 16:00',
+        written: 'Written: {0}',
+        empty: 'The phrase said nothing to write down',
+        failed: 'Could not read the phrase: {0}',
+        noEditor: 'Open the markdown file the task should go into'
+    },
     priorityPicker: {
         title: 'Set priority',
         current: 'current',
@@ -709,6 +743,17 @@ const RU: AgendaStrings = {
         syncDiverged:
             'Ничего не сделано: «{0}» и «{1}» разошлись. Сведите их (merge или rebase) в Source Control и синхронизируйте снова.',
         syncFailed: 'Синхронизация не выполнена: {0}'
+    },
+    phrasePrompt: {
+        title: 'Новая задача фразой',
+        prompt: 'Скажите задачу одним предложением',
+        placeholder: 'позвонить врачу завтра в 15:00, каждую неделю',
+        promptMore: 'Ещё фраза, чтобы уточнить, или Enter — записать',
+        placeholderMore: 'в 16:00',
+        written: 'Записано: {0}',
+        empty: 'Во фразе нечего записывать',
+        failed: 'Не удалось разобрать фразу: {0}',
+        noEditor: 'Откройте markdown-файл, в который записать задачу'
     },
     priorityPicker: {
         title: 'Приоритет',

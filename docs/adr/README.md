@@ -50,6 +50,7 @@ was decided, and the trade-offs that came with it.
 | 0020 | [The panel reports a merge but never resolves one](0020-panel-does-not-resolve-conflicts.md)                          | Accepted (amended by 0022)                                |
 | 0021 | [The month grid is the core's answer, not the panel's reconstruction](0021-the-month-grid-is-the-core-s-answer.md)    | Accepted                                                  |
 | 0022 | [The panel syncs in one press, and fast-forwards rather than merges](0022-the-panel-syncs-but-never-merges.md)        | Accepted                                                  |
+| 0023 | [A task is written by saying it, and the core is what reads the phrase](0023-a-task-is-written-by-saying-it.md)       | Accepted                                                  |
 
 ## Adding a new ADR
 

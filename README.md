@@ -38,8 +38,10 @@ thing to anything else that links it.
     - [CLOCK Entries](#clock-entries)
     - [Priority Levels](#priority-levels)
     - [Repeating Tasks](#repeating-tasks)
+- [Writing a task by saying it](#writing-a-task-by-saying-it)
 - [Commands](#commands)
     - [Task Status Commands](#task-status-commands)
+    - [Phrase Commands](#phrase-commands)
     - [Timestamp Commands](#timestamp-commands)
     - [CLOCK Commands](#clock-commands)
     - [Agenda Commands](#agenda-commands)
@@ -99,6 +101,7 @@ connect / select / sync demos and [ADR-0010](docs/adr/0010-google-calendar-sync.
 - **Timestamps** -- `CREATED`, `SCHEDULED`, `DEADLINE`, `CLOSED` and the keyword-less one, with full date / time, in both active `<...>` and inactive `[...]` forms per [ADR-0005](docs/adr/0005-active-and-inactive-timestamps.md). A keyword-less timestamp is the appointment rather than a date somebody owes, which is what tells the two apart in the agenda: write a recurring appointment as `` `<2025-09-01 Mon 19:00 +1w>` `` and a recurring obligation as `SCHEDULED:` with `++1w`.
 - **Repeating tasks** -- Org-mode repeaters `+1d`, `+1w`, `+1m`, `.+1m`, `++1w`, and `+1wd` for workdays (skips weekends and Russian holidays). Marking such a task DONE moves it to its next occurrence and leaves it open, as Emacs does: `+N` takes one step, `++N` steps until it passes today, `.+N` restarts from today ([ADR-0017](docs/adr/0017-repeating-tasks-move-on-done.md)). A `wd` repeater is the exception -- the editor says so instead of moving it, because the working calendar it would need is not published by the extractor. In the agenda, the repeat glyph on a row drawn under a day names the occurrence after _that_ day, so a daily task reads on in the week rather than repeating tomorrow's date on every row; a row borrowed into today -- overdue, or a deadline coming due -- names the next occurrence from today.
 - **CLOCK entries** -- Time tracking with start / finish events and an aggregated CLOCK table per file.
+- **A task said in one sentence** -- `Insert Task from Phrase` takes "позвонить врачу завтра в 15:00, каждую неделю" and writes the heading, the keyword, the priority and the planning line under it. The rules are the extractor's, so the editor and the Android client read a phrase the same way, and a second phrase refines the first rather than starting over. Nothing is written until Enter on an empty box; see [Writing a task by saying it](#writing-a-task-by-saying-it).
 - **Agenda views** -- Day, Week, Month and Tasks. Day and Tasks are cards (a sticky summary bar plus sections by time of day or by priority), the week groups overdue, scheduled and upcoming tasks under sticky day headers, and the month calendar shows a count of what is dated to each day, turning red on a day that has gone by with planning still on it and ringed on a day a deadline is coming due on. A press on a section head folds it: the rows go, the heading keeps its count, and a second press brings them back — a band folded in the week is folded on every day of it, and the fold lasts as long as the panel is open. Views keep a browser-style history you can step through with the Back / Forward commands. In the week, a day header whose rows do not all fit shows how many are out of sight -- `↑ N` behind the pinned header, `↓ M` below the bottom of the panel -- so a day that continues past the edge is never mistaken for a short one. A row counts once less than half of it is visible, which is where its text stops being readable. `Ctrl+F` opens the editor's find widget over the panel, so a task is reached by its title instead of by scrolling; `F3` and `Shift+F3` step through the matches from anywhere in the panel, and reopen a widget that was dismissed. The search reads what is rendered, so unfold a band before searching inside it.
 - **Editor colouring** -- Planning keywords, the parts of a timestamp (date, weekday, time, repeater, warning cookie), status keywords and the `[#A]` / `[#B]` / `[#C]` cookies are coloured in markdown editors, in the same colours the agenda uses for the same things. It works at any indentation, including the four spaces that make markdown treat a line as a code block and stop highlighting it -- the indentation the extractor reads without complaint. Turn it off with [`markdown-org.highlightInEditor`](#markdown-orghighlightineditor).
 - **Interface language** -- The agenda panel speaks English or Russian, following [`markdown-org.uiLanguage`](#markdown-orguilanguage); by default it follows the date locale, then the VS Code display language.
@@ -340,6 +343,42 @@ sync is not bound by that grid and maps the same repeater to
 `SCHEDULED: <2026-12-06 Sun +2wd>`
 ```
 
+## Writing a task by saying it
+
+A task is a heading with a keyword, sometimes a priority cookie, and a planning
+line under it carrying a date, an hour and a repeater. Typed by hand that is
+half a dozen commands; said in one sentence it is one:
+
+```
+Ctrl+K Ctrl+N   →   позвонить врачу завтра в 15:00, каждую неделю
+```
+
+```markdown
+### TODO позвонить врачу
+    `SCHEDULED: <2026-09-01 Вт 15:00 +1w>`
+```
+
+The rules that read the sentence are the extractor's (`parse-phrase`, 0.20.0),
+so this extension and the Android client understand a phrase the same way, and
+both grammars — Russian and English — are consulted whatever language the
+editor is set to. What the rules understand, and what they do not, is the
+[extractor's own table](https://github.com/VitalyOstanin/markdown-org-extract#what-the-rules-understand).
+
+| №   | What                        | How it behaves                                                                                              |
+| --- | --------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| 1   | The box after a phrase      | Reopens with the lines that would be written in its title, so the fields are seen before the file gets them |
+| 2   | Another phrase              | Refines the first: "в 16:00" moves the hour and leaves the day and the repeater alone                       |
+| 3   | Enter on an empty box       | Writes the entry; Escape leaves the file untouched                                                          |
+| 4   | Where the entry goes        | Into the note the cursor stands in, one level deeper, after everything already under it                     |
+| 5   | A file with no heading      | The entry is written at the cursor, as a top-level heading                                                  |
+| 6   | A phrase with no date in it | A heading and nothing else — a task for the Tasks view                                                      |
+| 7   | What the rules did not read | Stays in the heading; nothing said is dropped, only unsorted                                                |
+
+The weekday in the timestamp follows `markdown-org.weekdayLocale`, and the box
+speaks the language `markdown-org.uiLanguage` resolved to. The entry is written
+into the open document, so one Undo takes it back. The decision is in
+[ADR-0023](docs/adr/0023-a-task-is-written-by-saying-it.md).
+
 ## Commands
 
 Hotkeys below match the bindings declared in `package.json`. They are
@@ -361,6 +400,12 @@ for `Set TODO` (the `Shift+Up`/`Shift+Down` bindings are unchanged).
 | `Markdown Org: Set CANCELLED`   | `Ctrl+K Ctrl+X`       | Mark heading as CANCELLED (repeat to clear)             |
 | `Markdown Org: Toggle Priority` | `Ctrl+K Ctrl+P`       | Toggle priority: none → [#A] → none                     |
 | `Markdown Org: Set Priority`    | `Ctrl+K Ctrl+Shift+P` | Pick the priority: a letter A–Z, a number 0–64, or none |
+
+### Phrase Commands
+
+| Command                                 | Hotkey          | Description                                                                                                             |
+| --------------------------------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `Markdown Org: Insert Task from Phrase` | `Ctrl+K Ctrl+N` | Say the task in one sentence; the entry joins the note the cursor stands in (see [above](#writing-a-task-by-saying-it)) |
 
 ### Timestamp Commands
 

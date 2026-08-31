@@ -1,0 +1,187 @@
+import * as vscode from 'vscode';
+import * as assert from 'node:assert';
+import * as path from 'node:path';
+import * as fs from 'node:fs';
+import { suite, before, beforeEach, after, afterEach, test } from 'mocha';
+import { bundledBinaryName } from '../../utils/bundledBinary';
+import { DAY_NAMES_SHORT_RU } from '../../utils/dayNames';
+import { toIsoDate } from '../../utils/isoDate';
+
+/**
+ * A task written by saying it, from the phrase to the lines in the file.
+ *
+ * Driven against the real extractor rather than a stub: what is being checked
+ * is exactly the crossing — the subcommand, the arguments it is given, the
+ * JSON it answers with and the two lines that come out of it — and a fake
+ * would be a second copy of the answer this feature exists to consume.
+ *
+ * The phrases are Russian and dated relative to a day the test picks, so what
+ * they resolve to is a date the assertions can name.
+ */
+suite('Insert Task from Phrase', () => {
+    const repoRoot = path.resolve(__dirname, '..', '..', '..');
+    const originalInputBox = vscode.window.showInputBox;
+
+    let originalExtractorPath: string | undefined;
+    let originalWeekdayLocale: string | undefined;
+    let document: vscode.TextDocument | undefined;
+
+    before(async () => {
+        const config = vscode.workspace.getConfiguration('markdown-org');
+        originalExtractorPath = config.get<string>('extractorPath');
+        originalWeekdayLocale = config.get<string>('weekdayLocale');
+        // The bundled binary is what these tests are about, and the weekday
+        // language is fixed so the timestamp reads the same on any machine.
+        await config.update('extractorPath', '', vscode.ConfigurationTarget.Global);
+        await config.update('weekdayLocale', 'ru', vscode.ConfigurationTarget.Global);
+    });
+
+    after(async () => {
+        const config = vscode.workspace.getConfiguration('markdown-org');
+        await config.update('extractorPath', originalExtractorPath ?? '', vscode.ConfigurationTarget.Global);
+        await config.update('weekdayLocale', originalWeekdayLocale ?? 'ru', vscode.ConfigurationTarget.Global);
+    });
+
+    beforeEach(function () {
+        if (!fs.existsSync(path.join(repoRoot, 'bin', bundledBinaryName(process.platform)))) {
+            // Fetched on demand (`scripts/download-extractor.sh`), not built
+            // here; a checkout without it skips rather than fails.
+            this.skip();
+        }
+    });
+
+    afterEach(async () => {
+        (vscode.window as { showInputBox: unknown }).showInputBox = originalInputBox;
+        await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+    });
+
+    /** Answer the box with each phrase in turn, then with Enter on an empty one. */
+    function say(...phrases: string[]): void {
+        const answers = [...phrases, ''];
+        let next = 0;
+        (vscode.window as { showInputBox: unknown }).showInputBox = () => Promise.resolve(answers[next++]);
+    }
+
+    /** Dismiss the box with Escape. */
+    function dismiss(): void {
+        (vscode.window as { showInputBox: unknown }).showInputBox = () => Promise.resolve(undefined);
+    }
+
+    async function open(content: string, cursorLine = 0): Promise<vscode.TextDocument> {
+        document = await vscode.workspace.openTextDocument({ content, language: 'markdown' });
+        const editor = await vscode.window.showTextDocument(document);
+        editor.selection = new vscode.Selection(cursorLine, 0, cursorLine, 0);
+        return document;
+    }
+
+    /** Today and tomorrow as the extractor will resolve them. */
+    const today = new Date();
+    const tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+
+    test('one phrase becomes a heading and a planning line', async () => {
+        const doc = await open('# Notes\n\n## Errands\ntext\n', 3);
+
+        say('позвонить врачу завтра в 15:00');
+        await vscode.commands.executeCommand('markdown-org.insertTaskFromPhrase');
+
+        const written = doc.getText();
+        assert.match(written, /### TODO позвонить врачу/);
+        assert.match(
+            written,
+            new RegExp(`SCHEDULED: <${toIsoDate(tomorrow)} ${DAY_NAMES_SHORT_RU[tomorrow.getDay()]} 15:00>`)
+        );
+    });
+
+    test('a second phrase refines the first rather than starting over', async () => {
+        const doc = await open('## Errands\ntext\n', 1);
+
+        say('позвонить врачу завтра в 15:00, каждую неделю', 'в 16:00');
+        await vscode.commands.executeCommand('markdown-org.insertTaskFromPhrase');
+
+        const written = doc.getText();
+        assert.match(written, /### TODO позвонить врачу/);
+        // The hour moved; the day and the repeater are what the first phrase
+        // left, which is the extractor's folding and not this command's.
+        assert.match(written, new RegExp(`<${toIsoDate(tomorrow)} \\S+ 16:00 \\+1w>`));
+    });
+
+    test('the entry joins the note the cursor stands in, one level deeper', async () => {
+        const doc = await open('# Journal\n\n## Monday\ntext\n\n## Tuesday\ntext\n', 3);
+
+        say('купить хлеб');
+        await vscode.commands.executeCommand('markdown-org.insertTaskFromPhrase');
+
+        const lines = doc.getText().split('\n');
+        const entry = lines.findIndex((line) => line.includes('купить хлеб'));
+        assert.ok(entry > 0, 'the entry was written');
+        assert.strictEqual(lines[entry], '### TODO купить хлеб');
+        // Before the heading that ends the note it joined, not after it.
+        assert.ok(entry < lines.indexOf('## Tuesday'));
+    });
+
+    test('a phrase that named no date is a heading and nothing else', async () => {
+        const doc = await open('## Errands\ntext\n', 1);
+
+        say('купить хлеб');
+        await vscode.commands.executeCommand('markdown-org.insertTaskFromPhrase');
+
+        assert.match(doc.getText(), /### TODO купить хлеб/);
+        assert.doesNotMatch(doc.getText(), /SCHEDULED/);
+    });
+
+    test('a deadline is written on its own keyword', async () => {
+        const doc = await open('## Errands\ntext\n', 1);
+
+        say('сдать отчёт до пятницы');
+        await vscode.commands.executeCommand('markdown-org.insertTaskFromPhrase');
+
+        assert.match(doc.getText(), /DEADLINE: </);
+    });
+
+    test('a priority said in words lands in the cookie', async () => {
+        const doc = await open('## Errands\ntext\n', 1);
+
+        say('срочно позвонить врачу');
+        await vscode.commands.executeCommand('markdown-org.insertTaskFromPhrase');
+
+        assert.match(doc.getText(), /### TODO \[#A] позвонить врачу/);
+    });
+
+    test('English is understood on a Russian screen', async () => {
+        const doc = await open('## Errands\ntext\n', 1);
+
+        say('call the doctor tomorrow at 15:00');
+        await vscode.commands.executeCommand('markdown-org.insertTaskFromPhrase');
+
+        assert.match(doc.getText(), /### TODO call the doctor/);
+        assert.match(doc.getText(), new RegExp(`<${toIsoDate(tomorrow)} \\S+ 15:00>`));
+    });
+
+    test('escape writes nothing', async () => {
+        const before = '## Errands\ntext\n';
+        const doc = await open(before, 1);
+
+        dismiss();
+        await vscode.commands.executeCommand('markdown-org.insertTaskFromPhrase');
+
+        assert.strictEqual(doc.getText(), before);
+    });
+
+    test('a file with no heading takes the entry at the cursor', async () => {
+        const doc = await open('plain text\nmore text\n', 1);
+
+        say('купить хлеб');
+        await vscode.commands.executeCommand('markdown-org.insertTaskFromPhrase');
+
+        assert.match(doc.getText(), /^# TODO купить хлеб$/m);
+    });
+
+    test('what the rules do not know stays in the heading', async () => {
+        const doc = await open('## Errands\ntext\n', 1);
+
+        say('купить подарок для мамы');
+        await vscode.commands.executeCommand('markdown-org.insertTaskFromPhrase');
+
+        assert.match(doc.getText(), /### TODO купить подарок для мамы/);
+    });
+});
