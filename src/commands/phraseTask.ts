@@ -98,15 +98,18 @@ export async function insertTaskFromPhrase() {
     const document = editor.document;
     const lines = document.getText().split('\n');
     const placement = placeNewEntry(lines, headingLine, editor.selection.active.line);
+    // Fixed once, when the command opens: a chain of phrases read against a
+    // day that changed halfway through -- over midnight, or with the box left
+    // open -- would answer "tomorrow" with two different days. The mark under
+    // the heading carries this same moment, to the minute.
+    const opened = new Date();
     const options: PhraseEntryOptions = {
         hashes: placement.hashes,
         indent: placement.indent,
-        weekdays
+        weekdays,
+        written: opened
     };
-    // Fixed once, when the command opens: a chain of phrases read against a
-    // day that changed halfway through -- over midnight, or with the box left
-    // open -- would answer "tomorrow" with two different days.
-    const today = toIsoDate(new Date());
+    const today = toIsoDate(opened);
 
     const phrases: string[] = [];
     let fields: PhraseFields | undefined;

@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A task written from a phrase carries the moment it was written at:
+  `CREATED: [2026-09-01 вт 14:01]` under the heading, above the planning line.
+  To the minute, because that is what tells two entries written the same day
+  apart.
+  Inactive brackets, as org-mode's expiry convention has it — the entry came
+  into being that day rather than being held on it, so no agenda reads the mark
+  as a date to keep. The Android client marks an entry the same way and in the
+  same place, so a note written on either side reads alike. `Insert Created
+Timestamp` stays what it was, for entries typed into the editor by hand.
+
 - A task written by saying it. `Insert Task from Phrase` (`Ctrl+K Ctrl+N`) takes
   the sentence whoever is adding the task already has in mind — "позвонить врачу
   завтра в 15:00, каждую неделю" — and writes the heading, the keyword, the

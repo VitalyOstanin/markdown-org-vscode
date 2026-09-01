@@ -83,6 +83,15 @@ export interface PhraseEntryOptions {
     indent: string;
     /** Localized short weekday names, Sunday first, as `Date.getDay()` indexes them. */
     weekdays: readonly string[];
+    /**
+     * The moment the entry is being written at, which the mark under the
+     * heading carries to the minute.
+     *
+     * Fixed when the command opens, like the day the phrases are read against:
+     * a chain of phrases spanning midnight marks the moment it began rather
+     * than one no phrase was read against.
+     */
+    written: Date;
 }
 
 /** Whether the phrase said anything a timestamp can carry. */
@@ -107,16 +116,27 @@ function timestampDate(fields: PhraseFields): Date {
 }
 
 /**
- * The lines of the entry: the heading, and the planning line under it when the
- * phrase named a day, an hour or a repeater.
+ * The lines of the entry: the heading, the moment it was written at, and the
+ * planning line under them when the phrase named a day, an hour or a repeater.
  *
- * A phrase that named neither is a heading and nothing else — "купить хлеб" is
- * a task without a date, which is what the Tasks view is for. The planning
+ * A phrase that named no date is a heading and the mark — "купить хлеб" is a
+ * task without a date, which is what the Tasks view is for. The planning
  * keyword defaults to `SCHEDULED`: a day said without one ("завтра") is when
  * the work is meant to happen, and a deadline is what the phrase has to say
  * outright.
+ *
+ * The mark is written by the phone the same way, and for the same reason: an
+ * entry carries the moment it came into being, in the inactive brackets
+ * org-mode's expiry convention uses so that no agenda reads the mark as a day
+ * to keep.
+ * Above the planning line, which is the order both write them in.
  */
 export function phraseEntryLines(fields: PhraseFields, options: PhraseEntryOptions): string[] {
+    return entryLines(fields, options, true);
+}
+
+/** The entry, with the creation mark only where the entry is being written. */
+function entryLines(fields: PhraseFields, options: PhraseEntryOptions, marked: boolean): string[] {
     const heading = buildHeading({
         hashes: options.hashes,
         // Every entry written this way is a task: a phrase is how work is
@@ -125,8 +145,19 @@ export function phraseEntryLines(fields: PhraseFields, options: PhraseEntryOptio
         priority: fields.priority,
         title: fields.heading
     });
+    const { written } = options;
+    // With the hour, unlike the planning line, which carries one only where
+    // the phrase named a time: two entries written the same day are told apart
+    // by the minute they were written at, and a day alone cannot do that.
+    const created = `${options.indent}\`CREATED: ${buildOrgTimestamp({
+        date: written,
+        bracket: 'square',
+        weekday: options.weekdays[written.getDay()],
+        includeTime: true
+    })}\``;
+    const above = marked ? [heading, created] : [heading];
     if (!hasTimestamp(fields)) {
-        return [heading];
+        return above;
     }
     const date = timestampDate(fields);
     const timestamp = buildOrgTimestamp({
@@ -137,7 +168,7 @@ export function phraseEntryLines(fields: PhraseFields, options: PhraseEntryOptio
         repeater: fields.repeater
     });
     const keyword = fields.planning === 'deadline' ? 'DEADLINE' : 'SCHEDULED';
-    return [heading, `${options.indent}\`${keyword}: ${timestamp}\``];
+    return [...above, `${options.indent}\`${keyword}: ${timestamp}\``];
 }
 
 /**
@@ -150,7 +181,9 @@ export function phraseEntryLines(fields: PhraseFields, options: PhraseEntryOptio
  * rather than by editing the file afterwards.
  */
 export function describePhraseFields(fields: PhraseFields, options: PhraseEntryOptions): string {
-    return phraseEntryLines(fields, options)
+    // Without the creation mark: it says now whatever the phrase says, so a
+    // line of it in the title would take room from what is being corrected.
+    return entryLines(fields, options, false)
         .map((line) => line.trim())
         .join('  ');
 }

@@ -51,6 +51,7 @@ was decided, and the trade-offs that came with it.
 | 0021 | [The month grid is the core's answer, not the panel's reconstruction](0021-the-month-grid-is-the-core-s-answer.md)    | Accepted                                                  |
 | 0022 | [The panel syncs in one press, and fast-forwards rather than merges](0022-the-panel-syncs-but-never-merges.md)        | Accepted                                                  |
 | 0023 | [A task is written by saying it, and the core is what reads the phrase](0023-a-task-is-written-by-saying-it.md)       | Accepted                                                  |
+| 0024 | [An entry carries the moment it was written at](0024-an-entry-carries-the-moment-it-was-written-at.md)                | Accepted                                                  |
 
 ## Adding a new ADR
 

@@ -119,7 +119,7 @@ suite('Insert Task from Phrase', () => {
         assert.ok(entry < lines.indexOf('## Tuesday'));
     });
 
-    test('a phrase that named no date is a heading and nothing else', async () => {
+    test('a phrase that named no date is a heading and the moment it was written at', async () => {
         const doc = await open('## Errands\ntext\n', 1);
 
         say('купить хлеб');
@@ -127,6 +127,22 @@ suite('Insert Task from Phrase', () => {
 
         assert.match(doc.getText(), /### TODO купить хлеб/);
         assert.doesNotMatch(doc.getText(), /SCHEDULED/);
+        assert.match(doc.getText(), new RegExp(`CREATED: \\[${toIsoDate(today)} \\S+ \\d\\d:\\d\\d]`));
+    });
+
+    test('the moment the entry was written at stands above the day it is planned for', async () => {
+        const doc = await open('## Errands\ntext\n', 1);
+
+        say('позвонить врачу завтра в 15:00');
+        await vscode.commands.executeCommand('markdown-org.insertTaskFromPhrase');
+
+        const lines = doc.getText().split('\n');
+        const entry = lines.findIndex((line) => line.includes('позвонить врачу'));
+        assert.ok(entry > 0, 'the entry was written');
+        // The order the phone writes them in as well: what the entry is, then
+        // what it is planned for.
+        assert.match(lines[entry + 1] ?? '', new RegExp(`CREATED: \\[${toIsoDate(today)} \\S+ \\d\\d:\\d\\d]`));
+        assert.match(lines[entry + 2] ?? '', /SCHEDULED: </);
     });
 
     test('a deadline is written on its own keyword', async () => {

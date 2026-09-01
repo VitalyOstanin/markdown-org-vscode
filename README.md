@@ -371,13 +371,21 @@ editor is set to. What the rules understand, and what they do not, is the
 | 3   | Enter on an empty box       | Writes the entry; Escape leaves the file untouched                                                          |
 | 4   | Where the entry goes        | Into the note the cursor stands in, one level deeper, after everything already under it                     |
 | 5   | A file with no heading      | The entry is written at the cursor, as a top-level heading                                                  |
-| 6   | A phrase with no date in it | A heading and nothing else — a task for the Tasks view                                                      |
+| 6   | A phrase with no date in it | A heading and the creation mark — a task for the Tasks view                                                 |
 | 7   | What the rules did not read | Stays in the heading; nothing said is dropped, only unsorted                                                |
+
+Every entry written this way carries the moment it was written at —
+`CREATED: [2026-09-01 вт 14:01]` under the heading, above the planning line, in
+the inactive brackets the agenda never reads as a date to keep. To the minute,
+which is what tells two entries written the same day apart; the Android client
+marks an entry the same way. `Insert Created Timestamp` stays for entries typed
+by hand.
 
 The weekday in the timestamp follows `markdown-org.weekdayLocale`, and the box
 speaks the language `markdown-org.uiLanguage` resolved to. The entry is written
-into the open document, so one Undo takes it back. The decision is in
-[ADR-0023](docs/adr/0023-a-task-is-written-by-saying-it.md).
+into the open document, so one Undo takes it back. The decisions are in
+[ADR-0023](docs/adr/0023-a-task-is-written-by-saying-it.md) and
+[ADR-0024](docs/adr/0024-an-entry-carries-the-moment-it-was-written-at.md).
 
 ## Commands
 
