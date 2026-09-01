@@ -184,7 +184,7 @@ suite('renderGitChip', () => {
         const files = Array.from({ length: 5 }, (_, i) =>
             file({ file: `/repo/f${i}.md`, label: `f${i}.md`, uncommitted: true })
         );
-        assert.strictEqual(gitChipTitle(status({ files }), ru), 'не закоммичено: 5 файлов');
+        assert.strictEqual(gitChipTitle(status({ files }), ru), 'без коммита: 5 файлов');
     });
 
     test('russian counts commits by their own three forms', () => {
