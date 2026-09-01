@@ -45,6 +45,15 @@ interface CommitTarget {
 }
 
 /**
+ * How a commit round ended, for a caller with something to do afterwards.
+ *
+ * The distinction that matters is between "the user said no" and "there was
+ * nothing to write": a round that found every file already committed has not
+ * failed, and the sync that follows it is still worth running.
+ */
+export type CommitOutcome = 'committed' | 'nothing-to-commit' | 'cancelled' | 'failed';
+
+/**
  * Stage the given source files and commit them under one message.
  *
  * The message is asked for once and reused across repositories: the files came
@@ -55,11 +64,11 @@ export async function commitAgendaSources(
     files: readonly string[],
     strings: AgendaStrings,
     language: UiLanguage
-): Promise<void> {
+): Promise<CommitOutcome> {
     const realPathCache = new Map<string, string>();
     const grouped = await groupByRepository(files, realPathCache);
     if (grouped.size === 0) {
-        return;
+        return 'nothing-to-commit';
     }
 
     // Checked before the message is asked for: typing a commit message only to
@@ -69,7 +78,7 @@ export async function commitAgendaSources(
     const conflicted = [...grouped.keys()].find((repository) => hasConflicts(repository));
     if (conflicted) {
         notifyError(formatString(strings.git.commitConflicts, path.basename(conflicted.rootUri.fsPath)));
-        return;
+        return 'failed';
     }
 
     // A repository whose files are all committed already is left out entirely:
@@ -77,10 +86,10 @@ export async function commitAgendaSources(
     // round, leaving the repositories after it uncommitted.
     const targets = await commitTargets(grouped, realPathCache);
     if (targets.length === 0) {
-        return;
+        return 'nothing-to-commit';
     }
     if (!(await confirmForeignStaged(targets, strings, language))) {
-        return;
+        return 'cancelled';
     }
 
     const message = await vscode.window.showInputBox({
@@ -91,11 +100,11 @@ export async function commitAgendaSources(
     });
     // Escape / dismissal is a deliberate "not now" and passes in silence.
     if (message === undefined) {
-        return;
+        return 'cancelled';
     }
     if (message.trim() === '') {
         notifyError(strings.git.commitEmptyMessage);
-        return;
+        return 'failed';
     }
 
     // Staging and committing run without visible feedback otherwise: on a
@@ -117,14 +126,40 @@ export async function commitAgendaSources(
         }
         return done;
     });
-    if (committed !== undefined) {
-        notifyStatus(
-            formatString(
-                strings.git.committed,
-                countedNoun(committed, strings.git.files, language, currentDateLocale())
-            )
-        );
+    if (committed === undefined) {
+        return 'failed';
     }
+    notifyStatus(
+        formatString(strings.git.committed, countedNoun(committed, strings.git.files, language, currentDateLocale()))
+    );
+    return 'committed';
+}
+
+/**
+ * One press for what used to be two: commit, then sync.
+ *
+ * A note written here is read on the phone, and that takes both halves -- the
+ * commit alone leaves the note on this machine. Pressing them separately meant
+ * the second was easy to forget, and the notes then sat committed and unsent
+ * until the next time the panel was opened.
+ *
+ * The sync is skipped when the commit did not happen by the user's choice or by
+ * a failure: an escaped message box is a "not now" about the whole press, and a
+ * commit that failed is news to read rather than something to build on. A round
+ * that found nothing to commit still syncs -- the counters the button was drawn
+ * from are a snapshot, and what the remote holds is the other half of the
+ * question anyway.
+ */
+export async function commitAndSyncAgendaSources(
+    files: readonly string[],
+    strings: AgendaStrings,
+    language: UiLanguage
+): Promise<void> {
+    const outcome = await commitAgendaSources(files, strings, language);
+    if (outcome === 'cancelled' || outcome === 'failed') {
+        return;
+    }
+    await syncAgendaSources(files, strings, language);
 }
 
 /**

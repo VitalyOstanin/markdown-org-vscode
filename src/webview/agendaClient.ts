@@ -757,9 +757,9 @@ type HostMessage =
     // Integration-test hook: folding a section is a page-side state and a
     // re-render of the view around it, so the head is pressed for real.
     | { command: 'clickSectionFoldForTesting'; section?: string }
-    // Integration-test hook: what a press of Commit or Push leaves behind --
-    // both buttons out of service, the pressed one spinning -- exists only in
-    // the page, and only a real click puts it there.
+    // Integration-test hook: what a press of one of the git actions leaves
+    // behind -- the rest out of service, the pressed one spinning -- exists
+    // only in the page, and only a real click puts it there.
     | { command: 'clickGitActionForTesting'; action?: string }
     | { command: 'clickGitChipForTesting' };
 
@@ -904,19 +904,21 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
     // to the same thing can be recognised and left alone (see refreshGitMenu).
     let lastGitMenuHtml: string | undefined;
 
-    /** The three presses the git dropdown offers. */
-    type GitAction = 'commit' | 'push' | 'sync';
+    /** The presses the git dropdown offers. */
+    type GitAction = 'commit' | 'commitSync' | 'push' | 'sync';
 
     // Which button each action is, and which message it sends. Written once
     // rather than as a pair of conditionals per site: with two actions a
     // ternary read as the whole set, with three it reads as a default.
     const GIT_ACTION_BUTTONS: Record<GitAction, string> = {
         commit: 'gitCommitBtn',
+        commitSync: 'gitCommitSyncBtn',
         push: 'gitPushBtn',
         sync: 'gitSyncBtn'
     };
     const GIT_ACTION_COMMANDS: Record<GitAction, string> = {
         commit: 'gitCommit',
+        commitSync: 'gitCommitSync',
         push: 'gitPush',
         sync: 'gitSync'
     };
@@ -1494,9 +1496,9 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         // resolution, the status message, the markup -- reached the page.
         const gitChip = document.getElementById('gitMenuBtn')?.textContent ?? '';
         // Which actions the dropdown offers and what state a press left them
-        // in. `off` is the disabled attribute the click sets on both, `busy`
-        // the marker the pressed one carries -- the two together are the whole
-        // feedback a press gives before the host answers.
+        // in. `off` is the disabled attribute the click sets on all of them,
+        // `busy` the marker the pressed one carries -- the two together are the
+        // whole feedback a press gives before the host answers.
         const gitActions = [...document.querySelectorAll<HTMLButtonElement>('#gitMenu .git-action')].map((btn) => {
             const kind = gitActionOf(btn.id);
             const marks = [btn.disabled ? 'off' : '', btn.getAttribute('data-busy') === 'true' ? 'busy' : '']
@@ -2322,11 +2324,14 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
                 }
             });
         });
-        // Both actions raise host UI (an input box, a modal) and the dropdown
+        // Every action raises host UI (an input box, a modal) and the dropdown
         // would otherwise stay open behind it; the click that reaches document
         // closes it, so nothing extra is needed here beyond sending the intent.
         document.getElementById('gitCommitBtn')?.addEventListener('click', (ev) => {
             startGitAction('commit', ev.currentTarget);
+        });
+        document.getElementById('gitCommitSyncBtn')?.addEventListener('click', (ev) => {
+            startGitAction('commitSync', ev.currentTarget);
         });
         document.getElementById('gitPushBtn')?.addEventListener('click', (ev) => {
             startGitAction('push', ev.currentTarget);
@@ -2344,7 +2349,7 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
     }
 
     /**
-     * Take both buttons out of service for as long as an action is running.
+     * Take the buttons out of service for as long as an action is running.
      *
      * Nothing here ever turns them back on: the host sends `gitActionDone` when
      * the action is over -- including the cancelled cases, where no repository

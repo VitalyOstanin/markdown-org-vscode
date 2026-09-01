@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- One press for a commit and a sync. A note written here is read on the phone,
+  and that takes both halves — committing alone leaves it on this machine — so
+  the git dropdown offers "Commit and sync N" beside the commit it extends, on
+  the same counters. The commit runs first and the sync follows it; a commit the
+  user cancels, or one git refuses, stops the round there rather than syncing
+  around it. A round that finds nothing left to commit still syncs, because what
+  the remote holds is the other half of the question and no counter in the panel
+  can see it.
+
 - The phrase box names a muted microphone. A phrase is meant to be said, and
   the editor's speech extension hears nothing from a muted input while showing
   every sign of listening — the box waits, the sentence never arrives. The

@@ -8,7 +8,12 @@ import { suite, test, suiteSetup, suiteTeardown } from 'mocha';
 import { collectGitStatus } from '../../utils/git/collectGitStatus';
 import { getGitApi, resolveRepositoryFor } from '../../utils/git/gitApi';
 import { pathKey } from '../../utils/git/gitPathMatch';
-import { commitAgendaSources, pushAgendaSources, syncAgendaSources } from '../../commands/gitActions';
+import {
+    commitAgendaSources,
+    commitAndSyncAgendaSources,
+    pushAgendaSources,
+    syncAgendaSources
+} from '../../commands/gitActions';
 import { AGENDA_STRINGS } from '../../utils/agendaI18n';
 import { AgendaPanel } from '../../views/agendaPanel';
 import type { AgendaGitStatus } from '../../types';
@@ -961,6 +966,68 @@ suite('agenda git status against a real repository', () => {
         assert.strictEqual(repo.remoteHead(), remote, 'the remote must be untouched');
     });
 
+    // ---- commit and sync: the two presses as one ------------------------
+
+    /** Run the pair with the message box answering `message`. */
+    async function runCommitSync(source: string, message: string | undefined): Promise<void> {
+        const original = vscode.window.showInputBox;
+        (vscode.window as { showInputBox: unknown }).showInputBox = () => Promise.resolve(message);
+        try {
+            await commitAndSyncAgendaSources([source], AGENDA_STRINGS.en, 'en');
+        } finally {
+            (vscode.window as { showInputBox: unknown }).showInputBox = original;
+        }
+    }
+
+    // The press exists because a note is written here and read on the phone,
+    // which takes the commit and the push after it.
+    test('commit and sync writes the commit and hands it to the remote', async function () {
+        this.timeout(30000);
+        const repo = syncFixture('commit-sync');
+        fs.appendFileSync(repo.source, 'written here\n');
+
+        await runCommitSync(repo.source, 'agenda: commit and sync');
+
+        await waitUntil(() => repo.remoteHead() === repo.head(), 'the commit to reach the remote');
+        assert.ok(!repo.run(['status', '--porcelain']).includes('diary.md'), 'nothing should be left pending');
+        assert.ok(repo.run(['log', '-1', '--format=%s']).includes('agenda: commit and sync'));
+    });
+
+    // A dismissed message box is a "not now" about the whole press: syncing
+    // around it would move the branch the user just declined to add to.
+    test('a dismissed message box stops the round before the sync', async function () {
+        this.timeout(30000);
+        const repo = syncFixture('commit-sync-cancelled');
+        repo.elsewhere('from elsewhere\n');
+        fs.appendFileSync(repo.source, 'written here\n');
+        const local = repo.head();
+
+        await runCommitSync(repo.source, undefined);
+
+        assert.strictEqual(repo.head(), local, 'the branch here must be untouched');
+        assert.ok(
+            !fs.readFileSync(repo.source, 'utf-8').includes('from elsewhere'),
+            'the fetch must not have run either'
+        );
+    });
+
+    // The counters the button was drawn from are a snapshot. Finding nothing
+    // left to commit is not a refusal, and what the remote holds is the other
+    // half of the press.
+    test('a round with nothing to commit still syncs', async function () {
+        this.timeout(30000);
+        const repo = syncFixture('commit-sync-clean');
+        repo.elsewhere('from elsewhere\n');
+
+        await runCommitSync(repo.source, 'agenda: never asked');
+
+        await waitUntil(
+            () => fs.readFileSync(repo.source, 'utf-8').includes('from elsewhere'),
+            'the remote commit to arrive'
+        );
+        assert.strictEqual(repo.head(), repo.remoteHead(), 'the branch here must be level with the remote');
+    });
+
     // Nothing to do is an outcome, not a silence: the press has to answer, or
     // it reads as a button that does not work.
     test('a sync with nothing to move says the two sides agree', async function () {
@@ -1133,7 +1200,7 @@ suite('agenda panel git chip', () => {
     // rather than collected: the buttons only exist when there is something to
     // commit, and that must not depend on the state this repository happens to
     // be in while the suite runs.
-    test('pressing an action takes both buttons out of service and marks the pressed one', async function () {
+    test('pressing an action takes the other buttons out of service and marks the pressed one', async function () {
         this.timeout(30000);
         await renderOverPendingRepository('busy');
         // Posted once, not in a loop: `renderOverPendingRepository` has paused
@@ -1142,7 +1209,7 @@ suite('agenda panel git chip', () => {
         await AgendaPanel.postGitStatusForTesting(pendingStatus());
         await waitUntil(async () => {
             const info = await AgendaPanel.queryRenderedInfoForTesting();
-            return info?.gitActions.join(' | ') === 'sync | commit | push';
+            return info?.gitActions.join(' | ') === 'sync | commit | commitSync | push';
         }, 'all three actions to be offered');
 
         // The commit flow is held at its message prompt, which is what makes
@@ -1161,7 +1228,7 @@ suite('agenda panel git chip', () => {
             assert.ok(info);
             assert.deepStrictEqual(
                 info.gitActions,
-                ['sync (off)', 'commit (off, busy)', 'push (off)'],
+                ['sync (off)', 'commit (off, busy)', 'commitSync (off)', 'push (off)'],
                 'the other buttons must be out of service too, and without a spinner of their own'
             );
         } finally {
@@ -1189,7 +1256,7 @@ suite('agenda panel git chip', () => {
         await AgendaPanel.postGitStatusForTesting(pendingStatus());
         await waitUntil(async () => {
             const info = await AgendaPanel.queryRenderedInfoForTesting();
-            return info?.gitActions.join(' | ') === 'sync | commit | push';
+            return info?.gitActions.join(' | ') === 'sync | commit | commitSync | push';
         }, 'all three actions to be offered');
 
         await AgendaPanel.clickGitChipForTesting();
@@ -1232,7 +1299,7 @@ suite('agenda panel git chip', () => {
         await AgendaPanel.postGitStatusForTesting(pendingStatus());
         await waitUntil(async () => {
             const info = await AgendaPanel.queryRenderedInfoForTesting();
-            return info?.gitActions.join(' | ') === 'sync | commit | push';
+            return info?.gitActions.join(' | ') === 'sync | commit | commitSync | push';
         }, 'all three actions to be offered');
 
         const prompt = Promise.withResolvers<string | undefined>();
@@ -1251,7 +1318,7 @@ suite('agenda panel git chip', () => {
             const info = await AgendaPanel.queryRenderedInfoForTesting();
             assert.deepStrictEqual(
                 info?.gitActions,
-                ['sync (off)', 'commit (off, busy)', 'push (off)'],
+                ['sync (off)', 'commit (off, busy)', 'commitSync (off)', 'push (off)'],
                 'a status is not the end of the action and must not re-enable the buttons'
             );
         } finally {

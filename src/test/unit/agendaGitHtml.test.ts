@@ -341,6 +341,32 @@ suite('renderGitMenu', () => {
         assert.ok(!clean.includes('id="gitPushBtn"'));
     });
 
+    // Committing and then syncing is what it takes for a note written here to
+    // be read on the phone, and the two presses made the second easy to
+    // forget. The pair is offered under the same counters as the commit alone.
+    test('commit and sync is offered wherever the commit button is', () => {
+        const withChanges = renderGitMenu(
+            status({
+                repos: [LEVEL_REPO],
+                unpushedCommits: 0,
+                files: [file({ file: '/repo/work.md', label: 'work.md', uncommitted: true })]
+            }),
+            CTX
+        );
+        assert.ok(withChanges.includes('id="gitCommitSyncBtn"'), withChanges);
+        assert.ok(withChanges.includes('>Commit and sync 1</button>'), withChanges);
+
+        const clean = renderGitMenu(
+            status({
+                repos: [LEVEL_REPO],
+                unpushedCommits: 0,
+                files: [file({ file: '/repo/notes.md', label: 'notes.md' })]
+            }),
+            CTX
+        );
+        assert.ok(!clean.includes('id="gitCommitSyncBtn"'), clean);
+    });
+
     // Sync answers for the side no counter here can see, so it is offered
     // wherever there is a repository -- including the state where the other
     // two buttons are both gone because this side has nothing outstanding.
@@ -411,6 +437,7 @@ suite('renderGitMenu', () => {
             CTX
         );
         assert.ok(!html.includes('id="gitCommitBtn"'), 'the commit button must not survive a conflict');
+        assert.ok(!html.includes('id="gitCommitSyncBtn"'), 'nor the one that commits before it syncs');
         assert.ok(html.includes('data-group="conflicted"'), html);
         assert.ok(html.includes('Resolve them in Source Control'), html);
     });

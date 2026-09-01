@@ -269,6 +269,14 @@ export interface AgendaStrings {
         /** Action buttons; `{0}` is the count each acts on. */
         commitButton: string;
         commitButtonTitle: string;
+        /**
+         * The two presses as one: commit what this view changed, then sync the
+         * repositories it spans. Committing and then syncing is what a note
+         * written on one machine and read on another takes, and asking for it
+         * twice made the second half easy to forget.
+         */
+        commitSyncButton: string;
+        commitSyncButtonTitle: string;
         pushButton: string;
         pushButtonTitle: string;
         /** Row tooltips; `{0}` is the path. */
@@ -532,6 +540,8 @@ const EN: AgendaStrings = {
         commits: ['commit', 'commits'],
         commitButton: 'Commit {0}',
         commitButtonTitle: 'Stage and commit the changed source files of this view',
+        commitSyncButton: 'Commit and sync {0}',
+        commitSyncButtonTitle: 'Commit the changed source files of this view, then sync every repository it spans',
         pushButton: 'Push {0}',
         pushButtonTitle: 'Push the current branch to its upstream',
         openFileTitle: 'Open {0}',
@@ -710,6 +720,9 @@ const RU: AgendaStrings = {
         commits: ['коммит', 'коммита', 'коммитов'],
         commitButton: 'Создать коммит для {0}',
         commitButtonTitle: 'Добавить в индекс изменённые файлы-источники этого показа и создать коммит',
+        commitSyncButton: 'Коммит и синхронизация: {0}',
+        commitSyncButtonTitle:
+            'Создать коммит для изменённых файлов-источников этого показа, затем синхронизировать все репозитории показа',
         pushButton: 'Отправить {0}',
         pushButtonTitle: 'Отправить текущую ветку в upstream',
         openFileTitle: 'Открыть {0}',

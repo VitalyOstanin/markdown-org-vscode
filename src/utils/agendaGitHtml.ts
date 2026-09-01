@@ -472,11 +472,11 @@ export function gitFileRows(files: readonly GitFileState[], kind: string, ctx: G
 }
 
 /**
- * Sync, commit and push. The counted two are dropped when their counter is
- * zero -- an always-visible "Commit 0 files" invites a click that can only
- * fail -- and sync is offered wherever there is a repository at all, because
- * what it is for is the commits on the other side, which no counter here can
- * see.
+ * Sync, commit, commit-and-sync, and push. The counted ones are dropped when
+ * their counter is zero -- an always-visible "Commit 0 files" invites a click
+ * that can only fail -- and sync is offered wherever there is a repository at
+ * all, because what it is for is the commits on the other side, which no
+ * counter here can see.
  *
  * Sync comes first so that it stays put: the other two appear and vanish with
  * the state of the view, and a button that moves under the pointer between one
@@ -498,10 +498,17 @@ export function gitActions(status: AgendaGitStatus, ctx: GitHtmlContext): string
             `${ctx.escapeHtml(g.syncButton)}</button>`;
     }
     if (status.uncommittedCount > 0 && status.conflictCount === 0) {
-        const label = ctx.formatString(g.commitButton, ctx.formatNumber(status.uncommittedCount, ctx.locale));
+        const count = ctx.formatNumber(status.uncommittedCount, ctx.locale);
+        const label = ctx.formatString(g.commitButton, count);
         html +=
             `<button type="button" class="git-action" id="gitCommitBtn" title="${ctx.escapeHtml(g.commitButtonTitle)}">` +
             `${ctx.escapeHtml(label)}</button>`;
+        // Under the commit it extends, and gated on the same counters: what it
+        // adds is the sync, and a sync alone is already the button above them.
+        const both = ctx.formatString(g.commitSyncButton, count);
+        html +=
+            '<button type="button" class="git-action" id="gitCommitSyncBtn" ' +
+            `title="${ctx.escapeHtml(g.commitSyncButtonTitle)}">${ctx.escapeHtml(both)}</button>`;
     }
     // Gated on the commits, not on the files: the button pushes commits, and a
     // branch can be ahead by a commit that touched no file of this view.

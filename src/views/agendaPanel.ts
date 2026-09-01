@@ -78,7 +78,12 @@ import { buildCollectionMarks, collectionMarkHtml } from '../utils/agendaCollect
 import { hideCollections, renderCollectionChips } from '../utils/agendaCollectionFilter';
 import { collectGitStatus } from '../utils/git/collectGitStatus';
 import { forgetResolvedRepositories, getGitApi } from '../utils/git/gitApi';
-import { commitAgendaSources, pushAgendaSources, syncAgendaSources } from '../commands/gitActions';
+import {
+    commitAgendaSources,
+    commitAndSyncAgendaSources,
+    pushAgendaSources,
+    syncAgendaSources
+} from '../commands/gitActions';
 import { isCancelled } from '../utils/normalizeTaskType';
 import { shiftMonthAnchor } from '../utils/monthNav';
 import { wireDayHeaderNavigation } from '../utils/agendaDayHeaderNav';
@@ -966,7 +971,12 @@ export class AgendaPanel {
             if (typeof message.file === 'string') {
                 await AgendaPanel.openTaskInEditor(message.file, 1);
             }
-        } else if (message.command === 'gitCommit' || message.command === 'gitPush' || message.command === 'gitSync') {
+        } else if (
+            message.command === 'gitCommit' ||
+            message.command === 'gitCommitSync' ||
+            message.command === 'gitPush' ||
+            message.command === 'gitSync'
+        ) {
             const args = AgendaPanel.lastRenderArgs;
             if (!args) {
                 return;
@@ -976,6 +986,8 @@ export class AgendaPanel {
             try {
                 if (message.command === 'gitCommit') {
                     await commitAgendaSources(files, strings, language);
+                } else if (message.command === 'gitCommitSync') {
+                    await commitAndSyncAgendaSources(files, strings, language);
                 } else if (message.command === 'gitPush') {
                     await pushAgendaSources(files, strings, language);
                 } else {
