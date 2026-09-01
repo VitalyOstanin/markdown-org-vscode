@@ -46,6 +46,15 @@ Timestamp` stays what it was, for entries typed into the editor by hand.
 
 ### Changed
 
+- A CREATED line steps back whole. The keyword was already the disabled grey,
+  while the date and the weekday beside it kept the blue every other timestamp
+  carries, and the line read as half a record — the eye stopped on a date that
+  asks nothing of the reader. The colon, the spacing and the timestamp now take
+  the keyword's colour in one stretch, so when an entry was written stays behind
+  the dates that carry a plan. A line naming a CLOSED timestamp and a CREATED
+  one together, as org files written by hand do, keeps the closing date in its
+  own colours: each timestamp answers to the keyword in front of it.
+
 - The bundled extractor moves to 0.20.0, the release that reads a phrase. A
   binary configured through `markdown-org.extractorPath` that is older has no
   `parse-phrase` subcommand at all, which the version warning now names.

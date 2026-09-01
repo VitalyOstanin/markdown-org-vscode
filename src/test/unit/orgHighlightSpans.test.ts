@@ -92,7 +92,50 @@ suite('computeHighlightSpans', () => {
             'weekday',
             'time'
         ]);
-        assert.deepStrictEqual(kinds('`CREATED: [2026-03-01 Sun]`'), ['planning-created', 'date', 'weekday']);
+    });
+
+    test('a CREATED line is muted from the keyword to the closing bracket', () => {
+        // The keyword was grey and its date stayed timestamp-blue, which read
+        // as half a record. When an entry was written asks nothing of the
+        // reader, so the whole of it steps back at once.
+        assert.deepStrictEqual(painted('`CREATED: [2026-03-01 Sun]`'), [
+            'planning-created:CREATED',
+            'planning-created:: [2026-03-01 Sun]'
+        ]);
+        // Only the backticks are left to the injection grammar.
+        assert.deepStrictEqual(unpainted('`CREATED: [2026-03-01 Sun]`'), ['`', '`']);
+    });
+
+    test('a CREATED line with a time is muted just as whole', () => {
+        assert.deepStrictEqual(painted('  CREATED: [2026-03-01 Sun 09:15]'), [
+            'planning-created:CREATED',
+            'planning-created:: [2026-03-01 Sun 09:15]'
+        ]);
+    });
+
+    test('a timestamp keeps its own colours when another keyword introduces it', () => {
+        // Org files written by hand carry CLOSED and CREATED on one line. Each
+        // timestamp answers to the keyword in front of it: the closing date
+        // keeps its parts, the creation date is muted whole.
+        assert.deepStrictEqual(painted('`CLOSED: [2026-03-05 Thu 18:00] CREATED: [2026-03-01 Sun]`'), [
+            'planning-closed:CLOSED',
+            'planning-created:CREATED',
+            'date:2026-03-05',
+            'weekday:Thu',
+            'time:18:00',
+            'planning-created:: [2026-03-01 Sun]'
+        ]);
+    });
+
+    test('a timestamp standing before CREATED is not muted by it', () => {
+        // The owner is the keyword to the left, not any keyword on the line:
+        // a date typed ahead of the keyword belongs to no keyword at all.
+        assert.deepStrictEqual(painted('встреча <2026-03-03 Tue> CREATED: [2026-03-01 Sun]'), [
+            'planning-created:CREATED',
+            'date:2026-03-03',
+            'weekday:Tue',
+            'planning-created:: [2026-03-01 Sun]'
+        ]);
     });
 
     test('a CLOCK line paints both endpoints', () => {

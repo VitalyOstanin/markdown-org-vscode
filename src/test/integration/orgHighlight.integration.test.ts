@@ -57,6 +57,17 @@ suite('Editor highlighting of org constructs', () => {
         }
     });
 
+    test('a CREATED line is muted whole', async () => {
+        // The keyword and everything it introduces carry the one kind, so the
+        // record of when an entry was written reads as a single quiet line.
+        const doc = await openMarkdown('### TODO Задача', '    `CREATED: [2026-03-01 Sun]`');
+        assert.deepStrictEqual(painted(doc), [
+            'planning-created:: [2026-03-01 Sun]',
+            'planning-created:CREATED',
+            'status-todo:TODO'
+        ]);
+    });
+
     test('the ranges land on the right lines', async () => {
         const doc = await openMarkdown('# Заголовок', '', '    `DEADLINE: <2026-03-05 Thu>`');
         const deadline = documentDecorationRanges(doc).get('planning-deadline');

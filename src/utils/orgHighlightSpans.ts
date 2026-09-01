@@ -105,12 +105,55 @@ function pushTime(spans: HighlightSpan[], match: RegExpExecArray): void {
     spans.push({ kind: 'time', start: hour[0], end: minute[1] });
 }
 
-function collectTimestampSpans(lineText: string, spans: HighlightSpan[]): void {
+/** A planning keyword found on the line, and the columns it occupies. */
+interface PlanningKeyword {
+    keyword: string;
+    start: number;
+    end: number;
+}
+
+/**
+ * The keyword a timestamp answers to: the nearest one that ends to its left.
+ * A line this extension writes carries one keyword, but org files written by
+ * hand put `CLOSED: [...] CREATED: [...]` on a single line, and there each
+ * timestamp belongs to the keyword in front of it rather than to the first one
+ * on the line.
+ */
+function keywordBefore(keywords: PlanningKeyword[], position: number): PlanningKeyword | undefined {
+    let owner: PlanningKeyword | undefined;
+    for (const keyword of keywords) {
+        if (keyword.end > position) {
+            break;
+        }
+        owner = keyword;
+    }
+    return owner;
+}
+
+/**
+ * Everything CREATED introduces, in one muted stretch: the colon, the spacing
+ * and the whole timestamp, brackets included.
+ *
+ * The keyword alone used to be grey while its date and weekday kept the
+ * timestamp blue, and the line read as half a record -- the eye stopped on a
+ * date that asks nothing of the reader. The moment an entry was written is
+ * bookkeeping, so it stays behind the dates that carry a plan.
+ */
+function pushCreatedStretch(spans: HighlightSpan[], owner: PlanningKeyword, match: RegExpExecArray): void {
+    spans.push({ kind: 'planning-created', start: owner.end, end: match.index + match[0].length });
+}
+
+function collectTimestampSpans(lineText: string, spans: HighlightSpan[], keywords: PlanningKeyword[]): void {
     TIMESTAMP_SCAN_REGEX.lastIndex = 0;
     let match: RegExpExecArray | null;
     while ((match = TIMESTAMP_SCAN_REGEX.exec(lineText)) !== null) {
         const { open, close } = match.groups ?? {};
         if (open === undefined || close === undefined || !isPairedBracket(open, close)) {
+            continue;
+        }
+        const owner = keywordBefore(keywords, match.index);
+        if (owner?.keyword === 'CREATED') {
+            pushCreatedStretch(spans, owner, match);
             continue;
         }
         pushDate(spans, match);
@@ -175,16 +218,20 @@ function pushLateCookie(lineText: string, match: RegExpExecArray, spans: Highlig
     spans.push({ kind, start: titleSpan[0] + cookie.start, end: titleSpan[0] + cookie.end });
 }
 
-function collectPlanningSpans(lineText: string, spans: HighlightSpan[]): void {
+function collectPlanningSpans(lineText: string, spans: HighlightSpan[]): PlanningKeyword[] {
     PLANNING_KEYWORD_REGEX.lastIndex = 0;
+    const keywords: PlanningKeyword[] = [];
     let match: RegExpExecArray | null;
     while ((match = PLANNING_KEYWORD_REGEX.exec(lineText)) !== null) {
         const keyword = match[0];
+        const end = match.index + keyword.length;
+        keywords.push({ keyword, start: match.index, end });
         const kind = PLANNING_KINDS[keyword];
         if (kind) {
-            spans.push({ kind, start: match.index, end: match.index + keyword.length });
+            spans.push({ kind, start: match.index, end });
         }
     }
+    return keywords;
 }
 
 /**
@@ -192,6 +239,10 @@ function collectPlanningSpans(lineText: string, spans: HighlightSpan[]): void {
  * keywords, the parts of every timestamp on the line, and -- on a heading --
  * the status keyword and the priority cookie. Only priorities A, B and C get a
  * span, matching the agenda, which chips those three and leaves the rest plain.
+ *
+ * A timestamp introduced by CREATED is the exception: it is not broken into
+ * parts but muted whole, together with the colon in front of it, so the line
+ * recording when an entry was written stays behind the ones carrying a plan.
  *
  * What is left between the spans -- backticks, the colon after the keyword, the
  * timestamp brackets, a CLOCK range's `--` and its duration -- is not painted
@@ -202,8 +253,8 @@ function collectPlanningSpans(lineText: string, spans: HighlightSpan[]): void {
  */
 export function computeHighlightSpans(lineText: string): HighlightSpan[] {
     const spans: HighlightSpan[] = [];
-    collectPlanningSpans(lineText, spans);
-    collectTimestampSpans(lineText, spans);
+    const keywords = collectPlanningSpans(lineText, spans);
+    collectTimestampSpans(lineText, spans, keywords);
     collectHeadingSpans(lineText, spans);
     return spans;
 }
