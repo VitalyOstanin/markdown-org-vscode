@@ -373,6 +373,14 @@ editor is set to. What the rules understand, and what they do not, is the
 | 5   | A file with no heading      | The entry is written at the cursor, as a top-level heading                                                  |
 | 6   | A phrase with no date in it | A heading and the creation mark — a task for the Tasks view                                                 |
 | 7   | What the rules did not read | Stays in the heading; nothing said is dropped, only unsorted                                                |
+| 8   | A muted microphone          | Named under the box, before every phrase: a sentence said into a muted input is never heard                 |
+
+The phrase is meant to be said rather than typed, and a speech extension hears
+nothing from a muted microphone while showing every sign of listening. The
+mixer is asked before each box, and a muted input is named under it — nothing
+is switched on for you. The question goes to `pactl`, which answers for
+PulseAudio and PipeWire alike; where there is no answer to be had, on Windows
+and macOS, the box reads as it always did.
 
 Every entry written this way carries the moment it was written at —
 `CREATED: [2026-09-01 вт 14:01]` under the heading, above the planning line, in
@@ -384,8 +392,9 @@ by hand.
 The weekday in the timestamp follows `markdown-org.weekdayLocale`, and the box
 speaks the language `markdown-org.uiLanguage` resolved to. The entry is written
 into the open document, so one Undo takes it back. The decisions are in
-[ADR-0023](docs/adr/0023-a-task-is-written-by-saying-it.md) and
-[ADR-0024](docs/adr/0024-an-entry-carries-the-moment-it-was-written-at.md).
+[ADR-0023](docs/adr/0023-a-task-is-written-by-saying-it.md),
+[ADR-0024](docs/adr/0024-an-entry-carries-the-moment-it-was-written-at.md) and
+[ADR-0025](docs/adr/0025-the-phrase-box-names-a-muted-microphone.md).
 
 ## Commands
 

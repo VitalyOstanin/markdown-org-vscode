@@ -52,6 +52,7 @@ was decided, and the trade-offs that came with it.
 | 0022 | [The panel syncs in one press, and fast-forwards rather than merges](0022-the-panel-syncs-but-never-merges.md)        | Accepted                                                  |
 | 0023 | [A task is written by saying it, and the core is what reads the phrase](0023-a-task-is-written-by-saying-it.md)       | Accepted                                                  |
 | 0024 | [An entry carries the moment it was written at](0024-an-entry-carries-the-moment-it-was-written-at.md)                | Accepted                                                  |
+| 0025 | [The phrase box names a muted microphone, and switches nothing on](0025-the-phrase-box-names-a-muted-microphone.md)   | Accepted                                                  |
 
 ## Adding a new ADR
 

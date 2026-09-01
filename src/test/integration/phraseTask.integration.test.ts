@@ -6,6 +6,10 @@ import { suite, before, beforeEach, after, afterEach, test } from 'mocha';
 import { bundledBinaryName } from '../../utils/bundledBinary';
 import { DAY_NAMES_SHORT_RU } from '../../utils/dayNames';
 import { toIsoDate } from '../../utils/isoDate';
+import { formatString } from '../../utils/agendaI18n';
+import { currentUiStrings } from '../../utils/uiStrings';
+import { exec } from '../../utils/exec';
+import type { ExecFileCallback } from '../_execFake';
 
 /**
  * A task written by saying it, from the phrase to the lines in the file.
@@ -60,6 +64,45 @@ suite('Insert Task from Phrase', () => {
         const answers = [...phrases, ''];
         let next = 0;
         (vscode.window as { showInputBox: unknown }).showInputBox = () => Promise.resolve(answers[next++]);
+    }
+
+    /**
+     * Answer the box while keeping the prompts it was shown with.
+     *
+     * The prompt is where the microphone is named, so the tests about it need
+     * the options the box was opened with rather than only its answer.
+     */
+    function sayAndWatch(...phrases: string[]): string[] {
+        const answers = [...phrases, ''];
+        const prompts: string[] = [];
+        let next = 0;
+        (vscode.window as { showInputBox: unknown }).showInputBox = (options?: vscode.InputBoxOptions) => {
+            prompts.push(options?.prompt ?? '');
+            return Promise.resolve(answers[next++]);
+        };
+        return prompts;
+    }
+
+    /**
+     * Answer the mixer with `muted`, leaving every other process alone.
+     *
+     * The extractor runs through the same wrapper, and these tests are driven
+     * against the real one, so the fake has to hand everything that is not
+     * `pactl` back to the original.
+     */
+    function mixerSays(muted: boolean): () => void {
+        const original = exec.execFile;
+        exec.execFile = (...args: Parameters<typeof exec.execFile>) => {
+            if (args[0] !== 'pactl') {
+                return original(...args);
+            }
+            const callback = args.at(-1) as ExecFileCallback;
+            callback(null, muted ? 'Mute: yes\n' : 'Mute: no\n', '');
+            return undefined as unknown as ReturnType<typeof exec.execFile>;
+        };
+        return () => {
+            exec.execFile = original;
+        };
     }
 
     /** Dismiss the box with Escape. */
@@ -199,5 +242,41 @@ suite('Insert Task from Phrase', () => {
         await vscode.commands.executeCommand('markdown-org.insertTaskFromPhrase');
 
         assert.match(doc.getText(), /### TODO купить подарок для мамы/);
+    });
+
+    test('a muted microphone is named under the box', async () => {
+        await open('## Errands\ntext\n', 1);
+        const restore = mixerSays(true);
+        const prompts = sayAndWatch('купить хлеб');
+
+        try {
+            await vscode.commands.executeCommand('markdown-org.insertTaskFromPhrase');
+        } finally {
+            restore();
+        }
+
+        // Read from the same dictionary the command reads, because which
+        // language this editor speaks is the runner's business, not this
+        // test's.
+        const said = currentUiStrings().strings.phrasePrompt;
+        // Every box, not only the first: the microphone can be unmuted between
+        // one phrase and the next, and the reminder has to keep up either way.
+        assert.ok(prompts.length >= 2, 'the box opened for a phrase and for the one after it');
+        assert.strictEqual(prompts[0], formatString(said.muted, said.prompt));
+        assert.strictEqual(prompts[1], formatString(said.muted, said.promptMore));
+    });
+
+    test('a microphone that is on leaves the prompt as it was', async () => {
+        await open('## Errands\ntext\n', 1);
+        const restore = mixerSays(false);
+        const prompts = sayAndWatch('купить хлеб');
+
+        try {
+            await vscode.commands.executeCommand('markdown-org.insertTaskFromPhrase');
+        } finally {
+            restore();
+        }
+
+        assert.strictEqual(prompts[0], currentUiStrings().strings.phrasePrompt.prompt);
     });
 });

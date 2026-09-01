@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The phrase box names a muted microphone. A phrase is meant to be said, and
+  the editor's speech extension hears nothing from a muted input while showing
+  every sign of listening — the box waits, the sentence never arrives. The
+  mixer is asked before every box, and a muted input is named under it:
+  "Скажите задачу одним предложением — микрофон выключен". Nothing is switched
+  on for you; the reminder is the whole of it.
+  The question goes to `pactl`, which answers for PulseAudio and PipeWire alike;
+  where there is no answer to be had — Windows, macOS — the box reads as it
+  always did.
+
 - A task written from a phrase carries the moment it was written at:
   `CREATED: [2026-09-01 вт 14:01]` under the heading, above the planning line.
   To the minute, because that is what tells two entries written the same day

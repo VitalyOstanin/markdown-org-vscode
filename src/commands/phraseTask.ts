@@ -7,6 +7,7 @@ import { EXTRACTOR_MAX_BUFFER_BYTES, EXTRACTOR_TIMEOUT_MS, extractor } from '../
 import { exec } from '../utils/exec';
 import { formatError } from '../utils/formatError';
 import { formatString } from '../utils/agendaI18n';
+import { isMicrophoneMuted } from '../utils/microphone';
 import { notifyError, notifyInfo } from '../utils/notify';
 import { placeNewEntry } from '../utils/entryPlacement';
 import type { PhraseEntryOptions, PhraseFields } from '../utils/phraseEntry';
@@ -115,9 +116,15 @@ export async function insertTaskFromPhrase() {
     let fields: PhraseFields | undefined;
 
     for (;;) {
+        // Asked again before every box rather than once: the phrase is meant
+        // to be spoken, a muted input hears nothing while looking as though it
+        // listens, and someone who unmutes after the first reminder should not
+        // keep reading it.
+        const base = fields ? prompts.promptMore : prompts.prompt;
+        const muted = await isMicrophoneMuted();
         const said = await vscode.window.showInputBox({
             title: fields ? describePhraseFields(fields, options) : prompts.title,
-            prompt: fields ? prompts.promptMore : prompts.prompt,
+            prompt: muted ? formatString(prompts.muted, base) : base,
             placeHolder: fields ? prompts.placeholderMore : prompts.placeholder
         });
         if (said === undefined) {

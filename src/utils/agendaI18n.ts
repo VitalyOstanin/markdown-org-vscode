@@ -386,6 +386,8 @@ export interface AgendaStrings {
         empty: string;
         /** The extractor refused or could not be read; `{0}` is the reason. */
         failed: string;
+        /** The prompt with a muted microphone named; `{0}` is the prompt. */
+        muted: string;
         /** No markdown file is open to write into. */
         noEditor: string;
     };
@@ -576,6 +578,7 @@ const EN: AgendaStrings = {
         written: 'Written: {0}',
         empty: 'The phrase said nothing to write down',
         failed: 'Could not read the phrase: {0}',
+        muted: '{0} — the microphone is muted',
         noEditor: 'Open the markdown file the task should go into'
     },
     priorityPicker: {
@@ -753,6 +756,7 @@ const RU: AgendaStrings = {
         written: 'Записано: {0}',
         empty: 'Во фразе нечего записывать',
         failed: 'Не удалось разобрать фразу: {0}',
+        muted: '{0} — микрофон выключен',
         noEditor: 'Откройте markdown-файл, в который записать задачу'
     },
     priorityPicker: {
