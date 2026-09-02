@@ -17,15 +17,22 @@ export interface HeadingParts {
  * dropped, which is how callers express a toggle-off (remove the keyword or
  * the priority). The single source of truth for token order and spacing, so
  * `setTaskStatus`, `togglePriority` and `adjustHeadingPart` cannot diverge.
+ *
+ * The tokens are joined rather than each given a trailing space, so a heading
+ * with nothing after them does not end in one: clearing the priority of
+ * `## TODO [#A]` used to write `## TODO ` and leave the file with trailing
+ * whitespace no editor setting would strip on a line the user never typed on.
  */
 export function buildHeading(parts: HeadingParts): string {
-    let result = `${parts.hashes} `;
+    const tokens = [parts.hashes];
     if (parts.status) {
-        result += `${parts.status} `;
+        tokens.push(parts.status);
     }
     if (parts.priority) {
-        result += `[#${parts.priority}] `;
+        tokens.push(`[#${parts.priority}]`);
     }
-    result += parts.title;
-    return result;
+    if (parts.title !== '') {
+        tokens.push(parts.title);
+    }
+    return tokens.join(' ');
 }

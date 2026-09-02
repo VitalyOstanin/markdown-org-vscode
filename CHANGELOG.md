@@ -113,6 +113,10 @@ Timestamp` stays what it was, for entries typed into the editor by hand.
   written in the setext style, underlined rather than marked with `#`, is
   still found by the symbols alone.
 
+- Clearing the priority of a heading that carries nothing else no longer leaves
+  a space at the end of the line. `## TODO [#A]` came back as `## TODO ` — the
+  separator before the title stayed behind when there was no title to separate.
+
 ## [0.19.0] - 2026-08-23
 
 ### Fixed

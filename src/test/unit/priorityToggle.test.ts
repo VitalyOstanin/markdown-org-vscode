@@ -48,6 +48,13 @@ suite('Priority toggle', () => {
         assert.strictEqual(planPriorityToggle('## TODO Over the top [#65]'), '## TODO [#A] Over the top [#65]');
     });
 
+    test('a heading that is nothing but a cookie is left with an empty title', () => {
+        // There is no space on either side to swallow, so the two halves of the
+        // title join as they are. Anything else would leave the heading ending
+        // in a space the file did not have.
+        assert.strictEqual(planPriorityToggle('## TODO [#A]'), '## TODO');
+    });
+
     test('refuses a line that is not a heading', () => {
         assert.strictEqual(planPriorityToggle('plain text'), undefined);
     });
