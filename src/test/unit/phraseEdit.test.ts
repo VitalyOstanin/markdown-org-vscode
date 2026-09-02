@@ -109,6 +109,13 @@ suite('planPhraseEdit', () => {
         assert.deepStrictEqual(result.lines, undated);
     });
 
+    test('a line past the end of the note is refused like any other non-heading', () => {
+        const result = plan(ENTRY, { keyword: 'DONE' }, ENTRY.length + 3);
+
+        assert.strictEqual(result.refusal, 'not-a-heading');
+        assert.deepStrictEqual(result.lines, [...ENTRY]);
+    });
+
     test('a phrase that named nothing is refused', () => {
         const result = plan(ENTRY, {});
 
@@ -129,6 +136,85 @@ suite('planPhraseEdit', () => {
         assert.deepStrictEqual(result.changed, []);
         assert.strictEqual(result.refusal, undefined);
         assert.deepStrictEqual(result.lines, [...ENTRY]);
+    });
+
+    test('an entry whose next heading comes before any planning line gains one', () => {
+        const notes = ['## TODO купить хлеб', 'текст', '## TODO позвонить', '    `SCHEDULED: <2026-09-01 Вт>`'];
+
+        const result = plan(notes, { date: '2026-09-04', planning: 'scheduled' }, 0);
+
+        assert.deepStrictEqual(result.changed, ['date']);
+        // Written under its own heading, not into the entry below that owns
+        // the only planning line in the file.
+        assert.strictEqual(result.lines[1], '`SCHEDULED: <2026-09-04 Пт>`');
+        assert.strictEqual(result.lines[4], '    `SCHEDULED: <2026-09-01 Вт>`');
+    });
+
+    test('an hour named for a dated entry that had none joins the line it has', () => {
+        const dated = ['## TODO купить хлеб', '`SCHEDULED: <2026-09-01 Вт>`', 'текст'];
+
+        const result = plan(dated, { time: '16:00' }, 0);
+
+        assert.deepStrictEqual(result.changed, ['time']);
+        assert.strictEqual(result.lines[1], '`SCHEDULED: <2026-09-01 Вт 16:00>`');
+    });
+
+    test('the warning the timestamp carries survives the rewrite', () => {
+        const warned = ['## TODO купить хлеб', '`SCHEDULED: <2026-09-01 Вт +1w -2d>`', 'текст'];
+
+        const result = plan(warned, { date: '2026-09-04', planning: 'scheduled' }, 0);
+
+        assert.strictEqual(result.lines[1], '`SCHEDULED: <2026-09-04 Пт +1w -2d>`');
+    });
+
+    test("a timestamp written without a weekday is given the screen's", () => {
+        const bare = ['## TODO купить хлеб', '`SCHEDULED: <2026-09-01>`', 'текст'];
+
+        const result = plan(bare, { date: '2026-09-04', planning: 'scheduled' }, 0);
+
+        assert.strictEqual(result.lines[1], '`SCHEDULED: <2026-09-04 Пт>`');
+    });
+
+    test('a day the entry already stands on rewrites nothing', () => {
+        const result = plan(ENTRY, { date: '2026-09-01', planning: 'scheduled' });
+
+        assert.deepStrictEqual(result.changed, []);
+        assert.deepStrictEqual(result.lines, [...ENTRY]);
+    });
+
+    test('a planning line the entry did not have goes under the closing mark too', () => {
+        const closed = [
+            '## DONE купить хлеб',
+            '    `CREATED: [2026-08-31 пн 14:01]`',
+            '    `CLOSED: [2026-09-01 вт 09:12]`',
+            'текст'
+        ];
+
+        const result = plan(closed, { date: '2026-09-04', planning: 'deadline' }, 0);
+
+        assert.strictEqual(result.lines[3], '    `DEADLINE: <2026-09-04 Пт>`');
+        assert.strictEqual(result.lines[4], 'текст');
+    });
+
+    test('a date said without naming a line joins the deadline the entry already keeps', () => {
+        const deadlined = ['## TODO купить хлеб', '`DEADLINE: <2026-09-01 Вт>`', 'текст'];
+
+        const result = plan(deadlined, { date: '2026-09-04' }, 0);
+
+        assert.deepStrictEqual(result.changed, ['date']);
+        assert.strictEqual(result.lines[1], '`DEADLINE: <2026-09-04 Пт>`');
+    });
+
+    test('a planning line whose timestamp cannot be read is written afresh', () => {
+        // The line matches what a planning line looks like, and what stands
+        // inside the brackets is not a date. The phrase names one, so the line
+        // is written from the phrase alone rather than refused.
+        const broken = ['## TODO купить хлеб', '`SCHEDULED: <не дата>`', 'текст'];
+
+        const result = plan(broken, { date: '2026-09-04', planning: 'scheduled' }, 0);
+
+        assert.deepStrictEqual(result.changed, ['date']);
+        assert.strictEqual(result.lines[1], '`SCHEDULED: <2026-09-04 Пт>`');
     });
 
     test('two fields in one phrase are both written and both named', () => {

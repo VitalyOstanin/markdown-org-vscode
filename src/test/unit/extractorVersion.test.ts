@@ -18,6 +18,10 @@ suite('compareVersions', () => {
     test('orders by major, then minor, then patch', () => {
         assert.ok(compareVersions('0.10.0', '0.11.0') < 0);
         assert.ok(compareVersions('0.11.0', '0.11.0') === 0);
+        // A string with no version in it sorts before every real one, so a
+        // binary answering with something unreadable reads as too old rather
+        // than as new enough.
+        assert.ok(compareVersions('not a version', '0.1.0') < 0);
         assert.ok(compareVersions('1.0.0', '0.99.99') > 0);
         assert.ok(compareVersions('0.11.2', '0.11.10') < 0);
     });

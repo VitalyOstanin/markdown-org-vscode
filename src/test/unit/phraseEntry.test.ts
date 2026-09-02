@@ -88,6 +88,14 @@ suite('parsePhraseFields', () => {
     test('output that is not an object is refused', () => {
         assert.throws(() => parsePhraseFields('"nothing"'), /JSON object/);
     });
+
+    test('a field the extractor prints as something other than text is refused by name', () => {
+        // The keys are read one by one rather than cast whole, so a binary
+        // answering with a number for a date says which key it was.
+        const stdout = JSON.stringify({ current_date: '2026-08-31', heading: '', date: 20260904, cleared: [] });
+
+        assert.throws(() => parsePhraseFields(stdout), /date is number/);
+    });
 });
 
 suite('phraseEntryLines', () => {
