@@ -400,6 +400,43 @@ export interface AgendaStrings {
         noEditor: string;
     };
     /**
+     * The phrase box raised by `Edit Task from Phrase`. The entry it changes
+     * is the one the cursor stands in, as with every other editing command.
+     */
+    phraseEditPrompt: {
+        /** Input box title; `{0}` is the heading being changed. */
+        title: string;
+        /** Prompt under the box. */
+        prompt: string;
+        placeholder: string;
+        /** The prompt with a muted microphone named; `{0}` is the prompt. */
+        muted: string;
+        /** Reported when the entry was changed; `{0}` lists what moved. */
+        changed: string;
+        /** Names of the fields, for the line that says what moved. */
+        fields: {
+            keyword: string;
+            priority: string;
+            date: string;
+            time: string;
+            repeater: string;
+        };
+        /** The phrase named nothing the entry has room for. */
+        nothingSaid: string;
+        /** Everything the phrase named is what the entry already said. */
+        unchanged: string;
+        /** Part of the phrase was not understood; `{0}` is that part. */
+        leftover: string;
+        /** An hour or a repeater was said, and there is no day to put it on. */
+        noDate: string;
+        /** The extractor refused or could not be read; `{0}` is the reason. */
+        failed: string;
+        /** The cursor stands in no entry this command can change. */
+        noHeading: string;
+        /** No markdown file is open to change. */
+        noEditor: string;
+    };
+    /**
      * The priority picker raised by `Set Priority`. Host UI rather than page
      * UI, like the git prompts above, and here for the same reason: the
      * feature speaks the language `markdown-org.uiLanguage` picked.
@@ -591,6 +628,27 @@ const EN: AgendaStrings = {
         muted: '{0} — the microphone is muted',
         noEditor: 'Open the markdown file the task should go into'
     },
+    phraseEditPrompt: {
+        title: 'Change: {0}',
+        prompt: 'Say what to change about this entry',
+        placeholder: 'move to friday at 16:00 and make it urgent',
+        muted: '{0} — the microphone is muted',
+        changed: 'Changed: {0}',
+        fields: {
+            keyword: 'keyword',
+            priority: 'priority',
+            date: 'date',
+            time: 'hour',
+            repeater: 'repeater'
+        },
+        nothingSaid: 'The phrase named nothing to change',
+        unchanged: 'The entry already says that',
+        leftover: 'Not understood: "{0}". Nothing was changed.',
+        noDate: 'An hour needs a day: name one, or give the entry a date first',
+        failed: 'Could not read the phrase: {0}',
+        noHeading: 'Put the cursor in the entry to change',
+        noEditor: 'Open the markdown file with the entry to change'
+    },
     priorityPicker: {
         title: 'Set priority',
         current: 'current',
@@ -771,6 +829,27 @@ const RU: AgendaStrings = {
         failed: 'Не удалось разобрать фразу: {0}',
         muted: '{0} — микрофон выключен',
         noEditor: 'Откройте markdown-файл, в который записать задачу'
+    },
+    phraseEditPrompt: {
+        title: 'Правка: {0}',
+        prompt: 'Скажите, что изменить в этой записи',
+        placeholder: 'перенеси на пятницу в 16:00 и сделай срочной',
+        muted: '{0} — микрофон выключен',
+        changed: 'Изменено: {0}',
+        fields: {
+            keyword: 'ключевое слово',
+            priority: 'приоритет',
+            date: 'дата',
+            time: 'время',
+            repeater: 'повтор'
+        },
+        nothingSaid: 'Во фразе нечего менять',
+        unchanged: 'В записи уже так и есть',
+        leftover: 'Не понято: «{0}». Ничего не изменено.',
+        noDate: 'Времени нужен день: назовите дату или сначала задайте её записи',
+        failed: 'Не удалось разобрать фразу: {0}',
+        noHeading: 'Поставьте курсор в запись, которую надо изменить',
+        noEditor: 'Откройте markdown-файл с записью, которую надо изменить'
     },
     priorityPicker: {
         title: 'Приоритет',

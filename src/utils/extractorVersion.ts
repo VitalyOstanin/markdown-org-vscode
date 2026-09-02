@@ -13,6 +13,9 @@
  * optional: the month view asks for `--agenda month-grid` (0.17.0), which an
  * older binary rejects outright, and writing a task from a phrase asks for
  * `parse-phrase` (0.20.0), which one older has no subcommand for at all.
+ * Changing an entry by phrase reads two keys that subcommand only prints from
+ * 0.21.0 (`keyword` and `cleared`), and a binary between the two answers such
+ * a phrase with a field the entry does not change.
  *
  * Pure and vscode-free so it can be unit-tested; the wiring lives in
  * `extractor.ts`.
@@ -61,6 +64,9 @@ export function extractorVersionWarning(actual: string | undefined, required: st
         'writes those keys in -- an EXDATE carrying a time, a RECURRENCE_ID written ' +
         'with seconds -- are read only from 0.19.0. Insert Task from Phrase asks for a ' +
         'subcommand that does not exist before 0.20.0 (parse-phrase) and reports its ' +
-        'refusal every time. Clear the setting to use the bundled binary.'
+        'refusal every time; Edit Task from Phrase reads the keyword and the emptied ' +
+        'fields that subcommand prints from 0.21.0, and an older one leaves both out, ' +
+        'so a phrase that empties a field changes nothing. Clear the setting to use ' +
+        'the bundled binary.'
     );
 }

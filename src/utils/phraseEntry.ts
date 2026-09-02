@@ -1,3 +1,4 @@
+import type { TaskStatus } from '../types';
 import { buildHeading } from './buildHeading';
 import { buildOrgTimestamp } from './orgTimestamp';
 
@@ -28,7 +29,22 @@ export interface PhraseFields {
     time?: string | undefined;
     /** An org repeater (`+1w`), written the canonical way. */
     repeater?: string | undefined;
+    /**
+     * The keyword the phrase named, for an edit of an entry that exists. A
+     * phrase that creates one names none: every entry written by phrase is a
+     * task, and the keyword it gets is `TODO`.
+     */
+    keyword?: TaskStatus | undefined;
+    /**
+     * The fields the phrase said to empty, by the names the extractor prints:
+     * `date`, `time`, `repeater`, `priority`. Empty for a phrase that emptied
+     * nothing, which is every phrase that creates an entry.
+     */
+    cleared: readonly string[];
 }
+
+/** The keywords a phrase can name, which are the ones a heading can carry. */
+const TASK_KEYWORDS: readonly TaskStatus[] = ['TODO', 'DONE', 'CANCELLED', 'CANCELED'];
 
 /** A field the extractor prints as `null` is absent, not empty. */
 function optional(value: unknown, field: string): string | undefined {
@@ -64,6 +80,10 @@ export function parsePhraseFields(stdout: string): PhraseFields {
     if (planning !== undefined && planning !== 'scheduled' && planning !== 'deadline') {
         throw new Error(`parse-phrase: planning is ${planning}, expected scheduled or deadline`);
     }
+    const keyword = optional(raw.keyword, 'keyword');
+    if (keyword !== undefined && !TASK_KEYWORDS.includes(keyword as TaskStatus)) {
+        throw new Error(`parse-phrase: keyword is ${keyword}, expected ${TASK_KEYWORDS.join(', ')}`);
+    }
     return {
         currentDate,
         heading,
@@ -71,8 +91,28 @@ export function parsePhraseFields(stdout: string): PhraseFields {
         planning,
         date: optional(raw.date, 'date'),
         time: optional(raw.time, 'time'),
-        repeater: optional(raw.repeater, 'repeater')
+        repeater: optional(raw.repeater, 'repeater'),
+        keyword: keyword as TaskStatus | undefined,
+        cleared: clearedFields(raw.cleared)
     };
+}
+
+/**
+ * The names of the emptied fields.
+ *
+ * Absent rather than empty in the answer of a binary older than the one that
+ * prints it, which is read as "nothing was emptied": the pin makes such a
+ * binary unlikely, and a phrase that empties a field is refused by the version
+ * check long before it is parsed.
+ */
+function clearedFields(value: unknown): string[] {
+    if (value === null || value === undefined) {
+        return [];
+    }
+    if (!Array.isArray(value) || value.some((name) => typeof name !== 'string')) {
+        throw new Error('parse-phrase: cleared is not an array of field names');
+    }
+    return value as string[];
 }
 
 /** How the entry is written: where it goes and what the timestamp reads as. */

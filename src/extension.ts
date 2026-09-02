@@ -23,7 +23,7 @@ import { agendaFind } from './commands/agendaFind';
 import { moveToArchive, promoteToMaintain } from './commands/moveHeading';
 import { insertClockStart, insertClockFinish } from './commands/clock';
 import { insertClockTable } from './commands/clocktable';
-import { insertTaskFromPhrase } from './commands/phraseTask';
+import { editTaskFromPhrase, insertTaskFromPhrase } from './commands/phraseTask';
 import { connectGcal, disconnectGcal, selectCalendar, syncNow, registerGcalSaveTrigger } from './commands/gcalSync';
 import { notifyError } from './utils/notify';
 import { withErrorReporting } from './utils/orgCommandWrap';
@@ -53,6 +53,7 @@ export function activate(context: vscode.ExtensionContext) {
     registerOrgCommand(context, 'markdown-org.insertDeadline', () => insertDeadlineTimestamp());
     registerOrgCommand(context, 'markdown-org.insertTimestamp', () => insertPlainTimestamp());
     registerOrgCommand(context, 'markdown-org.insertTaskFromPhrase', () => insertTaskFromPhrase());
+    registerOrgCommand(context, 'markdown-org.editTaskFromPhrase', () => editTaskFromPhrase());
     registerOrgCommand(context, 'markdown-org.insertClockStart', () => insertClockStart());
     registerOrgCommand(context, 'markdown-org.insertClockFinish', () => insertClockFinish());
     registerOrgCommand(context, 'markdown-org.insertClockTable', () => insertClockTable());

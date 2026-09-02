@@ -122,6 +122,11 @@
         "category": "Markdown Org"
       },
       {
+        "command": "markdown-org.editTaskFromPhrase",
+        "title": "Edit Task from Phrase",
+        "category": "Markdown Org"
+      },
+      {
         "command": "markdown-org.insertClockStart",
         "title": "Insert CLOCK Start",
         "category": "Markdown Org"
@@ -273,6 +278,12 @@
         "command": "markdown-org.insertTaskFromPhrase",
         "key": "ctrl+k ctrl+n",
         "mac": "cmd+k cmd+n",
+        "when": "editorTextFocus && editorLangId == markdown"
+      },
+      {
+        "command": "markdown-org.editTaskFromPhrase",
+        "key": "ctrl+k ctrl+e",
+        "mac": "cmd+k cmd+e",
         "when": "editorTextFocus && editorLangId == markdown"
       },
       {
@@ -670,12 +681,12 @@
     "brace-expansion": "^5.0.8"
   },
   "x-markdown-org": {
-    "extractorVersion": "0.20.0",
+    "extractorVersion": "0.21.0",
     "extractorSha256": {
-      "x86_64-unknown-linux-gnu": "89cd31a5706641daa00ebd61336cbfe4ec80c27db9c02944ad5841fdd4245d98",
-      "x86_64-apple-darwin": "f147e02c55775323de9f2cd94e676a95bd771709d1ef063730ea201332493aed",
-      "aarch64-apple-darwin": "57edfcbcd2bba247f59e62bb05968fe3d9398fc17471813f8d6624a8ee91b0a5",
-      "x86_64-pc-windows-msvc": "ba07c1a9627908da6e11b26043a234160c36d54496fd785387164352547b0f8b"
+      "x86_64-unknown-linux-gnu": "84d3fa59b393bad8cccd88db89268c342730a4d36d13eaec5658c6d2d234b2fc",
+      "x86_64-apple-darwin": "ba4480b352e31fa8d94fb4db98a1fda6cda9763dfd315674d01cbfd45fc3030d",
+      "aarch64-apple-darwin": "f3a496bfaf85e43e078d700cc8ab8e51c30767c594ed76127d62c1ffd9fc0068",
+      "x86_64-pc-windows-msvc": "492abe27be675517d1ca41d80edb88d40b49fe175068e2ed66547e7e0c8d9741"
     }
   },
   "devDependencies": {

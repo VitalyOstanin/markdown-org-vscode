@@ -12,7 +12,7 @@ const OPTIONS: PhraseEntryOptions = { hashes: '##', indent: '    ', weekdays: RU
 
 /** What the extractor prints, with only the named fields set. */
 function fields(overrides: Partial<PhraseFields> = {}): PhraseFields {
-    return { currentDate: '2026-08-31', heading: 'позвонить врачу', ...overrides };
+    return { currentDate: '2026-08-31', heading: 'позвонить врачу', cleared: [], ...overrides };
 }
 
 suite('parsePhraseFields', () => {
@@ -29,7 +29,9 @@ suite('parsePhraseFields', () => {
             planning: 'scheduled',
             date: '2026-09-01',
             time: '15:00',
-            repeater: '+1w'
+            repeater: '+1w',
+            keyword: undefined,
+            cleared: []
         });
     });
 
@@ -50,6 +52,30 @@ suite('parsePhraseFields', () => {
         // A future binary that renames the field must fail here rather than
         // write an entry with an empty heading and no way to tell why.
         assert.throws(() => parsePhraseFields('{"current_date":"2026-08-31"}'), /heading/);
+    });
+
+    test('reads the keyword and the emptied fields of an edit', () => {
+        const parsed = parsePhraseFields(
+            '{"current_date":"2026-08-31","heading":"","keyword":"DONE","priority":null,' +
+                '"planning":null,"date":null,"time":null,"repeater":null,"cleared":["repeater"]}'
+        );
+
+        assert.strictEqual(parsed.keyword, 'DONE');
+        assert.deepStrictEqual(parsed.cleared, ['repeater']);
+    });
+
+    test('a keyword outside the four a heading can carry is refused', () => {
+        assert.throws(
+            () => parsePhraseFields('{"current_date":"2026-08-31","heading":"x","keyword":"LATER"}'),
+            /keyword/
+        );
+    });
+
+    test('cleared that is not an array of names is refused', () => {
+        assert.throws(
+            () => parsePhraseFields('{"current_date":"2026-08-31","heading":"x","cleared":"date"}'),
+            /cleared/
+        );
     });
 
     test('a planning value outside the two keywords is refused', () => {

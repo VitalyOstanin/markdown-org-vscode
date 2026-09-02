@@ -9,6 +9,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- An entry is changed by saying what to change: "Edit Task from Phrase"
+  (Ctrl+K Ctrl+E) asks for one sentence and applies it to the entry the cursor
+  stands in — the same entry every other editing command works on. One sentence
+  is what three commands and two dialogs of choice did: "перенеси на пятницу в
+  16:00 и сделай срочной" moves the day, the hour and the priority at once, and
+  "отметь выполненной" or "убрать дату" say the rest. Written straight away, and
+  taken back by the editor's own undo.
+  A word the rules do not know changes nothing at all and is named instead —
+  for a new entry a leftover becomes part of the heading, and here there is no
+  heading to put it in. An hour named for an entry that has no day is refused
+  the same way: an org timestamp has no way to say an hour without a date.
+
 - One press for a commit and a sync. A note written here is read on the phone,
   and that takes both halves — committing alone leaves it on this machine — so
   the git dropdown offers "Commit and sync N" beside the commit it extends, on

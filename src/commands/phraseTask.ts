@@ -10,8 +10,11 @@ import { formatString } from '../utils/agendaI18n';
 import { isMicrophoneMuted } from '../utils/microphone';
 import { notifyError, notifyInfo } from '../utils/notify';
 import { placeNewEntry } from '../utils/entryPlacement';
+import type { PhraseEditField, PhraseEditRefusal } from '../utils/phraseEdit';
+import { planPhraseEdit } from '../utils/phraseEdit';
 import type { PhraseEntryOptions, PhraseFields } from '../utils/phraseEntry';
 import { describePhraseFields, parsePhraseFields, phraseEntryLines } from '../utils/phraseEntry';
+import { HEADING_REGEX } from '../orgPatterns';
 import { currentUiStrings } from '../utils/uiStrings';
 
 /**
@@ -167,4 +170,130 @@ export async function insertTaskFromPhrase() {
     if (written) {
         notifyInfo(formatString(prompts.written, fields.heading));
     }
+}
+
+/**
+ * Change the entry the cursor stands in by saying what to change.
+ *
+ * The same rules and the same box as writing one, aimed at an entry that
+ * exists: "перенеси на пятницу в 16:00 и сделай срочной" is one sentence
+ * against three commands and two dialogs of choice. The entry is the one every
+ * other editing command works on — the deepest heading the cursor stands in.
+ *
+ * One phrase rather than a chain: the edit is written straight away, and what
+ * takes it back is the editor's own undo rather than a second phrase.
+ */
+export async function editTaskFromPhrase() {
+    const { strings } = currentUiStrings();
+    const prompts = strings.phraseEditPrompt;
+
+    const editor = requireActiveEditor({ markdownOnly: true });
+    if (!editor) {
+        // `requireActiveEditor` reports "no editor" itself, but says nothing
+        // when the open file is not markdown -- which for this command is the
+        // likelier mistake and the one worth naming.
+        if (vscode.window.activeTextEditor) {
+            notifyError(prompts.noEditor);
+        }
+        return;
+    }
+
+    const headingLine = await findNearestHeading(editor);
+    if (headingLine === null) {
+        notifyError(prompts.noHeading);
+        return;
+    }
+
+    const extractorPath = await extractor.resolveExtractorPath();
+    if (!extractorPath) {
+        return;
+    }
+
+    const lines = editor.document.getText().split('\n');
+    const muted = await isMicrophoneMuted();
+    const said = await vscode.window.showInputBox({
+        title: formatString(prompts.title, (lines[headingLine] ?? '').trim()),
+        prompt: muted ? formatString(prompts.muted, prompts.prompt) : prompts.prompt,
+        placeHolder: prompts.placeholder
+    });
+    if (said === undefined || said.trim() === '') {
+        return;
+    }
+
+    let fields: PhraseFields;
+    try {
+        fields = await runParsePhrase(extractorPath, [said], toIsoDate(new Date()));
+    } catch (error) {
+        notifyError(formatString(prompts.failed, formatError(error)));
+        return;
+    }
+
+    // A word no rule knows would become part of the heading if this were a new
+    // entry. Here there is no heading to put it in, and applying the half that
+    // was understood would change a field the person did not mean to name.
+    const leftover = fields.heading.trim();
+    if (leftover !== '') {
+        notifyError(formatString(prompts.leftover, leftover));
+        return;
+    }
+
+    const weekdays = getWeekdayLocale() === 'en' ? DAY_NAMES_SHORT_EN : DAY_NAMES_SHORT_RU;
+    const plan = planPhraseEdit({ lines, heading: headingLine, fields, weekdays });
+    if (plan.refusal) {
+        notifyInfo(refusalMessage(plan.refusal, prompts));
+        return;
+    }
+    if (plan.changed.length === 0) {
+        notifyInfo(prompts.unchanged);
+        return;
+    }
+
+    const section = sectionEnd(lines, headingLine);
+    // Only the entry's own lines are replaced: the rest of the file is
+    // untouched, so an edit shows up in the diff as the entry it changed.
+    const tail = lines.length - 1 - section;
+    const rewritten = plan.lines.slice(headingLine, plan.lines.length - tail).join('\n');
+    const written = await applyEditOrReport(
+        editor,
+        (editBuilder) => {
+            editBuilder.replace(
+                new vscode.Range(
+                    new vscode.Position(headingLine, 0),
+                    new vscode.Position(section, (lines[section] ?? '').length)
+                ),
+                rewritten
+            );
+        },
+        'the entry'
+    );
+    if (written) {
+        notifyInfo(formatString(prompts.changed, plan.changed.map((field) => nameOf(field, prompts)).join(', ')));
+    }
+}
+
+/** The last line of the entry's own section: everything up to the next heading. */
+function sectionEnd(lines: readonly string[], heading: number): number {
+    for (let index = heading + 1; index < lines.length; index += 1) {
+        if (HEADING_REGEX.test(lines[index] ?? '')) {
+            return index - 1;
+        }
+    }
+    return lines.length - 1;
+}
+
+type EditPrompts = ReturnType<typeof currentUiStrings>['strings']['phraseEditPrompt'];
+
+function refusalMessage(refusal: PhraseEditRefusal, prompts: EditPrompts): string {
+    switch (refusal) {
+        case 'not-a-heading':
+            return prompts.noHeading;
+        case 'nothing-said':
+            return prompts.nothingSaid;
+        case 'no-date-to-put-it-on':
+            return prompts.noDate;
+    }
+}
+
+function nameOf(field: PhraseEditField, prompts: EditPrompts): string {
+    return prompts.fields[field];
 }
