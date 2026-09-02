@@ -102,6 +102,17 @@ Timestamp` stays what it was, for entries typed into the editor by hand.
   and week views are unchanged: their second line carries a date, not one more
   word of the title.
 
+### Fixed
+
+- A command aimed at the entry the cursor stands in no longer aims at the
+  entry above it. The heading came from the document symbols, and a file
+  opened a moment earlier is indexed as its outermost heading alone, so
+  "Set TODO" or a timestamp inserted straight after opening the file landed on
+  the containing section instead of the entry inside it. The lines themselves
+  are read as well now, and the nearer of the two answers wins; a heading
+  written in the setext style, underlined rather than marked with `#`, is
+  still found by the symbols alone.
+
 ## [0.19.0] - 2026-08-23
 
 ### Fixed

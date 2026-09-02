@@ -108,6 +108,23 @@ export async function requireHeadingAtCursor(editor: vscode.TextEditor): Promise
 }
 
 /**
+ * The nearest line at or above `from` that opens a heading with `#`.
+ *
+ * What the document says now, as against what the symbol provider last
+ * indexed: a file opened a moment ago answers with the outer heading alone,
+ * and the entry the cursor stands in is then missed.
+ */
+function scanUpwardForHeading(document: vscode.TextDocument, from: number): number | null {
+    for (let line = from; line >= 0; line--) {
+        if (/^#+\s+/.test(document.lineAt(line).text)) {
+            return line;
+        }
+    }
+
+    return null;
+}
+
+/**
  * Find the innermost heading whose document symbol contains the cursor.
  * Falls back to a manual upward scan if no document symbols are available.
  */
@@ -118,6 +135,7 @@ export async function findNearestHeading(editor: vscode.TextEditor): Promise<num
     );
 
     const position = editor.selection.active;
+    const scanned = scanUpwardForHeading(editor.document, position.line);
 
     if (symbols && symbols.length > 0) {
         function findHeading(syms: vscode.DocumentSymbol[], parentLine?: number): number | null {
@@ -141,18 +159,20 @@ export async function findNearestHeading(editor: vscode.TextEditor): Promise<num
             return bestMatch;
         }
 
-        return findHeading(symbols);
-    }
+        const fromSymbols = findHeading(symbols);
 
-    // Fallback if symbols not available
-    for (let line = position.line; line >= 0; line--) {
-        const text = editor.document.lineAt(line).text;
-        if (/^#+\s+/.test(text)) {
-            return line;
+        // The nearer of the two wins. A symbol tree lagging behind the
+        // document names a heading above the one the cursor is under, and a
+        // heading the scan cannot see -- one written in the setext style,
+        // underlined rather than marked with `#` -- is only in the tree.
+        if (fromSymbols === null || (scanned !== null && scanned > fromSymbols)) {
+            return scanned ?? fromSymbols;
         }
+
+        return fromSymbols;
     }
 
-    return null;
+    return scanned;
 }
 
 export { DAY_NAMES_FULL_RU, DAY_NAMES_FULL_EN, DAY_NAMES_SHORT_RU, DAY_NAMES_SHORT_EN } from './utils/dayNames';

@@ -65,8 +65,12 @@ suite('Edit Task from Phrase', () => {
 
     async function open(content: string, cursorLine = 0): Promise<vscode.TextDocument> {
         document = await vscode.workspace.openTextDocument({ content, language: 'markdown' });
-        const editor = await vscode.window.showTextDocument(document);
-        editor.selection = new vscode.Selection(cursorLine, 0, cursorLine, 0);
+        // The cursor goes in with the editor rather than after it: assigning
+        // `selection` to the editor `showTextDocument` returns is not in
+        // effect by the time the command reads it on VS Code 1.136.
+        await vscode.window.showTextDocument(document, {
+            selection: new vscode.Range(cursorLine, 0, cursorLine, 0)
+        });
         return document;
     }
 
