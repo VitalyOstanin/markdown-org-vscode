@@ -366,6 +366,43 @@ suite('gcal/calendarClient', () => {
         assert.ok(r.calls[0]!.url.endsWith('/calendars/cal/events/eid'), `unexpected PATCH url: ${r.calls[0]!.url}`);
     });
 
+    test('a pinned calendar that is gone is reported rather than replaced', async () => {
+        // A calendar the user pinned and then deleted must not be silently
+        // swapped for a new one of the same name: the events already synced
+        // point at the pinned id, and a second calendar would double them.
+        const r = recorder(() => ({ status: 404, body: { error: { message: 'Not Found' } } }));
+        await assert.rejects(
+            () => ensureCalendar(r.fn, token, { name: 'markdown-org', pinnedId: 'pin' }),
+            /pinned calendar "pin"/
+        );
+    });
+
+    test('a refused creation is reported rather than read for an id', async () => {
+        const r = recorder((call) =>
+            call.method === 'GET'
+                ? { status: 200, body: { items: [] } }
+                : { status: 403, body: { error: { message: 'quota exceeded' } } }
+        );
+        await assert.rejects(() => ensureCalendar(r.fn, token, { name: 'markdown-org' }), /create calendar/);
+    });
+
+    test('a creation that answers without an id is reported rather than passed on', async () => {
+        // The id is what every later request is addressed to; an empty string
+        // there would send the first event to `/calendars//events`.
+        const r = recorder((call) =>
+            call.method === 'GET' ? { status: 200, body: { items: [] } } : { status: 200, body: { summary: 'made' } }
+        );
+        await assert.rejects(() => ensureCalendar(r.fn, token, { name: 'markdown-org' }), /returned no id/);
+    });
+
+    test('a delete that fails for a reason other than absence is reported', async () => {
+        // 404 and 410 mean the event is already gone, which is what the caller
+        // wanted. A 500 means nothing of the sort, and swallowing it would
+        // leave the file saying the event was removed while it still stands.
+        const r = recorder(() => ({ status: 500, body: { error: { message: 'boom' } } }));
+        await assert.rejects(() => deleteEvent(r.fn, token, 'cal', 'eid'), /delete event/);
+    });
+
     test('patchEvent throws with an "update event" message on a server error', async () => {
         const r = recorder(() => ({ status: 500, body: { error: { message: 'boom' } } }));
         await assert.rejects(

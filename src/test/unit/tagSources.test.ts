@@ -41,6 +41,22 @@ suite('Reading the tags a directory declares', () => {
         assert.deepStrictEqual(declarations, []);
     });
 
+    test('a tags file that cannot be read at all is reported, unlike an absent one', async () => {
+        // A missing file is the ordinary case and says nothing. A file that is
+        // there but unreadable -- a directory in its place, or one the user
+        // cannot open -- is a dictionary the agenda is silently filtering
+        // without, so the reason is passed to the caller.
+        const directory = path.join(tmpRoot, 'locked');
+        fs.mkdirSync(path.join(directory, TAGS_FILE), { recursive: true });
+        const skipped: string[] = [];
+
+        const declarations = await readTagDeclarations([directory], [], (message) => skipped.push(message));
+
+        assert.deepStrictEqual(declarations, []);
+        assert.strictEqual(skipped.length, 1, `expected one report, got ${JSON.stringify(skipped)}`);
+        assert.ok(skipped[0]?.includes('unreadable'), skipped[0]);
+    });
+
     test('the settings are a source beside the files, not instead of them', async () => {
         const work = notesDir('work', JSON.stringify([{ name: 'WORK', pattern: 'work' }]));
 

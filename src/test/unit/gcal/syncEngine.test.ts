@@ -308,6 +308,49 @@ suite('gcal/syncEngine', () => {
         assert.equal(summary.deferred, 0, 'no task is deferred by a sibling write-back shifting its line');
     });
 
+    test('a deletion falls back to the recorded event id when the ID does not convert', async () => {
+        // The ID property is written by hand as often as by the extension. One
+        // that does not convert must not leave the event behind on the
+        // calendar: the id cached beside it still names it.
+        const r = recorder(() => ({ status: 200, body: {} }));
+        const w = recordingWriter();
+        const cancelled = task({
+            task_type: 'CANCELLED',
+            properties: { ID: 'not a uuid', GCAL_EVENT_ID: 'evt1abcdef' }
+        });
+
+        const summary = await runSync(baseDeps([cancelled], r.fn, w.writer));
+
+        assert.equal(summary.deleted, 1);
+        assert.ok(
+            r.calls.some((c) => c.method === 'DELETE' && c.url.includes('evt1abcdef')),
+            `the recorded event id was not used: ${JSON.stringify(r.calls.map((c) => c.url))}`
+        );
+    });
+
+    test('tasks are ordered by file, and bottom-up inside each of them', async () => {
+        // Two files in one run: the order across them only has to be stable,
+        // but inside a file the lower line goes first, so a write-back never
+        // shifts a line a later task is still anchored to.
+        const r = recorder(() => ({ status: 200, body: { id: 'x' } }));
+        const w = recordingWriter();
+        const tasks = [
+            task({ file: '/w/b.md', line: 2, heading: 'B2' }),
+            task({ file: '/w/a.md', line: 1, heading: 'A1' }),
+            task({ file: '/w/a.md', line: 9, heading: 'A9' })
+        ];
+        const deps = baseDeps(tasks, r.fn, w.writer);
+        let n = 0;
+        deps.genUuid = () => `0000000${n++}-0000-0000-0000-000000000000`;
+
+        await runSync(deps);
+
+        assert.deepEqual(
+            w.writes.map((write) => write.heading).filter((heading, index, all) => all.indexOf(heading) === index),
+            ['A9', 'A1', 'B2']
+        );
+    });
+
     test('a run that keeps failing stops instead of hammering the API for every task', async () => {
         // A failure that repeats for every task is not about the tasks: revoked
         // access, a deleted calendar, a rate limit. Each task costs up to four

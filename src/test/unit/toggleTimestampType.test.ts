@@ -120,4 +120,11 @@ suite('normaliseBracket', () => {
         assert.strictEqual(normaliseBracket('<2025-12-06>', true), '<2025-12-06>');
         assert.strictEqual(normaliseBracket('[2025-12-06]', false), '[2025-12-06]');
     });
+
+    test('a string too short to carry brackets is returned as it stands', () => {
+        // Slicing the ends off a one-character string would leave nothing and
+        // hand back a bracket pair around an empty timestamp.
+        assert.strictEqual(normaliseBracket('', true), '');
+        assert.strictEqual(normaliseBracket('<', true), '<');
+    });
 });

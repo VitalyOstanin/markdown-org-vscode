@@ -121,4 +121,48 @@ suite('gcal/goa token provider', () => {
         const get = createGoaAccessTokenProvider({ run, accountPath: '/acc' });
         assert.equal(await get(), 'gtok');
     });
+
+    test('an account that answers without a token is reported, not cached as empty', async () => {
+        // A tuple of the wrong shape reaching the cache would be handed to
+        // every later request as the Authorization header, and the calendar
+        // would answer 401 for the rest of the session.
+        const run: DbusRun = async () => ({
+            stdout: JSON.stringify({ type: '(si)', data: [null, 'later'] }),
+            stderr: '',
+            code: 0
+        });
+        const get = createGoaAccessTokenProvider({ run, accountPath: '/acc' });
+        await assert.rejects(() => get(), /unexpected output/);
+    });
+
+    test('a failure that is not a missing busctl is passed on rather than retried over gdbus', async () => {
+        // Falling back on a real authorization error would ask the same
+        // question through a second tool and report its message instead of the
+        // one that says the account is not authorized.
+        const run: DbusRun = async (file) => {
+            if (file === 'busctl') {
+                return { stdout: '', stderr: 'Credentials not available', code: 1 };
+            }
+            throw new Error('gdbus must not be reached');
+        };
+        const get = createGoaAccessTokenProvider({ run, accountPath: '/acc' });
+        await assert.rejects(() => get(), /Credentials not available/);
+    });
+
+    test('a forced refresh goes on to the token even when EnsureCredentials is unavailable', async () => {
+        // Older GOA builds do not carry the method. The token request is what
+        // the run actually needs, so a missing re-validation must not stop it.
+        const methods: string[] = [];
+        const run: DbusRun = async (_file, args) => {
+            const method = args.at(-1)!;
+            methods.push(method);
+            if (method === 'EnsureCredentials') {
+                return { stdout: '', stderr: 'Unknown method', code: 1 };
+            }
+            return { stdout: JSON.stringify({ type: '(si)', data: ['at', 3600] }), stderr: '', code: 0 };
+        };
+        const get = createGoaAccessTokenProvider({ run, accountPath: '/acc' });
+        assert.equal(await get({ forceRefresh: true }), 'at');
+        assert.deepEqual(methods, ['EnsureCredentials', 'GetAccessToken']);
+    });
 });

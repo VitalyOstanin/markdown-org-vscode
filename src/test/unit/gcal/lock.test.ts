@@ -136,4 +136,15 @@ suite('gcal/lock', () => {
         const lock = await acquireLock({ path: p, heartbeatMs: 0 });
         assert.strictEqual(lock, null, 'a corrupt lock file must not be stolen');
     });
+
+    test('a lock path that cannot be read at all is not treated as free', async () => {
+        // A settings path pointing at a directory fails to read for a reason
+        // that has nothing to do with the lock being taken. Answering "free"
+        // there would let a second window sync at the same time as the first;
+        // the run is declined instead.
+        const dir = await mkdtemp(path.join(os.tmpdir(), 'gcal-lock-dir-'));
+        const lock = await acquireLock({ path: dir, heartbeatMs: 0 });
+        assert.strictEqual(lock, null, 'a path that cannot be read must not be stolen');
+        await rm(dir, { recursive: true, force: true });
+    });
 });

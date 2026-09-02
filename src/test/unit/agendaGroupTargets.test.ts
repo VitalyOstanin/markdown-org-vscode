@@ -95,6 +95,16 @@ suite('agendaGroupTargets.groupTargets', () => {
         assert.deepStrictEqual(groupTargets([], 'overdue-recent', LABELS), []);
     });
 
+    test('a payload that is not a list of days yields nothing', () => {
+        // The webview sends what it last rendered, and a panel that has not
+        // rendered yet sends the empty shape rather than an array. Reading a
+        // day out of that would act on rows nobody selected.
+        assert.deepStrictEqual(
+            groupTargets({} as unknown as Parameters<typeof groupTargets>[0], 'overdue-recent', LABELS),
+            []
+        );
+    });
+
     test('the named day is the one acted on, not the first of the week', () => {
         // The week view stands the same band under seven day headers, so the
         // key alone would answer with the first day's rows -- other files, and

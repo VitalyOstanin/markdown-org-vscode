@@ -28,6 +28,40 @@ suite('gcal/dbus', () => {
         );
     });
 
+    test('busctlCall reports the exit code when the command says nothing', async () => {
+        // A tool that fails silently still has to name a reason: without the
+        // code the message reads "busctl GetAccessToken failed:" and the user
+        // is left with nothing to look up.
+        const run = fakeRun({ code: 3, stderr: '   ' });
+        await assert.rejects(
+            () => busctlCall(run, { objectPath: '/p', iface: 'i', method: 'GetAccessToken' }),
+            /busctl GetAccessToken failed: exit 3/
+        );
+    });
+
+    test('busctlCall refuses output that is not JSON', async () => {
+        const run = fakeRun({ stdout: 'not json' });
+        await assert.rejects(
+            () => busctlCall(run, { objectPath: '/p', iface: 'i', method: 'GetAccessToken' }),
+            /unexpected output/
+        );
+    });
+
+    test('busctlCall refuses JSON that carries no data array', async () => {
+        // The token is read out of `data` by position. An object there would
+        // index as `undefined` and travel on as an empty token.
+        const run = fakeRun({ stdout: JSON.stringify({ type: '(si)', data: { token: 'tok' } }) });
+        await assert.rejects(
+            () => busctlCall(run, { objectPath: '/p', iface: 'i', method: 'GetAccessToken' }),
+            /unexpected output/
+        );
+    });
+
+    test('gdbusGetAccessToken reports a failed call rather than parsing its output', async () => {
+        const run = fakeRun({ code: 1, stderr: 'no such account' });
+        await assert.rejects(() => gdbusGetAccessToken(run, '/acc'), /gdbus GetAccessToken failed: no such account/);
+    });
+
     test('gdbusGetAccessToken parses a GVariant tuple', async () => {
         const run = fakeRun({ stdout: "('ya29.abc-DEF_123', 3599)\n" });
         const [tok, exp] = await gdbusGetAccessToken(run, '/acc');

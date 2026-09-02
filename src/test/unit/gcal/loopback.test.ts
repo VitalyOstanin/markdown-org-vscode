@@ -2,12 +2,12 @@ import * as assert from 'node:assert/strict';
 import * as http from 'node:http';
 import { startLoopbackServer } from '../../../utils/gcal/loopback';
 
-function hit(url: string): Promise<void> {
+function hit(url: string): Promise<number> {
     return new Promise((resolve, reject) => {
         http.get(url, (res) => {
             res.resume();
             res.on('end', () => {
-                resolve();
+                resolve(res.statusCode ?? 0);
             });
         }).on('error', reject);
     });
@@ -18,6 +18,22 @@ suite('gcal/loopback', () => {
         const server = await startLoopbackServer();
         try {
             const wait = server.waitForCode('st', 2000);
+            await hit(`${server.redirectUri}?code=abc&state=st`);
+            assert.equal(await wait, 'abc');
+        } finally {
+            server.dispose();
+        }
+    });
+
+    test('a request to any other path is answered 404 and waited past', async () => {
+        // The browser asks for a favicon on the same origin. Reading that as
+        // the redirect would settle the wait with no code at all and end the
+        // sign-in before the user finished it.
+        const server = await startLoopbackServer();
+        try {
+            const wait = server.waitForCode('st', 2000);
+            const status = await hit(server.redirectUri.replace('/callback', '/favicon.ico'));
+            assert.equal(status, 404);
             await hit(`${server.redirectUri}?code=abc&state=st`);
             assert.equal(await wait, 'abc');
         } finally {

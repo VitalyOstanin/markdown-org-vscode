@@ -1,6 +1,6 @@
 import * as assert from 'node:assert';
 import { suite, test } from 'mocha';
-import { addMonths, nextOccurrence, parseRepeater, RepeaterError } from '../../utils/repeater';
+import { addMonths, describe, nextOccurrence, parseRepeater, RepeaterError } from '../../utils/repeater';
 
 // The dates below are the ones markdown-org-ffi's own tests use (planning.rs),
 // so a change on either side that moves a task to a different day fails here.
@@ -120,6 +120,37 @@ suite('nextOccurrence', () => {
                 }),
             RepeaterError
         );
+    });
+
+    test('a ++ date too far back to reach today is refused rather than looped over', () => {
+        // A daily catch-up from three centuries ago needs more steps than the
+        // loop is willing to take. Without the ceiling the command would spin
+        // on a typo in a year, with nothing on screen to say why.
+        assert.throws(
+            () =>
+                nextOccurrence({
+                    base: new Date(1700, 0, 1),
+                    today,
+                    repeater: { type: 'catchUp', value: 1, unit: 'day' }
+                }),
+            RepeaterError
+        );
+    });
+});
+
+suite('describe', () => {
+    test('each kind of repeater is written the way a file writes it', () => {
+        // The text goes into the message the refusals above carry, so it has to
+        // read as the token the user typed rather than as the internal name.
+        assert.strictEqual(describe({ type: 'cumulative', value: 1, unit: 'day' }), '+1d');
+        assert.strictEqual(describe({ type: 'catchUp', value: 2, unit: 'week' }), '++2w');
+        assert.strictEqual(describe({ type: 'restart', value: 3, unit: 'month' }), '.+3m');
+        assert.strictEqual(describe({ type: 'cumulative', value: 4, unit: 'year' }), '+4y');
+        assert.strictEqual(describe({ type: 'cumulative', value: 6, unit: 'hour' }), '+6h');
+    });
+
+    test('a working-day repeater keeps its two-letter unit', () => {
+        assert.strictEqual(describe({ type: 'cumulative', value: 2, unit: 'workday' }), '+2wd');
     });
 });
 

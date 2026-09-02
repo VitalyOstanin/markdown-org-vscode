@@ -85,4 +85,15 @@ suite('gcal/seriesExceptions', () => {
 
         assert.deepEqual(occurrencesMissingFrom(cancelling, replaced), ['2026-08-20']);
     });
+
+    test('a RECURRENCE_ID that is not a date replaces no occurrence', () => {
+        // The property is written by hand, so it can say anything. A value the
+        // date reader cannot make sense of must not take a day out of the
+        // series: the occurrence would vanish from the calendar with nothing
+        // standing in for it.
+        const unreadable = replacement('series-1', 'the week after next');
+        const replaced = collectReplacedOccurrences([series, unreadable]);
+
+        assert.deepEqual(occurrencesMissingFrom(series, replaced), []);
+    });
 });

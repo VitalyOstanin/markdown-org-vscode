@@ -51,6 +51,14 @@ suite('microphone', () => {
         assert.strictEqual(await isMicrophoneMuted(), false);
     });
 
+    test('a mixer call that cannot even start is not called muted', async () => {
+        // `execFile` throws rather than calling back when the process cannot be
+        // spawned at all. Left to propagate, the phrase command would end on an
+        // unhandled rejection instead of writing the entry.
+        execFileStub.throws(new Error('EMFILE: too many open files'));
+        assert.strictEqual(await isMicrophoneMuted(), false);
+    });
+
     test('the default source is the one asked about', async () => {
         answers('Mute: no\n');
         await isMicrophoneMuted();

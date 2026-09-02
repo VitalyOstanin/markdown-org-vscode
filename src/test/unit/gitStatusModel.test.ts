@@ -145,6 +145,23 @@ suite('buildGitStatus', () => {
         assert.strictEqual(status.unpushedCommits, 0);
     });
 
+    test('a repository on no branch at all is listed without one', () => {
+        // A checkout of a commit rather than a branch -- what git calls a
+        // detached HEAD -- has no name to show. The chip still has to list the
+        // repository, so the user can see the files it holds are unpushed.
+        const detached: GitRepoSnapshot = {
+            root: '/repo',
+            uncommitted: ['/repo/work.md'],
+            unpushed: [],
+            commits: [],
+            conflicts: []
+        };
+        const status = buildGitStatus([source('/repo/work.md')], [detached], 'linux');
+        assert.strictEqual(status.repos.length, 1);
+        assert.strictEqual(status.repos[0]?.branch, undefined);
+        assert.strictEqual(status.uncommittedCount, 1);
+    });
+
     test('a file outside every repository leaves the repository list empty', () => {
         const status = buildGitStatus([outside('/elsewhere/loose.md')], [], 'linux');
         assert.strictEqual(status.repos.length, 0);

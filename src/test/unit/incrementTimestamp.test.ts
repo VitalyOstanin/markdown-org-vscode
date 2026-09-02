@@ -88,6 +88,13 @@ suite('incrementTimestamp', () => {
         assert.strictEqual(inc('<2026-05-31 Вс 12:00>', 'month', 1), '<2026-07-01 Ср 12:00>');
     });
 
+    test('a Russian weekday written in full comes back in full', () => {
+        // The length of the weekday already in the line decides the length of
+        // the one written back: a file that spells the day out must not be
+        // shortened to three letters by a keystroke on the month.
+        assert.strictEqual(inc('<2026-05-31 Воскресенье 12:00>', 'month', 1), '<2026-07-01 Среда 12:00>');
+    });
+
     test('timestamp without a weekday keeps having none', () => {
         assert.strictEqual(inc('<2026-05-15 12:00>', 'month', 1), '<2026-06-15 12:00>');
     });

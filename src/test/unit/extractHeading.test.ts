@@ -45,4 +45,23 @@ suite('extractHeadingBlockLines', () => {
         const result = extractHeadingBlockLines(lines, 2, 2);
         assert.deepStrictEqual(result, ['## A.1', 'a1-body']);
     });
+
+    test('an index past the end of the document yields no block at all', () => {
+        // findNearestHeading answers null when there is no heading above the
+        // cursor, but a caller reading a stale line number can still ask for a
+        // line the document no longer has. An empty block is the honest answer;
+        // an entry of `undefined` would travel into the written text.
+        const result = extractHeadingBlockLines(['# A', 'a-body'], 5, 1);
+        assert.deepStrictEqual(result, []);
+    });
+
+    test('a gap in the lines ends the block rather than being written out', () => {
+        // A sparse array reaches here when the caller builds the line list by
+        // index rather than by split. Reading the gap would push `undefined`
+        // into the block; stopping there keeps what was read intact.
+        const lines: string[] = ['# A', 'a-body'];
+        lines[4] = 'far-body';
+        const result = extractHeadingBlockLines(lines, 0, 1);
+        assert.deepStrictEqual(result, ['# A', 'a-body']);
+    });
 });

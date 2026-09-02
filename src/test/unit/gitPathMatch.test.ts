@@ -38,6 +38,14 @@ suite('gitPathMatch', () => {
         assert.strictEqual(isInside('/repo', '/repo-backup/work.md', 'linux'), false);
     });
 
+    test('a parent already ending in a separator is not given a second one', () => {
+        // The filesystem root is spelled with the separator on it. Appending
+        // another would look for `//notes` and report every file as outside
+        // the repository.
+        assert.strictEqual(isInside('/', '/repo/notes/work.md', 'linux'), true);
+        assert.strictEqual(isInside('C:\\', 'C:\\repo\\work.md', 'win32'), true);
+    });
+
     test('a symlink path is not the same key as its target', () => {
         // Why callers resolve both sides before comparing: the link path and
         // the real path are different strings and must stay different keys, or

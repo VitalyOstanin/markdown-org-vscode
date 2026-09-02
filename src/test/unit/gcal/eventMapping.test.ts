@@ -35,6 +35,13 @@ suite('gcal/eventMapping', () => {
         assert.ok(!isSyncable(without(base, 'timestamp_date')));
     });
 
+    test('a task with no timestamp is refused rather than sent as an event without a date', () => {
+        // `isSyncable` is the gate, and every caller goes through it. A caller
+        // that forgets would otherwise publish an event whose start is
+        // `undefined`, which Google accepts as the epoch.
+        assert.throws(() => mapTaskToEvent(without(base, 'timestamp_date'), 'org-1', opts), /not syncable/);
+    });
+
     test('all-day event: end.date is exclusive (next day)', () => {
         const ev = mapTaskToEvent(base, 'oid', opts);
         assert.deepEqual(ev.start, { date: '2026-06-01' });

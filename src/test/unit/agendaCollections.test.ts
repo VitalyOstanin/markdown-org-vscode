@@ -42,6 +42,16 @@ suite('agendaCollections.buildCollectionMarks', () => {
         ]);
     });
 
+    test('a root with no name of its own is labelled by the path itself', () => {
+        // The filesystem root has no last segment to name it. An empty label
+        // would draw a dot with nothing beside it and no way to tell which
+        // directory the row came from.
+        assert.deepStrictEqual(buildCollectionMarks(['/', '/notes/home']), [
+            { root: '/', name: '/', tone: 0 },
+            { root: '/notes/home', name: 'home', tone: 1 }
+        ]);
+    });
+
     test('the palette wraps round rather than running out', () => {
         const roots = Array.from({ length: COLLECTION_TONES + 2 }, (_value, index) => `/notes/${index}`);
         const tones = buildCollectionMarks(roots).map((mark) => mark.tone);

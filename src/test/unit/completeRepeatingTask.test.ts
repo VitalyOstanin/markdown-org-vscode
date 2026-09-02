@@ -101,6 +101,20 @@ suite('planCompletion', () => {
         assert.deepStrictEqual(plan.planning, [{ line: 1, text: '    `SCHEDULED: <2026-07-31 Пт +1d>`' }]);
     });
 
+    test('a repeater of zero is left where it stands rather than stepped by nothing', () => {
+        // `+0d` parses as a token but not as an interval: advancing by it would
+        // never pass today. The line stays as written, and the task completes
+        // without a repeat.
+        const plan = planCompletion({
+            lines: ['## TODO Broken repeat', '`SCHEDULED: <2026-07-30 Чт +0d>`'],
+            heading: 0,
+            today: TODAY
+        });
+
+        assert.strictEqual(plan.repeated, false);
+        assert.deepStrictEqual(plan.planning, []);
+    });
+
     test('a working-day repeater is refused rather than counted without the calendar', () => {
         assert.throws(
             () =>

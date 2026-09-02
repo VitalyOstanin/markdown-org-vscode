@@ -102,6 +102,14 @@ suite('orgProperties.findOrgPropertiesBlock', () => {
         assert.deepEqual(findOrgPropertiesBlock(lines, 0), { startLine: 4, endLineExclusive: 7 });
     });
 
+    test('a backtick fence carrying a backtick in its info string opens nothing', () => {
+        // CommonMark forbids it, so the line is ordinary text -- a sentence
+        // about `code`, say. Reading it as a fence would swallow the block
+        // below it and lose the properties of the entry.
+        const lines = ['### TODO T', '```markdown `x`', '```org-properties', 'K: v', '```'];
+        assert.deepEqual(findOrgPropertiesBlock(lines, 0), { startLine: 2, endLineExclusive: 5 });
+    });
+
     test('an org-properties fence inside a wider fence is not a block of its own', () => {
         const lines = ['### TODO T', '````markdown', '```org-properties', 'K: v', '```', '````'];
         assert.deepEqual(findOrgPropertiesBlocks(lines, 0), []);

@@ -297,4 +297,14 @@ suite('getClockTimestampPartAt', () => {
     test('returns null when the line is not a CLOCK entry', () => {
         assert.strictEqual(getClockTimestampPartAt('## TODO Just a heading', 5), null);
     });
+
+    test('a cursor on the word CLOCK addresses no part of the entry', () => {
+        // The keyword and the duration are not editable parts: the arrow keys
+        // that adjust a timestamp have to leave the line alone there rather
+        // than reaching for the nearest number.
+        assert.strictEqual(getClockTimestampPartAt(CLOSED_CLOCK, 3), null);
+        assert.strictEqual(getClockTimestampPartAt(CLOSED_CLOCK, 0), null);
+        // `=>  2:15` is computed from the two timestamps, not typed.
+        assert.strictEqual(getClockTimestampPartAt(CLOSED_CLOCK, 60), null);
+    });
 });

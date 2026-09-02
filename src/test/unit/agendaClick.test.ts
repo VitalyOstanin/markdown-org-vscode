@@ -69,6 +69,44 @@ suite('resolveTaskClickIntent (jsdom)', () => {
         const intent = resolveTaskClickIntent({ target: null }, null);
         assert.strictEqual(intent, null);
     });
+
+    test('a task line missing the file it points at opens nothing', () => {
+        // A card rendered from a group that lost its source keeps the class but
+        // carries no `data-file`. Opening on that would raise an error about an
+        // empty path; the click is dropped instead.
+        const { window } = setupDom();
+        const target = window.document.querySelector('.task-line')!;
+        target.removeAttribute('data-file');
+
+        const sel = window.getSelection()!;
+        sel.removeAllRanges();
+        const intent = resolveTaskClickIntent({ target }, sel);
+        assert.strictEqual(intent, null);
+    });
+
+    test('a task line missing the line it points at opens nothing', () => {
+        const { window } = setupDom();
+        const target = window.document.querySelector('.task-line')!;
+        target.removeAttribute('data-line');
+
+        const sel = window.getSelection()!;
+        sel.removeAllRanges();
+        const intent = resolveTaskClickIntent({ target }, sel);
+        assert.strictEqual(intent, null);
+    });
+
+    test('a line number that is not a number opens nothing', () => {
+        // The attribute reaches the DOM as text, and text that survives the
+        // render but not `parseInt` would otherwise open the file at NaN.
+        const { window } = setupDom();
+        const target = window.document.querySelector('.task-line')!;
+        target.setAttribute('data-line', 'not-a-line');
+
+        const sel = window.getSelection()!;
+        sel.removeAllRanges();
+        const intent = resolveTaskClickIntent({ target }, sel);
+        assert.strictEqual(intent, null);
+    });
 });
 
 suite('sanitizeTaskLine', () => {
