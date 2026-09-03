@@ -28,7 +28,7 @@ thing to anything else that links it.
 ## Table of Contents
 
 - [Features](#features)
-    - [Google Calendar sync (new)](#google-calendar-sync-new)
+    - [Google Calendar sync (opt-in)](#google-calendar-sync-opt-in)
     - [Core](#core)
 - [Quick Start](#quick-start)
 - [Syntax Examples](#syntax-examples)
@@ -79,7 +79,7 @@ thing to anything else that links it.
 Brings the [Org mode](https://orgmode.org/) task management workflow
 to Markdown files in VS Code.
 
-### Google Calendar sync (new)
+### Google Calendar sync (opt-in)
 
 **Opt-in, one-way push of `SCHEDULED` / `DEADLINE` tasks to your own
 Google Calendar.** Connect with your OAuth Desktop client (refresh
@@ -195,26 +195,26 @@ shown struck-through in the agenda and is never pushed to Google Calendar
 
 ```markdown
 ## TODO [#A] Important meeting
-`CREATED: [2025-12-01 Sun 09:15]`
-`DEADLINE: <2025-12-06 Fri 15:00>`
+`CREATED: [2025-12-01 Mon 09:15]`
+`DEADLINE: <2025-12-06 Sat 15:00>`
 ```
 
 **Completed task:**
 
 ```markdown
 ## DONE Fix bug in parser
-`CREATED: [2025-12-01 Sun 10:00]`
-`CLOSED: [2025-12-03 Tue 14:30]`
+`CREATED: [2025-12-01 Mon 10:00]`
+`CLOSED: [2025-12-03 Wed 14:30]`
 ```
 
 **Without tasks (standalone timestamps):**
 
 ```markdown
 ## Project planning session
-`SCHEDULED: <2025-12-10 Tue 10:00>`
+`SCHEDULED: <2025-12-10 Wed 10:00>`
 
 ## Report submission
-`DEADLINE: <2025-12-15 Sun>`
+`DEADLINE: <2025-12-15 Mon>`
 ```
 
 #### Active and inactive forms
@@ -233,8 +233,8 @@ follows the per-keyword policy defined in
 | `CLOCK:`     | `<...>` or `[...]` | Either form is accepted on read; the editor writes `[...]`.               |
 
 A keyword line whose bracket form does not match the table -- for
-example `CLOSED: <2025-12-03 Tue>` or a mixed pair like
-`<2025-12-03 Tue]` -- is surfaced as a warning under the
+example `CLOSED: <2025-12-03 Wed>` or a mixed pair like
+`<2025-12-03 Wed]` -- is surfaced as a warning under the
 `markdown-org` diagnostic source. Press `Ctrl+.` on the warning to
 apply the **Convert to canonical bracket form** Quick Fix.
 
@@ -356,13 +356,14 @@ Ctrl+K Ctrl+N   →   позвонить врачу завтра в 15:00, ка�
 
 ```markdown
 ### TODO позвонить врачу
+    `CREATED: [2026-08-31 Пн 14:01]`
     `SCHEDULED: <2026-09-01 Вт 15:00 +1w>`
 ```
 
-The rules that read the sentence are the extractor's (`parse-phrase`, 0.20.0),
-so this extension and the Android client understand a phrase the same way, and
-both grammars — Russian and English — are consulted whatever language the
-editor is set to. What the rules understand, and what they do not, is the
+The rules that read the sentence are the extractor's (`parse-phrase`, added in
+0.20.0), so this extension and the Android client understand a phrase the same
+way, and both grammars — Russian and English — are consulted whatever language
+the editor is set to. What the rules understand, and what they do not, is the
 [extractor's own table](https://github.com/VitalyOstanin/markdown-org-extract#what-the-rules-understand).
 
 | №   | What                        | How it behaves                                                                                              |
@@ -384,7 +385,7 @@ PulseAudio and PipeWire alike; where there is no answer to be had, on Windows
 and macOS, the box reads as it always did.
 
 Every entry written this way carries the moment it was written at —
-`CREATED: [2026-09-01 вт 14:01]` under the heading, above the planning line, in
+the `CREATED:` line above, under the heading and above the planning line, in
 the inactive brackets the agenda never reads as a date to keep. To the minute,
 which is what tells two entries written the same day apart; the Android client
 marks an entry the same way. `Insert Created Timestamp` stays for entries typed
@@ -1048,16 +1049,18 @@ next run.
 All Google Calendar sync settings live under the
 `markdown-org.gcalSync.*` namespace:
 
-| Setting                                      | Type                  | Default          | Description                                                                                                                                                     |
-| -------------------------------------------- | --------------------- | ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `markdown-org.gcalSync.clientId`             | `string`              | `""`             | Google OAuth Desktop `client_id` (BYO). The `client_secret` is entered on connect and kept in the OS keychain, not here. Scope `machine`.                       |
-| `markdown-org.gcalSync.calendarName`         | `string`              | `"markdown-org"` | Name used to find-or-create the sync calendar when no `calendarId` is pinned.                                                                                   |
-| `markdown-org.gcalSync.calendarId`           | `string`              | `""`             | Pinned Google calendar id (takes precedence over `calendarName`). Usually set by **Select Google Calendar**.                                                    |
-| `markdown-org.gcalSync.concurrencyPolicy`    | `"queue" \| "cancel"` | `"queue"`        | Behaviour when a sync is requested while one is running (within a window): `queue` coalesces into a single rerun; `cancel` aborts the current run and restarts. |
-| `markdown-org.gcalSync.syncOnSave`           | `boolean`             | `false`          | Run a (debounced) sync after saving a markdown file.                                                                                                            |
-| `markdown-org.gcalSync.syncOnSaveDebounceMs` | `number`              | `5000`           | Debounce interval (ms) for the sync-on-save trigger.                                                                                                            |
-| `markdown-org.gcalSync.onDone`               | `"delete" \| "keep"`  | `"delete"`       | When a task becomes DONE: `delete` removes its calendar event; `keep` leaves it.                                                                                |
-| `markdown-org.gcalSync.defaultEventMinutes`  | `number`              | `60`             | Duration for a timed task event when no end time is given.                                                                                                      |
+| Setting                                      | Type                         | Default          | Description                                                                                                                                                                          |
+| -------------------------------------------- | ---------------------------- | ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `markdown-org.gcalSync.clientId`             | `string`                     | `""`             | Google OAuth Desktop `client_id` (BYO). The `client_secret` is entered on connect and kept in the OS keychain, not here. Scope `machine`.                                            |
+| `markdown-org.gcalSync.calendarName`         | `string`                     | `"markdown-org"` | Name used to find-or-create the sync calendar when no `calendarId` is pinned.                                                                                                        |
+| `markdown-org.gcalSync.calendarId`           | `string`                     | `""`             | Pinned Google calendar id (takes precedence over `calendarName`). Usually set by **Select Google Calendar**.                                                                         |
+| `markdown-org.gcalSync.concurrencyPolicy`    | `"queue" \| "cancel"`        | `"queue"`        | Behaviour when a sync is requested while one is running (within a window): `queue` coalesces into a single rerun; `cancel` aborts the current run and restarts.                      |
+| `markdown-org.gcalSync.syncOnSave`           | `boolean`                    | `false`          | Run a (debounced) sync after saving a markdown file.                                                                                                                                 |
+| `markdown-org.gcalSync.syncOnSaveDebounceMs` | `number`                     | `5000`           | Debounce interval (ms) for the sync-on-save trigger.                                                                                                                                 |
+| `markdown-org.gcalSync.onDone`               | `"delete" \| "keep"`         | `"delete"`       | When a task becomes DONE: `delete` removes its calendar event; `keep` leaves it.                                                                                                     |
+| `markdown-org.gcalSync.defaultEventMinutes`  | `number`                     | `60`             | Duration for a timed task event when no end time is given.                                                                                                                           |
+| `markdown-org.gcalSync.authProvider`         | `"auto" \| "goa" \| "oauth"` | `"auto"`         | Where the access token comes from: `goa` takes it from GNOME Online Accounts (Linux), `oauth` runs the BYO Desktop-client flow, `auto` prefers GOA on Linux and falls back to OAuth. |
+| `markdown-org.gcalSync.goaAccount`           | `string`                     | `""`             | Which GNOME Online Accounts Google account to use when `authProvider` resolves to `goa`. Empty picks the only account there is; **Connect Google Calendar** stores the chosen one.   |
 
 ## Dependencies
 
