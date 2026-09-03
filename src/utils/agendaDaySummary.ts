@@ -199,7 +199,13 @@ export function buildOverdueBandIndex(days: DayAgenda[], labels: DaySectionLabel
         const b = (name: BucketName): TaskWithOffset[] => (Array.isArray(day[name]) ? day[name] : []);
         const age = Math.round((Date.parse(day.date) - Date.parse(todayIso)) / 86400000);
         const owed = [...b('scheduled_timed'), ...b('scheduled_no_time')]
-            .filter((task) => task.timestamp_type === 'SCHEDULED' || task.timestamp_type === 'DEADLINE')
+            .filter(
+                (task) =>
+                    (task.timestamp_type === 'SCHEDULED' || task.timestamp_type === 'DEADLINE') &&
+                    task.task_type !== 'DONE' &&
+                    task.task_type !== 'CANCELLED' &&
+                    task.task_type !== 'CANCELED'
+            )
             .map((task) => ({ ...task, days_offset: age }));
         const bands = buildDaySections({ date: day.date, overdue: owed }, labels)
             .filter((section) => section.key.startsWith('overdue-'))

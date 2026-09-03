@@ -203,6 +203,32 @@ suite('buildOverdueBandIndex', () => {
         ]);
     });
 
+    test('finished rows are left out of the bands', () => {
+        // The tooltip breaks down what the cell says is overdue, so the two
+        // have to leave out the same rows: a day whose planning is all done
+        // is not overdue and has nothing to break down.
+        const index = buildOverdueBandIndex(
+            [
+                day({
+                    date: '2025-12-02',
+                    scheduled_no_time: [planned({ task_type: 'DONE' }), planned({ task_type: 'CANCELLED' }), planned()]
+                })
+            ],
+            SECTIONS,
+            TODAY
+        );
+        assert.deepStrictEqual(index['2025-12-02'], [{ title: SECTIONS.overdueRecent, count: 1 }]);
+    });
+
+    test('a date whose planning is all finished is left out entirely', () => {
+        const index = buildOverdueBandIndex(
+            [day({ date: '2025-12-02', scheduled_no_time: [planned({ task_type: 'DONE' })] })],
+            SECTIONS,
+            TODAY
+        );
+        assert.deepStrictEqual(index['2025-12-02'], undefined);
+    });
+
     test('the band follows the age of the date, not the offset written on the row', () => {
         // On its own day the extractor writes days_offset 0. Read as written,
         // every entry would land in the "this week" band however old the date.

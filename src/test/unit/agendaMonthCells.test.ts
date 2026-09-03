@@ -58,6 +58,48 @@ suite('buildMonthDayIndex', () => {
         assert.deepStrictEqual(index, { '2025-12-02': { total: 1, overdue: true, dueSoon: false } });
     });
 
+    test('a date gone by owes nothing once its planning is finished', () => {
+        // The buckets keep finished rows -- `computeDaySummary` counts them as
+        // `done` out of the same ones -- so reading the timestamp alone marked
+        // every past day that ever held a task, which is most of a notes file.
+        const index = buildMonthDayIndex(
+            [
+                day('2025-12-02', {
+                    scheduled_no_time: [task({ timestamp_type: 'SCHEDULED', task_type: 'DONE' })]
+                })
+            ],
+            '2025-12-09'
+        );
+        assert.deepStrictEqual(index, { '2025-12-02': { total: 1, overdue: false, dueSoon: false } });
+    });
+
+    test('a cancelled task leaves no debt behind either', () => {
+        const index = buildMonthDayIndex(
+            [
+                day('2025-12-02', {
+                    scheduled_no_time: [task({ timestamp_type: 'DEADLINE', task_type: 'CANCELED' })]
+                })
+            ],
+            '2025-12-09'
+        );
+        assert.deepStrictEqual(index, { '2025-12-02': { total: 1, overdue: false, dueSoon: false } });
+    });
+
+    test('one unfinished task among finished ones still owes', () => {
+        const index = buildMonthDayIndex(
+            [
+                day('2025-12-02', {
+                    scheduled_no_time: [
+                        task({ timestamp_type: 'SCHEDULED', task_type: 'DONE' }),
+                        task({ timestamp_type: 'SCHEDULED', task_type: 'TODO' })
+                    ]
+                })
+            ],
+            '2025-12-09'
+        );
+        assert.deepStrictEqual(index, { '2025-12-02': { total: 2, overdue: true, dueSoon: false } });
+    });
+
     test('a date gone by holding a plain timestamp owes nothing', () => {
         // `keeps_a_missed_date` in the extractor: only SCHEDULED and DEADLINE
         // leave a debt behind. A meeting that has been and gone does not.

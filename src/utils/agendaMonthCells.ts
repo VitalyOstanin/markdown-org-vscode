@@ -147,7 +147,21 @@ export function buildMonthDayIndex(days: DayAgenda[], todayIso: string): MonthDa
             Array.isArray(day[name]) ? day[name] : [];
         const dated = [...bucket('scheduled_timed'), ...bucket('scheduled_no_time')];
         if (dated.length > 0) {
-            const owes = dated.some((t) => t.timestamp_type === 'SCHEDULED' || t.timestamp_type === 'DEADLINE');
+            // What is still owed on the date: planning, and only where the
+            // task has not been settled. The buckets keep the finished rows --
+            // `computeDaySummary` counts them out of these very arrays -- so
+            // reading the timestamp alone marked as overdue every past day
+            // that ever held a task, which in a notes file is most of them.
+            // Both cancelled spellings, as `isCancelled` has it; spelled out
+            // rather than called because the whole function is injected into
+            // the webview through `.toString()` and has no module scope there.
+            const owes = dated.some(
+                (t) =>
+                    (t.timestamp_type === 'SCHEDULED' || t.timestamp_type === 'DEADLINE') &&
+                    t.task_type !== 'DONE' &&
+                    t.task_type !== 'CANCELLED' &&
+                    t.task_type !== 'CANCELED'
+            );
             const due = dated.some((t) => warned.has(`${day.date}|${t.file}:${String(t.line)}`));
             index[day.date] = {
                 total: dated.length,

@@ -115,6 +115,13 @@ Timestamp` stays what it was, for entries typed into the editor by hand.
 
 ### Fixed
 
+- A day in the month grid is no longer marked overdue for planning that has
+  been carried out. The mark read the timestamp -- SCHEDULED or DEADLINE -- and
+  said nothing about the task, and the buckets keep the finished rows, so
+  nearly every past day of a notes file came up red and the tooltip broke the
+  same rows down into arrears bands. A finished or cancelled task leaves no
+  debt behind; a day still owes as soon as one task on it does not.
+
 - The git chip no longer reads "clean" over a tree whose status was never
   read. The first `git status` of a repository the workspace did not open is
   forced once and the root marked as done with; a file that asked for the pass
