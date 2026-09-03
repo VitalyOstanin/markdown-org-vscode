@@ -17,12 +17,12 @@ import type { Task } from '../../types';
 /** Series id -> the occurrence dates other entries of the run stand in for. */
 export type ReplacedOccurrences = ReadonlyMap<string, ReadonlySet<string>>;
 
-const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
 /** The date half of a `RECURRENCE_ID`, which is what occurrences match on. */
 function occurrenceDate(recurrenceId: string): string | undefined {
     const [date] = recurrenceId.trim().split(/\s+/, 1);
-    return date !== undefined && ISO_DATE_RE.test(date) ? date : undefined;
+    return date !== undefined && ISO_DATE_REGEX.test(date) ? date : undefined;
 }
 
 /**
@@ -62,7 +62,7 @@ export function collectReplacedOccurrences(tasks: readonly Task[]): ReplacedOccu
  * could not.
  */
 export function occurrencesMissingFrom(task: Task, replaced: ReplacedOccurrences): string[] {
-    const missing = new Set<string>((task.excluded_dates ?? []).filter((date) => ISO_DATE_RE.test(date)));
+    const missing = new Set<string>((task.excluded_dates ?? []).filter((date) => ISO_DATE_REGEX.test(date)));
     const seriesId = task.properties?.ID;
     if (seriesId) {
         for (const date of replaced.get(seriesId) ?? []) {

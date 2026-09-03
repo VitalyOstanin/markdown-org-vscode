@@ -31,7 +31,7 @@ export function buildOrgPropertiesBlock(props: Record<string, string>, indent = 
 // the extractor's ADR-0031 that means a cancelled occurrence returning to the
 // agenda. This mirrors the extractor: every block of the heading's section
 // counts, whatever fences it, and the last one wins on a repeated key.
-const FENCE = /^(\s*)(`{3,}|~{3,})\s*(.*)$/;
+const FENCE_REGEX = /^(\s*)(`{3,}|~{3,})\s*(.*)$/;
 // Where the section ends is `isSectionBreak` in `orgPatterns`, shared with
 // everything else that asks the question.
 
@@ -43,7 +43,7 @@ export interface OrgPropertiesRange {
 
 /** The opening fence of a block, or null when the line is not one. */
 function openingFence(line: string): { marker: string; info: string } | null {
-    const m = FENCE.exec(line);
+    const m = FENCE_REGEX.exec(line);
     if (!m) {
         return null;
     }
@@ -59,7 +59,7 @@ function openingFence(line: string): { marker: string; info: string } | null {
 
 /** Whether `line` closes a block opened with `marker`: same char, not shorter, no info. */
 function closesFence(line: string, marker: string): boolean {
-    const m = FENCE.exec(line);
+    const m = FENCE_REGEX.exec(line);
     if (!m) {
         return false;
     }

@@ -8,7 +8,7 @@ const MAX_FONT_STACK_LENGTH = 200;
  * parentheses, `/`, `*`, `:`, `@`, backslash, angle brackets, control
  * characters) belongs to CSS syntax rather than to a family name.
  */
-const FONT_STACK_PATTERN = /^[\p{L}\p{N} '",._-]+$/u;
+const FONT_STACK_REGEX = /^[\p{L}\p{N} '",._-]+$/u;
 
 /**
  * Validate `markdown-org.agendaFontFamily` before it is interpolated into the
@@ -28,7 +28,7 @@ export function sanitizeFontFamily(value: string | undefined | null): string {
     if (!trimmed || trimmed.length > MAX_FONT_STACK_LENGTH) {
         return '';
     }
-    return FONT_STACK_PATTERN.test(trimmed) ? trimmed : '';
+    return FONT_STACK_REGEX.test(trimmed) ? trimmed : '';
 }
 
 /**

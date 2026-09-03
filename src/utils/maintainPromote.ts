@@ -37,7 +37,7 @@ export interface PromoteBlock {
 }
 
 /** Regex for the `# incoming` section header, case-insensitive. */
-const INCOMING_HEADING_RE = /^#\s+incoming$/i;
+const INCOMING_HEADING_REGEX = /^#\s+incoming$/i;
 
 /**
  * Compute the new content of the maintain file after promoting `block`.
@@ -62,7 +62,7 @@ export function computeMaintainInsertion(maintainContent: string, block: Promote
     const lines = maintainContent.split('\n');
     let incomingIndex = -1;
     for (let i = 0; i < lines.length; i++) {
-        if (INCOMING_HEADING_RE.test(lines[i] ?? '')) {
+        if (INCOMING_HEADING_REGEX.test(lines[i] ?? '')) {
             incomingIndex = i;
             break;
         }

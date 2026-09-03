@@ -20,7 +20,7 @@ import { exec } from './exec';
 const MIXER_TIMEOUT_MS = 2000;
 
 /** What `pactl get-source-mute` says of an input that is off. */
-const MUTED = /^\s*Mute:\s*yes\s*$/im;
+const MUTED_INPUT_REGEX = /^\s*Mute:\s*yes\s*$/im;
 
 /**
  * Ask the mixer whether the default input is muted.
@@ -37,7 +37,7 @@ export function isMicrophoneMuted(): Promise<boolean> {
                 ['get-source-mute', '@DEFAULT_SOURCE@'],
                 { encoding: 'utf-8', timeout: MIXER_TIMEOUT_MS },
                 (error, stdout) => {
-                    resolve(!error && MUTED.test(stdout));
+                    resolve(!error && MUTED_INPUT_REGEX.test(stdout));
                 }
             );
         } catch {

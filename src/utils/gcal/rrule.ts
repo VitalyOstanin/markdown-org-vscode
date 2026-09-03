@@ -13,7 +13,7 @@
 // a positive integer, and the unit is lower-case. A wider pattern here would
 // accept strings the extractor never emits and rejects on its own side
 // (`+++1d`, `+0d`, `+1H`).
-const REPEATER_RE = /^(?:\+\+|\.\+|\+)([1-9]\d*)(wd|[dwmyh])$/;
+const REPEATER_REGEX = /^(?:\+\+|\.\+|\+)([1-9]\d*)(wd|[dwmyh])$/;
 
 const UNIT_TO_FREQ: Record<string, string> = {
     d: 'DAILY',
@@ -44,7 +44,7 @@ export function repeaterToRrule(repeater: string | undefined): string[] | undefi
     if (!repeater) {
         return undefined;
     }
-    const m = REPEATER_RE.exec(repeater.trim());
+    const m = REPEATER_REGEX.exec(repeater.trim());
     if (!m) {
         return undefined;
     }
