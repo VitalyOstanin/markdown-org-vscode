@@ -76,9 +76,12 @@ Timestamp` stays what it was, for entries typed into the editor by hand.
   one together, as org files written by hand do, keeps the closing date in its
   own colours: each timestamp answers to the keyword in front of it.
 
-- The bundled extractor moves to 0.20.0, the release that reads a phrase. A
-  binary configured through `markdown-org.extractorPath` that is older has no
-  `parse-phrase` subcommand at all, which the version warning now names.
+- The bundled extractor moves to 0.21.0, the release that reads a phrase and
+  answers with the keyword it named and the fields it said to empty. A binary
+  configured through `markdown-org.extractorPath` older than 0.20.0 has no
+  `parse-phrase` subcommand at all, and one older than 0.21.0 prints neither the
+  keyword nor the emptied fields, so a phrase that empties a field changes
+  nothing. The version warning names both.
 
 - The month grid is a calendar to glance at rather than a page to scroll. The
   cells are square, so the width of the grid set their height, and at 800px

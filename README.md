@@ -39,6 +39,7 @@ thing to anything else that links it.
     - [Priority Levels](#priority-levels)
     - [Repeating Tasks](#repeating-tasks)
 - [Writing a task by saying it](#writing-a-task-by-saying-it)
+- [Changing an entry by saying what to change](#changing-an-entry-by-saying-what-to-change)
 - [Commands](#commands)
     - [Task Status Commands](#task-status-commands)
     - [Phrase Commands](#phrase-commands)
@@ -396,6 +397,31 @@ into the open document, so one Undo takes it back. The decisions are in
 [ADR-0024](docs/adr/0024-an-entry-carries-the-moment-it-was-written-at.md) and
 [ADR-0025](docs/adr/0025-the-phrase-box-names-a-muted-microphone.md).
 
+## Changing an entry by saying what to change
+
+An entry that already exists changes the way it was written: in one sentence.
+`Edit Task from Phrase` (`Ctrl+K Ctrl+E`) asks for it and applies it to the
+entry the cursor stands in — the same entry every other editing command works
+on. "перенеси на пятницу в 16:00 и сделай срочной" moves the day, the hour and
+the priority in one write, where the commands for them are three invocations
+and two dialogs of choice.
+
+| №   | What                          | How it behaves                                                                        |
+| --- | ----------------------------- | ------------------------------------------------------------------------------------- |
+| 1   | Which entry is changed        | The one the cursor stands in, as `Set TODO` and the timestamp commands find it        |
+| 2   | The keyword                   | Said in the phrase as well: "отметь выполненной", "в работу"                          |
+| 3   | Emptying a field              | "убрать дату", "убрать время", "без повтора", "без приоритета"                        |
+| 4   | A word the rules did not read | Nothing is changed and the word is named: an edit has no heading to put a leftover in |
+| 5   | An hour with no day           | Refused: an org timestamp has no way to write an hour without a date                  |
+| 6   | Taking it back                | The editor's own undo — the entry is written into the open document                   |
+
+The rules are the extractor's, and reading a phrase this way needs 0.21.0: the
+release that answers with the keyword a phrase named and with the fields it
+said to empty, beside the fields it filled. An older binary configured through
+[`markdown-org.extractorPath`](#markdown-orgextractorpath) leaves both out, and
+the version warning names it. The decision is in
+[ADR-0026](docs/adr/0026-an-entry-is-changed-by-saying-what-to-change.md).
+
 ## Commands
 
 Hotkeys below match the bindings declared in `package.json`. They are
@@ -423,6 +449,7 @@ for `Set TODO` (the `Shift+Up`/`Shift+Down` bindings are unchanged).
 | Command                                 | Hotkey          | Description                                                                                                             |
 | --------------------------------------- | --------------- | ----------------------------------------------------------------------------------------------------------------------- |
 | `Markdown Org: Insert Task from Phrase` | `Ctrl+K Ctrl+N` | Say the task in one sentence; the entry joins the note the cursor stands in (see [above](#writing-a-task-by-saying-it)) |
+| `Markdown Org: Edit Task from Phrase`   | `Ctrl+K Ctrl+E` | Say what to change in the entry the cursor stands in (see [above](#changing-an-entry-by-saying-what-to-change))         |
 
 ### Timestamp Commands
 
