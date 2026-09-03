@@ -30,7 +30,7 @@ was decided, and the trade-offs that came with it.
 | ---- | --------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
 | 0001 | [External Rust extractor for markdown scanning](0001-external-rust-extractor.md)                                                        | Accepted                                                  |
 | 0002 | [Webview-based agenda UI](0002-webview-agenda.md)                                                                                       | Accepted                                                  |
-| 0003 | [Org-mode wire format for timestamps and CLOCK](0003-org-mode-wire-format.md)                                                           | Accepted                                                  |
+| 0003 | [Org-mode wire format for timestamps and CLOCK](0003-org-mode-wire-format.md)                                                           | Accepted (amended by 0005)                                |
 | 0004 | [Distribute via Open VSX and GitHub Releases, not Microsoft Marketplace](0004-open-vsx-distribution.md)                                 | Accepted                                                  |
 | 0005 | [Active and inactive timestamps (editor side)](0005-active-and-inactive-timestamps.md)                                                  | Accepted                                                  |
 | 0006 | [Bracket-toggle keybindings and scope](0006-bracket-toggle-keybindings.md)                                                              | Accepted                                                  |

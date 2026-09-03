@@ -67,6 +67,14 @@ Timestamp` stays what it was, for entries typed into the editor by hand.
 
 ### Changed
 
+- The panel's Russian says one thing one way. The git dropdown spoke in
+  transliterations where Russian has words of its own -- "закоммичено", "не
+  закоммичено", "без пуша" -- and it named the file filter "метка" while the
+  Android client calls it "тег", and a scanned directory "каталог" where the
+  rest of the interface calls it a collection. Each is now said once: "в
+  коммите", "без коммита", "не отправлено", "тег", "коллекция". The English
+  interface is unchanged.
+
 - A CREATED line steps back whole. The keyword was already the disabled grey,
   while the date and the weekday beside it kept the blue every other timestamp
   carries, and the line read as half a record — the eye stopped on a date that

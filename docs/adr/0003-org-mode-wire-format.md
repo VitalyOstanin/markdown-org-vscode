@@ -10,7 +10,7 @@
 
 ## Status
 
-Accepted.
+Accepted, amended by [ADR-0005](0005-active-and-inactive-timestamps.md).
 
 ## Context
 

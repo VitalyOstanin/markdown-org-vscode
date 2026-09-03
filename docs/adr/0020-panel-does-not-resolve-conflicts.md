@@ -10,9 +10,10 @@
 
 ## Status
 
-Accepted. Amends [ADR-0016](0016-git-status-via-git-extension-api.md), which
-described the chip as two counters and the actions that answer them; the source
-of the status and the resolution chain it decided are unchanged.
+Accepted, amended by [ADR-0022](0022-the-panel-syncs-but-never-merges.md).
+Amends [ADR-0016](0016-git-status-via-git-extension-api.md), which described the
+chip as two counters and the actions that answer them; the source of the status
+and the resolution chain it decided are unchanged.
 
 ## Context
 
