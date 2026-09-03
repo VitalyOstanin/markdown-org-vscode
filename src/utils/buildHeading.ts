@@ -34,5 +34,14 @@ export function buildHeading(parts: HeadingParts): string {
     if (parts.title !== '') {
         tokens.push(parts.title);
     }
+    // A heading with nothing after the hashes keeps the space that makes it
+    // one: `#` alone is not a heading to this extension nor to the extractor
+    // (`HEADING_HASHES_RE` asks for a space or a tab), so clearing the last
+    // token off `## [#A]` without it would leave a line no command could
+    // touch again and no agenda would list. This is the one case the trailing
+    // space is load-bearing rather than left over.
+    if (tokens.length === 1) {
+        return `${parts.hashes} `;
+    }
     return tokens.join(' ');
 }

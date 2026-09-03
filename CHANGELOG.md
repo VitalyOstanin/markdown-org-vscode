@@ -115,6 +115,16 @@ Timestamp` stays what it was, for entries typed into the editor by hand.
 
 ### Fixed
 
+- An answer from the extractor that is not JSON at all is refused by name.
+  `JSON.parse` was left to raise its own wording, so a binary that printed a
+  warning, or nothing, reached the user as "Unexpected end of JSON input" over
+  the phrase they had just said.
+
+- A heading cleared of its last token keeps the space that makes it a heading.
+  `## [#A]` with the cookie taken off came back as `##`, which neither this
+  extension nor the extractor reads as a heading -- the entry could not be
+  edited again and no agenda listed it.
+
 - A day in the month grid is no longer marked overdue for planning that has
   been carried out. The mark read the timestamp -- SCHEDULED or DEADLINE -- and
   said nothing about the task, and the buckets keep the finished rows, so

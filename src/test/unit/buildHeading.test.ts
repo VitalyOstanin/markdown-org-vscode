@@ -58,4 +58,13 @@ suite('buildHeading', () => {
         const out = buildHeading({ hashes: '###', status: 'CANCELLED', priority: 'A', title: 'Foo' });
         assert.strictEqual(out, '### CANCELLED [#A] Foo');
     });
+
+    test('a heading left with nothing after the hashes keeps its space', () => {
+        // Found by the round-trip property in orgGrammarProperties.test.ts:
+        // `##` is not a heading to the extractor nor to HEADING_REGEX, so
+        // clearing the cookie off `## [#A]` without the space would leave a
+        // line no command could touch again.
+        assert.strictEqual(buildHeading({ hashes: '##', title: '' }), '## ');
+        assert.strictEqual(buildHeading({ hashes: '##', status: 'TODO', title: '' }), '## TODO');
+    });
 });

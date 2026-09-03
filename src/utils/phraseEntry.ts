@@ -1,5 +1,6 @@
 import type { TaskStatus } from '../types';
 import { buildHeading } from './buildHeading';
+import { formatError } from './formatError';
 import { buildOrgTimestamp } from './orgTimestamp';
 
 /**
@@ -66,7 +67,16 @@ function optional(value: unknown, field: string): string | undefined {
  * surface later as an entry with an empty heading.
  */
 export function parsePhraseFields(stdout: string): PhraseFields {
-    const parsed: unknown = JSON.parse(stdout);
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(stdout);
+    } catch (error) {
+        // Named here rather than left to `JSON.parse`: a binary that printed a
+        // warning, or nothing at all, would otherwise reach the user as the
+        // parser's own wording -- "Unexpected end of JSON input" over a phrase
+        // they had just said.
+        throw new Error(`parse-phrase: the answer is not JSON: ${formatError(error)}`, { cause: error });
+    }
     if (typeof parsed !== 'object' || parsed === null) {
         throw new Error('parse-phrase: expected a JSON object');
     }

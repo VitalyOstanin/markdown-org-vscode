@@ -9,6 +9,7 @@ live in [README.md](README.md).
 - [Requirements](#requirements)
 - [Build](#build)
 - [Tests](#tests)
+    - [Properties and the differential check](#properties-and-the-differential-check)
     - [Coverage](#coverage)
     - [Test-only hooks](#test-only-hooks)
 - [Lint and format](#lint-and-format)
@@ -81,6 +82,29 @@ exception is CI, where the runner is headless. On macOS and Windows the runner
 uses the native display.
 
 CI runs the full lint + unit + integration suite on Ubuntu, macOS, and Windows (`.github/workflows/ci.yml`). The release workflow re-runs the same matrix before packaging the VSIX.
+
+### Properties and the differential check
+
+Two suites in the unit run are generated rather than written out case by case:
+
+- `src/test/unit/orgGrammarProperties.test.ts` -- properties over the heading
+  and timestamp grammars and over `planPhraseEdit`: build and parse agree, an
+  edit repeated writes nothing the second time, lines the phrase did not name
+  come through unchanged, and any answer from the extractor is either read into
+  fields or refused with a message that names `parse-phrase:`. Written with
+  [fast-check](https://fast-check.dev/), 200 runs per property.
+- `src/test/unit/extractorGrammarDiff.test.ts` -- the patterns written after the
+  extractor's own (the CLOCK line, the priority cookie, the planning keyword)
+  against the real binary: generated notes are written to a temporary directory,
+  `bin/markdown-org-extract` is run over them, and acceptance and value are
+  compared. A process per file, so 24 runs, and the suite skips itself when
+  `bin/` has not been populated.
+
+A counterexample fast-check prints is not the end of it. Reproduce with the
+seed it names (`{ seed, path }` in the failure), then **write the shrunk case
+out as a named test beside the examples** -- `buildHeading` keeping the space
+of an otherwise empty heading is one that came from this suite -- and only then
+fix the code. The seed is not a record of anything: the next run picks another.
 
 ### Coverage
 
