@@ -18,6 +18,7 @@ import * as vscode from 'vscode';
 import * as path from 'node:path';
 import { formatError } from '../formatError';
 import { KeyedResolutionCache } from '../keyedResolutionCache';
+import { KeyedSharedPass } from '../keyedSharedPass';
 import { logDiagnostic } from '../logChannel';
 import { isInside, pathKey } from './gitPathMatch';
 import { resolveRealPath } from './realPath';
@@ -46,7 +47,7 @@ const primedRoots = new Set<string>();
  * asks for each of them: without this, one render would run `git status` as
  * many times as it has files in that repository.
  */
-const statusPasses = new Map<string, Promise<void>>();
+const statusPasses = new KeyedSharedPass();
 
 /**
  * Drop everything this module remembers about repositories.
@@ -162,25 +163,16 @@ function isWatchedByWorkspace(root: string): boolean {
  * Returns whether it succeeded: a pass that fails leaves the state as it was,
  * so the agenda under-reports rather than failing to render.
  */
-async function runStatusPass(repository: GitRepository, root: string): Promise<boolean> {
-    const running = statusPasses.get(root);
-    if (running) {
-        await running;
-        return true;
-    }
-    let ok = true;
-    const pass = repository
-        .status()
-        .catch((error: unknown) => {
-            ok = false;
-            logDiagnostic(`agenda git status: refresh of ${root} failed: ${formatError(error)}`);
-        })
-        .then(() => {
-            statusPasses.delete(root);
-        });
-    statusPasses.set(root, pass);
-    await pass;
-    return ok;
+function runStatusPass(repository: GitRepository, root: string): Promise<boolean> {
+    return statusPasses.run(root, () =>
+        repository
+            .status()
+            .then(() => true)
+            .catch((error: unknown) => {
+                logDiagnostic(`agenda git status: refresh of ${root} failed: ${formatError(error)}`);
+                return false;
+            })
+    );
 }
 
 /** Once per session: the agenda refreshes often and this answer never changes. */

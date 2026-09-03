@@ -115,6 +115,15 @@ Timestamp` stays what it was, for entries typed into the editor by hand.
 
 ### Fixed
 
+- The git chip no longer reads "clean" over a tree whose status was never
+  read. The first `git status` of a repository the workspace did not open is
+  forced once and the root marked as done with; a file that asked for the pass
+  while it was already running was told it went fine whatever happened, so a
+  failed pass left the root marked and no second attempt was ever made. Every
+  caller is told how the pass actually went, and a pass that ends after the
+  repositories were forgotten no longer drops the entry of the pass that
+  replaced it.
+
 - A command that asks a question no longer writes over what changed while it
   was waiting for the answer. "Set Priority" read the heading before opening
   the list of values and rewrote that line once a value was picked, so an edit
