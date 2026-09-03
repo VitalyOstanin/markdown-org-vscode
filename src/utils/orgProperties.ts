@@ -5,7 +5,7 @@
 // lines. These functions operate on arrays of document lines so they can be
 // unit-tested without the editor; the editor binding (WorkspaceEdit) lives
 // with the consumer (calendar sync), not here.
-import { matchTimestampLine } from '../orgPatterns';
+import { isSectionBreak, matchTimestampLine } from '../orgPatterns';
 
 /** Info string that marks a property block. Exact match, no extra attrs. */
 const ORG_PROPERTIES_INFO = 'org-properties';
@@ -32,8 +32,8 @@ export function buildOrgPropertiesBlock(props: Record<string, string>, indent = 
 // agenda. This mirrors the extractor: every block of the heading's section
 // counts, whatever fences it, and the last one wins on a repeated key.
 const FENCE = /^(\s*)(`{3,}|~{3,})\s*(.*)$/;
-/** A markdown ATX heading, which ends the section a block can belong to. */
-const HEADING = /^\s{0,3}#{1,6}(\s|$)/;
+// Where the section ends is `isSectionBreak` in `orgPatterns`, shared with
+// everything else that asks the question.
 
 /** Half-open line range `[startLine, endLineExclusive)` of a found block. */
 export interface OrgPropertiesRange {
@@ -83,7 +83,7 @@ export function findOrgPropertiesBlocks(lines: string[], headingLine: number): O
         const line = lines[i] ?? '';
         const opening = openingFence(line);
         if (!opening) {
-            if (HEADING.test(line)) {
+            if (isSectionBreak(line)) {
                 break;
             }
             i++;

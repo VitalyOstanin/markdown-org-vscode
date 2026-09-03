@@ -115,6 +115,21 @@ Timestamp` stays what it was, for entries typed into the editor by hand.
 
 ### Fixed
 
+- A command that asks a question no longer writes over what changed while it
+  was waiting for the answer. "Set Priority" read the heading before opening
+  the list of values and rewrote that line once a value was picked, so an edit
+  made in between -- by a save that reformatted the file, by the Android client
+  through a sync, by the user typing in another place -- was replaced by the
+  text as it stood when the list opened. The heading is looked up again after
+  the answer arrives, and the line is rewritten as it now stands.
+
+- One definition of a heading, the extractor's, across placement, section walks
+  and the editing commands. Each carried a pattern of its own, and they
+  disagreed at the edges: `## ` with nothing after the hashes was a heading to
+  the command that writes an entry under it and plain text to the command that
+  edits it, and a line of seven hashes -- not a heading in markdown at all --
+  was read as one at level seven. Both now answer the way the extractor does.
+
 - A command aimed at the entry the cursor stands in no longer aims at the
   entry above it. The heading came from the document symbols, and a file
   opened a moment earlier is indexed as its outermost heading alone, so

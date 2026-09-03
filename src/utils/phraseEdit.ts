@@ -1,9 +1,11 @@
-import { HEADING_REGEX, matchTimestampLine } from '../orgPatterns';
+import { HEADING_REGEX, findPriorityCookie, matchTimestampLine } from '../orgPatterns';
 import type { TaskStatus } from '../types';
 import { TIMESTAMP_REGEX } from './timestampParts';
 import { buildHeading } from './buildHeading';
 import { buildOrgTimestamp } from './orgTimestamp';
 import { getWeekdayName } from './incrementTimestamp';
+import { isCancelled } from './normalizeTaskType';
+import { withoutPriorityCookie } from './priorityToggle';
 import type { PhraseFields } from './phraseEntry';
 
 /**
@@ -170,14 +172,30 @@ function editedHeading(
 ): string {
     const groups = match.groups ?? {};
     const current = groups.status as TaskStatus | undefined;
-    const status = fields.keyword ?? current;
-    const priority = cleared.has('priority') ? undefined : (fields.priority ?? groups.priority);
+    const title = groups.title ?? '';
+    // `CANCELED` and `CANCELLED` are one status: a phrase that names the
+    // cancelled keyword against an entry already cancelled leaves the spelling
+    // the file uses. The extractor documents both, the Android client keeps
+    // what it reads, and respelling one here would show up as an edit that
+    // changed nothing.
+    const namesTheSameCancelled = isCancelled(fields.keyword) && isCancelled(current);
+    const status = fields.keyword !== undefined && !namesTheSameCancelled ? fields.keyword : current;
 
+    // A cookie counts for the priority wherever it was typed, which is how the
+    // extractor reads it and how this extension's own priority commands write
+    // it. Reading only the canonical group left the one inside the title in
+    // place and wrote a second cookie beside it.
+    const currentPriority = groups.priority ?? findPriorityCookie(title)?.value;
+    const namesPriority = fields.priority !== undefined || cleared.has('priority');
+    const priority = namesPriority ? (cleared.has('priority') ? undefined : fields.priority) : groups.priority;
+    // A phrase that says nothing about the priority leaves the cookie where it
+    // was typed; one that names it writes it in the canonical place and takes
+    // the old one out of the title, wherever that was.
     const rewritten = buildHeading({
         hashes: groups.hashes ?? '#',
         status,
         priority,
-        title: groups.title ?? ''
+        title: namesPriority ? withoutPriorityCookie(title) : title
     });
     if (rewritten === text) {
         return text;
@@ -187,7 +205,7 @@ function editedHeading(
     if (status !== current) {
         changed.push('keyword');
     }
-    if (priority !== groups.priority) {
+    if (namesPriority && priority !== currentPriority) {
         changed.push('priority');
     }
     return rewritten;

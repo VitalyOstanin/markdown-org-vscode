@@ -63,10 +63,7 @@ export function planPrioritySet(text: string, priority: string | undefined): str
     // `match.groups.priority` covers only the canonical position, and
     // buildHeading rewrites that one anyway; what has to go is a cookie that
     // survived inside the title.
-    const cookie = findPriorityCookie(title);
-    const bareTitle = cookie ? withoutCookie(title, cookie.start, cookie.end) : title;
-
-    return buildHeading({ hashes, status, priority, title: bareTitle });
+    return buildHeading({ hashes, status, priority, title: withoutPriorityCookie(title) });
 }
 
 /** The priority the heading carries, wherever the cookie sits, or `undefined`. */
@@ -76,6 +73,19 @@ export function readHeadingPriority(text: string): string | undefined {
         return undefined;
     }
     return match.groups.priority ?? findPriorityCookie(namedGroups(match, 'title').title)?.value;
+}
+
+/**
+ * `title` with the priority cookie taken out, wherever it was typed, or the
+ * title unchanged when it carries none.
+ *
+ * The one way to strip a cookie from a title: `planPrioritySet` writes the new
+ * one in the canonical place, and the phrase edit rebuilds the heading around
+ * it, so both have to cut the old one the same way.
+ */
+export function withoutPriorityCookie(title: string): string {
+    const cookie = findPriorityCookie(title);
+    return cookie ? withoutCookie(title, cookie.start, cookie.end) : title;
 }
 
 /**

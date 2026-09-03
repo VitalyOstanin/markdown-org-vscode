@@ -174,12 +174,20 @@ export async function setPriority() {
         return;
     }
 
-    const line = editor.document.lineAt(headingLine);
-    const chosen = await pickPriority(readHeadingPriority(line.text));
+    const chosen = await pickPriority(readHeadingPriority(editor.document.lineAt(headingLine).text));
     if (!chosen) {
         return;
     }
 
+    // The pick is modal, so the document may have moved on while it was open:
+    // ask for the heading again and rewrite the line as it now stands, rather
+    // than replaying the text read before the list opened.
+    const currentHeading = await findNearestHeading(editor);
+    if (currentHeading === null) {
+        return;
+    }
+
+    const line = editor.document.lineAt(currentHeading);
     const newText = planPrioritySet(line.text, chosen.value);
     if (newText === undefined) {
         return;

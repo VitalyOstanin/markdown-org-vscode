@@ -1,4 +1,4 @@
-import { matchTimestampLine } from '../orgPatterns';
+import { headingLevel, matchTimestampLine } from '../orgPatterns';
 
 /**
  * Where a new entry goes in the file it is written into.
@@ -25,11 +25,6 @@ export interface EntryPlacement {
     blankBefore: boolean;
     /** A blank line is needed below: the entry does not end the file. */
     blankAfter: boolean;
-}
-
-/** The `#` run at the head of a line, or empty when the line is not a heading. */
-function headingHashes(line: string): string {
-    return /^(#+)\s/.exec(line)?.[1] ?? '';
 }
 
 /**
@@ -64,8 +59,8 @@ function planningIndent(lines: readonly string[], headingLine: number): string {
 function noteEnd(lines: readonly string[], headingLine: number, level: number): number {
     let end = lines.length;
     for (let i = headingLine + 1; i < lines.length; i++) {
-        const hashes = headingHashes(lines[i] ?? '');
-        if (hashes !== '' && hashes.length <= level) {
+        const found = headingLevel(lines[i] ?? '');
+        if (found !== null && found <= level) {
             end = i;
             break;
         }
@@ -92,7 +87,7 @@ export function placeNewEntry(
     // headings is not guaranteed to be nothing -- an untitled buffer of plain
     // text came back with a symbol at line 0, which read as a note here and
     // put the entry at the end of the file instead of at the cursor.
-    const level = headingLine === null ? 0 : headingHashes(lines[headingLine] ?? '').length;
+    const level = headingLine === null ? 0 : (headingLevel(lines[headingLine] ?? '') ?? 0);
     if (headingLine === null || level === 0) {
         const line = Math.min(Math.max(cursorLine, 0), lines.length);
         return {

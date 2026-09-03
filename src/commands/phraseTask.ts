@@ -10,6 +10,7 @@ import { formatString } from '../utils/agendaI18n';
 import { isMicrophoneMuted } from '../utils/microphone';
 import { notifyError, notifyInfo } from '../utils/notify';
 import { placeNewEntry } from '../utils/entryPlacement';
+import { documentLines, endOfLine, planPhraseInsert } from '../utils/phraseInsert';
 import type { PhraseEditField, PhraseEditRefusal } from '../utils/phraseEdit';
 import { planPhraseEdit } from '../utils/phraseEdit';
 import type { PhraseEntryOptions, PhraseFields } from '../utils/phraseEntry';
@@ -63,11 +64,6 @@ function runParsePhrase(command: string, phrases: readonly string[], today: stri
     });
 }
 
-/** The lines to write, joined with the blank lines the placement asks for. */
-function entryText(lines: readonly string[], blankBefore: boolean, blankAfter: boolean): string {
-    return `${blankBefore ? '\n' : ''}${lines.join('\n')}\n${blankAfter ? '\n' : ''}`;
-}
-
 /**
  * Ask for a task in words and write it into the note the cursor stands in.
  *
@@ -100,8 +96,10 @@ export async function insertTaskFromPhrase() {
     const weekdays = getWeekdayLocale() === 'en' ? DAY_NAMES_SHORT_EN : DAY_NAMES_SHORT_RU;
     const headingLine = await findNearestHeading(editor);
     const document = editor.document;
-    const lines = document.getText().split('\n');
-    const placement = placeNewEntry(lines, headingLine, editor.selection.active.line);
+    // Read once for the title of the box, which shows the entry as it would
+    // be written; where it actually lands is worked out again after the box
+    // closes, against the document as it stands then.
+    const placement = placeNewEntry(documentLines(document.getText()), headingLine, editor.selection.active.line);
     // Fixed once, when the command opens: a chain of phrases read against a
     // day that changed halfway through -- over midnight, or with the box left
     // open -- would answer "tomorrow" with two different days. The mark under
@@ -156,14 +154,21 @@ export async function insertTaskFromPhrase() {
         return;
     }
 
-    const entry = phraseEntryLines(fields, options);
+    // The file may have moved while the box was open -- another edit, a save
+    // that reformatted it, the cursor carried elsewhere -- so the placement is
+    // worked out again rather than taken from the snapshot above. The entry
+    // itself is built from the level and the indent of where it now lands.
+    const currentHeading = await findNearestHeading(editor);
+    const plan = planPhraseInsert({
+        text: editor.document.getText(),
+        headingLine: currentHeading,
+        cursorLine: editor.selection.active.line,
+        entry: ({ hashes, indent }) => phraseEntryLines(fields, { ...options, hashes, indent })
+    });
     const written = await applyEditOrReport(
         editor,
         (editBuilder) => {
-            editBuilder.insert(
-                new vscode.Position(placement.line, 0),
-                entryText(entry, placement.blankBefore, placement.blankAfter)
-            );
+            editBuilder.insert(new vscode.Position(plan.line, 0), plan.text);
         },
         'the task'
     );
@@ -209,10 +214,10 @@ export async function editTaskFromPhrase() {
         return;
     }
 
-    const lines = editor.document.getText().split('\n');
+    const shown = documentLines(editor.document.getText());
     const muted = await isMicrophoneMuted();
     const said = await vscode.window.showInputBox({
-        title: formatString(prompts.title, (lines[headingLine] ?? '').trim()),
+        title: formatString(prompts.title, (shown[headingLine] ?? '').trim()),
         prompt: muted ? formatString(prompts.muted, prompts.prompt) : prompts.prompt,
         placeHolder: prompts.placeholder
     });
@@ -237,8 +242,21 @@ export async function editTaskFromPhrase() {
         return;
     }
 
+    // Read again after the box: the entry the phrase is about is the one on
+    // screen now, not the one snapshotted before the phrase was said and
+    // before the extractor ran. The heading is located again for the same
+    // reason -- an edit above it moves every line under it.
+    const currentHeading = await findNearestHeading(editor);
+    if (currentHeading === null) {
+        notifyError(prompts.noHeading);
+        return;
+    }
+    const text = editor.document.getText();
+    const eol = endOfLine(text);
+    const lines = documentLines(text);
+
     const weekdays = getWeekdayLocale() === 'en' ? DAY_NAMES_SHORT_EN : DAY_NAMES_SHORT_RU;
-    const plan = planPhraseEdit({ lines, heading: headingLine, fields, weekdays });
+    const plan = planPhraseEdit({ lines, heading: currentHeading, fields, weekdays });
     if (plan.refusal) {
         notifyInfo(refusalMessage(plan.refusal, prompts));
         return;
@@ -248,17 +266,17 @@ export async function editTaskFromPhrase() {
         return;
     }
 
-    const section = sectionEnd(lines, headingLine);
+    const section = sectionEnd(lines, currentHeading);
     // Only the entry's own lines are replaced: the rest of the file is
     // untouched, so an edit shows up in the diff as the entry it changed.
     const tail = lines.length - 1 - section;
-    const rewritten = plan.lines.slice(headingLine, plan.lines.length - tail).join('\n');
+    const rewritten = plan.lines.slice(currentHeading, plan.lines.length - tail).join(eol);
     const written = await applyEditOrReport(
         editor,
         (editBuilder) => {
             editBuilder.replace(
                 new vscode.Range(
-                    new vscode.Position(headingLine, 0),
+                    new vscode.Position(currentHeading, 0),
                     new vscode.Position(section, (lines[section] ?? '').length)
                 ),
                 rewritten

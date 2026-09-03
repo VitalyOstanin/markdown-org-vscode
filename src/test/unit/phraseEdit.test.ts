@@ -224,4 +224,60 @@ suite('planPhraseEdit', () => {
         assert.strictEqual(result.lines[2], '## DONE [#B] позвонить врачу');
         assert.strictEqual(result.lines[4], '    `SCHEDULED: <2026-09-04 Пт 15:00 +1w>`');
     });
+
+    suite('the heading is read the way the extractor reads it', () => {
+        test('a cookie away from the canonical place is replaced, not doubled', () => {
+            // The extractor counts a cookie wherever it was typed (its
+            // ADR-0027), and so do this extension's own priority commands. The
+            // phrase edit read only the canonical group, so it wrote a second
+            // cookie and left the line saying two different priorities.
+            const lines = ['# Заметки', '', '## TODO позвонить врачу [#B] срочно'];
+
+            const result = plan(lines, { priority: 'A' });
+
+            assert.deepStrictEqual(result.changed, ['priority']);
+            assert.strictEqual(result.lines[2], '## TODO [#A] позвонить врачу срочно');
+        });
+
+        test('emptying the priority finds the cookie wherever it stands', () => {
+            const lines = ['# Заметки', '', '## TODO позвонить врачу [#B] срочно'];
+
+            const result = plan(lines, { cleared: ['priority'] });
+
+            assert.deepStrictEqual(result.changed, ['priority']);
+            assert.strictEqual(result.lines[2], '## TODO позвонить врачу срочно');
+        });
+
+        test('a cookie the phrase does not name is left where it was typed', () => {
+            const lines = ['# Заметки', '', '## TODO позвонить врачу [#B] срочно'];
+
+            const result = plan(lines, { keyword: 'DONE' });
+
+            assert.deepStrictEqual(result.changed, ['keyword']);
+            assert.strictEqual(result.lines[2], '## DONE позвонить врачу [#B] срочно');
+        });
+
+        test('the American spelling of the cancelled keyword is left alone', () => {
+            // `CANCELED` and `CANCELLED` are one status in all three projects;
+            // the extension owns the rule through `isCancelled`, and the
+            // Android client keeps whichever spelling the file uses. Rewriting
+            // it here made a diff out of an edit that changed nothing, and the
+            // line reported a keyword change that never happened.
+            const lines = ['# Заметки', '', '## CANCELED позвонить врачу'];
+
+            const result = plan(lines, { keyword: 'CANCELLED', priority: 'A' });
+
+            assert.deepStrictEqual(result.changed, ['priority']);
+            assert.strictEqual(result.lines[2], '## CANCELED [#A] позвонить врачу');
+        });
+
+        test('a phrase naming only the spelling the entry already says changes nothing', () => {
+            const lines = ['# Заметки', '', '## CANCELED позвонить врачу'];
+
+            const result = plan(lines, { keyword: 'CANCELLED' });
+
+            assert.deepStrictEqual(result.changed, []);
+            assert.strictEqual(result.lines[2], '## CANCELED позвонить врачу');
+        });
+    });
 });

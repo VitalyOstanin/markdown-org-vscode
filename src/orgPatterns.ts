@@ -93,8 +93,40 @@ export function matchTimestampLine(text: string): TimestampLineMatch | null {
 // there as well, but stays inside the title, and so it does here: it lands in
 // `title` rather than in `priority`, and the two projects agree on what the
 // heading says. Use `findPriorityCookie` to locate it.
+//
+// The hashes and the space after them mirror the extractor's
+// `HEADING_HASHES_RE` (`^(#{1,6})[ \t]+`, src/parser.rs): one to six hashes at
+// the start of the line, then a space or a tab. Seven hashes are not a heading
+// in markdown, an indented one is a heading to CommonMark but not a line
+// either project rewrites, and a heading whose text is empty is still a
+// heading -- `## ` used to be one to the command that inserts an entry under
+// it and plain text to the command that edits it.
 export const HEADING_REGEX =
-    /^(?<hashes>#+)\s+(?:(?<status>TODO|DONE|CANCELLED|CANCELED)\s+)?(?:\[#(?<priority>[A-Z]|6[0-4]|[1-5][0-9]|[0-9])\]\s*)?(?<title>.+)$/;
+    /^(?<hashes>#{1,6})[ \t]+(?:(?<status>TODO|DONE|CANCELLED|CANCELED)[ \t]+)?(?:\[#(?<priority>[A-Z]|6[0-4]|[1-5][0-9]|[0-9])\][ \t]*)?(?<title>.*)$/;
+
+/**
+ * The heading level of `text`, or `null` when the line is not a heading this
+ * extension rewrites.
+ *
+ * The single answer to "is this a heading": placement, section walks and the
+ * editing commands all ask it here rather than each carrying a pattern of its
+ * own.
+ */
+export function headingLevel(text: string): number | null {
+    return HEADING_REGEX.exec(text)?.groups?.hashes?.length ?? null;
+}
+
+// Where a section stops, which is the other question: an ATX heading as
+// CommonMark defines one -- up to three spaces of indent, one to six hashes,
+// and either whitespace or the end of the line after them. The extractor reads
+// files through comrak, so this is the boundary its property blocks belong to,
+// and it is deliberately wider than the line the commands rewrite.
+const SECTION_BREAK_REGEX = /^ {0,3}#{1,6}([ \t]|$)/;
+
+/** Whether `text` ends the section above it, as CommonMark reads the file. */
+export function isSectionBreak(text: string): boolean {
+    return SECTION_BREAK_REGEX.test(text);
+}
 
 // The cookie on its own, for finding one inside a title. Same accepted values
 // as above, so `[#65]` and `[#01]` are text in both places rather than a
