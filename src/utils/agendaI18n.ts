@@ -124,6 +124,8 @@ export interface AgendaStrings {
         refused: string;
         /** Nothing in the band could be acted on. */
         nothing: string;
+        /** A file the action could not be written to; `{0}` is the reason. */
+        failed: string;
         /** The undo offer, and what taking it did; `{0}` counts the files. */
         undo: string;
         undone: string;
@@ -505,6 +507,7 @@ const EN: AgendaStrings = {
         cancelled: 'Cancelled {0}',
         refused: '({0} left as they were)',
         nothing: 'Nothing in this group could be changed',
+        failed: 'Group action failed: {0}',
         undo: 'Undo',
         undone: 'Put back {0}',
         undoPartial: 'Some notes had changed and were left as they are.',
@@ -706,6 +709,7 @@ const RU: AgendaStrings = {
         cancelled: 'Отменено: {0}',
         refused: '(оставлено без изменений: {0})',
         nothing: 'В этом разделе нечего было изменить',
+        failed: 'Не удалось изменить группу: {0}',
         undo: 'Отменить',
         undone: 'Возвращено: {0}',
         undoPartial: 'Часть заметок изменилась и оставлена как есть.',

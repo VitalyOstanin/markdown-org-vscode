@@ -78,7 +78,7 @@ export async function applyGroupAction(
             // carries on.
             const reason = formatError(error);
             logDiagnostic(`group action failed on ${file}: ${reason}`);
-            notifyError(`Group action failed: ${reason}`);
+            notifyError(formatString(strings.group.failed, reason));
         }
     }
 

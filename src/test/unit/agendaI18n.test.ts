@@ -1,13 +1,7 @@
 import * as assert from 'node:assert';
 import { suite, test } from 'mocha';
-import {
-    AGENDA_STRINGS,
-    AgendaStrings,
-    UI_LANGUAGES,
-    formatString,
-    pluralIndex,
-    resolveUiLanguage
-} from '../../utils/agendaI18n';
+import { AGENDA_STRINGS, UI_LANGUAGES, formatString, pluralIndex, resolveUiLanguage } from '../../utils/agendaI18n';
+import type { AgendaStrings } from '../../utils/agendaI18n';
 
 suite('resolveUiLanguage', () => {
     test('an explicit setting wins over both locales', () => {
@@ -192,6 +186,27 @@ suite('AGENDA_STRINGS', () => {
                     `${lang}${path.replace('strings', '')} has ${forms.length} forms, needs ${needed}`
                 );
             });
+        }
+    });
+});
+
+suite('the notices an action from the panel raises', () => {
+    // ADR-0019: an action started from the panel speaks the panel's language,
+    // and that has to hold on the path where the action failed as well --
+    // otherwise "Перенесено 3 задачи" and an English refusal come out of the
+    // same press.
+    const GIT_FAILURES: readonly (keyof AgendaStrings['git'])[] = ['commitFailed', 'pushFailed', 'syncFailed'];
+
+    test('every action that can fail names its refusal in the dictionary', () => {
+        for (const lang of UI_LANGUAGES) {
+            const strings = AGENDA_STRINGS[lang];
+            for (const key of GIT_FAILURES) {
+                const template = strings.git[key];
+                assert.strictEqual(typeof template, 'string', `${lang}.git.${key}`);
+                assert.ok(String(template).includes('{0}'), `${lang}.git.${key} does not carry the reason`);
+            }
+            assert.strictEqual(typeof strings.group.failed, 'string', `${lang}.group.failed`);
+            assert.ok(strings.group.failed.includes('{0}'), `${lang}.group.failed does not carry the reason`);
         }
     });
 });

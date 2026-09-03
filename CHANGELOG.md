@@ -115,6 +115,11 @@ Timestamp` stays what it was, for entries typed into the editor by hand.
 
 ### Fixed
 
+- A group action that could not write a file says so in the panel's language.
+  The success and the "nothing to change" answer came from the dictionary and
+  the write failure did not, so one press produced "Перенесено 3 задачи" and an
+  English refusal side by side.
+
 - An answer from the extractor that is not JSON at all is refused by name.
   `JSON.parse` was left to raise its own wording, so a binary that printed a
   warning, or nothing, reached the user as "Unexpected end of JSON input" over
