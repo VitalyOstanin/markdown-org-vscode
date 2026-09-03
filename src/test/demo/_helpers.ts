@@ -26,19 +26,23 @@ export async function hideSidePanels(): Promise<void> {
 }
 
 /**
- * Turn on VS Code's built-in screencast overlay -- the one that surfaces
- * pressed keys at the bottom of the editor and draws a click ring on the
- * pointer. With it on, a recorded GIF reads as "what command was invoked",
- * not just "the cursor moved".
+ * Turn on VS Code's built-in screencast overlay for the click ring it draws
+ * on the pointer, and for that alone.
+ *
+ * The keystroke echo it also offers is off: a band of chords and command
+ * names across the bottom of every shot takes the eye off what the extension
+ * is doing, which is what the footage is of. What was invoked is said in the
+ * text beside the GIF instead.
  *
  * Settings tweaks:
- *   - `screencastMode.fontSize`: bumped above the default 56px equivalent so
- *     the overlay stays legible at the 1280x720 Xvfb the recorder uses.
- *   - `screencastMode.keyboardOptions.showSingleEditorCursorMoves`: off, so
- *     plain arrow-key cursor moves do not flood the overlay during
- *     navigation-heavy scenarios.
- *   - `screencastMode.verticalOffset`: pushed up so the overlay sits inside
- *     the editor viewport regardless of the bottom-panel state.
+ *   - `screencastMode.keyboardOptions.showKeys` / `showKeybindings` /
+ *     `showCommands`: off, so nothing is painted over the editor when a key
+ *     is pressed.
+ *   - `screencastMode.fontSize`: kept legible at the 1280x720 Xvfb the
+ *     recorder uses, for the case the echo is turned back on.
+ *   - `screencastMode.verticalOffset`: pushed up so anything the overlay does
+ *     draw sits inside the editor viewport regardless of the bottom-panel
+ *     state.
  *
  * Settings are written at Global scope; the test instance runs against a
  * disposable `--user-data-dir` (see `.vscode-test.demo.mjs`), so this does
@@ -65,9 +69,9 @@ export async function enableScreencast(): Promise<void> {
     await cfg.update(
         'keyboardOptions',
         {
-            showKeys: true,
-            showKeybindings: true,
-            showCommands: true,
+            showKeys: false,
+            showKeybindings: false,
+            showCommands: false,
             showCommandGroups: false,
             showSingleEditorCursorMoves: false
         },
@@ -512,7 +516,12 @@ export async function typeText(text: string, submit = false, options: { masked?:
     }
 }
 
-/** Turn the screencast overlay's keystroke echo on or off, leaving the rest of its settings alone. */
+/**
+ * Turn the screencast overlay's keystroke echo on or off, leaving the rest of
+ * its settings alone. The echo is off for the whole of a recording (see
+ * `enableScreencast`), so the masking around a typed secret is what holds if
+ * it is ever turned back on rather than what hides it today.
+ */
 export async function setScreencastKeys(showKeys: boolean): Promise<void> {
     const cfg = vscode.workspace.getConfiguration('screencastMode');
     const current = cfg.get<Record<string, unknown>>('keyboardOptions') ?? {};

@@ -260,6 +260,11 @@ only the first invocation goes through the palette and the repeats are sent as
 that chord, since another four seconds buys nothing once the name has been
 read.
 
+The screencast overlay is on for the ring it draws where the pointer clicks,
+and its keystroke echo is off: a band of chords and command names across the
+bottom of every shot competes with what the recording is of, and the palette
+already spells the command out where the eye is.
+
 Two exceptions, both deliberate. The screenshot scenario invokes commands
 programmatically: the palette is closed by the time a frame is taken, and
 driving it from xdotool is what made the typed query drop characters on a
