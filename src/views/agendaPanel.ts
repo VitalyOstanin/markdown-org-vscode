@@ -1,7 +1,12 @@
 import * as vscode from 'vscode';
 import { randomBytes } from 'node:crypto';
 import type { AgendaData, AgendaGitStatus, AgendaRenderedInfo } from '../types';
-import { isMeaningfulSelection, resolveTaskClickIntent, sanitizeTaskLine } from '../utils/agendaClick';
+import {
+    isMeaningfulSelection,
+    resolveOccurrenceClickIntent,
+    resolveTaskClickIntent,
+    sanitizeTaskLine
+} from '../utils/agendaClick';
 import { escapeHtml } from '../utils/agendaEscapeHtml';
 import { DEFAULT_AGENDA_FONT_STACK, sanitizeFontFamily } from '../utils/agendaFontFamily';
 import { agendaModeCommand } from '../utils/agendaModeCommand';
@@ -1008,7 +1013,42 @@ export class AgendaPanel {
             }
         } else if (message.command === 'groupAction') {
             await AgendaPanel.handleGroupAction(message.section, message.action, message.hidden, message.date);
+        } else if (message.command === 'occurrence') {
+            await AgendaPanel.handleOccurrence(message.file, message.line, message.date);
         }
+    }
+
+    /**
+     * The two things that can be done to the one occurrence a repeating row
+     * stands for.
+     *
+     * The entry is opened first and the choice offered over it: both operations
+     * write to the entry the cursor stands in, which is the rule every editing
+     * command here follows, and having the file on screen is what makes a write
+     * to it reviewable and undoable in the usual way.
+     *
+     * The day travels from the page rather than being asked for again -- it is
+     * the day the row was drawn on, which is the occurrence the reader pointed
+     * at. The commands still open their box on it, so it can be corrected.
+     */
+    private static async handleOccurrence(file?: string, line?: number, date?: string): Promise<void> {
+        if (typeof file !== 'string' || typeof line !== 'number' || date === undefined || !isIsoDate(date)) {
+            return;
+        }
+        await AgendaPanel.openTaskInEditor(file, line);
+
+        const { strings } = AgendaPanel.uiStrings();
+        const s = strings.occurrence;
+        const move = { label: s.move, detail: s.moveDetail, command: 'markdown-org.moveOccurrence' };
+        const cancel = { label: s.cancel, detail: s.cancelDetail, command: 'markdown-org.cancelOccurrence' };
+        const picked = await vscode.window.showQuickPick([move, cancel], {
+            title: formatString(s.pick, date),
+            matchOnDetail: true
+        });
+        if (!picked) {
+            return;
+        }
+        await vscode.commands.executeCommand(picked.command, date);
     }
 
     /**
@@ -1210,6 +1250,14 @@ export class AgendaPanel {
     }
 
     /**
+     * Press the flag of the repeating row written at `line`, the way a reader
+     * asking about one occurrence does.
+     */
+    public static clickOccurrenceFlagForTesting(line: number): Thenable<boolean> {
+        return AgendaPanel.postToPage({ command: 'clickOccurrenceFlagForTesting', line });
+    }
+
+    /**
      * Test-only helper: fold the section `section` away, or bring it back, as
      * pressing its head does.
      *
@@ -1360,6 +1408,7 @@ export class AgendaPanel {
     private static readonly INLINED_HELPERS = {
         isMeaningfulSelection,
         resolveTaskClickIntent,
+        resolveOccurrenceClickIntent,
         sanitizeTaskLine,
         escapeHtml,
         rememberScroll,

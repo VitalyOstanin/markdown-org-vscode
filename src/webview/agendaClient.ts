@@ -96,6 +96,13 @@ export interface TaskRef {
     readonly line: number;
 }
 
+/** What a click on the flag of a repeating row is about. */
+export interface OccurrenceRef {
+    readonly file: string;
+    readonly line: number;
+    readonly date: string;
+}
+
 /** Anchor date (`YYYY-MM-DD`) -> remembered `scrollY`. */
 export type ScrollMemory = Record<string, number>;
 
@@ -299,6 +306,7 @@ export interface AgendaClientDeps {
     /** Called by `resolveTaskClickIntent`; not invoked directly by the client. */
     isMeaningfulSelection: (sel: SelectionLike | null) => boolean;
     resolveTaskClickIntent: (event: ClickEventLike, selection: SelectionLike | null) => TaskRef | null;
+    resolveOccurrenceClickIntent: (event: ClickEventLike, selection: SelectionLike | null) => OccurrenceRef | null;
     sanitizeTaskLine: (value: unknown) => number;
     escapeHtml: (text: string | number | boolean | undefined | null) => string;
     rememberScroll: (history: ScrollMemory, anchor: string, scrollY: number) => void;
@@ -754,6 +762,10 @@ type HostMessage =
     // the page, and what the message carries is decided there -- so the item is
     // pressed rather than the message forged.
     | { command: 'clickGroupActionForTesting'; section?: string; action?: string; date?: string }
+    // Integration-test hook: the flag of a repeating row is a control of the
+    // page, and what the message it sends carries is read off the row -- so the
+    // flag is pressed rather than the message forged.
+    | { command: 'clickOccurrenceFlagForTesting'; line?: number }
     // Integration-test hook: folding a section is a page-side state and a
     // re-render of the view around it, so the head is pressed for real.
     | { command: 'clickSectionFoldForTesting'; section?: string }
@@ -778,6 +790,7 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
     // how the ones that call each other keep working.
     const {
         resolveTaskClickIntent,
+        resolveOccurrenceClickIntent,
         sanitizeTaskLine,
         escapeHtml,
         rememberScroll,
@@ -1316,6 +1329,21 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         item?.click();
     }
 
+    /**
+     * Press the flag of the row written at `line`, as
+     * `clickOccurrenceFlagForTesting` asks.
+     *
+     * Found by comparing the attribute rather than through a selector, for the
+     * reason `clickCollectionChip` gives: a row is addressed by a filesystem
+     * path as well, and this keeps the two lookups the same shape.
+     */
+    function clickOccurrenceFlag(line: number): void {
+        const row = [...document.querySelectorAll<HTMLElement>('.task-line')].find(
+            (candidate) => candidate.getAttribute('data-line') === String(line)
+        );
+        row?.querySelector<HTMLElement>('.flag')?.click();
+    }
+
     /** Press a section head, as `clickSectionFoldForTesting` asks. */
     function clickSectionFold(section: string): void {
         const head = [...document.querySelectorAll<HTMLElement>('.day-section-head')].find(
@@ -1363,6 +1391,8 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             clickCollectionChip(message.root ?? '');
         } else if (message.command === 'clickGroupActionForTesting') {
             clickGroupAction(message.section ?? '', message.action ?? '', message.date);
+        } else if (message.command === 'clickOccurrenceFlagForTesting') {
+            clickOccurrenceFlag(message.line ?? -1);
         } else if (message.command === 'clickSectionFoldForTesting') {
             clickSectionFold(message.section ?? '');
         } else if (message.command === 'clickGitChipForTesting') {
@@ -1641,6 +1671,19 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         }
         // The head itself comes next, for the same reason: it is not a row.
         if (handleSectionFoldClick(e)) {
+            return;
+        }
+        // The flag of a repeating row asks about the one occurrence the row
+        // stands for, and is read before the row itself: a click there is not a
+        // request to open the file, which is what the row means everywhere else.
+        const occurrence = resolveOccurrenceClickIntent(e as unknown as ClickEventLike, window.getSelection());
+        if (occurrence) {
+            vscode.postMessage({
+                command: 'occurrence',
+                file: occurrence.file,
+                line: occurrence.line,
+                date: occurrence.date
+            });
             return;
         }
         // Source of truth: src/utils/agendaClick.ts -- jsdom tested.

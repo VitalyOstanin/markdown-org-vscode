@@ -24,6 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   repeater goes, because one occurrence does not repeat. A series with no
   identifier is given one. An entry that does not repeat, or one that repeats on
   two dates at once, is refused rather than guessed at.
+  Reached from the agenda as well: the ↻ of a row that repeats opens the entry
+  and offers the two, about the day the row was drawn on rather than about the
+  day the series is planned for. Everywhere else the row still opens the file,
+  and so does the flag of a row that does not repeat.
 
 - An entry is changed by saying what to change: "Edit Task from Phrase"
   (Ctrl+K Ctrl+E) asks for one sentence and applies it to the entry the cursor

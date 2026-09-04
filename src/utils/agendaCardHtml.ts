@@ -124,10 +124,19 @@ export function renderTaskRow(
         ? ctx.offsetTooltip(daysOffset, dateDir, ctx.tooltips, ctx.formatString, ctx.countDays)
         : '';
 
+    // A repeating row stands for one occurrence of a series, and the two things
+    // that can be done to that one occurrence are reached through its flag. The
+    // day is the row's own: the agenda rewrites `timestamp_date` to the day it
+    // drew the occurrence on, so this is the day the exception is about.
+    const occurrence = task.timestamp_repeater && task.timestamp_date ? task.timestamp_date : '';
+    const occurrenceAttr = occurrence ? ` data-occurrence="${ctx.escapeHtml(occurrence)}"` : '';
+    const flagTitle = ctx.flagTooltip(flag, ctx.tooltips, ctx.formatString, ctx.formatDate, task);
+    const flagHint = occurrence ? `${flagTitle} — ${ctx.tooltips.occurrenceMenu}` : flagTitle;
+
     return (
         `<div class="task-line" data-status="${statusKind}" data-priority="${priorityAttr}"` +
         ` data-type="${typeAttr}" data-file="${ctx.escapeHtml(task.file)}"` +
-        ` data-line="${ctx.sanitizeTaskLine(task.line)}">` +
+        ` data-line="${ctx.sanitizeTaskLine(task.line)}"${occurrenceAttr}>` +
         // The big-time column: a clean HH:MM, or empty for an all-day task --
         // an empty column is the whole statement, no placeholder glyph. The
         // tooltip is what says so in words, and what names the end of a timed
@@ -139,7 +148,7 @@ export function renderTaskRow(
         ` title="${ctx.escapeHtml(ctx.attentionTooltip(attention, ctx.tooltips))}">${ctx.escapeHtml(status)}</span>` +
         // .flag: the type glyph (deadline/scheduled/repeat/cancelled).
         `<span class="flag" data-flag="${flag}"` +
-        ` title="${ctx.escapeHtml(ctx.flagTooltip(flag, ctx.tooltips, ctx.formatString, ctx.formatDate, task))}"></span>` +
+        ` title="${ctx.escapeHtml(flagHint)}"></span>` +
         `<span class="priority" data-priority="${priorityAttr}"` +
         ` title="${ctx.escapeHtml(ctx.priorityTooltip(priorityLetter, ctx.tooltips, ctx.formatString))}">` +
         `${ctx.escapeHtml(priorityLetter)}</span>` +

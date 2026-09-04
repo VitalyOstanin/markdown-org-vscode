@@ -1,6 +1,16 @@
 import * as vscode from 'vscode';
 import * as assert from 'node:assert';
-import { suite, after, afterEach, test } from 'mocha';
+import * as path from 'node:path';
+import * as fs from 'node:fs';
+import * as sinon from 'sinon';
+import { suite, before, beforeEach, after, afterEach, test } from 'mocha';
+import { exec } from '../../utils/exec';
+import { extractor } from '../../utils/extractor';
+import { AgendaPanel } from '../../views/agendaPanel';
+import { AGENDA_STRINGS } from '../../utils/agendaI18n';
+import { makeExtractorFake } from '../_execFake';
+import { toIsoDate } from '../../utils/isoDate';
+import { waitForAgendaRender, waitUntil } from './_helpers';
 
 /**
  * The two exceptions a repeating entry can carry, written from the editor.
@@ -119,5 +129,125 @@ suite('One occurrence of a series', () => {
         await vscode.commands.executeCommand('markdown-org.cancelOccurrence');
 
         assert.strictEqual(doc.getText(), once);
+    });
+});
+
+/**
+ * The way in from the agenda: the flag of a repeating row.
+ *
+ * The row stands for one occurrence of a series, and the flag is what says so;
+ * pressing it opens the entry and offers the two things that can be done to
+ * that one occurrence. The day travels with the press, which is what makes the
+ * choice about the occurrence the reader pointed at rather than about the
+ * series' own date.
+ */
+suite('One occurrence, from the agenda', () => {
+    const root = path.join(__dirname, '../../test-workspace-occurrence');
+    const notes = path.join(root, 'series.md');
+
+    let execFileStub: sinon.SinonStub;
+    let resolveExtractorStub: sinon.SinonStub;
+    let quickPickStub: sinon.SinonStub;
+    let previousWorkspaceDir: string | undefined;
+    const inputBox = vscode.window.showInputBox;
+
+    /**
+     * A weekly class, drawn on the day the panel is anchored on -- which is
+     * today, because that is the day `Show Agenda (Day)` opens. The occurrence
+     * the row stands for is its own `timestamp_date`, which is what the flag
+     * carries and what the exception is about.
+     */
+    const day = {
+        date: toIsoDate(new Date()),
+        overdue: [],
+        scheduled_timed: [
+            {
+                file: notes,
+                line: 1,
+                heading: 'English',
+                content: '',
+                task_type: 'TODO',
+                timestamp_type: 'SCHEDULED',
+                timestamp_repeater: '+1w',
+                timestamp_date: '2026-08-20',
+                timestamp_time: '15:00'
+            }
+        ],
+        scheduled_no_time: [],
+        upcoming: []
+    };
+
+    before(() => {
+        fs.mkdirSync(root, { recursive: true });
+        fs.writeFileSync(notes, '# TODO English\n`SCHEDULED: <2026-08-06 Thu 15:00 +1w>`\n', 'utf8');
+    });
+
+    beforeEach(async () => {
+        const config = vscode.workspace.getConfiguration('markdown-org');
+        previousWorkspaceDir = config.inspect<string>('workspaceDir')?.workspaceValue;
+        await config.update('workspaceDir', root, vscode.ConfigurationTarget.Workspace);
+        await config.update('currentTag', 'ALL', vscode.ConfigurationTarget.Workspace);
+        await config.update('uiLanguage', 'en', vscode.ConfigurationTarget.Workspace);
+
+        resolveExtractorStub = sinon.stub(extractor, 'resolveExtractorPath').resolves('markdown-org-extract');
+        execFileStub = sinon
+            .stub(exec, 'execFile')
+            .callsFake(makeExtractorFake({ day: [day], week: [day], month: [day], tasks: [], holidays: [] }));
+        quickPickStub = sinon.stub(vscode.window, 'showQuickPick');
+    });
+
+    afterEach(async () => {
+        const config = vscode.workspace.getConfiguration('markdown-org');
+        await config.update('workspaceDir', previousWorkspaceDir, vscode.ConfigurationTarget.Workspace);
+        await config.update('uiLanguage', 'auto', vscode.ConfigurationTarget.Workspace);
+        execFileStub.restore();
+        resolveExtractorStub.restore();
+        quickPickStub.restore();
+        (vscode.window as { showInputBox: unknown }).showInputBox = inputBox;
+        await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+    });
+
+    after(() => {
+        fs.rmSync(root, { recursive: true, force: true });
+    });
+
+    /** Press the flag and wait for the choice it raises. */
+    async function pressTheFlag(): Promise<void> {
+        await vscode.commands.executeCommand('markdown-org.showAgendaDay');
+        await waitForAgendaRender('day');
+        await AgendaPanel.clickOccurrenceFlagForTesting(1);
+        await waitUntil(() => quickPickStub.called, 'the flag raised no choice');
+    }
+
+    test('the flag opens the entry and offers the two exceptions', async function () {
+        this.timeout(20000);
+        quickPickStub.resolves(undefined);
+
+        await pressTheFlag();
+
+        const [items, options] = quickPickStub.firstCall.args as [{ label: string }[], { title: string }];
+        assert.deepStrictEqual(
+            items.map((item) => item.label),
+            [AGENDA_STRINGS.en.occurrence.move, AGENDA_STRINGS.en.occurrence.cancel]
+        );
+        assert.ok(options.title.includes('2026-08-20'), `the title was: ${options.title}`);
+        assert.strictEqual(vscode.window.activeTextEditor?.document.uri.fsPath, notes, 'the entry is on screen');
+    });
+
+    test('the day the row was drawn on is the day the box opens on', async function () {
+        this.timeout(20000);
+        const offered: string[] = [];
+        (vscode.window as { showInputBox: unknown }).showInputBox = (options?: { value?: string }) => {
+            offered.push(options?.value ?? '');
+            return Promise.resolve(undefined);
+        };
+        quickPickStub.callsFake((items: { command: string }[]) => Promise.resolve(items[1]));
+
+        await pressTheFlag();
+        await waitUntil(() => offered.length > 0, 'no box was opened');
+
+        // The series is planned for 2026-08-06; the row was drawn on the 20th,
+        // which is the occurrence the reader pointed at.
+        assert.deepStrictEqual(offered, ['2026-08-20']);
     });
 });

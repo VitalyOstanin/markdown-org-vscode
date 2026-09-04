@@ -211,6 +211,27 @@ export interface AgendaStrings {
         offsetUpcomingPlain: string;
         /** Counted noun for the two above, in the order `pluralIndex` returns. */
         days: string[];
+        /**
+         * The flag of a repeating row, which opens the two things that can be
+         * done to the one occurrence the row stands for. Added to the flag's
+         * own tooltip rather than replacing it: the glyph still says what kind
+         * of entry this is.
+         */
+        occurrenceMenu: string;
+    };
+    /**
+     * The two exceptions a repeating entry can carry, offered from the agenda.
+     *
+     * Read on the extension side (a QuickPick is host UI), and kept here so
+     * the feature speaks the language `markdown-org.uiLanguage` picked. `{0}`
+     * is the day the row was drawn on.
+     */
+    occurrence: {
+        pick: string;
+        move: string;
+        moveDetail: string;
+        cancel: string;
+        cancelDetail: string;
     };
     /**
      * Git status of the agenda's source files: the header chip, the list it
@@ -557,7 +578,15 @@ const EN: AgendaStrings = {
         offsetToday: 'Dated today',
         offsetOverduePlain: 'Dated before today',
         offsetUpcomingPlain: 'Dated after today',
-        days: ['day', 'days']
+        days: ['day', 'days'],
+        occurrenceMenu: 'Repeats — click for this one occurrence'
+    },
+    occurrence: {
+        pick: 'One occurrence of this series, {0}',
+        move: 'Move this occurrence',
+        moveDetail: 'Write it at another day or hour; the series goes on repeating',
+        cancel: 'Cancel this occurrence',
+        cancelDetail: 'Leave the day out of the series; nothing is owed for it'
     },
     git: {
         caption: 'Source files',
@@ -759,7 +788,15 @@ const RU: AgendaStrings = {
         offsetToday: 'Дата — сегодня',
         offsetOverduePlain: 'Дата раньше сегодняшней',
         offsetUpcomingPlain: 'Дата позже сегодняшней',
-        days: ['день', 'дня', 'дней']
+        days: ['день', 'дня', 'дней'],
+        occurrenceMenu: 'Повторяется — нажмите, чтобы изменить одно занятие'
+    },
+    occurrence: {
+        pick: 'Одно занятие серии, {0}',
+        move: 'Перенести это занятие',
+        moveDetail: 'Записать его на другой день или час; серия продолжает повторяться',
+        cancel: 'Отменить это занятие',
+        cancelDetail: 'Исключить день из серии; за него ничего не числится'
     },
     git: {
         caption: 'Файлы-источники',

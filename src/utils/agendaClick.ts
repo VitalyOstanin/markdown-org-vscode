@@ -98,3 +98,50 @@ export function resolveTaskClickIntent(event: ClickEventLike, selection: Selecti
     }
     return { file, line };
 }
+
+/** What a click on the flag of a repeating row is about. */
+export interface OccurrenceRef {
+    readonly file: string;
+    readonly line: number;
+    readonly date: string;
+}
+
+/**
+ * Decide whether a click asked about the one occurrence a repeating row stands
+ * for, which is what its flag is for.
+ *
+ * `null` for every other click, including one on the flag of a row that does
+ * not repeat: `data-occurrence` is written only where there is an occurrence to
+ * be about. The row's own handler then opens the file, as it does anywhere else
+ * on the row.
+ *
+ * Inlined into the webview through `.toString()` like its neighbours here, so
+ * the jsdom test on this function exercises the code that ships.
+ */
+export function resolveOccurrenceClickIntent(
+    event: ClickEventLike,
+    selection: SelectionLike | null
+): OccurrenceRef | null {
+    if (isMeaningfulSelection(selection)) {
+        return null;
+    }
+    const flag = event.target ? event.target.closest('.flag') : null;
+    if (!flag) {
+        return null;
+    }
+    const row = flag.closest('.task-line');
+    if (!row) {
+        return null;
+    }
+    const date = row.getAttribute('data-occurrence');
+    const file = row.getAttribute('data-file');
+    const lineStr = row.getAttribute('data-line');
+    if (!date || !file || lineStr === null) {
+        return null;
+    }
+    const line = parseInt(lineStr, 10);
+    if (Number.isNaN(line)) {
+        return null;
+    }
+    return { file, line, date };
+}

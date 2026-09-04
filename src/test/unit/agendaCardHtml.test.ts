@@ -267,3 +267,53 @@ suite('agendaCardHtml.renderCard', () => {
         assert.strictEqual(card.querySelector('.day-empty')?.textContent, '<b>none</b>');
     });
 });
+
+/**
+ * A repeating row stands for one occurrence of a series, and the day it stands
+ * for is the day the agenda drew it on -- which is what the exception commands
+ * are about. The row carries that day so the page can name it without asking
+ * the extension what it rendered.
+ */
+suite('a row that repeats', () => {
+    test('carries the day it was drawn on', () => {
+        const html = renderTaskRow(task({ timestamp_repeater: '+1w', timestamp_date: '2026-08-20' }), 0, 'today', ctx);
+        const row = parse(html).querySelector('.task-line');
+
+        assert.strictEqual(row?.getAttribute('data-occurrence'), '2026-08-20');
+    });
+
+    test('says on its flag what the flag now opens', () => {
+        const html = renderTaskRow(task({ timestamp_repeater: '+1w', timestamp_date: '2026-08-20' }), 0, 'today', ctx);
+        const flag = parse(html).querySelector('.flag');
+
+        assert.ok(flag?.getAttribute('title')?.includes(EN.tooltips.occurrenceMenu));
+    });
+
+    /**
+     * A deadline that repeats flies the deadline flag -- that is the older rule
+     * and it stands -- but it is still a series, and the occurrence is reached
+     * through the flag it does have.
+     */
+    test('is a series even where the flag says deadline', () => {
+        const html = renderTaskRow(
+            task({ timestamp_type: 'DEADLINE', timestamp_repeater: '+1m', timestamp_date: '2026-08-20' }),
+            0,
+            'today',
+            ctx
+        );
+        const row = parse(html).querySelector('.task-line');
+
+        assert.ok(row, 'the row was not rendered');
+        assert.strictEqual(row.querySelector('.flag')?.getAttribute('data-flag'), 'deadline');
+        assert.strictEqual(row.getAttribute('data-occurrence'), '2026-08-20');
+    });
+
+    test('a row that does not repeat carries no day of its own', () => {
+        const html = renderTaskRow(task({ timestamp_date: '2026-08-20' }), 0, 'today', ctx);
+        const row = parse(html).querySelector('.task-line');
+
+        assert.ok(row, 'the row was not rendered');
+        assert.strictEqual(row.getAttribute('data-occurrence'), null);
+        assert.ok(!row.querySelector('.flag')?.getAttribute('title')?.includes(EN.tooltips.occurrenceMenu));
+    });
+});

@@ -2,7 +2,7 @@ import * as assert from 'node:assert';
 import { suite, test } from 'mocha';
 import { JSDOM } from 'jsdom';
 import type { ClickTargetLike } from '../../utils/agendaClick';
-import { resolveTaskClickIntent, sanitizeTaskLine } from '../../utils/agendaClick';
+import { resolveOccurrenceClickIntent, resolveTaskClickIntent, sanitizeTaskLine } from '../../utils/agendaClick';
 
 // jsdom is the only practical way to exercise the agenda webview's
 // click-vs-selection behaviour without spinning up a full VS Code instance
@@ -157,5 +157,74 @@ suite('sanitizeTaskLine', () => {
         assert.strictEqual(sanitizeTaskLine(undefined), 0);
         assert.strictEqual(sanitizeTaskLine({}), 0);
         assert.strictEqual(sanitizeTaskLine([1, 2]), 0);
+    });
+});
+
+/**
+ * The flag of a repeating row is the way into the two things that can be done
+ * to the one occurrence the row stands for. Everywhere else on the row -- and
+ * on the flag of a row that does not repeat -- a click still opens the file.
+ */
+suite('resolveOccurrenceClickIntent (jsdom)', () => {
+    function setupDom() {
+        const dom = new JSDOM(
+            `<!DOCTYPE html>
+            <html><body>
+              <div id="content">
+                <div class="task-line" data-file="/work/notes.md" data-line="42" data-occurrence="2026-08-20">
+                  <span class="flag" data-flag="repeat"></span>
+                  <span class="heading">Weekly class</span>
+                </div>
+                <div class="task-line" data-file="/work/notes.md" data-line="70">
+                  <span class="flag" data-flag="scheduled"></span>
+                  <span class="heading">A single day</span>
+                </div>
+              </div>
+            </body></html>`,
+            { pretendToBeVisual: true }
+        );
+        const { window } = dom;
+        const at = (selector: string) => window.document.querySelector(selector) as unknown as ClickTargetLike;
+        const sel = window.getSelection()!;
+        sel.removeAllRanges();
+        return { window, at, sel };
+    }
+
+    test('the flag of a repeating row names the day the row was drawn on', () => {
+        const { at, sel } = setupDom();
+
+        const intent = resolveOccurrenceClickIntent({ target: at('.task-line .flag') }, sel);
+
+        assert.deepStrictEqual(intent, { file: '/work/notes.md', line: 42, date: '2026-08-20' });
+    });
+
+    test('the flag of a row that does not repeat is not about an occurrence', () => {
+        const { at, sel } = setupDom();
+
+        const intent = resolveOccurrenceClickIntent({ target: at('.task-line:nth-child(2) .flag') }, sel);
+
+        assert.strictEqual(intent, null);
+    });
+
+    test('the rest of a repeating row still opens the file', () => {
+        const { at, sel } = setupDom();
+
+        assert.strictEqual(resolveOccurrenceClickIntent({ target: at('.task-line .heading') }, sel), null);
+        assert.deepStrictEqual(resolveTaskClickIntent({ target: at('.task-line .heading') }, sel), {
+            file: '/work/notes.md',
+            line: 42
+        });
+    });
+
+    test('a selection drag that ends on the flag is not a click on it', () => {
+        const { window, at } = setupDom();
+        const row = window.document.querySelector('.task-line')!;
+        const range = window.document.createRange();
+        range.selectNodeContents(row);
+        const sel = window.getSelection()!;
+        sel.removeAllRanges();
+        sel.addRange(range);
+
+        assert.strictEqual(resolveOccurrenceClickIntent({ target: at('.task-line .flag') }, sel), null);
     });
 });

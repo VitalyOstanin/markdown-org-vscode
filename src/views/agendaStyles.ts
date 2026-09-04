@@ -932,6 +932,17 @@ export const AGENDA_STYLES = `
         .flag[data-flag="scheduled"]::before { content: "◷"; color: var(--accent-blue); }
         .flag[data-flag="repeat"]::before { content: "↻"; color: var(--accent-yellow); }
         .flag[data-flag="cancelled"]::before { content: "⊘"; color: var(--vscode-disabledForeground); }
+        /* The flag of a repeating row is a control: it opens the two things
+           that can be done to the one occurrence the row stands for. Said with
+           the cursor and a lift on hover rather than with a border of its own,
+           which would take width the row has none of and would show on every
+           row that carries a flag -- most of which are not series. */
+        .task-line[data-occurrence] .flag {
+            cursor: pointer;
+        }
+        .task-line[data-occurrence] .flag:hover::before {
+            filter: brightness(1.35);
+        }
         /* priority chip */
         .priority {
             font-size: var(--font-xs);

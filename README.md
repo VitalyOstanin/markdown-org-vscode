@@ -382,6 +382,11 @@ repeater goes -- one occurrence does not repeat. A warning cookie stays, because
 a deadline moved is still a deadline warned about the same number of days ahead.
 A series with no `ID` is given one on the first move.
 
+From the agenda the two are reached through the row's own flag: pressing the ↻
+of a repeating row opens the entry and offers them, about the day the row was
+drawn on. A row of a repeating `DEADLINE` flies ⚑ rather than ↻ -- the flag says
+what kind of entry it is -- and its flag opens the same two.
+
 The same two operations are in the Android client, and both write the file the
 same way, so a series edited on either side reads the same on the other.
 
