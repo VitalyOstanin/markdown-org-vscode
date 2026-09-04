@@ -30,6 +30,8 @@ import { withErrorReporting } from './utils/orgCommandWrap';
 import { registerBracketDiagnostics } from './diagnostics/timestampBrackets';
 import { registerOrgHighlight } from './decorations/orgHighlight';
 import { registerTimestampAdjustableContext } from './commands/timestampAdjustableContext';
+import { openNotesRepositories } from './utils/git/gitApi';
+import { resolveAgendaDirectories } from './utils/agendaDirectories';
 
 function registerOrgCommand(
     context: vscode.ExtensionContext,
@@ -40,6 +42,47 @@ function registerOrgCommand(
 ): void {
     const wrapped = withErrorReporting(name, (msg) => notifyError(msg), handler);
     context.subscriptions.push(vscode.commands.registerCommand(name, wrapped));
+}
+
+/**
+ * The directories the agenda would sweep, as the settings name them now.
+ *
+ * Read again on every call rather than kept: the list is a setting, and the
+ * one caller runs when it changes.
+ */
+function notesDirectories(): string[] {
+    const config = vscode.workspace.getConfiguration('markdown-org');
+    return resolveAgendaDirectories(
+        config.get<string[]>('workspaceDirs'),
+        config.get<string>('workspaceDir'),
+        vscode.workspace.workspaceFolders?.[0]?.uri.fsPath
+    );
+}
+
+/**
+ * Let the Git extension know about the notes, at activation and afterwards.
+ *
+ * Without this the git marks in a note appear only once the agenda has been
+ * opened, because that is what opened the repository — see
+ * {@link openNotesRepositories}. Not awaited: the opening spawns a `git
+ * rev-parse` per directory, and nothing in the activation path depends on the
+ * answer.
+ */
+function primeNotesRepositories(context: vscode.ExtensionContext): void {
+    void openNotesRepositories(notesDirectories());
+    context.subscriptions.push(
+        vscode.workspace.onDidChangeConfiguration((event) => {
+            if (
+                event.affectsConfiguration('markdown-org.workspaceDirs') ||
+                event.affectsConfiguration('markdown-org.workspaceDir')
+            ) {
+                void openNotesRepositories(notesDirectories());
+            }
+        }),
+        vscode.workspace.onDidChangeWorkspaceFolders(() => {
+            void openNotesRepositories(notesDirectories());
+        })
+    );
 }
 
 export function activate(context: vscode.ExtensionContext) {
@@ -96,6 +139,7 @@ export function activate(context: vscode.ExtensionContext) {
     registerOrgHighlight(context);
     registerTimestampAdjustableContext(context);
     registerGcalSaveTrigger(context);
+    primeNotesRepositories(context);
 }
 
 export function deactivate() {

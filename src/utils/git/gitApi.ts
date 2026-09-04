@@ -295,3 +295,56 @@ async function resolveRepositoryUncached(api: GitApi, filePath: string): Promise
     await primeRepositoryState(repository, root.fsPath);
     return repository;
 }
+
+/**
+ * Open the repositories the notes live in, before anything asks for them.
+ *
+ * The Git extension starts with the window and watches the folders of the
+ * workspace, but a notes directory is often not one of them: it is a
+ * repository of its own, named in `markdown-org.workspaceDirs`, and VS Code
+ * leaves such a root alone unless `git.openRepositoryInParentFolders` says
+ * otherwise. Nothing there is decorated then -- no gutter marks in an opened
+ * note, no entry in Source Control -- until the agenda panel resolves a
+ * repository for one of its files and opens the root as a side effect. The
+ * reader saw a note gain its git marks only after the agenda had been opened
+ * once, and had no way to connect the two.
+ *
+ * So the same opening is done at activation, for the directories the agenda
+ * would sweep. What it costs is one `git rev-parse` per directory, and the
+ * visible effect -- the repository joining Source Control -- is the one
+ * ADR-0016 already accepted for these directories.
+ *
+ * Failures are logged and nothing else: a directory that is not a repository
+ * at all is the ordinary case, and the panel reports it in its own way when
+ * the reader gets there.
+ */
+export async function openNotesRepositories(directories: readonly string[]): Promise<void> {
+    if (directories.length === 0) {
+        return;
+    }
+    const api = await getGitApi();
+    if (!api) {
+        return;
+    }
+    await openRepositoriesIn(api, directories);
+}
+
+/**
+ * The opening itself, against a given API.
+ *
+ * Separate from {@link openNotesRepositories} so a test can hand it an API of
+ * its own: the difference between the two is only where the API comes from.
+ */
+export async function openRepositoriesIn(api: GitApi, directories: readonly string[]): Promise<void> {
+    for (const directory of directories) {
+        try {
+            const root = await api.getRepositoryRoot(vscode.Uri.file(directory));
+            if (!root) {
+                continue;
+            }
+            await api.openRepository(vscode.Uri.file(root.fsPath));
+        } catch (error) {
+            logDiagnostic(`agenda git status: cannot open a repository for ${directory}: ${formatError(error)}`);
+        }
+    }
+}

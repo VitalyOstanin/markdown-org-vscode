@@ -180,6 +180,14 @@ Timestamp` stays what it was, for entries typed into the editor by hand.
   a space at the end of the line. `## TODO [#A]` came back as `## TODO ` — the
   separator before the title stayed behind when there was no title to separate.
 
+- A note in a repository of its own carries its git marks as soon as it is
+  opened, rather than after the agenda has been opened once. The Git extension
+  leaves a repository outside the workspace folders alone, and what used to
+  open such a root was the agenda panel — as a side effect of working out
+  which repository its files belong to. The directories the agenda sweeps are
+  now opened at activation instead, and again when the setting naming them
+  changes.
+
 - A repeater and a warning period in a timestamp read as more than a colour.
   Markdown treats the planning line as inline code, and a theme is free to
   paint that run any colour it likes: on Monokai it comes out at `#FD971F`

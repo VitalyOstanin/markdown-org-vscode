@@ -1,7 +1,7 @@
 import * as assert from 'node:assert/strict';
 import * as path from 'node:path';
 import { suite, test, setup } from 'mocha';
-import { forgetResolvedRepositories, resolveRepositoryFor } from '../../utils/git/gitApi';
+import { forgetResolvedRepositories, openRepositoriesIn, resolveRepositoryFor } from '../../utils/git/gitApi';
 import type { GitApi, GitRepository } from '../../utils/git/gitApiTypes';
 
 /**
@@ -75,6 +75,58 @@ suite('git repository resolution', () => {
             }
         };
     }
+
+    /**
+     * What activation does, so a note carries its git marks before the agenda
+     * is opened for the first time. The Git extension leaves a repository
+     * outside the workspace folders alone, and until something opens it the
+     * editor decorates nothing there — which used to be the agenda panel, as a
+     * side effect of resolving a repository for one of its files.
+     */
+    test('every notes directory that is a repository is opened', async () => {
+        const root = path.join(path.sep, 'tmp', 'notes-repo');
+        const opened: string[] = [];
+        const api = {
+            repositories: [],
+            getRepository: () => null,
+            getRepositoryRoot: (uri: { readonly fsPath: string }) =>
+                Promise.resolve(uri.fsPath === root ? { fsPath: root } : null),
+            openRepository: (uri: { readonly fsPath: string }) => {
+                opened.push(uri.fsPath);
+                return Promise.resolve(null);
+            },
+            onDidOpenRepository: () => ({ dispose: () => undefined }),
+            onDidCloseRepository: () => ({ dispose: () => undefined })
+        } satisfies GitApi;
+
+        await openRepositoriesIn(api, [root, path.join(path.sep, 'tmp', 'plain-notes')]);
+
+        assert.deepEqual(opened, [root], 'a directory outside git is passed over in silence');
+    });
+
+    /** One directory that cannot be asked about must not stop the rest. */
+    test('a directory git refuses to answer for does not take the others with it', async () => {
+        const root = path.join(path.sep, 'tmp', 'second-repo');
+        const opened: string[] = [];
+        const api = {
+            repositories: [],
+            getRepository: () => null,
+            getRepositoryRoot: (uri: { readonly fsPath: string }) =>
+                uri.fsPath === root
+                    ? Promise.resolve({ fsPath: root })
+                    : Promise.reject(new Error('detected dubious ownership')),
+            openRepository: (uri: { readonly fsPath: string }) => {
+                opened.push(uri.fsPath);
+                return Promise.resolve(null);
+            },
+            onDidOpenRepository: () => ({ dispose: () => undefined }),
+            onDidCloseRepository: () => ({ dispose: () => undefined })
+        } satisfies GitApi;
+
+        await openRepositoriesIn(api, [path.join(path.sep, 'tmp', 'refused'), root]);
+
+        assert.deepEqual(opened, [root]);
+    });
 
     test('a failure to ask git is not remembered as "outside git"', async () => {
         // The failure this covers is transient by nature -- an unsafe-ownership
