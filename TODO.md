@@ -474,6 +474,36 @@
       leave it to the README -- a notification is more visible and more
       intrusive, so it is a decision, not a detail.
 
+- [ ] A help panel of the extension's own
+    - Not before the release: the ecosystem ships first, the panel comes after.
+    - There is no in-editor help at all today. `contributes` declares commands,
+      configuration, grammars, keybindings and menus -- no `walkthroughs`, and
+      no command that opens documentation. A reader either finds the
+      marketplace page or is left with the tooltips inside the agenda.
+    - Decided form: a webview panel of our own, with a table of contents, a
+      search box over the sections, and text in both languages following
+      `markdown-org.uiLanguage`. A VS Code walkthrough was weighed and dropped:
+      its cards are declared in `package.json` and follow the editor's display
+      language, so they cannot follow that setting. Opening the shipped README
+      in the built-in markdown preview was weighed and dropped as well: the
+      README leans on `<picture>` and on the GIFs that stay out of the VSIX, so
+      a good part of it would render blank.
+    - Shape: `src/views/docsPanel.ts` for the panel, the help text as markdown
+      files shipped under `media/`, one directory per language, and an index
+      built from their headings to feed both the contents and the search.
+    - Sections to carry, all of them living only in the README today: tasks and
+      priorities, timestamps, repeaters, the agenda and its views, the phrase
+      commands, Google Calendar sync, the git panel.
+    - Must describe cancelling and moving a single occurrence of a series --
+      the question this entry started from: the model behind it (an `ID` on the
+      series, `SERIES_ID` plus `RECURRENCE_ID` on the replacement entry, an
+      `EXDATE` line for a cancelled day) and the two commands that write it.
+    - The cost of the chosen form is a second description of the same commands
+      beside the README, which drifts on every edit. Answer that with a guard
+      test rather than with discipline: assert that every command in
+      `package.json` and every `markdown-org.*` setting appears in the help
+      text of both languages.
+
 ## Testing
 
 - [x] Add unit tests for core functionality
