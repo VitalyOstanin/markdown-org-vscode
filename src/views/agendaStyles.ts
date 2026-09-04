@@ -252,6 +252,9 @@ export const AGENDA_STYLES = `
            consistent set of affordances. */
         .tag-menu-btn,
         .chip-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: var(--space-1);
             background: var(--vscode-button-secondaryBackground);
             color: var(--vscode-button-secondaryForeground);
             border: 1px solid var(--vscode-panel-border);
@@ -262,6 +265,19 @@ export const AGENDA_STYLES = `
             font-size: var(--font-md);
             line-height: 1.3;
             transition: background 0.1s ease;
+        }
+        /* The chevron of a dropdown, sized against the text rather than in
+           pixels, so it keeps its proportion when the panel's font scales. It
+           is drawn in the markup and takes its colour from the button. */
+        .chip-caret {
+            width: 0.85em;
+            height: 0.85em;
+            flex: none;
+            opacity: 0.75;
+        }
+        .tag-menu-btn:hover .chip-caret,
+        .chip-btn:hover .chip-caret {
+            opacity: 1;
         }
         .tag-menu-btn:hover,
         .chip-btn:hover {

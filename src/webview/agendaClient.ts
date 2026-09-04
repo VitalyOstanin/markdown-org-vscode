@@ -2210,9 +2210,16 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         document.querySelectorAll('#tagMenu .tag-menu-item').forEach((el) => {
             el.classList.toggle('active', el.getAttribute('data-tag') === tag);
         });
-        const btn = document.getElementById('tagMenuBtn');
-        if (btn) {
-            btn.textContent = tagButtonText(tag, { tagAll: UI.tagAll, tagButton: UI.tagButton, formatString });
+        // The label alone, not the whole button: the caret beside it is an
+        // element of its own, and writing over `textContent` took it with the
+        // old text and left the button flat.
+        const label = document.querySelector('#tagMenuBtn .chip-text');
+        if (label) {
+            label.textContent = tagButtonText(tag, {
+                tagAll: UI.tagAll,
+                tagButton: UI.tagButton,
+                formatString
+            });
         }
         vscode.postMessage({ command: 'setTag', tag });
     }

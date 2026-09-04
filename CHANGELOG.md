@@ -113,6 +113,12 @@ Timestamp` stays what it was, for entries typed into the editor by hand.
   and week views are unchanged: their second line carries a date, not one more
   word of the title.
 
+- The tag dropdown in the header is marked by a drawn chevron rather than the
+  character `▾`. A font renders that character as a filled triangle sitting on
+  the text baseline, heavier than the strokes beside it and lower than the
+  middle of the button; the chevron is drawn at the weight of the text and
+  centred on the line, the way the editor's own menus mark theirs.
+
 ### Fixed
 
 - A group action that could not write a file says so in the panel's language.

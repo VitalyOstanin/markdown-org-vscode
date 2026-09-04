@@ -55,13 +55,33 @@ export function tagLabel(name: string, allLabel: string): string {
     return name === 'ALL' ? allLabel : name;
 }
 
-/** Text of the collapsed dropdown button, caret included. */
+/** Text of the collapsed dropdown button. The caret beside it is [`CARET_SVG`]. */
 export function tagButtonText(
     tag: string,
     ctx: { tagAll: string; tagButton: string; formatString: FormatString }
 ): string {
-    return `${ctx.formatString(ctx.tagButton, tagLabel(tag, ctx.tagAll))} ▾`;
+    return ctx.formatString(ctx.tagButton, tagLabel(tag, ctx.tagAll));
 }
+
+/**
+ * The caret of a dropdown, drawn rather than typed.
+ *
+ * It used to be the character `▾`, which a font renders as a filled
+ * triangle sitting on the text baseline: heavier than the strokes beside it
+ * and aligned with the letters rather than with the middle of the button. This
+ * is the chevron the editor's own menus use -- two strokes of the same weight
+ * as the text, centred on the line.
+ *
+ * Written into the markup instead of loaded as an image: the panel's policy is
+ * `default-src 'none'` with no `img-src`, so a `data:` URI in CSS would be
+ * refused, while an element in the document is not a resource at all. It takes
+ * its colour from the text through `currentColor` and is hidden from the
+ * accessibility tree, the button's own text being what names it.
+ */
+export const CARET_SVG =
+    '<svg class="chip-caret" viewBox="0 0 16 16" aria-hidden="true" focusable="false">' +
+    '<path d="M3.5 6 8 10.5 12.5 6" fill="none" stroke="currentColor" ' +
+    'stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
 /**
  * The file-tag dropdown: a collapsed button plus a list of tags. The ids and
@@ -99,7 +119,8 @@ export function renderTagMenu(
     return (
         '<div class="tag-menu" id="tagMenu">' +
         `<button class="tag-menu-btn" id="tagMenuBtn" title="${ctx.escapeHtml(ctx.tagCaption)}">` +
-        `${ctx.escapeHtml(tagButtonText(currentTag, ctx))}</button>` +
+        `<span class="chip-text">${ctx.escapeHtml(tagButtonText(currentTag, ctx))}</span>` +
+        `${CARET_SVG}</button>` +
         '<div class="tag-menu-list">' +
         `<div class="tag-menu-label">${ctx.escapeHtml(ctx.tagCaption)}</div>` +
         rows +

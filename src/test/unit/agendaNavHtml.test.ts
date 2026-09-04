@@ -71,11 +71,8 @@ suite('agendaNavHtml.tagLabel / tagButtonText', () => {
         assert.strictEqual(tagLabel('work', 'All'), 'work');
     });
 
-    test('the collapsed button carries the caret', () => {
-        assert.strictEqual(
-            tagButtonText('work', { tagAll: 'All', tagButton: 'Tag: {0}', formatString }),
-            'Tag: work ▾'
-        );
+    test('the collapsed button names the tag and nothing else', () => {
+        assert.strictEqual(tagButtonText('work', { tagAll: 'All', tagButton: 'Tag: {0}', formatString }), 'Tag: work');
     });
 });
 
@@ -108,7 +105,7 @@ suite('agendaNavHtml.renderTagMenu', () => {
 
     test('the collapsed button shows the current tag', () => {
         const btn = parse(renderTagMenu(['ALL', 'work'], 'work', ctx)).querySelector('#tagMenuBtn');
-        assert.strictEqual(btn?.textContent, 'Tag: work ▾');
+        assert.strictEqual(btn?.textContent, 'Tag: work');
     });
 
     test('ALL gets its own tooltip; a named tag gets the filter wording', () => {
@@ -118,6 +115,24 @@ suite('agendaNavHtml.renderTagMenu', () => {
             doc.querySelector('[data-tag="work"]')?.getAttribute('title'),
             'Filter to files tagged work'
         );
+    });
+
+    /**
+     * The caret is drawn in the markup rather than fetched: the panel runs
+     * under `default-src 'none'` with no `img-src`, so an icon behind a `data:`
+     * URI would be refused and the button would lose it silently. The label
+     * lives in its own element because the client writes the chosen tag into
+     * that element alone -- writing over the button's text would take the
+     * caret with it.
+     */
+    test('the collapsed button carries a drawn caret beside a label of its own', () => {
+        const doc = parse(renderTagMenu(['ALL', 'work'], 'work', ctx));
+        const button = doc.querySelector('#tagMenuBtn');
+        assert.ok(button, 'the collapsed button is there to begin with');
+
+        assert.strictEqual(button.querySelector('.chip-text')?.textContent, 'Tag: work');
+        assert.strictEqual(button.querySelectorAll('svg.chip-caret').length, 1);
+        assert.ok(!button.textContent.includes('▾'), 'the typed triangle is gone');
     });
 
     test('a tag name with markup in it cannot break out of the attribute', () => {
