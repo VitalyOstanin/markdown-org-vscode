@@ -421,6 +421,8 @@ export interface AgendaStrings {
         muted: string;
         /** No markdown file is open to write into. */
         noEditor: string;
+        /** The workspace is not trusted, so the extractor is not run. */
+        untrusted: string;
     };
     /**
      * The phrase box raised by `Edit Task from Phrase`. The entry it changes
@@ -458,6 +460,8 @@ export interface AgendaStrings {
         noHeading: string;
         /** No markdown file is open to change. */
         noEditor: string;
+        /** The workspace is not trusted, so the extractor is not run. */
+        untrusted: string;
     };
     /**
      * The priority picker raised by `Set Priority`. Host UI rather than page
@@ -658,7 +662,8 @@ const EN: AgendaStrings = {
         empty: 'The phrase said nothing to write down',
         failed: 'Could not read the phrase: {0}',
         muted: '{0} — the microphone is muted',
-        noEditor: 'Open the markdown file the task should go into'
+        noEditor: 'Open the markdown file the task should go into',
+        untrusted: 'Writing a task from a phrase is disabled in untrusted workspaces'
     },
     phraseEditPrompt: {
         title: 'Change: {0}',
@@ -679,7 +684,8 @@ const EN: AgendaStrings = {
         noDate: 'An hour needs a day: name one, or give the entry a date first',
         failed: 'Could not read the phrase: {0}',
         noHeading: 'Put the cursor in the entry to change',
-        noEditor: 'Open the markdown file with the entry to change'
+        noEditor: 'Open the markdown file with the entry to change',
+        untrusted: 'Changing an entry from a phrase is disabled in untrusted workspaces'
     },
     priorityPicker: {
         title: 'Set priority',
@@ -869,7 +875,8 @@ const RU: AgendaStrings = {
         empty: 'Во фразе нечего записывать',
         failed: 'Не удалось разобрать фразу: {0}',
         muted: '{0} — микрофон выключен',
-        noEditor: 'Откройте markdown-файл, в который записать задачу'
+        noEditor: 'Откройте markdown-файл, в который записать задачу',
+        untrusted: 'Запись задачи фразой отключена в недоверенной рабочей области'
     },
     phraseEditPrompt: {
         title: 'Правка: {0}',
@@ -890,7 +897,8 @@ const RU: AgendaStrings = {
         noDate: 'Времени нужен день: назовите дату или сначала задайте её записи',
         failed: 'Не удалось разобрать фразу: {0}',
         noHeading: 'Поставьте курсор в запись, которую надо изменить',
-        noEditor: 'Откройте markdown-файл с записью, которую надо изменить'
+        noEditor: 'Откройте markdown-файл с записью, которую надо изменить',
+        untrusted: 'Правка записи фразой отключена в недоверенной рабочей области'
     },
     priorityPicker: {
         title: 'Приоритет',

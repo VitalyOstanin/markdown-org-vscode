@@ -8,7 +8,7 @@ import { exec } from '../utils/exec';
 import { formatError } from '../utils/formatError';
 import { formatString } from '../utils/agendaI18n';
 import { isMicrophoneMuted } from '../utils/microphone';
-import { notifyError, notifyInfo } from '../utils/notify';
+import { notifyError, notifyInfo, notifyWarn } from '../utils/notify';
 import { placeNewEntry } from '../utils/entryPlacement';
 import { documentLines, endOfLine, planPhraseInsert } from '../utils/phraseInsert';
 import type { PhraseEditField, PhraseEditRefusal } from '../utils/phraseEdit';
@@ -76,6 +76,14 @@ function runParsePhrase(command: string, phrases: readonly string[], today: stri
 export async function insertTaskFromPhrase() {
     const { strings } = currentUiStrings();
     const prompts = strings.phrasePrompt;
+
+    // The phrase is read by the extractor, which is a binary this command
+    // runs; an untrusted workspace is where the extension runs no binary at
+    // all (README, "Workspace Trust").
+    if (!vscode.workspace.isTrusted) {
+        notifyWarn(prompts.untrusted);
+        return;
+    }
 
     const editor = requireActiveEditor({ markdownOnly: true });
     if (!editor) {
@@ -191,6 +199,13 @@ export async function insertTaskFromPhrase() {
 export async function editTaskFromPhrase() {
     const { strings } = currentUiStrings();
     const prompts = strings.phraseEditPrompt;
+
+    // Same gate as writing one: the phrase reaches the entry through the
+    // extractor, and untrusted workspaces run no binary.
+    if (!vscode.workspace.isTrusted) {
+        notifyWarn(prompts.untrusted);
+        return;
+    }
 
     const editor = requireActiveEditor({ markdownOnly: true });
     if (!editor) {

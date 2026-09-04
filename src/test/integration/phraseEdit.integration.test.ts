@@ -6,6 +6,7 @@ import { suite, before, beforeEach, after, afterEach, test } from 'mocha';
 import { bundledBinaryName } from '../../utils/bundledBinary';
 import { DAY_NAMES_SHORT_RU } from '../../utils/dayNames';
 import { toIsoDate } from '../../utils/isoDate';
+import { currentUiStrings } from '../../utils/uiStrings';
 
 /**
  * An entry changed by saying what to change, from the phrase to the lines in
@@ -72,6 +73,38 @@ suite('Edit Task from Phrase', () => {
             selection: new vscode.Range(cursorLine, 0, cursorLine, 0)
         });
         return document;
+    }
+
+    /**
+     * Report the workspace as untrusted for the duration of one call.
+     *
+     * `isTrusted` is a getter on the namespace object rather than a plain
+     * field, so it is redefined and put back rather than assigned to.
+     */
+    function untrusted(): () => void {
+        const original = Object.getOwnPropertyDescriptor(vscode.workspace, 'isTrusted');
+        Object.defineProperty(vscode.workspace, 'isTrusted', { get: () => false, configurable: true });
+        return () => {
+            if (original) {
+                Object.defineProperty(vscode.workspace, 'isTrusted', original);
+            }
+        };
+    }
+
+    /** Collect what the extension warns about while the body runs. */
+    function watchWarnings(): { warnings: string[]; restore: () => void } {
+        const warnings: string[] = [];
+        const original = vscode.window.showWarningMessage;
+        (vscode.window as { showWarningMessage: unknown }).showWarningMessage = (message: string) => {
+            warnings.push(message);
+            return Promise.resolve(undefined);
+        };
+        return {
+            warnings,
+            restore: () => {
+                (vscode.window as { showWarningMessage: unknown }).showWarningMessage = original;
+            }
+        };
     }
 
     const today = new Date();
@@ -200,5 +233,34 @@ suite('Edit Task from Phrase', () => {
         await vscode.commands.executeCommand('markdown-org.editTaskFromPhrase');
 
         assert.strictEqual(doc.getText(), ENTRY);
+    });
+
+    /**
+     * The same gate as writing an entry by phrase: the sentence reaches the
+     * entry through the extractor, and an untrusted window runs no binary.
+     */
+    test('an untrusted workspace changes nothing and says why', async () => {
+        const doc = await open(ENTRY, 2);
+        const before = doc.getText();
+        let opened = false;
+        (vscode.window as { showInputBox: unknown }).showInputBox = () => {
+            opened = true;
+            return Promise.resolve('');
+        };
+        const watched = watchWarnings();
+        const restore = untrusted();
+
+        try {
+            await vscode.commands.executeCommand('markdown-org.editTaskFromPhrase');
+        } finally {
+            restore();
+            watched.restore();
+        }
+
+        assert.strictEqual(opened, false, 'the phrase box never opened');
+        assert.strictEqual(doc.getText(), before, 'the entry is untouched');
+        assert.deepStrictEqual(watched.warnings, [
+            `Markdown Org: ${currentUiStrings().strings.phraseEditPrompt.untrusted}`
+        ]);
     });
 });

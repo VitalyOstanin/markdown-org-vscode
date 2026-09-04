@@ -87,6 +87,16 @@ Timestamp` stays what it was, for entries typed into the editor by hand.
 
 ### Changed
 
+- The phrase asks for a trusted workspace, as the agenda already did. Both
+  phrase commands run the extractor to read what was said, and running a binary
+  is exactly what an untrusted window is meant to hold back; they were the only
+  commands that ran one without asking. They now report it and write nothing.
+  The README says the rule the extension actually follows: trust is asked for by
+  the commands that run the extractor, reach the network, or write beyond the
+  open document -- and it names "Insert CLOCK Table", which writes only into the
+  open document and is held back all the same, as the one exception rather than
+  leaving it in a list it never fitted.
+
 - The panel's Russian says one thing one way. The git dropdown spoke in
   transliterations where Russian has words of its own -- "закоммичено", "не
   закоммичено", "без пуша" -- and it named the file filter "метка" while the

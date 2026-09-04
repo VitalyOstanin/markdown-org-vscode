@@ -121,6 +121,38 @@ suite('Insert Task from Phrase', () => {
         return document;
     }
 
+    /**
+     * Report the workspace as untrusted for the duration of one call.
+     *
+     * `isTrusted` is a getter on the namespace object rather than a plain
+     * field, so it is redefined and put back rather than assigned to.
+     */
+    function untrusted(): () => void {
+        const original = Object.getOwnPropertyDescriptor(vscode.workspace, 'isTrusted');
+        Object.defineProperty(vscode.workspace, 'isTrusted', { get: () => false, configurable: true });
+        return () => {
+            if (original) {
+                Object.defineProperty(vscode.workspace, 'isTrusted', original);
+            }
+        };
+    }
+
+    /** Collect what the extension warns about while the body runs. */
+    function watchWarnings(): { warnings: string[]; restore: () => void } {
+        const warnings: string[] = [];
+        const original = vscode.window.showWarningMessage;
+        (vscode.window as { showWarningMessage: unknown }).showWarningMessage = (message: string) => {
+            warnings.push(message);
+            return Promise.resolve(undefined);
+        };
+        return {
+            warnings,
+            restore: () => {
+                (vscode.window as { showWarningMessage: unknown }).showWarningMessage = original;
+            }
+        };
+    }
+
     /** Today and tomorrow as the extractor will resolve them. */
     const today = new Date();
     const tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
@@ -282,5 +314,35 @@ suite('Insert Task from Phrase', () => {
         }
 
         assert.strictEqual(prompts[0], currentUiStrings().strings.phrasePrompt.prompt);
+    });
+
+    /**
+     * The phrase is read by the extractor, and a binary is what an untrusted
+     * window holds back -- the same gate the agenda has carried since it
+     * started running one.
+     */
+    test('an untrusted workspace writes nothing and says why', async () => {
+        const doc = await open('## Errands\ntext\n', 1);
+        const before = doc.getText();
+        let opened = false;
+        (vscode.window as { showInputBox: unknown }).showInputBox = () => {
+            opened = true;
+            return Promise.resolve('');
+        };
+        const watched = watchWarnings();
+        const restore = untrusted();
+
+        try {
+            await vscode.commands.executeCommand('markdown-org.insertTaskFromPhrase');
+        } finally {
+            restore();
+            watched.restore();
+        }
+
+        assert.strictEqual(opened, false, 'the phrase box never opened');
+        assert.strictEqual(doc.getText(), before, 'the document is untouched');
+        assert.deepStrictEqual(watched.warnings, [
+            `Markdown Org: ${currentUiStrings().strings.phrasePrompt.untrusted}`
+        ]);
     });
 });

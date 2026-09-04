@@ -925,7 +925,17 @@ own). The matching `client_secret` is entered once when you run
 
 ## Workspace Trust
 
-The extension is **limited in untrusted workspaces**. The following commands are disabled because they read configured executable/file paths: `Show Agenda*`, `Show Tasks`, `Cycle Tag Filter`, `Insert CLOCK Table`, `Move to Archive`, `Promote to Maintain`.
+The extension is **limited in untrusted workspaces**. A command is disabled there when it runs the extractor binary, reaches the network, or writes anywhere beyond the document you have open:
+
+| Command                                            | Why it needs trust                                                                                                                                                                                                |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Show Agenda (Day/Week/Month)`, `Show Tasks`       | run the extractor over the configured notes directories                                                                                                                                                           |
+| `Insert Task from Phrase`, `Edit Task from Phrase` | run the extractor to read the phrase                                                                                                                                                                              |
+| `Sync Now (Google Calendar)`                       | runs the extractor, reaches Google, and reads the stored token                                                                                                                                                    |
+| `Move to Archive`, `Promote to Maintain`           | write a file next to the note, one of them at a configured path                                                                                                                                                   |
+| `Insert CLOCK Table`                               | writes into the document rather than beyond it, and is disabled all the same: the table is generated content, and generating it into a repository you have not vouched for is not what an untrusted window is for |
+
+Everything else stays available, including the syntax highlighting and the commands that edit the entry under the cursor -- task status, priority, timestamps, CLOCK entries, and the two commands that cancel or move a single occurrence of a series.
 
 ## Google Calendar Sync
 
