@@ -21,6 +21,7 @@ import { AgendaPanel } from './views/agendaPanel';
 import { adjustTimestamp, toggleTimestampActive } from './commands/timestampEdit';
 import { agendaFind } from './commands/agendaFind';
 import { moveToArchive, promoteToMaintain } from './commands/moveHeading';
+import { cancelOccurrenceCommand, moveOccurrenceCommand } from './commands/occurrence';
 import { insertClockStart, insertClockFinish } from './commands/clock';
 import { insertClockTable } from './commands/clocktable';
 import { editTaskFromPhrase, insertTaskFromPhrase } from './commands/phraseTask';
@@ -122,6 +123,11 @@ export function activate(context: vscode.ExtensionContext) {
     registerOrgCommand(context, 'markdown-org.toggleTimestampActive', () => toggleTimestampActive());
     registerOrgCommand(context, 'markdown-org.moveToArchive', () => moveToArchive());
     registerOrgCommand(context, 'markdown-org.promoteToMaintain', () => promoteToMaintain());
+    // The day comes from the agenda, which knows which occurrence the row it
+    // was invoked on stands for; from the palette there is none and the boxes
+    // open on the day the series is planned for.
+    registerOrgCommand(context, 'markdown-org.cancelOccurrence', (date?: string) => cancelOccurrenceCommand(date));
+    registerOrgCommand(context, 'markdown-org.moveOccurrence', (date?: string) => moveOccurrenceCommand(date));
     registerOrgCommand(context, 'markdown-org.cycleTag', () => cycleTag(context));
     registerOrgCommand(context, 'markdown-org.showTagDictionary', () => showTagDictionary());
     registerOrgCommand(context, 'markdown-org.cycleAgendaHeaderMode', () => cycleAgendaHeaderMode());

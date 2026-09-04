@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- One occurrence of a series is cancelled or moved without touching the rest of
+  it. "Cancel One Occurrence" adds the day to the series' own `EXDATE`, and it
+  goes on repeating around the gap; "Move One Occurrence" writes a second entry
+  at the end of the same file, spelled the way the series is and naming the
+  occurrence it stands in for, so the day it moved from is drawn once and at its
+  new hour. Both open on the day the entry is planned for, which makes
+  confirming a keypress.
+  This is the shape the extension already reads and exports to Google Calendar
+  (the extractor's ADR-0031), and the shape the Android client writes: the
+  replacement goes at the end of the file, the heading is copied as it stands,
+  and the planning line is rewritten token by token — its keyword, its
+  indentation and the language of its weekday are the file's, and only the
+  repeater goes, because one occurrence does not repeat. A series with no
+  identifier is given one. An entry that does not repeat, or one that repeats on
+  two dates at once, is refused rather than guessed at.
+
 - An entry is changed by saying what to change: "Edit Task from Phrase"
   (Ctrl+K Ctrl+E) asks for one sentence and applies it to the entry the cursor
   stands in — the same entry every other editing command works on. One sentence

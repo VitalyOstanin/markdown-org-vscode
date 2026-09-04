@@ -38,6 +38,7 @@ thing to anything else that links it.
     - [CLOCK Entries](#clock-entries)
     - [Priority Levels](#priority-levels)
     - [Repeating Tasks](#repeating-tasks)
+        - [One occurrence that differs](#one-occurrence-that-differs)
 - [Writing a task by saying it](#writing-a-task-by-saying-it)
 - [Changing an entry by saying what to change](#changing-an-entry-by-saying-what-to-change)
 - [Commands](#commands)
@@ -46,6 +47,7 @@ thing to anything else that links it.
     - [Timestamp Commands](#timestamp-commands)
     - [CLOCK Commands](#clock-commands)
     - [Agenda Commands](#agenda-commands)
+    - [Series Commands](#series-commands)
     - [Shadowed VS Code chords](#shadowed-vs-code-chords)
     - [Heading Management Commands](#heading-management-commands)
         - [Migrating into a maintain file with **Promote to Maintain**](#migrating-into-a-maintain-file-with-promote-to-maintain)
@@ -344,6 +346,45 @@ sync is not bound by that grid and maps the same repeater to
 `SCHEDULED: <2026-12-06 Sun +2wd>`
 ```
 
+#### One occurrence that differs
+
+A repeater describes an endless series and has nowhere to say that one of its
+occurrences is different. Two commands write that down, in the shape iCalendar
+settled on (the extractor's ADR-0031), and the agenda, the editor and the
+Google Calendar export all read it:
+
+- **`Cancel One Occurrence`** adds the day to the series' own `EXDATE`. The
+  series goes on repeating; the agenda leaves out the one day.
+- **`Move One Occurrence`** writes a second entry at the end of the same file,
+  carrying `SERIES_ID` and `RECURRENCE_ID`. It replaces the occurrence it names,
+  so nothing has to be excluded as well, and the day it moved from is drawn
+  once -- at its new hour.
+
+````markdown
+## TODO English
+`SCHEDULED: <2026-08-06 Thu 15:00 +1w>`
+```org-properties
+ID: 9f2c
+EXDATE: 2026-08-13
+```
+
+## TODO English
+`SCHEDULED: <2026-08-20 Thu 18:00>`
+```org-properties
+SERIES_ID: 9f2c
+RECURRENCE_ID: 2026-08-20 15:00
+```
+````
+
+The replacement is the series' own entry rewritten: its heading, its level, its
+priority and the language of its weekday are copied as they stand, and only the
+repeater goes -- one occurrence does not repeat. A warning cookie stays, because
+a deadline moved is still a deadline warned about the same number of days ahead.
+A series with no `ID` is given one on the first move.
+
+The same two operations are in the Android client, and both write the file the
+same way, so a series edited on either side reads the same on the other.
+
 ## Writing a task by saying it
 
 A task is a heading with a keyword, sometimes a priority cookie, and a planning
@@ -562,6 +603,20 @@ One binding under that prefix reaches past the editor: `Cycle Tag Filter` (`Ctrl
 Ctrl+T`) is bound in a Markdown editor and in the agenda panel, so the filter can be changed
 while looking at the agenda itself, which is what it applies to. Outside those two the prefix is
 left to the editor's own commands.
+
+### Series Commands
+
+| Command                               | Hotkey | Description                                                          |
+| ------------------------------------- | ------ | -------------------------------------------------------------------- |
+| `Markdown Org: Move One Occurrence`   | --     | Move one occurrence of the repeating entry to another day or hour    |
+| `Markdown Org: Cancel One Occurrence` | --     | Take one occurrence out of the repeating entry, leaving it repeating |
+
+Both act on the entry the cursor stands in and ask which day they are about,
+opening on the day the entry is planned for. An entry that does not repeat has
+no occurrences and is refused; so is one repeating on two dates at once, where
+which of the two an occurrence is counted by is left to be decided by hand. See
+[One occurrence that differs](#one-occurrence-that-differs) for what lands in
+the file.
 
 ### Heading Management Commands
 

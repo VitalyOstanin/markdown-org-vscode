@@ -197,6 +197,16 @@
         "category": "Markdown Org"
       },
       {
+        "command": "markdown-org.moveOccurrence",
+        "title": "Move One Occurrence",
+        "category": "Markdown Org"
+      },
+      {
+        "command": "markdown-org.cancelOccurrence",
+        "title": "Cancel One Occurrence",
+        "category": "Markdown Org"
+      },
+      {
         "command": "markdown-org.moveToArchive",
         "title": "Move to Archive",
         "category": "Markdown Org"
