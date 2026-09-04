@@ -15,12 +15,13 @@ travel with the repository.
     <img src="media/demo-agenda-light.gif" alt="Day / Week / Month agenda demo">
 </picture>
 
-The extension is one of two projects reading the same files:
+The extension is one of three projects reading the same files:
 
 | Project                                                                         | What it is                                                              |
 | ------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
 | `markdown-org-vscode` (this one)                                                | the VS Code extension: agenda panel, editing commands, time tracking    |
 | [`markdown-org-extract`](https://github.com/VitalyOstanin/markdown-org-extract) | the CLI and Rust library the extension runs to read tasks out of a file |
+| [`markdown-org-android`](https://github.com/VitalyOstanin/markdown-org-android) | the Android client, carrying the same notes on a phone over git         |
 
 Everything the agenda shows is read by the extractor, so a file means the same
 thing to anything else that links it.
@@ -71,6 +72,7 @@ thing to anything else that links it.
     - [`markdown-org.gcalSync.clientId`](#markdown-orggcalsyncclientid)
 - [Workspace Trust](#workspace-trust)
 - [Google Calendar Sync](#google-calendar-sync)
+- [The Android client](#the-android-client)
 - [Dependencies](#dependencies)
 - [Development](#development)
 - [Release notes](#release-notes)
@@ -1131,6 +1133,36 @@ All Google Calendar sync settings live under the
 | `markdown-org.gcalSync.defaultEventMinutes`  | `number`                     | `60`             | Duration for a timed task event when no end time is given.                                                                                                                           |
 | `markdown-org.gcalSync.authProvider`         | `"auto" \| "goa" \| "oauth"` | `"auto"`         | Where the access token comes from: `goa` takes it from GNOME Online Accounts (Linux), `oauth` runs the BYO Desktop-client flow, `auto` prefers GOA on Linux and falls back to OAuth. |
 | `markdown-org.gcalSync.goaAccount`           | `string`                     | `""`             | Which GNOME Online Accounts Google account to use when `authProvider` resolves to `goa`. Empty picks the only account there is; **Connect Google Calendar** stores the chosen one.   |
+
+## The Android client
+
+[`markdown-org-android`](https://github.com/VitalyOstanin/markdown-org-android)
+carries the same notes on a phone. It links the same extractor the extension
+runs, so a file and a phrase mean there what they mean here, and the two sides
+are kept in step over git rather than through a service of either one. The
+three views are the ones the agenda panel opens with -- day, week and month --
+as a phone draws them.
+
+<p>
+    <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="https://github.com/VitalyOstanin/markdown-org-vscode/raw/HEAD/media/android-day-dark.png">
+        <img src="media/android-day-light.png" alt="Android agenda, day" width="32%">
+    </picture>
+    <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="https://github.com/VitalyOstanin/markdown-org-vscode/raw/HEAD/media/android-week-dark.png">
+        <img src="media/android-week-light.png" alt="Android agenda, week" width="32%">
+    </picture>
+    <picture>
+        <source media="(prefers-color-scheme: dark)" srcset="https://github.com/VitalyOstanin/markdown-org-vscode/raw/HEAD/media/android-month-dark.png">
+        <img src="media/android-month-light.png" alt="Android agenda, month" width="32%">
+    </picture>
+</p>
+
+A release of that repository is the whole of its distribution: a tag builds an
+APK signed with the developer's key, and its
+[releases page](https://github.com/VitalyOstanin/markdown-org-android/releases)
+carries the file. No store lists it, so nothing announces an update -- the
+reasons are in that repository's README.
 
 ## Dependencies
 

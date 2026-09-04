@@ -87,6 +87,12 @@ Timestamp` stays what it was, for entries typed into the editor by hand.
 
 ### Changed
 
+- The README names the Android client as the third project reading these files,
+  with the day, week and month it draws on a phone and where its builds come
+  from. The set of files is the same one the extension reads, and the extractor
+  the client links is the one the extension runs, so a reader who keeps notes on
+  both sides now finds that stated rather than having to infer it.
+
 - The phrase asks for a trusted workspace, as the agenda already did. Both
   phrase commands run the extractor to read what was said, and running a binary
   is exactly what an untrusted window is meant to hold back; they were the only
