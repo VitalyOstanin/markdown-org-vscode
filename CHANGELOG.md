@@ -174,6 +174,14 @@ Timestamp` stays what it was, for entries typed into the editor by hand.
   a space at the end of the line. `## TODO [#A]` came back as `## TODO ` — the
   separator before the title stayed behind when there was no title to separate.
 
+- A repeater and a warning period in a timestamp read as more than a colour.
+  Markdown treats the planning line as inline code, and a theme is free to
+  paint that run any colour it likes: on Monokai it comes out at `#FD971F`
+  against the `#CCA700` of `charts.yellow`, a contrast ratio of 1.06, so `+1w`
+  was coloured and read as no different from the text around it — the date
+  beside it, in blue, stands at 1.41. Both now carry weight as well, which is
+  the one thing no theme paints over.
+
 ## [0.19.0] - 2026-08-23
 
 ### Fixed

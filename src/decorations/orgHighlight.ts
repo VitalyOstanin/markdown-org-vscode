@@ -3,6 +3,7 @@ import type { DebouncedFunction } from '../utils/debounce';
 import { debounce } from '../utils/debounce';
 import type { HighlightKind } from '../utils/orgHighlightSpans';
 import { computeHighlightSpans } from '../utils/orgHighlightSpans';
+import { KIND_COLORS, KIND_WEIGHTS } from '../utils/orgHighlightPalette';
 
 /**
  * Debounce window for repainting after an edit, matching the bracket
@@ -13,45 +14,15 @@ const REPAINT_DEBOUNCE_MS = 300;
 /** Setting that turns the editor decorations off. */
 const ENABLED_SETTING = 'markdown-org.highlightInEditor';
 
-/**
- * Colour for every highlight kind, as a theme colour token rather than a hex
- * value. These are the same tokens the agenda panel paints with
- * (`agendaStyles.ts`: `--vscode-charts-red` for a DEADLINE and priority A,
- * `--vscode-charts-yellow` for a repeater and priority B, `--vscode-charts-blue`
- * for a SCHEDULED, a time and priority C, `--vscode-charts-green` for DONE,
- * `--vscode-disabledForeground` for a cancelled task), so a task line reads the
- * same in the editor and in the agenda instead of picking up whatever colour a
- * theme happens to give a TextMate scope. The agenda blends its accents a third
- * of the way towards the editor foreground for large surfaces; single words in
- * the editor take the unblended token, which is the more legible of the two on
- * a short run of text.
- */
-const KIND_COLORS: Record<HighlightKind, string> = {
-    'planning-deadline': 'charts.red',
-    'planning-scheduled': 'charts.blue',
-    'planning-closed': 'charts.green',
-    'planning-created': 'disabledForeground',
-    'planning-clock': 'charts.blue',
-    date: 'charts.blue',
-    weekday: 'charts.blue',
-    time: 'charts.blue',
-    repeater: 'charts.yellow',
-    warning: 'charts.yellow',
-    'status-todo': 'charts.blue',
-    'status-done': 'charts.green',
-    'status-cancelled': 'disabledForeground',
-    'priority-a': 'charts.red',
-    'priority-b': 'charts.yellow',
-    'priority-c': 'charts.blue'
-};
-
 function createDecorationTypes(): Map<HighlightKind, vscode.TextEditorDecorationType> {
     const types = new Map<HighlightKind, vscode.TextEditorDecorationType>();
     for (const [kind, color] of Object.entries(KIND_COLORS) as [HighlightKind, string][]) {
+        const weight = KIND_WEIGHTS[kind];
         types.set(
             kind,
             vscode.window.createTextEditorDecorationType({
                 color: new vscode.ThemeColor(color),
+                ...(weight ? { fontWeight: weight } : {}),
                 // The decoration follows the text it was computed for: an edit
                 // in the middle of a timestamp otherwise leaves the colour
                 // behind on the old columns until the repaint lands.
