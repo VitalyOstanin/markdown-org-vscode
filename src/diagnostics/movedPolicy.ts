@@ -11,9 +11,11 @@
  * says the same thing at the moment the line is written.
  */
 
+import { headingLevel, matchTimestampLine } from '../orgPatterns';
 import { namedGroups } from '../utils/regexGroups';
 import { getWeekdayName } from '../utils/incrementTimestamp';
 import { weekdaySample } from '../utils/movedLine';
+import { parseRepeater } from '../utils/repeater';
 
 /** `MOVED: <anything>` inside an inline-code span, at any indentation. */
 const MOVED_LINE_REGEX = /^(?<indent>\s*)`MOVED:(?<body>[^`]*)`\s*$/;
@@ -69,28 +71,52 @@ export interface MovedViolation {
  * Analyse a document's lines and return every `MOVED` line the extractor would
  * refuse. Lines that are not `MOVED` lines are ignored; a heading starts a new
  * entry, which is what makes "this entry moves the day twice" answerable.
+ *
+ * Each entry is read whole before its moves are judged, because a planning
+ * line is not always written above them: a series whose `SCHEDULED` stands
+ * below its `MOVED` line repeats just the same, and walking the file line by
+ * line called it an entry that does not repeat.
  */
 export function validateMovedLines(lines: string[]): MovedViolation[] {
     const violations: MovedViolation[] = [];
     const fallbackWeekday = weekdaySample(lines);
-    const fresh = (): Entry => ({ daysMoved: new Set<string>(), weekday: null, repeats: false });
-    let entry = fresh();
 
-    lines.forEach((text, line) => {
-        if (/^\s*#{1,6}[ \t]/.test(text)) {
-            entry = fresh();
-            return;
+    for (const [from, to] of entryRanges(lines)) {
+        const entry = readEntry(lines, from, to);
+        for (let line = from; line < to; line++) {
+            violations.push(...validateMovedLine(lines[line] ?? '', line, entry, fallbackWeekday));
         }
-        const planning = PLANNING_REGEX.exec(text);
-        if (planning) {
-            const { weekday, repeater } = planning.groups ?? {};
-            entry.weekday ??= weekday ?? null;
-            entry.repeats ||= repeater !== undefined;
-        }
-        violations.push(...validateMovedLine(text, line, entry, fallbackWeekday));
-    });
+    }
 
     return violations;
+}
+
+/**
+ * Half-open line ranges of the document's entries, whatever stands above the
+ * first heading included as one of its own.
+ */
+function entryRanges(lines: readonly string[]): [number, number][] {
+    const starts = [0];
+    lines.forEach((text, line) => {
+        if (line > 0 && headingLevel(text) !== null) {
+            starts.push(line);
+        }
+    });
+    return starts.map((from, index) => [from, starts[index + 1] ?? lines.length]);
+}
+
+/** What the entry's own lines say about the moves standing in it. */
+function readEntry(lines: readonly string[], from: number, to: number): Entry {
+    const entry: Entry = { daysMoved: new Set<string>(), weekday: null, repeats: false };
+    for (let line = from; line < to; line++) {
+        const planning = planningTimestamp(lines[line] ?? '');
+        if (planning === null) {
+            continue;
+        }
+        entry.weekday ??= weekdayOf(planning);
+        entry.repeats ||= carriesRepeater(planning);
+    }
+    return entry;
 }
 
 /** What the lines above a `MOVED` line say about the entry it belongs to. */
@@ -111,14 +137,41 @@ interface Entry {
     repeats: boolean;
 }
 
+/** A keyword written in the inactive brackets, timestamp and all. */
+const KEYWORD_INACTIVE_REGEX = /`(?:SCHEDULED|DEADLINE): (?<timestamp>\[[^\]]*\])`/;
+
+/** The weekday a timestamp spells, so a fix offers the entry's own language. */
+const WEEKDAY_REGEX = /^[<[]\d{4}-\d{2}-\d{2} (?<weekday>[А-Яа-яA-Za-z]+)/;
+
 /**
- * A planning line of an entry, read for its weekday and its repeater. Both
- * bracket forms are accepted: a planning line written inactive is a fault of
- * its own, reported by the bracket diagnostics, and reading it as no series
- * here would answer that one fault with a second, unrelated complaint.
+ * The timestamp of a line that plans the entry for a day, or null.
+ *
+ * A series is kept on a `SCHEDULED`, a `DEADLINE`, or a bare active timestamp
+ * -- the same three `occurrenceEdit` counts occurrences by, so the warning and
+ * the command that writes the line read the entry alike. A keyword written in
+ * the inactive brackets is read as a planning line too: that is a fault of its
+ * own, reported by the bracket diagnostics, and reading it as no series here
+ * would answer one fault with a second, unrelated complaint.
  */
-const PLANNING_REGEX =
-    /`(?:SCHEDULED|DEADLINE): [<[]\d{4}-\d{2}-\d{2}(?: (?<weekday>[А-Яа-яA-Za-z]+))?(?:[^>\]]*?(?<repeater>(?:\.\+|\+\+|\+)\d+(?:wd|[dwmyh])))?[^>\]]*[>\]]`/;
+function planningTimestamp(text: string): string | null {
+    const hit = matchTimestampLine(text);
+    if (hit && (hit.type === 'SCHEDULED' || hit.type === 'DEADLINE' || (hit.type === 'PLAIN' && hit.active))) {
+        return hit.timestamp;
+    }
+    return KEYWORD_INACTIVE_REGEX.exec(text)?.groups?.timestamp ?? null;
+}
+
+/** Whether a planning timestamp repeats, and so has occurrences to move. */
+function carriesRepeater(timestamp: string): boolean {
+    return timestamp
+        .slice(1, -1)
+        .split(/\s+/)
+        .some((field) => parseRepeater(field) !== null);
+}
+
+function weekdayOf(timestamp: string): string | null {
+    return WEEKDAY_REGEX.exec(timestamp)?.groups?.weekday ?? null;
+}
 
 function validateMovedLine(text: string, line: number, entry: Entry, fallbackWeekday: string): MovedViolation[] {
     const matched = MOVED_LINE_REGEX.exec(text);

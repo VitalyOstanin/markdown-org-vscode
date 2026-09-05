@@ -249,6 +249,38 @@ suite('movedPolicy', () => {
         assert.equal(found[0]?.kind, 'entry-does-not-repeat');
     });
 
+    test('a bare active timestamp that repeats keeps a series too', () => {
+        assert.deepEqual(
+            validateMovedLines([
+                '# TODO Занятие',
+                '`<2025-12-08 Пн 15:00 +1w>`',
+                '`MOVED: [2026-09-07 Пн] -> <2026-09-09 Ср 13:00>`'
+            ]),
+            []
+        );
+    });
+
+    test('a planning line standing below the move is still read', () => {
+        assert.deepEqual(
+            validateMovedLines([
+                '# TODO Write the report',
+                '`MOVED: [2026-08-20 Thu] -> <2026-08-22 Sat 18:00>`',
+                '`SCHEDULED: <2026-08-06 Thu 15:00 +1w>`'
+            ]),
+            []
+        );
+    });
+
+    test('a bare timestamp written inactive keeps no series', () => {
+        const found = validateMovedLines([
+            '# TODO Write the report',
+            '`[2026-08-06 Thu 15:00 +1w]`',
+            '`MOVED: [2026-08-20 Thu] -> <2026-08-22 Sat 18:00>`'
+        ]);
+        assert.equal(found.length, 1);
+        assert.equal(found[0]?.kind, 'entry-does-not-repeat');
+    });
+
     test('a DEADLINE that repeats is a series like any other', () => {
         assert.deepEqual(
             validateMovedLines([

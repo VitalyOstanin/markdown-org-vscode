@@ -258,7 +258,7 @@ hours. What the line may not carry is warned about with the reason:
 | 6   | A warning cookie on either half               | How far ahead a deadline warns belongs to the series.                |
 | 7   | The target written `[...]`, bare, or unpaired | Where an occurrence is held is active.                               |
 | 8   | A day this entry already moves                | The first move stands; the second line is read as prose.             |
-| 9   | The entry's planning line has no repeater     | An entry that does not repeat has no occurrence to move.             |
+| 9   | The entry keeps no repeating series           | An entry that does not repeat has no occurrence to move.             |
 | 10  | A half that is not a date at all              | The line is read as prose.                                           |
 
 Every fault the editor can name a correction for carries a Quick Fix
@@ -268,6 +268,12 @@ and an entry that does not repeat carry none: what was meant is not
 there to guess. One fix takes out one fault, so a line with two says
 the second once the first is gone, and the fault of the entry stands
 beside the fault of the line rather than hiding it.
+
+A series is kept on a `SCHEDULED`, a `DEADLINE`, or a bare active
+timestamp -- whichever of them carries the repeater, wherever in the
+entry it stands, above the move or below it. That is the same reading
+the move command itself uses, so a line the command wrote is never
+warned about as standing in an entry without a series.
 
 To flip a bare inline timestamp between `<...>` and `[...]`, run
 `Markdown Org: Toggle Timestamp Active/Inactive` from the Command

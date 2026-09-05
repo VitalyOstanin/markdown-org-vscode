@@ -26,10 +26,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   refuse are warned about as well, because the editor cannot work with them:
   an occurrence written as a bare date, which no date key can step, and a move
   standing in an entry whose planning line carries no repeater, which has one
-  date and no occurrences for the line to name. The bare form converts in one
-  keystroke; the entry that does not repeat carries no fix, since a repeater
-  on the entry and an edit of the date itself are both answers and the line
-  does not say which was meant.
+  date and no occurrences for the line to name. The series is looked for the
+  way the move command itself looks for it: on a `SCHEDULED`, a `DEADLINE`, or
+  a bare active timestamp, anywhere in the entry rather than only above the
+  move. The bare form converts in one keystroke; the entry that does not repeat
+  carries no fix, since a repeater on the entry and an edit of the date itself
+  are both answers and the line does not say which was meant.
 - A written `MOVED` line names the weekday on both halves, always. A day
   written as digits alone says nothing about a step that landed on the wrong
   day, and the weekday beside the date is what makes one visible. The spelling
