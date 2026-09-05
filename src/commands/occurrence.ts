@@ -37,6 +37,7 @@ import {
     moveOccurrence,
     planningLineOf,
     replacedRange,
+    replacementOf,
     seriesWeekday,
     type SeriesOccurrence
 } from '../utils/occurrenceEdit';
@@ -244,11 +245,15 @@ export async function moveOccurrenceCommand(day?: string): Promise<void> {
             const planning = planningLineOf(entry.lines, entry.headingLine, title);
             const listed = listOccurrences(entry.lines, entry.headingLine, title, occurrence, 1)[0];
             const line = entry.lines[planning] ?? '';
+            // An occurrence moved once opens on where it went rather than on
+            // the day the series draws it: moving it again is answered from
+            // what the notes now say, and the reader walks on from there.
+            const moved = replacementOf(entry.lines, entry.headingLine, occurrence);
             const draft = occurrenceDraftLine(
                 line.slice(0, line.length - line.trimStart().length),
                 toIsoDate(occurrence),
-                occurrence,
-                listed?.time ?? null,
+                moved ? fromIsoDate(moved.day) : occurrence,
+                (moved ? moved.time : listed?.time) ?? null,
                 seriesWeekday(entry.lines, entry.headingLine, title)
             );
             const written = await applyEditOrReport(
@@ -302,6 +307,11 @@ export async function confirmOccurrenceMoveCommand(): Promise<void> {
                 draft.time,
                 randomUUID()
             );
+            if (!edit.changed) {
+                // The draft still goes: it says what the notes already say,
+                // and left standing it would be confirmed again tomorrow.
+                notifyStatus(`${draft.from} already falls on ${draft.to}`);
+            }
             await write(editor, lines, edit.lines, 'the moved occurrence');
         } catch (error) {
             report(error);

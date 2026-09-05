@@ -30,7 +30,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and the planning line is rewritten token by token — its keyword, its
   indentation and the language of its weekday are the file's, and only the
   repeater goes, because one occurrence does not repeat. A series with no
-  identifier is given one. An entry that does not repeat, or one that repeats on
+  identifier is given one. An occurrence that was moved once is moved again in
+  place: the draft opens on the day it now stands on rather than on the day the
+  series draws it, and confirming rewrites the entry already standing in for that
+  occurrence instead of writing a second one -- two entries naming the same
+  `RECURRENCE_ID` are a file with no answer for which of them holds.
+  An entry that does not repeat, or one that repeats on
   two dates at once, is refused rather than guessed at.
   Reached from the agenda as well: the ↻ of a row that repeats opens the entry
   and offers the two, about the day the row was drawn on rather than about the

@@ -158,6 +158,30 @@ function plans(hit: TimestampLineMatch): boolean {
 }
 
 /**
+ * Every planning line of the entry at `headingLine`, in the order they stand.
+ *
+ * A line the format does not name is passed over instead of ending the walk:
+ * a keyword typed without its colon is a line like that, and stopping there
+ * hid a `SCHEDULED` that was in plain sight two lines down.
+ */
+function planningLines(lines: readonly string[], headingLine: number): RepeatingLine[] {
+    const found: RepeatingLine[] = [];
+    for (let i = headingLine + 1; i < lines.length; i++) {
+        const text = lines[i] ?? '';
+        if (headingLevel(text) !== null) {
+            break;
+        }
+        const hit = matchTimestampLine(text);
+        if (!hit || !plans(hit)) {
+            continue;
+        }
+        const start = text.indexOf(hit.timestamp);
+        found.push({ line: i, span: { start, end: start + hit.timestamp.length } });
+    }
+    return found;
+}
+
+/**
  * The one planning line of the entry that repeats.
  *
  * An entry that does not repeat has no occurrences to make an exception to:
@@ -178,24 +202,12 @@ function plans(hit: TimestampLineMatch): boolean {
  * and a wrong guess writes a wrong date into the user's notes.
  */
 export function findRepeatingLine(lines: readonly string[], headingLine: number, heading: string): RepeatingLine {
-    const repeating: RepeatingLine[] = [];
-    let planning = 0;
-    for (let i = headingLine + 1; i < lines.length; i++) {
-        const text = lines[i] ?? '';
-        if (headingLevel(text) !== null) {
-            break;
-        }
-        const hit = matchTimestampLine(text);
-        if (!hit || !plans(hit)) {
-            continue;
-        }
-        planning += 1;
-        const start = text.indexOf(hit.timestamp);
-        const span = { start, end: start + hit.timestamp.length };
-        if (fields(text, span).some((field) => isRepeater(text.slice(field.start, field.end)))) {
-            repeating.push({ line: i, span });
-        }
-    }
+    const planning = planningLines(lines, headingLine);
+    const repeating = planning.filter((found) =>
+        fields(lines[found.line] ?? '', found.span).some((field) =>
+            isRepeater((lines[found.line] ?? '').slice(field.start, field.end))
+        )
+    );
 
     const first = repeating[0];
     if (!first) {
@@ -204,7 +216,7 @@ export function findRepeatingLine(lines: readonly string[], headingLine: number,
         // or whose date was never written, and saying it does not repeat
         // sends the reader looking for a repeater that is already there.
         throw new OccurrenceError(
-            planning === 0
+            planning.length === 0
                 ? `${heading} carries no planning line the format names, so it has no occurrences; a planning line is written \`SCHEDULED: <YYYY-MM-DD>\``
                 : `${heading} does not repeat, and an entry that does not repeat has no occurrences`
         );
@@ -376,19 +388,63 @@ export function cancelOccurrence(
     return { lines: setProperty(lines, headingLine, EXDATE_KEY, dates.join(', ')), changed: true };
 }
 
-/** Whether the file already holds an entry replacing `date` of `series`. */
-function alreadyReplaced(lines: readonly string[], series: string, date: string): boolean {
+/** The entry of the file that already stands in for one occurrence of a series. */
+export interface StandingReplacement {
+    /** Which line the replacing entry's heading is on. */
+    headingLine: number;
+    /** The day it now falls on, as `YYYY-MM-DD`. */
+    day: string;
+    /** The hour it is held at, as its timestamp writes it, or `null`. */
+    time: string | null;
+}
+
+/**
+ * The entry replacing `date` of `series`, or `null` where none does.
+ *
+ * The whole file is walked rather than the lines under the series: a
+ * replacement is written at the end of the file, and one made months ago is
+ * separated from the series it belongs to by everything written since.
+ */
+function findReplacement(lines: readonly string[], series: string, date: string): StandingReplacement | null {
+    if (series === '') {
+        return null;
+    }
     for (let i = 0; i < lines.length; i++) {
         if (headingLevel(lines[i] ?? '') === null) {
             continue;
         }
         const named = findProperty(lines, i, SERIES_ID_KEY)?.value === series;
         const replaced = findProperty(lines, i, RECURRENCE_ID_KEY)?.value.split(/\s+/)[0];
-        if (named && replaced === date) {
-            return true;
+        if (!named || replaced !== date) {
+            continue;
         }
+        const planning = planningLines(lines, i)[0];
+        const line = planning ? (lines[planning.line] ?? '') : '';
+        const written = planning ? fields(line, planning.span)[0] : undefined;
+
+        return {
+            headingLine: i,
+            day: written ? line.slice(written.start, written.end) : date,
+            time: planning ? writtenTime(line, planning.span) : null
+        };
     }
-    return false;
+    return null;
+}
+
+/**
+ * Where the occurrence of `occurrence` now stands, for a caller about to
+ * offer to move it again.
+ *
+ * An occurrence moved once is moved from where it went, not from where the
+ * series draws it: the day the reader is answering about is the one already
+ * written into the notes.
+ */
+export function replacementOf(
+    lines: readonly string[],
+    headingLine: number,
+    occurrence: Date
+): StandingReplacement | null {
+    return findReplacement(lines, findProperty(lines, headingLine, ID_KEY)?.value ?? '', toIsoDate(occurrence));
 }
 
 /**
@@ -400,6 +456,10 @@ function alreadyReplaced(lines: readonly string[], series: string, date: string)
  * the series is and carrying the pair that says which occurrence it stands in
  * for. The occurrence it replaces is then not drawn from the series, so
  * nothing has to be excluded as well.
+ *
+ * An occurrence that was moved once is moved again by rewriting the entry
+ * already standing in for it rather than by writing a second one: two entries
+ * naming the same `RECURRENCE_ID` are a file no reader of it could resolve.
  *
  * `time` is `HH:MM` and `null` keeps whatever time the series carries -- an
  * occurrence moved to another day is usually held at the same hour.
@@ -422,10 +482,14 @@ export function moveOccurrence(
     const identifier = known !== undefined && known !== '' ? known : seriesId;
 
     const replaced = toIsoDate(occurrence);
-    if (alreadyReplaced(lines, identifier, replaced)) {
-        throw new OccurrenceError(
-            `${replaced} of ${headingTitle(headingText)} is already replaced by an entry of this file, which is the one to edit`
-        );
+    const standing = findReplacement(lines, identifier, replaced);
+    if (standing) {
+        // Moved a second time -- rescheduled again, or moved back a day --
+        // the replacement already written is the entry the notes carry for
+        // this occurrence, so it is rewritten rather than joined by a second
+        // one. `RECURRENCE_ID` stays as it is: which occurrence is being
+        // stood in for did not change, only where it now falls.
+        return rewriteReplacement(lines, standing, to, time);
     }
 
     const planning = lines[repeating.line] ?? '';
@@ -452,6 +516,36 @@ export function moveOccurrence(
         `${RECURRENCE_ID_KEY}: ${recurrence}`,
         '```'
     );
+
+    return { lines: result, changed: true };
+}
+
+/**
+ * Move a replacement that is already written to another date or time.
+ *
+ * Only its timestamp is touched: the heading, the properties and the place in
+ * the file are the ones the replacement was written with, and rewriting them
+ * would move an entry the reader may since have added notes under.
+ */
+function rewriteReplacement(
+    lines: readonly string[],
+    standing: StandingReplacement,
+    to: Date,
+    time: string | null
+): OccurrenceEdit {
+    const planning = planningLines(lines, standing.headingLine)[0];
+    if (!planning) {
+        throw new OccurrenceError(
+            `the entry standing in for ${standing.day} carries no planning line, so there is nothing to move`
+        );
+    }
+    const line = lines[planning.line] ?? '';
+    const rewritten = replacementLine(line, planning.span, to, time);
+    if (rewritten === line) {
+        return { lines: [...lines], changed: false };
+    }
+    const result = [...lines];
+    result[planning.line] = rewritten;
 
     return { lines: result, changed: true };
 }
@@ -580,7 +674,7 @@ export function listOccurrences(
                 day: falls,
                 time,
                 cancelled: excluded.has(falls),
-                moved: series !== '' && alreadyReplaced(lines, series, falls)
+                moved: findReplacement(lines, series, falls) !== null
             });
         }
         date = step(date, repeater);

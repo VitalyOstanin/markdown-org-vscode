@@ -167,6 +167,39 @@ suite('One occurrence of a series', () => {
         assert.ok(!text.includes('EXDATE'), 'a replacement needs no EXDATE beside it');
     });
 
+    test('a day already moved is drafted where it now stands, and moved again in place', async () => {
+        const doc = await open(SERIES);
+
+        pickDay(0);
+        await vscode.commands.executeCommand('markdown-org.moveOccurrence', '2026-08-20');
+        await walkTheDraftTo(doc, '2026-08-22');
+        await vscode.commands.executeCommand('markdown-org.confirmOccurrenceMove');
+
+        quickPick?.restore();
+        quickPick = null;
+        pickDay(0);
+        await vscode.commands.executeCommand('markdown-org.moveOccurrence', '2026-08-20');
+
+        const drafted = doc
+            .getText()
+            .split('\n')
+            .find((line) => line.includes('`MOVE '));
+        assert.strictEqual(drafted, '`MOVE 2026-08-20 -> <2026-08-22 Sat 15:00>`', 'the draft opens on the new day');
+
+        await walkTheDraftTo(doc, '2026-08-25');
+        await vscode.commands.executeCommand('markdown-org.confirmOccurrenceMove');
+
+        const text = doc.getText();
+        assert.ok(!text.includes('`MOVE '), 'the draft is gone');
+        assert.match(text, /\n# TODO English\n`SCHEDULED: <2026-08-25 Tue 15:00>`\n/);
+        assert.strictEqual(
+            text.match(/RECURRENCE_ID: 2026-08-20 15:00/g)?.length,
+            1,
+            'the occurrence is stood in for once'
+        );
+        assert.ok(!text.includes('2026-08-22'), 'nothing is left of where it stood before');
+    });
+
     test('discarding the draft leaves the series as it was', async () => {
         const doc = await open(SERIES);
 

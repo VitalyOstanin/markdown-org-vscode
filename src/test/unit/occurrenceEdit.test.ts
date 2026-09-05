@@ -5,6 +5,7 @@ import {
     cancelOccurrence,
     listOccurrences,
     moveOccurrence,
+    replacementOf,
     seriesWeekday
 } from '../../utils/occurrenceEdit';
 
@@ -105,13 +106,74 @@ suite('an occurrence that moved', () => {
         assert.ok(edit.lines.includes('SERIES_ID: 5b17'), 'the replacement names it');
     });
 
-    test('is refused where an entry of the file already replaces that day', () => {
-        const edit = moveOccurrence(SERIES, 0, on('2026-08-20'), on('2026-08-22'), null, 'unused');
+    test('moved a second time, rewrites the replacement rather than writing another', () => {
+        const once = moveOccurrence(SERIES, 0, on('2026-08-20'), on('2026-08-22'), null, 'unused');
 
-        assert.throws(
-            () => moveOccurrence(edit.lines, 0, on('2026-08-20'), on('2026-08-25'), null, 'unused'),
-            OccurrenceError
+        const twice = moveOccurrence(once.lines, 0, on('2026-08-20'), on('2026-08-25'), null, 'unused');
+
+        assert.strictEqual(twice.changed, true);
+        assert.deepStrictEqual(twice.lines.slice(-6), [
+            '# TODO English',
+            '    `SCHEDULED: <2026-08-25 Tue 15:00>`',
+            '```org-properties',
+            'SERIES_ID: 9f2c',
+            'RECURRENCE_ID: 2026-08-20 15:00',
+            '```'
+        ]);
+        assert.strictEqual(
+            twice.lines.filter((line) => line === 'RECURRENCE_ID: 2026-08-20 15:00').length,
+            1,
+            'the day is stood in for once'
         );
+        assert.strictEqual(twice.lines.length, once.lines.length, 'no second entry is written');
+    });
+
+    test('moved a second time, takes the hour asked for and keeps the one it had otherwise', () => {
+        const once = moveOccurrence(SERIES, 0, on('2026-08-20'), on('2026-08-22'), '18:00', 'unused');
+
+        const hour = moveOccurrence(once.lines, 0, on('2026-08-20'), on('2026-08-25'), '09:30', 'unused');
+        const kept = moveOccurrence(once.lines, 0, on('2026-08-20'), on('2026-08-25'), null, 'unused');
+
+        assert.ok(hour.lines.includes('    `SCHEDULED: <2026-08-25 Tue 09:30>`'));
+        assert.ok(kept.lines.includes('    `SCHEDULED: <2026-08-25 Tue 18:00>`'));
+    });
+
+    test('moved back to where it already stands, changes nothing', () => {
+        const once = moveOccurrence(SERIES, 0, on('2026-08-20'), on('2026-08-22'), '18:00', 'unused');
+
+        const again = moveOccurrence(once.lines, 0, on('2026-08-20'), on('2026-08-22'), '18:00', 'unused');
+
+        assert.strictEqual(again.changed, false);
+        assert.deepStrictEqual(again.lines, once.lines);
+    });
+
+    test('finds the replacement wherever in the file it stands', () => {
+        const once = moveOccurrence(SERIES, 0, on('2026-08-20'), on('2026-08-22'), null, 'unused');
+        const far = [...once.lines.slice(0, 6), '# Another entry', 'A note under it.', '', ...once.lines.slice(6)];
+
+        const twice = moveOccurrence(far, 0, on('2026-08-20'), on('2026-08-25'), null, 'unused');
+
+        assert.ok(twice.lines.includes('    `SCHEDULED: <2026-08-25 Tue 15:00>`'));
+        assert.strictEqual(twice.lines.length, far.length, 'no second entry is written');
+    });
+
+    test('moved a second time from another series, leaves that series alone', () => {
+        const theirs = [
+            '# TODO Spanish',
+            '`SCHEDULED: <2026-08-06 Thu 12:00 +1w>`',
+            '```org-properties',
+            'ID: 4a11',
+            '```',
+            ''
+        ];
+        const mine = moveOccurrence(SERIES, 0, on('2026-08-20'), on('2026-08-22'), null, 'unused');
+        const both = [...theirs, ...mine.lines];
+
+        const edit = moveOccurrence(both, theirs.length, on('2026-08-20'), on('2026-08-25'), null, 'unused');
+
+        assert.ok(edit.lines.includes('    `SCHEDULED: <2026-08-25 Tue 15:00>`'), 'the English one moved');
+        assert.ok(edit.lines.includes('`SCHEDULED: <2026-08-06 Thu 12:00 +1w>`'), 'the Spanish series is untouched');
+        assert.strictEqual(edit.lines.filter((line) => line.startsWith('SERIES_ID')).length, 1);
     });
 
     test('is refused where two planning lines repeat at once', () => {
@@ -404,5 +466,34 @@ suite('the days a series falls on', () => {
             listOccurrences(bare, 0, 'English', on('2026-08-06'), 2).map((day) => day.day),
             ['2026-08-06', '2026-08-13']
         );
+    });
+});
+
+suite('where an occurrence already stands', () => {
+    test('is nothing for a day the series still draws itself', () => {
+        assert.strictEqual(replacementOf(SERIES, 0, on('2026-08-20')), null);
+    });
+
+    test('is the day and hour the replacement was written with', () => {
+        const edit = moveOccurrence(SERIES, 0, on('2026-08-20'), on('2026-08-22'), '18:00', 'unused');
+
+        const standing = replacementOf(edit.lines, 0, on('2026-08-20'));
+
+        assert.ok(standing, 'the replacement was not found');
+        assert.strictEqual(standing.day, '2026-08-22');
+        assert.strictEqual(standing.time, '18:00');
+    });
+
+    test('is nothing for a series that carries no identifier', () => {
+        const nameless = ['# TODO English', '`SCHEDULED: <2026-08-06 Thu 15:00 +1w>`', ''];
+
+        assert.strictEqual(replacementOf(nameless, 0, on('2026-08-20')), null);
+    });
+
+    test('is nothing for a replacement of another series', () => {
+        const edit = moveOccurrence(SERIES, 0, on('2026-08-20'), on('2026-08-22'), null, 'unused');
+        const theirs = edit.lines.map((line) => (line === 'SERIES_ID: 9f2c' ? 'SERIES_ID: 4a11' : line));
+
+        assert.strictEqual(replacementOf(theirs, 0, on('2026-08-20')), null);
     });
 });
