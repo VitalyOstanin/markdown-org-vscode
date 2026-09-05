@@ -15,7 +15,9 @@
  * `parse-phrase` (0.20.0), which one older has no subcommand for at all.
  * Changing an entry by phrase reads two keys that subcommand only prints from
  * 0.21.0 (`keyword` and `cleared`), and a binary between the two answers such
- * a phrase with a field the entry does not change.
+ * a phrase with a field the entry does not change. A move written as a line of
+ * the series (`MOVED:`) is reported from 0.22.0, and an older binary passes the
+ * line over as prose.
  *
  * Pure and vscode-free so it can be unit-tested; the wiring lives in
  * `extractor.ts`.
@@ -66,7 +68,10 @@ export function extractorVersionWarning(actual: string | undefined, required: st
         'subcommand that does not exist before 0.20.0 (parse-phrase) and reports its ' +
         'refusal every time; Edit Task from Phrase reads the keyword and the emptied ' +
         'fields that subcommand prints from 0.21.0, and an older one leaves both out, ' +
-        'so a phrase that empties a field changes nothing. Clear the setting to use ' +
-        'the bundled binary.'
+        'so a phrase that empties a field changes nothing. A move written as a line of ' +
+        'the series (MOVED:) reaches the agenda from 0.22.0; an older binary reads the ' +
+        'line as prose, so the occurrence is still drawn on the day it was moved away ' +
+        'from and a Google Calendar export sends the series over it. Clear the setting ' +
+        'to use the bundled binary.'
     );
 }

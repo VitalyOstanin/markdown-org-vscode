@@ -691,7 +691,7 @@
     "brace-expansion": "^5.0.8"
   },
   "x-markdown-org": {
-    "extractorVersion": "0.21.0",
+    "extractorVersion": "0.22.0",
     "extractorSha256": {
       "x86_64-unknown-linux-gnu": "84d3fa59b393bad8cccd88db89268c342730a4d36d13eaec5658c6d2d234b2fc",
       "x86_64-apple-darwin": "ba4480b352e31fa8d94fb4db98a1fda6cda9763dfd315674d01cbfd45fc3030d",

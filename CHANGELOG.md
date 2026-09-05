@@ -37,7 +37,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   it stands. An entry that does not repeat, or one that repeats on two dates at
   once, is refused rather than guessed at. A move is exported to Google Calendar
   the way it was before: the day it left leaves the series as an EXDATE, and the
-  occurrence goes as an event of its own on the day it went to.
+  occurrence goes as an event of its own on the day it went to. Reading the line
+  back requires the extractor 0.22.0 or newer, which is the version bundled.
   Reached from the agenda as well: the ↻ of a row that repeats opens the entry
   and offers the two, about the day the row was drawn on rather than about the
   day the series is planned for. Everywhere else the row still opens the file,
