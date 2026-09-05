@@ -137,7 +137,7 @@ suite('One occurrence of a series', () => {
             [
                 '# TODO English',
                 '`SCHEDULED: <2026-08-06 Thu 15:00 +1w>`',
-                '`MOVED: 2026-08-20 -> <2026-08-20 Thu 15:00>`',
+                '`MOVED: [2026-08-20 Thu] -> <2026-08-20 Thu 15:00>`',
                 ''
             ].join('\n')
         );
@@ -148,6 +148,25 @@ suite('One occurrence of a series', () => {
             '2026-08-20',
             'the caret is on the day it moves to'
         );
+    });
+
+    test('the occurrence it names is walked with the date keys, like the day it moves to', async () => {
+        // ADR-0039 wrote the address as an inactive timestamp for exactly
+        // this: correcting which occurrence moved is a keystroke rather than
+        // an edit of text, and the weekday follows the day it names.
+        const doc = await open(SERIES);
+
+        pickDay(0);
+        await vscode.commands.executeCommand('markdown-org.moveOccurrence', '2026-08-20');
+
+        const editor = vscode.window.activeTextEditor;
+        assert.ok(editor, 'no editor');
+        const line = doc.lineAt(2).text;
+        const day = line.indexOf('[2026-08-20') + '[2026-08-'.length;
+        editor.selection = new vscode.Selection(2, day, 2, day);
+        await vscode.commands.executeCommand('markdown-org.timestampUp');
+
+        assert.ok(doc.lineAt(2).text.includes('`MOVED: [2026-08-21 Fri]'), `the line was: ${doc.lineAt(2).text}`);
     });
 
     test('the series goes on repeating, and no replacement entry is written', async () => {
@@ -180,7 +199,7 @@ suite('One occurrence of a series', () => {
         const text = doc.getText();
         assert.strictEqual(text.match(/`MOVED: [^`]*`/g)?.length, 1, 'the occurrence is moved by one line, not by two');
         assert.ok(
-            text.includes('`MOVED: 2026-08-20 -> <2026-08-22 Sat 15:00>`'),
+            text.includes('`MOVED: [2026-08-20 Thu] -> <2026-08-22 Sat 15:00>`'),
             `the line was: ${text.split('\n')[2] ?? ''}`
         );
     });
@@ -201,8 +220,8 @@ suite('One occurrence of a series', () => {
             [
                 '# TODO English',
                 '`SCHEDULED: <2026-08-06 Thu 15:00 +1w>`',
-                '`MOVED: 2026-08-20 -> <2026-08-20 Thu 15:00>`',
-                '`MOVED: 2026-08-27 -> <2026-08-27 Thu 15:00>`',
+                '`MOVED: [2026-08-20 Thu] -> <2026-08-20 Thu 15:00>`',
+                '`MOVED: [2026-08-27 Thu] -> <2026-08-27 Thu 15:00>`',
                 ''
             ].join('\n')
         );
@@ -263,7 +282,7 @@ suite('One occurrence, whatever the entry looks like', () => {
     test('a series planned with SCHEDULED', async () => {
         const doc = await moveFirstOf(['# TODO English', '`SCHEDULED: <2026-08-06 Thu 15:00 +1w>`', ''].join('\n'));
 
-        assert.match(doc.getText(), /\n`MOVED: 2026-08-20 -> <2026-08-20 Thu 15:00>`\n/);
+        assert.match(doc.getText(), /\n`MOVED: \[2026-08-20 Thu\] -> <2026-08-20 Thu 15:00>`\n/);
     });
 
     test('a series that names no keyword at all', async () => {
@@ -271,14 +290,18 @@ suite('One occurrence, whatever the entry looks like', () => {
 
         // The keyword belongs to the series' own line; the move carries its
         // own and says nothing about how the series is planned.
-        assert.match(doc.getText(), /\n`MOVED: 2026-08-20 -> <2026-08-20 Thu 15:00>`\n/);
+        assert.match(doc.getText(), /\n`MOVED: \[2026-08-20 Thu\] -> <2026-08-20 Thu 15:00>`\n/);
         assert.ok(!doc.getText().includes('SCHEDULED'), 'no keyword was invented');
     });
 
     test('a series kept on a DEADLINE', async () => {
         const doc = await moveFirstOf(['# TODO Report', '`DEADLINE: <2026-08-06 Thu +1w>`', ''].join('\n'));
 
-        assert.match(doc.getText(), /\n`MOVED: 2026-08-20 -> <2026-08-20 Thu>`\n/, 'a series with no hour names none');
+        assert.match(
+            doc.getText(),
+            /\n`MOVED: \[2026-08-20 Thu\] -> <2026-08-20 Thu>`\n/,
+            'a series with no hour names none'
+        );
     });
 
     test('a series under a creation stamp and above a property block', async () => {
@@ -300,7 +323,7 @@ suite('One occurrence, whatever the entry looks like', () => {
         // dates of an entry stand.
         assert.match(
             text,
-            /`SCHEDULED: <2025-12-08 Mon 15:00 \+1w>`\n`MOVED: 2026-08-20 -> <2026-08-20 Thu 15:00>`\n```org-properties\n/
+            /`SCHEDULED: <2025-12-08 Mon 15:00 \+1w>`\n`MOVED: \[2026-08-20 Thu\] -> <2026-08-20 Thu 15:00>`\n```org-properties\n/
         );
         assert.ok(!text.includes('SERIES_ID'), 'a line inside the entry points at nothing');
         assert.strictEqual(text.match(/^ID: /gm)?.length, 1, 'the entry keeps its one ID');
@@ -317,7 +340,7 @@ suite('One occurrence, whatever the entry looks like', () => {
         );
 
         const text = doc.getText();
-        assert.match(text, /\n`MOVED: 2026-08-20 -> <2026-08-20 Thu 15:00>`\n/);
+        assert.match(text, /\n`MOVED: \[2026-08-20 Thu\] -> <2026-08-20 Thu 15:00>`\n/);
         assert.ok(text.includes('`SCHEDULED <2025-12-01 Mon 15:00 +1w>`'), 'the line typed by hand is untouched');
     });
 });

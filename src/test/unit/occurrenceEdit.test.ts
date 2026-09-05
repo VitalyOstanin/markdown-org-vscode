@@ -78,7 +78,7 @@ suite('an occurrence that moved', () => {
         assert.deepStrictEqual(edit.lines, [
             '# TODO English',
             '    `SCHEDULED: <2026-08-06 Thu 15:00 +1w>`',
-            '    `MOVED: 2026-08-20 -> <2026-08-22 Sat 18:00>`',
+            '    `MOVED: [2026-08-20 Thu] -> <2026-08-22 Sat 18:00>`',
             '```org-properties',
             'ID: 9f2c',
             '```',
@@ -97,7 +97,7 @@ suite('an occurrence that moved', () => {
     test('keeps the hour of the series when none is asked for', () => {
         const edit = moveOccurrence(SERIES, 0, on('2026-08-20'), on('2026-08-22'), null);
 
-        assert.ok(edit.lines.includes('    `MOVED: 2026-08-20 -> <2026-08-22 Sat 15:00>`'));
+        assert.ok(edit.lines.includes('    `MOVED: [2026-08-20 Thu] -> <2026-08-22 Sat 15:00>`'));
     });
 
     test('needs no identifier on the series, and gives it none', () => {
@@ -107,7 +107,7 @@ suite('an occurrence that moved', () => {
 
         const edit = moveOccurrence(nameless, 0, on('2026-08-20'), on('2026-08-22'), null);
 
-        assert.ok(edit.lines.includes('    `MOVED: 2026-08-20 -> <2026-08-22 Sat 15:00>`'));
+        assert.ok(edit.lines.includes('    `MOVED: [2026-08-20 Thu] -> <2026-08-22 Sat 15:00>`'));
         assert.ok(!edit.lines.some((line) => line.startsWith('ID:')), 'no identifier is invented');
     });
 
@@ -117,9 +117,9 @@ suite('an occurrence that moved', () => {
         const twice = moveOccurrence(once.lines, 0, on('2026-08-20'), on('2026-08-25'), null);
 
         assert.strictEqual(twice.changed, true);
-        assert.ok(twice.lines.includes('    `MOVED: 2026-08-20 -> <2026-08-25 Tue 15:00>`'));
+        assert.ok(twice.lines.includes('    `MOVED: [2026-08-20 Thu] -> <2026-08-25 Tue 15:00>`'));
         assert.strictEqual(
-            twice.lines.filter((line) => line.includes('MOVED: 2026-08-20')).length,
+            twice.lines.filter((line) => line.includes('MOVED: [2026-08-20')).length,
             1,
             'the occurrence is moved by one line'
         );
@@ -132,9 +132,9 @@ suite('an occurrence that moved', () => {
         const hour = moveOccurrence(once.lines, 0, on('2026-08-20'), on('2026-08-25'), '09:30');
         const kept = moveOccurrence(once.lines, 0, on('2026-08-20'), on('2026-08-25'), null);
 
-        assert.ok(hour.lines.includes('    `MOVED: 2026-08-20 -> <2026-08-25 Tue 09:30>`'));
+        assert.ok(hour.lines.includes('    `MOVED: [2026-08-20 Thu] -> <2026-08-25 Tue 09:30>`'));
         assert.ok(
-            kept.lines.includes('    `MOVED: 2026-08-20 -> <2026-08-25 Tue 15:00>`'),
+            kept.lines.includes('    `MOVED: [2026-08-20 Thu] -> <2026-08-25 Tue 15:00>`'),
             'with no hour asked for, the hour of the series stands'
         );
     });
@@ -155,8 +155,8 @@ suite('an occurrence that moved', () => {
 
         assert.deepStrictEqual(twice.lines.slice(1, 4), [
             '    `SCHEDULED: <2026-08-06 Thu 15:00 +1w>`',
-            '    `MOVED: 2026-08-20 -> <2026-08-22 Sat 15:00>`',
-            '    `MOVED: 2026-08-27 -> <2026-08-29 Sat 15:00>`'
+            '    `MOVED: [2026-08-20 Thu] -> <2026-08-22 Sat 15:00>`',
+            '    `MOVED: [2026-08-27 Thu] -> <2026-08-29 Sat 15:00>`'
         ]);
     });
 
@@ -166,7 +166,7 @@ suite('an occurrence that moved', () => {
 
         const edit = moveOccurrence(russian, 0, on('2026-08-06'), on('2026-08-08'), null);
 
-        assert.ok(edit.lines.includes('`MOVED: 2026-08-06 -> <2026-08-08 сб 15:00>`'));
+        assert.ok(edit.lines.includes('`MOVED: [2026-08-06 чт] -> <2026-08-08 сб 15:00>`'));
     });
 
     test('names no hour where the series has none, and takes one that is asked for', () => {
@@ -174,12 +174,12 @@ suite('an occurrence that moved', () => {
 
         assert.ok(
             moveOccurrence(allDay, 0, on('2026-08-06'), on('2026-08-08'), null).lines.includes(
-                '`MOVED: 2026-08-06 -> <2026-08-08 Sat>`'
+                '`MOVED: [2026-08-06 Thu] -> <2026-08-08 Sat>`'
             )
         );
         assert.ok(
             moveOccurrence(allDay, 0, on('2026-08-06'), on('2026-08-08'), '09:30').lines.includes(
-                '`MOVED: 2026-08-06 -> <2026-08-08 Sat 09:30>`'
+                '`MOVED: [2026-08-06 Thu] -> <2026-08-08 Sat 09:30>`'
             )
         );
     });
@@ -191,14 +191,14 @@ suite('an occurrence that moved', () => {
 
         const edit = moveOccurrence(ranged, 0, on('2026-08-06'), on('2026-08-08'), null);
 
-        assert.ok(edit.lines.includes('`MOVED: 2026-08-06 -> <2026-08-08 Sat 15:00-16:30>`'));
+        assert.ok(edit.lines.includes('`MOVED: [2026-08-06 Thu] -> <2026-08-08 Sat 15:00-16:30>`'));
     });
 
     test('the range is read back, so moving it again does not lose the hour it ends at', () => {
         const ranged = [
             '# TODO English',
             '`SCHEDULED: <2026-08-06 Thu 15:00-16:30 +1w>`',
-            '`MOVED: 2026-08-06 -> <2026-08-08 Sat 15:00-16:30>`',
+            '`MOVED: [2026-08-06 Thu] -> <2026-08-08 Sat 15:00-16:30>`',
             ''
         ];
 
@@ -238,7 +238,7 @@ suite('an occurrence that moved', () => {
         const edit = moveOccurrence(older, 0, on('2026-08-20'), on('2026-08-25'), null);
 
         assert.ok(edit.lines.includes('`SCHEDULED: <2026-08-25 Tue 18:00>`'), 'the older entry moved');
-        assert.ok(!edit.lines.some((line) => line.includes('MOVED: 2026-08-20')), 'and no line was added');
+        assert.ok(!edit.lines.some((line) => line.includes('MOVED: [2026-08-20')), 'and no line was added');
         assert.strictEqual(edit.lines.length, older.length);
     });
 });
@@ -289,7 +289,7 @@ suite('the file the other client writes', () => {
             edit.lines.join('\n'),
             '# TODO English\n' +
                 '`SCHEDULED: <2026-08-06 Thu 15:00 +1w>`\n' +
-                '`MOVED: 2026-08-20 -> <2026-08-20 Thu 18:00>`\n'
+                '`MOVED: [2026-08-20 Thu] -> <2026-08-20 Thu 18:00>`\n'
         );
     });
 
@@ -303,7 +303,7 @@ suite('the file the other client writes', () => {
             edit.lines.join('\n'),
             '### TODO [#A] English\n' +
                 '`SCHEDULED: <2026-08-14 Fri +1w>`\n' +
-                '`MOVED: 2026-08-21 -> <2026-08-28 Fri>`\n'
+                '`MOVED: [2026-08-21 Fri] -> <2026-08-28 Fri>`\n'
         );
     });
 
@@ -313,7 +313,7 @@ suite('the file the other client writes', () => {
 
         const edit = moveOccurrence(workdays, 0, on('2026-08-06'), on('2026-08-07'), null);
 
-        assert.ok(edit.lines.includes('`MOVED: 2026-08-06 -> <2026-08-07 Fri 10:00>`'));
+        assert.ok(edit.lines.includes('`MOVED: [2026-08-06 Thu] -> <2026-08-07 Fri 10:00>`'));
     });
 });
 
@@ -341,7 +341,7 @@ suite('the planning line, in an entry that is not only a planning line', () => {
 
         const edit = moveOccurrence(entry, 0, DAY, on('2026-08-22'), null);
 
-        assert.match(edit.lines.join('\n'), /`MOVED: 2026-08-20 -> <2026-08-22 Sat 15:00>`/);
+        assert.match(edit.lines.join('\n'), /`MOVED: \[2026-08-20 Thu\] -> <2026-08-22 Sat 15:00>`/);
     });
 
     test('is found under a property block', () => {
@@ -356,7 +356,7 @@ suite('the planning line, in an entry that is not only a planning line', () => {
 
         const edit = moveOccurrence(entry, 0, DAY, on('2026-08-22'), null);
 
-        assert.match(edit.lines.join('\n'), /`MOVED: 2026-08-20 -> <2026-08-22 Sat 15:00>`/);
+        assert.match(edit.lines.join('\n'), /`MOVED: \[2026-08-20 Thu\] -> <2026-08-22 Sat 15:00>`/);
     });
 
     test('is found past a keyword written without its colon', () => {
@@ -371,7 +371,7 @@ suite('the planning line, in an entry that is not only a planning line', () => {
 
         const edit = moveOccurrence(entry, 0, DAY, on('2026-08-22'), null);
 
-        assert.match(edit.lines.join('\n'), /`MOVED: 2026-08-20 -> <2026-08-22 Sat 15:00>`/);
+        assert.match(edit.lines.join('\n'), /`MOVED: \[2026-08-20 Thu\] -> <2026-08-22 Sat 15:00>`/);
     });
 
     test('is not looked for past the end of the entry', () => {

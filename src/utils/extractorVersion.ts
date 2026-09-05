@@ -17,7 +17,9 @@
  * 0.21.0 (`keyword` and `cleared`), and a binary between the two answers such
  * a phrase with a field the entry does not change. A move written as a line of
  * the series (`MOVED:`) is reported from 0.22.0, and an older binary passes the
- * line over as prose.
+ * line over as prose; the occurrence it names is written as an inactive
+ * timestamp, which is read from 0.23.0, and 0.22.0 passes such a line over as
+ * prose too.
  *
  * Pure and vscode-free so it can be unit-tested; the wiring lives in
  * `extractor.ts`.
@@ -69,9 +71,10 @@ export function extractorVersionWarning(actual: string | undefined, required: st
         'refusal every time; Edit Task from Phrase reads the keyword and the emptied ' +
         'fields that subcommand prints from 0.21.0, and an older one leaves both out, ' +
         'so a phrase that empties a field changes nothing. A move written as a line of ' +
-        'the series (MOVED:) reaches the agenda from 0.22.0; an older binary reads the ' +
-        'line as prose, so the occurrence is still drawn on the day it was moved away ' +
-        'from and a Google Calendar export sends the series over it. Clear the setting ' +
-        'to use the bundled binary.'
+        'the series (MOVED:) reaches the agenda from 0.22.0, and the form written now -- ' +
+        'the occurrence in brackets -- from 0.23.0; an older binary reads the line as ' +
+        'prose, so the occurrence is still drawn on the day it was moved away from and ' +
+        'a Google Calendar export sends the series over it. Clear the setting to use ' +
+        'the bundled binary.'
     );
 }

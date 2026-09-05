@@ -4,18 +4,19 @@
  * ````text
  * # TODO English
  * `SCHEDULED: <2026-09-08 Mon 15:00 +1w>`
- * `MOVED: 2026-09-08 -> <2026-09-15 Tue 13:00>`
+ * `MOVED: [2026-09-08 Mon] -> <2026-09-15 Tue 13:00>`
  * ````
  *
  * The line stands in the entry the series is written in, which is where the
  * reader looks for it (the extractor's ADR-0038). It is written the way the
- * planning lines around it are -- an inline-code span, at their indentation --
- * and what follows the arrow is an ordinary active timestamp, so Shift+Up and
- * Shift+Down walk it like any other date the editor holds.
+ * planning lines around it are -- an inline-code span, at their indentation.
  *
- * The day being moved stands first and outside the brackets: it names which
- * occurrence the line is about, and, standing bare, it is not a timestamp the
- * arrow keys can walk, so they move only where the occurrence is going.
+ * Both halves are timestamps, so Shift+Up and Shift+Down walk either of them
+ * like any other date the editor holds, and the brackets say which is which
+ * (the extractor's ADR-0039): the occurrence before the arrow is an address,
+ * written inactive, and the day it is held on is active. Written bare, the way
+ * ADR-0038 first had it, the address is still read -- files hold it -- but it
+ * is not what this extension writes.
  */
 import { getWeekdayName } from './incrementTimestamp';
 import { toIsoDate } from './isoDate';
@@ -30,7 +31,10 @@ export interface MovedOccurrence {
     time: string | null;
 }
 
-const MOVED_REGEX = /^(?<indent>\s*)`MOVED: (?<from>\d{4}-\d{2}-\d{2}) -> <(?<to>\d{4}-\d{2}-\d{2})(?<rest>[^>]*)>`$/;
+// The address is read in both forms: the inactive timestamp written since
+// ADR-0039 and the bare date of ADR-0038, which files already hold.
+const MOVED_REGEX =
+    /^(?<indent>\s*)`MOVED: (?:\[(?<held>\d{4}-\d{2}-\d{2})[^\]]*\]|(?<bare>\d{4}-\d{2}-\d{2})) -> <(?<to>\d{4}-\d{2}-\d{2})(?<rest>[^>]*)>`$/;
 
 /** Read a `MOVED` line; `null` for any other line. */
 export function matchMovedLine(text: string): MovedOccurrence | null {
@@ -38,9 +42,9 @@ export function matchMovedLine(text: string): MovedOccurrence | null {
     if (!match?.groups) {
         return null;
     }
-    const { from, to, rest } = match.groups;
+    const { held, bare, to, rest } = match.groups;
     const time = /(?<time>\d{2}:\d{2}(?:-\d{2}:\d{2})?)/.exec(rest ?? '')?.groups?.time ?? null;
-    return { from: from ?? '', to: to ?? '', time };
+    return { from: held ?? bare ?? '', to: to ?? '', time };
 }
 
 /**
@@ -48,12 +52,13 @@ export function matchMovedLine(text: string): MovedOccurrence | null {
  *
  * `weekday` is the weekday as the series' own timestamp spells it, so that a
  * file writing "Пн" is not answered with "Mon"; where the series names no
- * weekday, neither does the line.
+ * weekday, neither half of the line names one.
  */
-export function movedLine(indent: string, from: string, to: Date, time: string | null, weekday: string | null): string {
+export function movedLine(indent: string, from: Date, to: Date, time: string | null, weekday: string | null): string {
+    const address = weekday === null ? toIsoDate(from) : `${toIsoDate(from)} ${spelt(from, weekday)}`;
     const named = weekday === null ? '' : ` ${spelt(to, weekday)}`;
     const held = time === null ? '' : ` ${time}`;
-    return `${indent}\`MOVED: ${from} -> <${toIsoDate(to)}${named}${held}>\``;
+    return `${indent}\`MOVED: [${address}] -> <${toIsoDate(to)}${named}${held}>\``;
 }
 
 /** The weekday of `date`, written the way `sample` is. */

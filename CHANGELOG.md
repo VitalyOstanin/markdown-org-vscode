@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - One occurrence of a series is cancelled or moved without touching the rest of
   it. "Cancel One Occurrence" adds the day to the series' own `EXDATE`, and it
   goes on repeating around the gap; "Move One Occurrence" writes a line of the
-  series itself, `MOVED: 2026-09-08 -> <2026-09-15 Mon 13:00>`, naming the
+  series itself, `MOVED: [2026-09-08 Mon] -> <2026-09-15 Mon 13:00>`, naming the
   occurrence and where it is held instead, so the day it moved from is drawn
   once and at its new hour. The line stands where the series is, which is where
   the reader looks for it: nothing is appended to the end of the file, and no
@@ -22,13 +22,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   already lost -- cancelled, or moved elsewhere -- listed among them and marked.
   Where a move goes is answered in the notes rather than in a box. The line is
   written straight away, at the day and hour the occurrence stands on now, and
-  the date is walked with the same Shift+Up and Shift+Down that walk any other
-  timestamp; there is nothing to confirm, and the editor's own undo takes it
-  back. The day being moved stands outside the brackets, so the arrows move only
-  where it is going. The line is written the way the series is: its indentation
-  and the language of its weekday are the file's, and it carries no repeater and
-  no warning cookie, because one occurrence does not repeat and how far ahead a
-  deadline warns belongs to the series. An occurrence that was moved once is
+  both dates are walked with the same Shift+Up and Shift+Down that walk any
+  other timestamp; there is nothing to confirm, and the editor's own undo takes
+  it back. Both halves are timestamps, and the brackets say which is which: the
+  occurrence is an address, written inactive, and the day it moves to is when
+  the entry is kept, written active (the extractor's ADR-0039). Correcting
+  which occurrence the line is about is therefore a step of the same keys. The
+  line is written the way the series is: its indentation and the language of
+  its weekday are the file's, and it carries no repeater and no warning cookie,
+  because one occurrence does not repeat and how far ahead a deadline warns
+  belongs to the series. An occurrence that was moved once is
   moved again in place -- the line already standing for it is rewritten rather
   than a second one added, since two lines naming the same occurrence are a file
   with no answer for which of the two days it is on. An occurrence moved before
@@ -38,7 +41,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   once, is refused rather than guessed at. A move is exported to Google Calendar
   the way it was before: the day it left leaves the series as an EXDATE, and the
   occurrence goes as an event of its own on the day it went to. Reading the line
-  back requires the extractor 0.22.0 or newer, which is the version bundled.
+  back requires the extractor 0.23.0 or newer, which is the version bundled.
   Reached from the agenda as well: the ↻ of a row that repeats opens the entry
   and offers the two, about the day the row was drawn on rather than about the
   day the series is planned for. Everywhere else the row still opens the file,

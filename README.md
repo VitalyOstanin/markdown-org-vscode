@@ -358,14 +358,14 @@ itself, and the agenda, the editor and the Google Calendar export all read it:
   (the extractor's ADR-0031). The series goes on repeating; the agenda leaves
   out the one day.
 - **`Move One Occurrence`** writes a `MOVED` line of the series
-  (the extractor's ADR-0038): the day before the arrow is the occurrence, the
-  timestamp after it is where the occurrence is held instead. Nothing has to be
-  excluded as well, and the day it moved from is drawn once -- at its new hour.
+  (the extractor's ADR-0038 and ADR-0039): before the arrow is the occurrence,
+  after it is where the occurrence is held instead. Nothing has to be excluded
+  as well, and the day it moved from is drawn once -- at its new hour.
 
 ````markdown
 ## TODO English
 `SCHEDULED: <2026-08-06 Thu 15:00 +1w>`
-`MOVED: 2026-08-20 -> <2026-08-27 Thu 18:00>`
+`MOVED: [2026-08-20 Thu] -> <2026-08-27 Thu 18:00>`
 ```org-properties
 EXDATE: 2026-08-13
 ```
@@ -375,11 +375,15 @@ The move stands where the series is, which is where the reader looks for it: a
 class moved to Wednesday is one line under the class, rather than an entry at
 the end of the file under whatever heading happens to be last. The line is
 written the way the planning lines around it are -- an inline-code span, at
-their indentation, with the weekday spelt as the file spells it. What follows
-the arrow may name a weekday, an hour and a range of hours; it may not carry a
-repeater or a warning cookie, because one occurrence does not repeat and how
-far ahead a deadline warns belongs to the series. The move needs no `ID` on the
-series: a line inside the entry points at nothing.
+their indentation, with the weekday spelt as the file spells it. Both halves
+are timestamps, and the brackets say which is which: the occurrence is an
+address, written inactive, and the day it moves to is when the entry is kept,
+written active. What follows the arrow may name a weekday, an hour and a range
+of hours; it may not carry a repeater or a warning cookie, because one
+occurrence does not repeat and how far ahead a deadline warns belongs to the
+series. What stands before it is a day and only a day: an active timestamp, an
+hour, a repeater or a warning cookie there are refused. The move needs no `ID`
+on the series: a line inside the entry points at nothing.
 
 What a move cannot say is what a separate entry could: one occurrence has no
 state, no body and no clocks of its own, so marking a single occurrence `DONE`
@@ -406,14 +410,14 @@ the caret is left on the day it goes to:
 ```markdown
 ## TODO English
 `SCHEDULED: <2026-08-06 Thu 15:00 +1w>`
-`MOVED: 2026-08-20 -> <2026-08-20 Thu 15:00>`
+`MOVED: [2026-08-20 Thu] -> <2026-08-20 Thu 15:00>`
 ```
 
-The date in the brackets is walked with the same **Shift+Up** and
-**Shift+Down** that walk any other timestamp -- day, hour, minute, whichever
-field the caret is on. There is nothing to confirm: the line is the move, and
-the editor's own undo takes it back. The day being moved stands outside the
-brackets, so the arrows move only where the occurrence is going.
+Both dates are walked with the same **Shift+Up** and **Shift+Down** that walk
+any other timestamp -- day, hour, minute, whichever field the caret is on.
+There is nothing to confirm: the line is the move, and the editor's own undo
+takes it back. Which occurrence the line is about is corrected the same way,
+by stepping the day before the arrow.
 
 Moving the same occurrence again rewrites the line already standing for it
 rather than adding a second one -- two lines naming the same occurrence are a
@@ -1137,7 +1141,8 @@ next run.
   the occurrence). It needs the bundled extractor 0.18.0 or newer, which is
   where the first of those keys come from, 0.19.0 or newer for the forms a
   calendar export writes them in -- an `EXDATE` carrying a time, a
-  `RECURRENCE_ID` written with seconds -- and 0.22.0 for `MOVED`. The
+  `RECURRENCE_ID` written with seconds -- and 0.23.0 for `MOVED` in the form
+  written now. The
   occurrence is pushed as an event of its own, keyed by the series' event id
   and the day it left, rather than patched into the series through the
   calendar's `instances` collection -- which is what the agenda shows as well.

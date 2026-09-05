@@ -489,13 +489,7 @@ export function moveOccurrence(
 
     const planning = lines[repeating.line] ?? '';
     const held = time ?? writtenTime(planning, repeating.span);
-    const written = movedLine(
-        indentation(planning),
-        toIsoDate(occurrence),
-        to,
-        held,
-        seriesWeekday(lines, headingLine, heading)
-    );
+    const written = movedLine(indentation(planning), occurrence, to, held, seriesWeekday(lines, headingLine, heading));
 
     const standing = findMovedLine(lines, headingLine, toIsoDate(occurrence));
     if (standing !== null) {
