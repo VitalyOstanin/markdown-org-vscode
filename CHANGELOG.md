@@ -5,38 +5,39 @@ All notable changes to the "Markdown Org" extension will be documented in this f
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.20.0] - 2026-09-03
 
 ### Added
 
 - One occurrence of a series is cancelled or moved without touching the rest of
   it. "Cancel One Occurrence" adds the day to the series' own `EXDATE`, and it
-  goes on repeating around the gap; "Move One Occurrence" writes a second entry
-  at the end of the same file, spelled the way the series is and naming the
-  occurrence it stands in for, so the day it moved from is drawn once and at its
-  new hour. Neither asks for a date to be typed: the days offered are the ones
-  the series actually falls on, counted from its own date, with the days it has
+  goes on repeating around the gap; "Move One Occurrence" writes a line of the
+  series itself, `MOVED: 2026-09-08 -> <2026-09-15 Mon 13:00>`, naming the
+  occurrence and where it is held instead, so the day it moved from is drawn
+  once and at its new hour. The line stands where the series is, which is where
+  the reader looks for it: nothing is appended to the end of the file, and no
+  heading is copied to a place it does not belong to (the extractor's ADR-0038).
+  Neither command asks for a date to be typed: the days offered are the ones the
+  series actually falls on, counted from its own date, with the days it has
   already lost -- cancelled, or moved elsewhere -- listed among them and marked.
-  Where a move goes is answered in the notes rather than in a box. The command
-  writes a draft line under the series, `MOVE 2026-09-08 -> <2026-09-15 Mon>`,
-  and the date is walked with the same Shift+Up and Shift+Down that walk any
-  other timestamp; Ctrl+Enter turns the draft into the replacement and Escape
-  takes the line back out. The day being moved stands
-  outside the brackets, so the arrows move only where it is going, and a draft
-  is a planning line to nobody: an unfinished one appears on no agenda.
-  This is the shape the extension already reads and exports to Google Calendar
-  (the extractor's ADR-0031), and the shape the Android client writes: the
-  replacement goes at the end of the file, the heading is copied as it stands,
-  and the planning line is rewritten token by token — its keyword, its
-  indentation and the language of its weekday are the file's, and only the
-  repeater goes, because one occurrence does not repeat. A series with no
-  identifier is given one. An occurrence that was moved once is moved again in
-  place: the draft opens on the day it now stands on rather than on the day the
-  series draws it, and confirming rewrites the entry already standing in for that
-  occurrence instead of writing a second one -- two entries naming the same
-  `RECURRENCE_ID` are a file with no answer for which of them holds.
-  An entry that does not repeat, or one that repeats on
-  two dates at once, is refused rather than guessed at.
+  Where a move goes is answered in the notes rather than in a box. The line is
+  written straight away, at the day and hour the occurrence stands on now, and
+  the date is walked with the same Shift+Up and Shift+Down that walk any other
+  timestamp; there is nothing to confirm, and the editor's own undo takes it
+  back. The day being moved stands outside the brackets, so the arrows move only
+  where it is going. The line is written the way the series is: its indentation
+  and the language of its weekday are the file's, and it carries no repeater and
+  no warning cookie, because one occurrence does not repeat and how far ahead a
+  deadline warns belongs to the series. An occurrence that was moved once is
+  moved again in place -- the line already standing for it is rewritten rather
+  than a second one added, since two lines naming the same occurrence are a file
+  with no answer for which of the two days it is on. An occurrence moved before
+  this release, into an entry of its own carrying `SERIES_ID` and
+  `RECURRENCE_ID`, is still read, and moving it again rewrites that entry where
+  it stands. An entry that does not repeat, or one that repeats on two dates at
+  once, is refused rather than guessed at. A move is exported to Google Calendar
+  the way it was before: the day it left leaves the series as an EXDATE, and the
+  occurrence goes as an event of its own on the day it went to.
   Reached from the agenda as well: the ↻ of a row that repeats opens the entry
   and offers the two, about the day the row was drawn on rather than about the
   day the series is planned for. Everywhere else the row still opens the file,
@@ -1789,7 +1790,8 @@ and repeating tasks that move forward when marked DONE instead of closing.
 
 - Requires [markdown-org-extract](https://crates.io/crates/markdown-org-extract) utility
 
-[Unreleased]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.19.0...HEAD
+[Unreleased]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.20.0...HEAD
+[0.20.0]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.16.0...v0.17.0

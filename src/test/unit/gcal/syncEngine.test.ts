@@ -424,4 +424,64 @@ suite('gcal/syncEngine', () => {
         assert.ok(failed, 'a failed change is recorded');
         assert.match(failed.error ?? '', /forbidden calendar/, 'failure reason is preserved');
     });
+
+    test('an occurrence held on another day is pushed as an event of its own', async () => {
+        const r = recorder((c) =>
+            c.method === 'POST' ? { status: 200, body: { id: 'x' } } : { status: 200, body: {} }
+        );
+        const w = recordingWriter();
+        const series = task({
+            properties: { ID: '11111111-1111-1111-1111-111111111111' },
+            timestamp_time: '15:00',
+            timestamp_repeater: '+1w',
+            moved_occurrences: [{ from: '2026-06-08', to: '2026-06-10', time: '13:00' }]
+        });
+
+        const summary = await runSync(baseDeps([series], r.fn, w.writer));
+
+        const inserted = r.calls.filter((c) => c.method === 'POST').map((c) => c.body);
+        assert.equal(inserted.length, 2, 'the series and the occurrence it holds elsewhere');
+        const [wholeSeries, held] = inserted;
+        assert.ok(wholeSeries, 'the series was inserted');
+        assert.ok(held, 'the occurrence was inserted');
+        assert.equal(wholeSeries.id, '11111111111111111111111111111111');
+        assert.equal(held.id, '11111111111111111111111111111111' + '20260608');
+        // The day the occurrence left is out of the rule, and the event that
+        // stands for it is one-shot on the day it went to.
+        assert.deepEqual(wholeSeries.recurrence, ['RRULE:FREQ=WEEKLY', `EXDATE;TZID=${TZ}:20260608T150000`]);
+        assert.deepEqual(held.start, { dateTime: '2026-06-10T13:00:00', timeZone: TZ });
+        assert.equal(summary.created, 2);
+        assert.deepEqual(
+            summary.changes.map((c) => [c.action, c.date]),
+            [
+                ['created', '2026-06-01'],
+                ['created', '2026-06-10']
+            ]
+        );
+    });
+
+    test('a moved occurrence already in the calendar is patched, not written twice', async () => {
+        const held = '11111111111111111111111111111111' + '20260608';
+        const r = recorder((c) =>
+            c.method === 'POST' && (c.body?.id as string) === held
+                ? { status: 409, body: {} }
+                : { status: 200, body: { id: 'x' } }
+        );
+        const w = recordingWriter();
+        const series = task({
+            properties: { ID: '11111111-1111-1111-1111-111111111111' },
+            timestamp_time: '15:00',
+            timestamp_repeater: '+1w',
+            moved_occurrences: [{ from: '2026-06-08', to: '2026-06-10' }]
+        });
+
+        const summary = await runSync(baseDeps([series], r.fn, w.writer));
+
+        assert.ok(
+            r.calls.some((c) => c.method === 'PATCH' && c.url.includes(held)),
+            `the calls were: ${r.calls.map((c) => `${c.method} ${c.url}`).join(', ')}`
+        );
+        assert.equal(summary.updated, 1);
+        assert.equal(summary.created, 1, 'the series itself was still new');
+    });
 });

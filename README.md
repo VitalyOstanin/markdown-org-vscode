@@ -351,38 +351,41 @@ sync is not bound by that grid and maps the same repeater to
 #### One occurrence that differs
 
 A repeater describes an endless series and has nowhere to say that one of its
-occurrences is different. Two commands write that down, in the shape iCalendar
-settled on (the extractor's ADR-0031), and the agenda, the editor and the
-Google Calendar export all read it:
+occurrences is different. Two commands write that down, inside the entry
+itself, and the agenda, the editor and the Google Calendar export all read it:
 
-- **`Cancel One Occurrence`** adds the day to the series' own `EXDATE`. The
-  series goes on repeating; the agenda leaves out the one day.
-- **`Move One Occurrence`** writes a second entry at the end of the same file,
-  carrying `SERIES_ID` and `RECURRENCE_ID`. It replaces the occurrence it names,
-  so nothing has to be excluded as well, and the day it moved from is drawn
-  once -- at its new hour.
+- **`Cancel One Occurrence`** adds the day to the series' own `EXDATE`
+  (the extractor's ADR-0031). The series goes on repeating; the agenda leaves
+  out the one day.
+- **`Move One Occurrence`** writes a `MOVED` line of the series
+  (the extractor's ADR-0038): the day before the arrow is the occurrence, the
+  timestamp after it is where the occurrence is held instead. Nothing has to be
+  excluded as well, and the day it moved from is drawn once -- at its new hour.
 
 ````markdown
 ## TODO English
 `SCHEDULED: <2026-08-06 Thu 15:00 +1w>`
+`MOVED: 2026-08-20 -> <2026-08-27 Thu 18:00>`
 ```org-properties
-ID: 9f2c
 EXDATE: 2026-08-13
-```
-
-## TODO English
-`SCHEDULED: <2026-08-20 Thu 18:00>`
-```org-properties
-SERIES_ID: 9f2c
-RECURRENCE_ID: 2026-08-20 15:00
 ```
 ````
 
-The replacement is the series' own entry rewritten: its heading, its level, its
-priority and the language of its weekday are copied as they stand, and only the
-repeater goes -- one occurrence does not repeat. A warning cookie stays, because
-a deadline moved is still a deadline warned about the same number of days ahead.
-A series with no `ID` is given one on the first move.
+The move stands where the series is, which is where the reader looks for it: a
+class moved to Wednesday is one line under the class, rather than an entry at
+the end of the file under whatever heading happens to be last. The line is
+written the way the planning lines around it are -- an inline-code span, at
+their indentation, with the weekday spelt as the file spells it. What follows
+the arrow may name a weekday, an hour and a range of hours; it may not carry a
+repeater or a warning cookie, because one occurrence does not repeat and how
+far ahead a deadline warns belongs to the series. The move needs no `ID` on the
+series: a line inside the entry points at nothing.
+
+What a move cannot say is what a separate entry could: one occurrence has no
+state, no body and no clocks of its own, so marking a single occurrence `DONE`
+is not expressible. An occurrence moved the older way -- a second entry
+carrying `SERIES_ID` and `RECURRENCE_ID`, which is what iCalendar's shape maps
+onto -- is still read, and moving it again rewrites that entry where it stands.
 
 From the agenda the two are reached through the row's own flag: pressing the ↻
 of a repeating row opens the entry and offers them, about the day the row was
@@ -396,22 +399,25 @@ already lost are listed among them and marked `cancelled` or `already moved`,
 because seeing that is the answer to why the entry is not on the agenda. A day
 further off than the list reaches is typed instead, through the last row of it.
 
-Where a move goes is answered in the notes. The command writes a draft line
-under the series and steps aside:
+Where a move goes is answered in the notes rather than in a box. The line is
+written straight away, at the day and hour the occurrence stands on now, and
+the caret is left on the day it goes to:
 
 ```markdown
 ## TODO English
 `SCHEDULED: <2026-08-06 Thu 15:00 +1w>`
-`MOVE 2026-08-20 -> <2026-08-27 Thu 15:00>`
+`MOVED: 2026-08-20 -> <2026-08-20 Thu 15:00>`
 ```
 
 The date in the brackets is walked with the same **Shift+Up** and
 **Shift+Down** that walk any other timestamp -- day, hour, minute, whichever
-field the caret is on -- and **Ctrl+Enter** turns the draft into the
-replacement. **Escape** takes the line back out and leaves the series as it
-was. The day being moved stands outside the brackets, so the arrows never
-touch it, and the draft is a planning line to nobody: neither the agenda nor
-the export reads it, so an unfinished one shows up nowhere.
+field the caret is on. There is nothing to confirm: the line is the move, and
+the editor's own undo takes it back. The day being moved stands outside the
+brackets, so the arrows move only where the occurrence is going.
+
+Moving the same occurrence again rewrites the line already standing for it
+rather than adding a second one -- two lines naming the same occurrence are a
+file with no answer for which of the two days it is on.
 
 The same two operations are in the Android client, and both write the file the
 same way, so a series edited on either side reads the same on the other.
@@ -637,12 +643,10 @@ left to the editor's own commands.
 
 ### Series Commands
 
-| Command                                  | Hotkey       | Description                                                          |
-| ---------------------------------------- | ------------ | -------------------------------------------------------------------- |
-| `Markdown Org: Move One Occurrence`      | --           | Draft a move of one occurrence of the repeating entry                |
-| `Markdown Org: Confirm the Drafted Move` | `Ctrl+Enter` | Write the replacement the draft under the cursor describes           |
-| `Markdown Org: Discard the Drafted Move` | `Escape`     | Take the draft line back out, leaving the series as it was           |
-| `Markdown Org: Cancel One Occurrence`    | --           | Take one occurrence out of the repeating entry, leaving it repeating |
+| Command                               | Hotkey | Description                                                          |
+| ------------------------------------- | ------ | -------------------------------------------------------------------- |
+| `Markdown Org: Move One Occurrence`   | --     | Hold one occurrence of the repeating entry on another day            |
+| `Markdown Org: Cancel One Occurrence` | --     | Take one occurrence out of the repeating entry, leaving it repeating |
 
 Both act on the entry the cursor stands in and ask which day they are about,
 opening on the day the entry is planned for. An entry that does not repeat has
@@ -1126,16 +1130,19 @@ next run.
   differ only in how org shifts the date on completion, which a calendar grid
   has no notion of, so they do not change the rule.
 - **A moved occurrence stays a separate event.** An occurrence a repeating
-  entry does not have leaves with the rule as an `EXDATE` line -- both the days
-  the entry cancels itself (`EXDATE:` in its `org-properties`) and the days
-  another entry stands in for (that entry's `SERIES_ID` naming this one's `ID`,
-  and its `RECURRENCE_ID` naming the occurrence). It needs the bundled
-  extractor 0.18.0 or newer, which is where those keys come from, and 0.19.0
-  or newer for the forms a calendar export writes them in -- an `EXDATE`
-  carrying a time, a `RECURRENCE_ID` written with seconds. The entry
-  standing in has a heading, a file and a line of its own, so it is pushed as
-  its own event rather than patched into the series through the calendar's
-  `instances` collection -- which is what the agenda shows as well.
+  entry does not have leaves with the rule as an `EXDATE` line -- the days the
+  entry cancels itself (`EXDATE:` in its `org-properties`), the days it holds
+  elsewhere (its `MOVED` lines), and the days another entry stands in for (that
+  entry's `SERIES_ID` naming this one's `ID`, and its `RECURRENCE_ID` naming
+  the occurrence). It needs the bundled extractor 0.18.0 or newer, which is
+  where the first of those keys come from, 0.19.0 or newer for the forms a
+  calendar export writes them in -- an `EXDATE` carrying a time, a
+  `RECURRENCE_ID` written with seconds -- and 0.22.0 for `MOVED`. The
+  occurrence is pushed as an event of its own, keyed by the series' event id
+  and the day it left, rather than patched into the series through the
+  calendar's `instances` collection -- which is what the agenda shows as well.
+  A move taken back out of the notes leaves that event behind: it is deleted
+  from the calendar by hand.
 - **Second-window edits are invisible.** If the same file is open in a
   second VS Code window with unsaved edits, this extension cannot see
   that other window's in-memory state. A sync writing back to disk there

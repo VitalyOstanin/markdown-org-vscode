@@ -4,8 +4,9 @@
  * A series drawn on a day the user did not want it on has two answers, and
  * they are not the same: the occurrence is gone, or it moved. Both are written
  * into the notes by `utils/occurrenceEdit`, which follows the extractor's
- * ADR-0031 and the Android client's module of the same name; this file is the
- * editor around them -- which entry, which day, and the write itself.
+ * ADR-0031 for a cancelled occurrence and its ADR-0038 for a moved one, along
+ * with the Android client's module of the same name; this file is the editor
+ * around them -- which entry, which day, and the write itself.
  *
  * The day is asked for rather than assumed even where the caller names one:
  * the agenda hands over the day the row was drawn on, and an entry acted on
@@ -16,29 +17,26 @@
  * series was never on.
  *
  * Where the occurrence moves to is answered in the notes instead of in a box:
- * the command writes a draft line under the series (`utils/occurrenceDraft`)
- * and the date is walked with the same Shift+Up and Shift+Down that walk any
- * other timestamp. Confirming turns the draft into the replacement; cancelling
- * takes the line back out.
+ * the command writes the `MOVED` line of the series (`utils/movedLine`) and
+ * the date is walked with the same Shift+Up and Shift+Down that walk any other
+ * timestamp. The line is the move itself, so there is nothing to confirm and
+ * the editor's own undo is what takes it back.
  */
 import * as vscode from 'vscode';
-import { randomUUID } from 'node:crypto';
 import { HEADING_REGEX } from '../orgPatterns';
 import { findNearestHeading, requireActiveEditor } from '../utils';
 import { applyEditOrReport } from '../utils/applyEdit';
 import { queueEdit } from '../utils/editQueue';
 import { isIsoDate, toIsoDate } from '../utils/isoDate';
 import { formatError, notifyStatus, notifyWarn } from '../utils/notify';
-import { draftDayColumn, matchOccurrenceDraft, occurrenceDraftLine } from '../utils/occurrenceDraft';
+import { matchMovedLine, movedDayColumn } from '../utils/movedLine';
 import {
     OccurrenceError,
     cancelOccurrence,
     listOccurrences,
     moveOccurrence,
-    planningLineOf,
     replacedRange,
     replacementOf,
-    seriesWeekday,
     type SeriesOccurrence
 } from '../utils/occurrenceEdit';
 
@@ -213,12 +211,12 @@ export async function cancelOccurrenceCommand(day?: string): Promise<void> {
 }
 
 /**
- * Offer to move one occurrence of the repeating entry at the cursor.
+ * Move one occurrence of the repeating entry at the cursor.
  *
- * The command ends with a draft line under the series rather than with the
- * move itself: the day it proposes is the occurrence's own, and it is walked
- * from there with Shift+Up and Shift+Down. `confirmOccurrenceMoveCommand`
- * writes what the draft ends up saying.
+ * The move is written straight away, as a `MOVED` line of the series: the day
+ * it proposes is where the occurrence stands now, and the caret is left on it
+ * so Shift+Up and Shift+Down walk it from there. Nothing has to be confirmed
+ * -- the line is the move, and the editor's own undo takes it back.
  */
 export async function moveOccurrenceCommand(day?: string): Promise<void> {
     const entry = await entryAtCursor();
@@ -228,13 +226,6 @@ export async function moveOccurrenceCommand(day?: string): Promise<void> {
     const named = day !== undefined && isIsoDate(day) ? day : undefined;
     const title = heading(entry.lines, entry.headingLine);
 
-    const standing = findDraft(entry.lines);
-    if (standing !== null) {
-        notifyStatus('A move is already drafted; confirm or cancel it first');
-        moveCaretTo(entry.editor, standing);
-        return;
-    }
-
     const occurrence = await pickOccurrence('Move which occurrence?', entry.lines, entry.headingLine, title, named);
     if (!occurrence) {
         return;
@@ -242,126 +233,51 @@ export async function moveOccurrenceCommand(day?: string): Promise<void> {
 
     await queueEdit(async () => {
         try {
-            const planning = planningLineOf(entry.lines, entry.headingLine, title);
-            const listed = listOccurrences(entry.lines, entry.headingLine, title, occurrence, 1)[0];
-            const line = entry.lines[planning] ?? '';
             // An occurrence moved once opens on where it went rather than on
             // the day the series draws it: moving it again is answered from
             // what the notes now say, and the reader walks on from there.
-            const moved = replacementOf(entry.lines, entry.headingLine, occurrence);
-            const draft = occurrenceDraftLine(
-                line.slice(0, line.length - line.trimStart().length),
-                toIsoDate(occurrence),
-                moved ? fromIsoDate(moved.day) : occurrence,
-                (moved ? moved.time : listed?.time) ?? null,
-                seriesWeekday(entry.lines, entry.headingLine, title)
-            );
-            const written = await applyEditOrReport(
-                entry.editor,
-                (builder) => {
-                    builder.insert(new vscode.Position(planning + 1, 0), `${draft}\n`);
-                },
-                'the draft of the move'
-            );
-            if (written) {
-                moveCaretTo(entry.editor, planning + 1);
-                notifyStatus('Walk the date with Shift+Up and Shift+Down, then Ctrl+Enter to move it');
-            }
-        } catch (error) {
-            report(error);
-        }
-    });
-}
-
-/** Turn the draft standing in the document into the replacement it describes. */
-export async function confirmOccurrenceMoveCommand(): Promise<void> {
-    const editor = requireActiveEditor({ markdownOnly: true });
-    if (!editor) {
-        return;
-    }
-    const lines = editor.document.getText().split(/\r?\n/);
-    const at = findDraft(lines);
-    if (at === null) {
-        notifyStatus('No move is drafted here');
-        return;
-    }
-    const draft = matchOccurrenceDraft(lines[at] ?? '');
-    if (!draft) {
-        return;
-    }
-    const headingLine = headingAbove(lines, at);
-    if (headingLine === null) {
-        notifyWarn('The draft stands under no entry');
-        return;
-    }
-
-    await queueEdit(async () => {
-        try {
-            const without = [...lines];
-            without.splice(at, 1);
+            const standing = replacementOf(entry.lines, entry.headingLine, occurrence);
+            const listed = listOccurrences(entry.lines, entry.headingLine, title, occurrence, 1)[0];
             const edit = moveOccurrence(
-                without,
-                headingLine,
-                fromIsoDate(draft.from),
-                fromIsoDate(draft.to),
-                draft.time,
-                randomUUID()
+                entry.lines,
+                entry.headingLine,
+                occurrence,
+                standing ? fromIsoDate(standing.day) : occurrence,
+                (standing ? standing.time : listed?.time) ?? null
             );
             if (!edit.changed) {
-                // The draft still goes: it says what the notes already say,
-                // and left standing it would be confirmed again tomorrow.
-                notifyStatus(`${draft.from} already falls on ${draft.to}`);
+                return;
             }
-            await write(editor, lines, edit.lines, 'the moved occurrence');
+            if (await write(entry.editor, entry.lines, edit.lines, 'the move')) {
+                const at = findMoved(edit.lines, entry.headingLine, toIsoDate(occurrence));
+                if (at !== null) {
+                    moveCaretTo(entry.editor, at);
+                    notifyStatus('Walk the day and the hour with Shift+Up and Shift+Down');
+                }
+            }
         } catch (error) {
             report(error);
         }
     });
 }
 
-/** Take the draft back out, leaving the series as it was. */
-export async function cancelOccurrenceMoveCommand(): Promise<void> {
-    const editor = requireActiveEditor({ markdownOnly: true });
-    if (!editor) {
-        return;
-    }
-    const lines = editor.document.getText().split(/\r?\n/);
-    const at = findDraft(lines);
-    if (at === null) {
-        return;
-    }
-
-    await queueEdit(async () => {
-        const without = [...lines];
-        without.splice(at, 1);
-        await write(editor, lines, without, 'the cancelled draft');
-    });
-}
-
-/** Which line the draft stands on, or `null` where the document holds none. */
-export function findDraft(lines: readonly string[]): number | null {
-    for (let i = 0; i < lines.length; i++) {
-        if (matchOccurrenceDraft(lines[i] ?? '')) {
-            return i;
-        }
-    }
-    return null;
-}
-
-/** The heading the line at `at` belongs to. */
-function headingAbove(lines: readonly string[], at: number): number | null {
-    for (let i = at; i >= 0; i--) {
+/** Which line of the entry moves the occurrence of `day`. */
+function findMoved(lines: readonly string[], headingLine: number, day: string): number | null {
+    for (let i = headingLine + 1; i < lines.length; i++) {
         if (HEADING_REGEX.test(lines[i] ?? '')) {
+            break;
+        }
+        if (matchMovedLine(lines[i] ?? '')?.from === day) {
             return i;
         }
     }
     return null;
 }
 
-/** Put the caret on the day of the draft, which is the field the arrows start on. */
+/** Put the caret on the day the occurrence moves to, which is where the arrows start. */
 function moveCaretTo(editor: vscode.TextEditor, line: number): void {
     const text = editor.document.lineAt(Math.min(line, editor.document.lineCount - 1)).text;
-    const at = new vscode.Position(line, draftDayColumn(text));
+    const at = new vscode.Position(line, movedDayColumn(text));
     editor.selection = new vscode.Selection(at, at);
     editor.revealRange(new vscode.Range(at, at));
 }

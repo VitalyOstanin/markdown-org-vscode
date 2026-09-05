@@ -2,7 +2,7 @@
   "name": "markdown-org-vscode",
   "displayName": "Markdown Org",
   "description": "Org-mode style task management in Markdown: TODO/DONE workflow, priorities, SCHEDULED/DEADLINE timestamps, agenda views, and CLOCK time tracking.",
-  "version": "0.19.0",
+  "version": "0.20.0",
   "publisher": "vitalyostanin",
   "repository": {
     "type": "git",
@@ -199,16 +199,6 @@
       {
         "command": "markdown-org.moveOccurrence",
         "title": "Move One Occurrence",
-        "category": "Markdown Org"
-      },
-      {
-        "command": "markdown-org.confirmOccurrenceMove",
-        "title": "Confirm the Drafted Move",
-        "category": "Markdown Org"
-      },
-      {
-        "command": "markdown-org.cancelOccurrenceMove",
-        "title": "Discard the Drafted Move",
         "category": "Markdown Org"
       },
       {
@@ -443,17 +433,6 @@
         "key": "ctrl+k ctrl+k ctrl+t",
         "mac": "cmd+k cmd+k cmd+t",
         "when": "(editorTextFocus && editorLangId == markdown) || markdown-org.agendaFocused"
-      },
-      {
-        "command": "markdown-org.confirmOccurrenceMove",
-        "key": "ctrl+enter",
-        "mac": "cmd+enter",
-        "when": "editorTextFocus && editorLangId == markdown && markdown-org.occurrenceDraft"
-      },
-      {
-        "command": "markdown-org.cancelOccurrenceMove",
-        "key": "escape",
-        "when": "editorTextFocus && editorLangId == markdown && markdown-org.occurrenceDraft"
       }
     ],
     "configuration": {

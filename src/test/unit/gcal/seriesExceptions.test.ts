@@ -86,6 +86,33 @@ suite('gcal/seriesExceptions', () => {
         assert.deepEqual(occurrencesMissingFrom(cancelling, replaced), ['2026-08-20']);
     });
 
+    test('an occurrence the entry moves itself is missing from the series', () => {
+        const moving = { ...series, moved_occurrences: [{ from: '2026-08-20', to: '2026-08-22', time: '13:00' }] };
+        const replaced = collectReplacedOccurrences([moving]);
+
+        // The day it left, not the day it went to: the calendar draws the
+        // occurrence on the 22nd from an event of its own, and would draw the
+        // series over it on the 20th without this.
+        assert.deepEqual(occurrencesMissingFrom(moving, replaced), ['2026-08-20']);
+    });
+
+    test('all three reasons meet in one answer, sorted and without repeats', () => {
+        const both = {
+            ...series,
+            excluded_dates: ['2026-09-03'],
+            moved_occurrences: [{ from: '2026-08-27', to: '2026-08-29' }]
+        };
+        const replaced = collectReplacedOccurrences([both, replacement('series-1', '2026-08-20 15:00')]);
+
+        assert.deepEqual(occurrencesMissingFrom(both, replaced), ['2026-08-20', '2026-08-27', '2026-09-03']);
+    });
+
+    test('a move whose day cannot be read takes nothing out of the series', () => {
+        const moving = { ...series, moved_occurrences: [{ from: 'next Thursday', to: '2026-08-22' }] };
+
+        assert.deepEqual(occurrencesMissingFrom(moving, collectReplacedOccurrences([moving])), []);
+    });
+
     test('a RECURRENCE_ID that is not a date replaces no occurrence', () => {
         // The property is written by hand, so it can say anything. A value the
         // date reader cannot make sense of must not take a day out of the

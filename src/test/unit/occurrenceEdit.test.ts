@@ -71,109 +71,141 @@ suite('an occurrence that is gone', () => {
 });
 
 suite('an occurrence that moved', () => {
-    test('is an entry of its own at the end of the file, naming what it replaces', () => {
-        const edit = moveOccurrence(SERIES, 0, on('2026-08-20'), on('2026-08-22'), '18:00', 'unused');
+    test('is a MOVED line of the series, under its planning line', () => {
+        const edit = moveOccurrence(SERIES, 0, on('2026-08-20'), on('2026-08-22'), '18:00');
 
-        assert.deepStrictEqual(edit.lines.slice(-6), [
+        assert.strictEqual(edit.changed, true);
+        assert.deepStrictEqual(edit.lines, [
             '# TODO English',
-            '    `SCHEDULED: <2026-08-22 Sat 18:00>`',
+            '    `SCHEDULED: <2026-08-06 Thu 15:00 +1w>`',
+            '    `MOVED: 2026-08-20 -> <2026-08-22 Sat 18:00>`',
             '```org-properties',
-            'SERIES_ID: 9f2c',
-            'RECURRENCE_ID: 2026-08-20 15:00',
-            '```'
+            'ID: 9f2c',
+            '```',
+            ''
         ]);
     });
 
-    test('leaves the series repeating, with no EXDATE beside it', () => {
-        const edit = moveOccurrence(SERIES, 0, on('2026-08-20'), on('2026-08-22'), null, 'unused');
+    test('leaves the series repeating, with no EXDATE and no second entry', () => {
+        const edit = moveOccurrence(SERIES, 0, on('2026-08-20'), on('2026-08-22'), null);
 
-        assert.deepStrictEqual(edit.lines.slice(0, 5), SERIES.slice(0, 5));
+        assert.ok(edit.lines.includes('    `SCHEDULED: <2026-08-06 Thu 15:00 +1w>`'));
         assert.ok(!edit.lines.some((line) => line.startsWith('EXDATE')));
+        assert.strictEqual(edit.lines.filter((line) => line.startsWith('# TODO English')).length, 1);
     });
 
     test('keeps the hour of the series when none is asked for', () => {
-        const edit = moveOccurrence(SERIES, 0, on('2026-08-20'), on('2026-08-22'), null, 'unused');
+        const edit = moveOccurrence(SERIES, 0, on('2026-08-20'), on('2026-08-22'), null);
 
-        assert.ok(edit.lines.includes('    `SCHEDULED: <2026-08-22 Sat 15:00>`'));
+        assert.ok(edit.lines.includes('    `MOVED: 2026-08-20 -> <2026-08-22 Sat 15:00>`'));
     });
 
-    test('names the series it replaces an occurrence of, giving it an identifier when it has none', () => {
+    test('needs no identifier on the series, and gives it none', () => {
+        // What `SERIES_ID` pointed at was an entry elsewhere; a line inside
+        // the entry points at nothing and needs no name for it.
         const nameless = ['# TODO English', '    `SCHEDULED: <2026-08-06 Thu 15:00 +1w>`', ''];
 
-        const edit = moveOccurrence(nameless, 0, on('2026-08-20'), on('2026-08-22'), null, '5b17');
+        const edit = moveOccurrence(nameless, 0, on('2026-08-20'), on('2026-08-22'), null);
 
-        assert.ok(edit.lines.includes('ID: 5b17'), 'the series is given the identifier');
-        assert.ok(edit.lines.includes('SERIES_ID: 5b17'), 'the replacement names it');
+        assert.ok(edit.lines.includes('    `MOVED: 2026-08-20 -> <2026-08-22 Sat 15:00>`'));
+        assert.ok(!edit.lines.some((line) => line.startsWith('ID:')), 'no identifier is invented');
     });
 
-    test('moved a second time, rewrites the replacement rather than writing another', () => {
-        const once = moveOccurrence(SERIES, 0, on('2026-08-20'), on('2026-08-22'), null, 'unused');
+    test('moved a second time, rewrites its line rather than writing another', () => {
+        const once = moveOccurrence(SERIES, 0, on('2026-08-20'), on('2026-08-22'), null);
 
-        const twice = moveOccurrence(once.lines, 0, on('2026-08-20'), on('2026-08-25'), null, 'unused');
+        const twice = moveOccurrence(once.lines, 0, on('2026-08-20'), on('2026-08-25'), null);
 
         assert.strictEqual(twice.changed, true);
-        assert.deepStrictEqual(twice.lines.slice(-6), [
-            '# TODO English',
-            '    `SCHEDULED: <2026-08-25 Tue 15:00>`',
-            '```org-properties',
-            'SERIES_ID: 9f2c',
-            'RECURRENCE_ID: 2026-08-20 15:00',
-            '```'
-        ]);
+        assert.ok(twice.lines.includes('    `MOVED: 2026-08-20 -> <2026-08-25 Tue 15:00>`'));
         assert.strictEqual(
-            twice.lines.filter((line) => line === 'RECURRENCE_ID: 2026-08-20 15:00').length,
+            twice.lines.filter((line) => line.includes('MOVED: 2026-08-20')).length,
             1,
-            'the day is stood in for once'
+            'the occurrence is moved by one line'
         );
-        assert.strictEqual(twice.lines.length, once.lines.length, 'no second entry is written');
+        assert.strictEqual(twice.lines.length, once.lines.length);
     });
 
     test('moved a second time, takes the hour asked for and keeps the one it had otherwise', () => {
-        const once = moveOccurrence(SERIES, 0, on('2026-08-20'), on('2026-08-22'), '18:00', 'unused');
+        const once = moveOccurrence(SERIES, 0, on('2026-08-20'), on('2026-08-22'), '18:00');
 
-        const hour = moveOccurrence(once.lines, 0, on('2026-08-20'), on('2026-08-25'), '09:30', 'unused');
-        const kept = moveOccurrence(once.lines, 0, on('2026-08-20'), on('2026-08-25'), null, 'unused');
+        const hour = moveOccurrence(once.lines, 0, on('2026-08-20'), on('2026-08-25'), '09:30');
+        const kept = moveOccurrence(once.lines, 0, on('2026-08-20'), on('2026-08-25'), null);
 
-        assert.ok(hour.lines.includes('    `SCHEDULED: <2026-08-25 Tue 09:30>`'));
-        assert.ok(kept.lines.includes('    `SCHEDULED: <2026-08-25 Tue 18:00>`'));
+        assert.ok(hour.lines.includes('    `MOVED: 2026-08-20 -> <2026-08-25 Tue 09:30>`'));
+        assert.ok(
+            kept.lines.includes('    `MOVED: 2026-08-20 -> <2026-08-25 Tue 15:00>`'),
+            'with no hour asked for, the hour of the series stands'
+        );
     });
 
     test('moved back to where it already stands, changes nothing', () => {
-        const once = moveOccurrence(SERIES, 0, on('2026-08-20'), on('2026-08-22'), '18:00', 'unused');
+        const once = moveOccurrence(SERIES, 0, on('2026-08-20'), on('2026-08-22'), '18:00');
 
-        const again = moveOccurrence(once.lines, 0, on('2026-08-20'), on('2026-08-22'), '18:00', 'unused');
+        const again = moveOccurrence(once.lines, 0, on('2026-08-20'), on('2026-08-22'), '18:00');
 
         assert.strictEqual(again.changed, false);
         assert.deepStrictEqual(again.lines, once.lines);
     });
 
-    test('finds the replacement wherever in the file it stands', () => {
-        const once = moveOccurrence(SERIES, 0, on('2026-08-20'), on('2026-08-22'), null, 'unused');
-        const far = [...once.lines.slice(0, 6), '# Another entry', 'A note under it.', '', ...once.lines.slice(6)];
+    test('moves a second occurrence with a line of its own', () => {
+        const once = moveOccurrence(SERIES, 0, on('2026-08-20'), on('2026-08-22'), null);
 
-        const twice = moveOccurrence(far, 0, on('2026-08-20'), on('2026-08-25'), null, 'unused');
+        const twice = moveOccurrence(once.lines, 0, on('2026-08-27'), on('2026-08-29'), null);
 
-        assert.ok(twice.lines.includes('    `SCHEDULED: <2026-08-25 Tue 15:00>`'));
-        assert.strictEqual(twice.lines.length, far.length, 'no second entry is written');
+        assert.deepStrictEqual(twice.lines.slice(1, 4), [
+            '    `SCHEDULED: <2026-08-06 Thu 15:00 +1w>`',
+            '    `MOVED: 2026-08-20 -> <2026-08-22 Sat 15:00>`',
+            '    `MOVED: 2026-08-27 -> <2026-08-29 Sat 15:00>`'
+        ]);
     });
 
-    test('moved a second time from another series, leaves that series alone', () => {
-        const theirs = [
-            '# TODO Spanish',
-            '`SCHEDULED: <2026-08-06 Thu 12:00 +1w>`',
-            '```org-properties',
-            'ID: 4a11',
-            '```',
+    test('is spelled the way the series is', () => {
+        // A file written in Russian keeps its Russian weekdays.
+        const russian = ['# TODO Занятие', '`DEADLINE: <2026-08-06 чт 15:00 +1w -2d>`', ''];
+
+        const edit = moveOccurrence(russian, 0, on('2026-08-06'), on('2026-08-08'), null);
+
+        assert.ok(edit.lines.includes('`MOVED: 2026-08-06 -> <2026-08-08 сб 15:00>`'));
+    });
+
+    test('names no hour where the series has none, and takes one that is asked for', () => {
+        const allDay = ['# TODO English', '`SCHEDULED: <2026-08-06 Thu +1w>`', ''];
+
+        assert.ok(
+            moveOccurrence(allDay, 0, on('2026-08-06'), on('2026-08-08'), null).lines.includes(
+                '`MOVED: 2026-08-06 -> <2026-08-08 Sat>`'
+            )
+        );
+        assert.ok(
+            moveOccurrence(allDay, 0, on('2026-08-06'), on('2026-08-08'), '09:30').lines.includes(
+                '`MOVED: 2026-08-06 -> <2026-08-08 Sat 09:30>`'
+            )
+        );
+    });
+
+    test('an occurrence held between two times keeps both of them', () => {
+        // An hour and a half on Thursday is an hour and a half on Saturday:
+        // the range says how long the occurrence is, not only when it starts.
+        const ranged = ['# TODO English', '`SCHEDULED: <2026-08-06 Thu 15:00-16:30 +1w>`', ''];
+
+        const edit = moveOccurrence(ranged, 0, on('2026-08-06'), on('2026-08-08'), null);
+
+        assert.ok(edit.lines.includes('`MOVED: 2026-08-06 -> <2026-08-08 Sat 15:00-16:30>`'));
+    });
+
+    test('the range is read back, so moving it again does not lose the hour it ends at', () => {
+        const ranged = [
+            '# TODO English',
+            '`SCHEDULED: <2026-08-06 Thu 15:00-16:30 +1w>`',
+            '`MOVED: 2026-08-06 -> <2026-08-08 Sat 15:00-16:30>`',
             ''
         ];
-        const mine = moveOccurrence(SERIES, 0, on('2026-08-20'), on('2026-08-22'), null, 'unused');
-        const both = [...theirs, ...mine.lines];
 
-        const edit = moveOccurrence(both, theirs.length, on('2026-08-20'), on('2026-08-25'), null, 'unused');
+        const standing = replacementOf(ranged, 0, on('2026-08-06'));
 
-        assert.ok(edit.lines.includes('    `SCHEDULED: <2026-08-25 Tue 15:00>`'), 'the English one moved');
-        assert.ok(edit.lines.includes('`SCHEDULED: <2026-08-06 Thu 12:00 +1w>`'), 'the Spanish series is untouched');
-        assert.strictEqual(edit.lines.filter((line) => line.startsWith('SERIES_ID')).length, 1);
+        assert.ok(standing);
+        assert.equal(standing.time, '15:00-16:30');
     });
 
     test('is refused where two planning lines repeat at once', () => {
@@ -183,44 +215,31 @@ suite('an occurrence that moved', () => {
             '    `DEADLINE: <2026-08-07 Fri +1w>`'
         ];
 
-        assert.throws(() => moveOccurrence(both, 0, on('2026-08-06'), on('2026-08-08'), null, 'x'), OccurrenceError);
+        assert.throws(() => moveOccurrence(both, 0, on('2026-08-06'), on('2026-08-08'), null), OccurrenceError);
     });
 
     /**
-     * The replacement is the series' own line rewritten, so a file written in
-     * Russian keeps its Russian weekdays and a deadline keeps the window it is
-     * warned about; only the repeater goes, because one occurrence does not
-     * repeat.
+     * An occurrence moved before the format changed stands in an entry of its
+     * own, which the core still reads. Moving it again rewrites that entry: a
+     * `MOVED` line here would speak for the same day, and the file would draw
+     * the occurrence twice.
      */
-    test('is spelled the way the series is', () => {
-        const russian = ['# TODO Занятие', '`DEADLINE: <2026-08-06 чт 15:00 +1w -2d>`', ''];
+    test('moved again where an older entry stands in for it, rewrites that entry', () => {
+        const older = [
+            ...SERIES,
+            '# TODO English',
+            '`SCHEDULED: <2026-08-22 Sat 18:00>`',
+            '```org-properties',
+            'SERIES_ID: 9f2c',
+            'RECURRENCE_ID: 2026-08-20 15:00',
+            '```'
+        ];
 
-        const edit = moveOccurrence(russian, 0, on('2026-08-06'), on('2026-08-08'), null, 'x');
+        const edit = moveOccurrence(older, 0, on('2026-08-20'), on('2026-08-25'), null);
 
-        assert.ok(edit.lines.includes('`DEADLINE: <2026-08-08 сб 15:00 -2d>`'));
-    });
-
-    test('writes a time into a timestamp that carried none', () => {
-        const allDay = ['# TODO English', '`SCHEDULED: <2026-08-06 Thu +1w>`', ''];
-
-        const edit = moveOccurrence(allDay, 0, on('2026-08-06'), on('2026-08-08'), '09:30', 'x');
-
-        assert.ok(edit.lines.includes('`SCHEDULED: <2026-08-08 Sat 09:30>`'));
-        assert.ok(edit.lines.includes('RECURRENCE_ID: 2026-08-06'), 'a series with no hour names the day alone');
-    });
-
-    /**
-     * A range of times names one occurrence by where it starts, which is what a
-     * recurrence identifier is -- and the extractor reads such a timestamp, so
-     * a series written with one has to be movable.
-     */
-    test('names an occurrence held between two times by the time it starts', () => {
-        const ranged = ['# TODO English', '`SCHEDULED: <2026-08-06 Thu 15:00-16:30 +1w>`', ''];
-
-        const edit = moveOccurrence(ranged, 0, on('2026-08-06'), on('2026-08-08'), null, 'x');
-
-        assert.ok(edit.lines.includes('RECURRENCE_ID: 2026-08-06 15:00'));
-        assert.ok(edit.lines.includes('`SCHEDULED: <2026-08-08 Sat 15:00-16:30>`'), 'the range moves as it stands');
+        assert.ok(edit.lines.includes('`SCHEDULED: <2026-08-25 Tue 18:00>`'), 'the older entry moved');
+        assert.ok(!edit.lines.some((line) => line.includes('MOVED: 2026-08-20')), 'and no line was added');
+        assert.strictEqual(edit.lines.length, older.length);
     });
 });
 
@@ -264,41 +283,37 @@ suite('the file the other client writes', () => {
     });
 
     test('a moved occurrence lands the same way', () => {
-        const edit = moveOccurrence(THEIRS, 0, on('2026-08-20'), on('2026-08-20'), '18:00', '9f2c');
+        const edit = moveOccurrence(THEIRS, 0, on('2026-08-20'), on('2026-08-20'), '18:00');
 
         assert.strictEqual(
             edit.lines.join('\n'),
             '# TODO English\n' +
                 '`SCHEDULED: <2026-08-06 Thu 15:00 +1w>`\n' +
-                '```org-properties\n' +
-                'ID: 9f2c\n' +
-                '```\n' +
-                '\n' +
-                '# TODO English\n' +
-                '`SCHEDULED: <2026-08-20 Thu 18:00>`\n' +
-                '```org-properties\n' +
-                'SERIES_ID: 9f2c\n' +
-                'RECURRENCE_ID: 2026-08-20 15:00\n' +
-                '```'
+                '`MOVED: 2026-08-20 -> <2026-08-20 Thu 18:00>`\n'
         );
     });
 
-    /** A priority and a heading level are copied as they stand. */
-    test('the replacement carries the heading the series is written with', () => {
+    /** The line joins the entry it belongs to, whatever level that entry is at. */
+    test('the move is written under the series, however deep the heading is', () => {
         const deep = ['### TODO [#A] English', '`SCHEDULED: <2026-08-14 Fri +1w>`', ''];
 
-        const edit = moveOccurrence(deep, 0, on('2026-08-21'), on('2026-08-21'), null, 'x');
+        const edit = moveOccurrence(deep, 0, on('2026-08-21'), on('2026-08-28'), null);
 
-        assert.ok(edit.lines.join('\n').includes('### TODO [#A] English\n`SCHEDULED: <2026-08-21 Fri>`\n'));
+        assert.strictEqual(
+            edit.lines.join('\n'),
+            '### TODO [#A] English\n' +
+                '`SCHEDULED: <2026-08-14 Fri +1w>`\n' +
+                '`MOVED: 2026-08-21 -> <2026-08-28 Fri>`\n'
+        );
     });
 
-    /** A working-day repeater goes as well: one occurrence does not repeat, whatever the unit. */
-    test('a working-day series leaves its repeater behind too', () => {
+    /** A working-day repeater moves like any other: one occurrence, one line. */
+    test('a working-day series is moved the same way', () => {
         const workdays = ['# TODO Standup', '`SCHEDULED: <2026-08-06 Thu 10:00 +1wd>`', ''];
 
-        const edit = moveOccurrence(workdays, 0, on('2026-08-06'), on('2026-08-07'), null, 'x');
+        const edit = moveOccurrence(workdays, 0, on('2026-08-06'), on('2026-08-07'), null);
 
-        assert.ok(edit.lines.includes('`SCHEDULED: <2026-08-07 Fri 10:00>`'));
+        assert.ok(edit.lines.includes('`MOVED: 2026-08-06 -> <2026-08-07 Fri 10:00>`'));
     });
 });
 
@@ -324,9 +339,9 @@ suite('the planning line, in an entry that is not only a planning line', () => {
             ''
         ];
 
-        const edit = moveOccurrence(entry, 0, DAY, on('2026-08-22'), null, '9f2c');
+        const edit = moveOccurrence(entry, 0, DAY, on('2026-08-22'), null);
 
-        assert.match(edit.lines.join('\n'), /`SCHEDULED: <2026-08-22 Sat 15:00>`/);
+        assert.match(edit.lines.join('\n'), /`MOVED: 2026-08-20 -> <2026-08-22 Sat 15:00>`/);
     });
 
     test('is found under a property block', () => {
@@ -339,9 +354,9 @@ suite('the planning line, in an entry that is not only a planning line', () => {
             ''
         ];
 
-        const edit = moveOccurrence(entry, 0, DAY, on('2026-08-22'), null, '9f2c');
+        const edit = moveOccurrence(entry, 0, DAY, on('2026-08-22'), null);
 
-        assert.match(edit.lines.join('\n'), /`SCHEDULED: <2026-08-22 Sat 15:00>`/);
+        assert.match(edit.lines.join('\n'), /`MOVED: 2026-08-20 -> <2026-08-22 Sat 15:00>`/);
     });
 
     test('is found past a keyword written without its colon', () => {
@@ -354,9 +369,9 @@ suite('the planning line, in an entry that is not only a planning line', () => {
             ''
         ];
 
-        const edit = moveOccurrence(entry, 0, DAY, on('2026-08-22'), null, '9f2c');
+        const edit = moveOccurrence(entry, 0, DAY, on('2026-08-22'), null);
 
-        assert.match(edit.lines.join('\n'), /`SCHEDULED: <2026-08-22 Sat 15:00>`/);
+        assert.match(edit.lines.join('\n'), /`MOVED: 2026-08-20 -> <2026-08-22 Sat 15:00>`/);
     });
 
     test('is not looked for past the end of the entry', () => {
@@ -370,7 +385,7 @@ suite('the planning line, in an entry that is not only a planning line', () => {
         ];
 
         assert.throws(
-            () => moveOccurrence(entry, 0, DAY, on('2026-08-22'), null, '9f2c'),
+            () => moveOccurrence(entry, 0, DAY, on('2026-08-22'), null),
             (error: unknown) => error instanceof OccurrenceError && error.message.includes('carries no planning line')
         );
     });
@@ -380,11 +395,11 @@ suite('the planning line, in an entry that is not only a planning line', () => {
         const none = ['## English', '`CREATED: [2025-12-08 Mon 01:06]`', ''];
 
         assert.throws(
-            () => moveOccurrence(once, 0, DAY, on('2026-08-22'), null, '9f2c'),
+            () => moveOccurrence(once, 0, DAY, on('2026-08-22'), null),
             (error: unknown) => error instanceof OccurrenceError && error.message.includes('does not repeat')
         );
         assert.throws(
-            () => moveOccurrence(none, 0, DAY, on('2026-08-22'), null, '9f2c'),
+            () => moveOccurrence(none, 0, DAY, on('2026-08-22'), null),
             (error: unknown) => error instanceof OccurrenceError && error.message.includes('carries no planning line')
         );
     });
@@ -421,7 +436,7 @@ suite('the days a series falls on', () => {
 
     test('say which days the series has already lost', () => {
         const cancelled = cancelOccurrence(WEEKLY, 0, 'English', on('2026-08-13'));
-        const moved = moveOccurrence(cancelled.lines, 0, on('2026-08-20'), on('2026-08-22'), null, '9f2c');
+        const moved = moveOccurrence(cancelled.lines, 0, on('2026-08-20'), on('2026-08-22'), null);
 
         const ahead = listOccurrences(moved.lines, 0, 'English', on('2026-08-06'), 3);
 
@@ -475,7 +490,7 @@ suite('where an occurrence already stands', () => {
     });
 
     test('is the day and hour the replacement was written with', () => {
-        const edit = moveOccurrence(SERIES, 0, on('2026-08-20'), on('2026-08-22'), '18:00', 'unused');
+        const edit = moveOccurrence(SERIES, 0, on('2026-08-20'), on('2026-08-22'), '18:00');
 
         const standing = replacementOf(edit.lines, 0, on('2026-08-20'));
 
@@ -490,9 +505,35 @@ suite('where an occurrence already stands', () => {
         assert.strictEqual(replacementOf(nameless, 0, on('2026-08-20')), null);
     });
 
-    test('is nothing for a replacement of another series', () => {
-        const edit = moveOccurrence(SERIES, 0, on('2026-08-20'), on('2026-08-22'), null, 'unused');
-        const theirs = edit.lines.map((line) => (line === 'SERIES_ID: 9f2c' ? 'SERIES_ID: 4a11' : line));
+    test('is the day an older entry standing in for it carries', () => {
+        // The shape written before the format changed, which the core still
+        // reads and the command still has to answer from.
+        const older = [
+            ...SERIES,
+            '# TODO English',
+            '`SCHEDULED: <2026-08-22 Sat 18:00>`',
+            '```org-properties',
+            'SERIES_ID: 9f2c',
+            'RECURRENCE_ID: 2026-08-20 15:00',
+            '```'
+        ];
+
+        const standing = replacementOf(older, 0, on('2026-08-20'));
+
+        assert.strictEqual(standing?.day, '2026-08-22');
+        assert.strictEqual(standing.time, '18:00');
+    });
+
+    test('is nothing for an older entry standing in for another series', () => {
+        const theirs = [
+            ...SERIES,
+            '# TODO English',
+            '`SCHEDULED: <2026-08-22 Sat 18:00>`',
+            '```org-properties',
+            'SERIES_ID: 4a11',
+            'RECURRENCE_ID: 2026-08-20 15:00',
+            '```'
+        ];
 
         assert.strictEqual(replacementOf(theirs, 0, on('2026-08-20')), null);
     });

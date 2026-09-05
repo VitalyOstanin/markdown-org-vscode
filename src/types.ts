@@ -83,6 +83,28 @@ export interface Task {
     // The `ID` of the series this entry replaces an occurrence of, from its
     // `SERIES_ID` property (extractor ADR-0031). See `recurrence_id`.
     series_id?: string;
+    // The occurrences of this entry held on another day, read out of its
+    // `MOVED` lines by markdown-org-extract 0.22.0 (extractor ADR-0038).
+    // Absent when the entry moves none, and from an older extractor. The
+    // agenda draws each one on the day it went to rather than on the day the
+    // repeater names; the Google Calendar export takes the day it left out of
+    // the series and writes the occurrence as an event of its own.
+    moved_occurrences?: MovedOccurrence[];
+}
+
+// One occurrence of a repeating entry, held on another day than the repeater
+// names (extractor ADR-0038). Field names come from markdown-org-extract JSON
+// and must stay in snake_case.
+export interface MovedOccurrence {
+    // The day the repeater draws the occurrence on, as `YYYY-MM-DD`.
+    from: string;
+    // The day it is held on instead.
+    to: string;
+    // The hour it is held at, when the move names one; absent otherwise, and
+    // the entry's own hour then stands.
+    time?: string;
+    // The hour it ends at, when the move names a range.
+    end_time?: string;
 }
 
 export interface TaskWithOffset extends Task {

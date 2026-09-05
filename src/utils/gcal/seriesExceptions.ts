@@ -8,10 +8,15 @@
 // when the occurrence moved, keeps it beside the entry that replaced it, so
 // the day holds two.
 //
-// There are two reasons an occurrence can be missing and they are collected
+// There are three reasons an occurrence can be missing and they are collected
 // the same way here, because the calendar treats them alike: the day loses the
 // occurrence either way. What tells them apart -- who owes the arrears -- is
 // an agenda question, and the calendar has no bucket for it.
+//
+// A move is written inside the entry from extractor ADR-0038 and needs no
+// second entry to be found in, so it is read straight off the task; the pair
+// of properties ADR-0031 wrote a move in is still collected beside it, for the
+// files and the other tools that hold it.
 import type { Task } from '../../types';
 
 /** Series id -> the occurrence dates other entries of the run stand in for. */
@@ -54,8 +59,9 @@ export function collectReplacedOccurrences(tasks: readonly Task[]): ReplacedOccu
 }
 
 /**
- * Every occurrence `task` does not have: the dates it cancels itself, and the
- * ones entries of the run stand in for. Sorted, one entry per date.
+ * Every occurrence `task` does not have: the dates it cancels itself, the ones
+ * it holds on another day, and the ones entries of the run stand in for.
+ * Sorted, one entry per date.
  *
  * A date that is not `YYYY-MM-DD` is left out rather than passed on: the value
  * is written by hand, and the calendar has no way to read what the extractor
@@ -63,6 +69,11 @@ export function collectReplacedOccurrences(tasks: readonly Task[]): ReplacedOccu
  */
 export function occurrencesMissingFrom(task: Task, replaced: ReplacedOccurrences): string[] {
     const missing = new Set<string>((task.excluded_dates ?? []).filter((date) => ISO_DATE_REGEX.test(date)));
+    for (const moved of task.moved_occurrences ?? []) {
+        if (ISO_DATE_REGEX.test(moved.from)) {
+            missing.add(moved.from);
+        }
+    }
     const seriesId = task.properties?.ID;
     if (seriesId) {
         for (const date of replaced.get(seriesId) ?? []) {

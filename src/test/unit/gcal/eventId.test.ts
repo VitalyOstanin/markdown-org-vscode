@@ -1,5 +1,5 @@
 import * as assert from 'node:assert/strict';
-import { taskIdToEventId, isValidEventId } from '../../../utils/gcal/eventId';
+import { movedEventId, taskIdToEventId, isValidEventId } from '../../../utils/gcal/eventId';
 
 suite('gcal/eventId', () => {
     test('derives a base32hex id from a UUID (dashes removed, lowercased)', () => {
@@ -35,5 +35,20 @@ suite('gcal/eventId', () => {
 
     test('throws for an id that cannot form a valid event id', () => {
         assert.throws(() => taskIdToEventId('xyz'), /event id/);
+    });
+
+    test('a moved occurrence is the series id and the day it left', () => {
+        const id = movedEventId('11111111-2222-3333-4444-555555555555', '2026-08-20');
+
+        assert.equal(id, '11111111222233334444555555555555' + '20260820');
+        assert.ok(isValidEventId(id), 'the day is digits, so the id stays base32hex');
+    });
+
+    test('two occurrences of one series get two ids, and each one is stable', () => {
+        const series = '11111111-2222-3333-4444-555555555555';
+
+        assert.notEqual(movedEventId(series, '2026-08-20'), movedEventId(series, '2026-08-27'));
+        assert.equal(movedEventId(series, '2026-08-20'), movedEventId(series, '2026-08-20'));
+        assert.notEqual(movedEventId(series, '2026-08-20'), taskIdToEventId(series));
     });
 });

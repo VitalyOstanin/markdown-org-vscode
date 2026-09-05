@@ -1,5 +1,5 @@
 // Pure mapping from an org task to a Google Calendar event resource (no VS Code, no I/O).
-import type { Task } from '../../types';
+import type { MovedOccurrence, Task } from '../../types';
 import { splitInto } from '../regexGroups';
 import type { GcalEventResource } from './types';
 import { repeaterToRrule } from './rrule';
@@ -135,6 +135,64 @@ export function mapTaskToEvent(
         end,
         recurrence,
         extendedProperties: ext
+    };
+}
+
+/**
+ * Map one occurrence held on another day to an event of its own.
+ *
+ * The occurrence is the series on a different day (extractor ADR-0038), so
+ * everything but the date and the hour is the series': the same summary, the
+ * same description, the same source line. It leaves as a one-shot event --
+ * the rule belongs to the series, and the day this occurrence left is taken
+ * out of that rule as an EXDATE by `occurrencesMissingFrom`.
+ *
+ * A move naming an hour carries its own end as well, exactly as the core
+ * reads it: a move to 13:00 does not keep an end of 16:00 written for a start
+ * of 15:00. A move naming no hour keeps both of the series'.
+ */
+export function mapMovedOccurrenceToEvent(
+    task: Task,
+    orgId: string,
+    moved: MovedOccurrence,
+    opts: MapOptions
+): GcalEventResource {
+    const {
+        timestamp_repeater: _repeater,
+        excluded_dates: _cancelled,
+        moved_occurrences: _moves,
+        timestamp_time: seriesTime,
+        timestamp_end_time: seriesEnd,
+        ...rest
+    } = task;
+    const held: Task = {
+        ...rest,
+        timestamp_date: moved.to,
+        ...hours(moved, seriesTime, seriesEnd)
+    };
+    const event = mapTaskToEvent(held, orgId, opts);
+    // The occurrence the event stands for, which is what RFC 5545 would put in
+    // a RECURRENCE-ID. Google fills that field itself for an instance of a
+    // series it expanded, and refuses it on an event written on its own, so it
+    // is carried here instead -- where a later run can read back which day of
+    // the series this event answers for.
+    event.extendedProperties = {
+        private: { ...(event.extendedProperties?.private ?? {}), mdOrgOccurrence: moved.from }
+    };
+    return event;
+}
+
+/** The hour a moved occurrence is held at: its own where it names one, else the series'. */
+function hours(
+    moved: MovedOccurrence,
+    seriesTime: string | undefined,
+    seriesEnd: string | undefined
+): { timestamp_time?: string; timestamp_end_time?: string } {
+    const time = moved.time ?? seriesTime;
+    const end = moved.time === undefined ? seriesEnd : moved.end_time;
+    return {
+        ...(time === undefined ? {} : { timestamp_time: time }),
+        ...(end === undefined ? {} : { timestamp_end_time: end })
     };
 }
 

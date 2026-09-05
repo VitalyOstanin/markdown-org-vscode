@@ -58,13 +58,13 @@ suite('One occurrence of a series', () => {
         return document;
     }
 
-    /** Rewrite the draft line, which is what walking its date with Shift+Up leaves behind. */
-    async function walkTheDraftTo(doc: vscode.TextDocument, day: string): Promise<void> {
+    /** Rewrite the `MOVED` line, which is what walking its date with Shift+Up leaves behind. */
+    async function walkTheMoveTo(doc: vscode.TextDocument, day: string): Promise<void> {
         const at = doc
             .getText()
             .split('\n')
-            .findIndex((line) => line.includes('`MOVE '));
-        assert.ok(at >= 0, 'no draft to walk');
+            .findIndex((line) => line.includes('`MOVED: '));
+        assert.ok(at >= 0, 'nothing was moved');
         const line = doc.lineAt(at);
         const editor = vscode.window.activeTextEditor;
         assert.ok(editor, 'no editor');
@@ -126,7 +126,7 @@ suite('One occurrence of a series', () => {
         assert.strictEqual(items[0]?.label, '2026-08-20 15:00');
     });
 
-    test('a move is drafted under the series, at the day and hour it is held', async () => {
+    test('a move is written into the series, at the day and hour it is held', async () => {
         const doc = await open(SERIES);
 
         pickDay(0);
@@ -137,12 +137,12 @@ suite('One occurrence of a series', () => {
             [
                 '# TODO English',
                 '`SCHEDULED: <2026-08-06 Thu 15:00 +1w>`',
-                '`MOVE 2026-08-20 -> <2026-08-20 Thu 15:00>`',
+                '`MOVED: 2026-08-20 -> <2026-08-20 Thu 15:00>`',
                 ''
             ].join('\n')
         );
         const caret = vscode.window.activeTextEditor?.selection.active;
-        assert.strictEqual(caret?.line, 2, 'the caret is on the draft');
+        assert.strictEqual(caret?.line, 2, 'the caret is on the line that moves it');
         assert.strictEqual(
             doc.lineAt(2).text.slice(caret.character, caret.character + 10),
             '2026-08-20',
@@ -150,74 +150,62 @@ suite('One occurrence of a series', () => {
         );
     });
 
-    test('confirming the draft writes the replacement and takes the draft back out', async () => {
+    test('the series goes on repeating, and no replacement entry is written', async () => {
         const doc = await open(SERIES);
 
         pickDay(0);
         await vscode.commands.executeCommand('markdown-org.moveOccurrence', '2026-08-20');
-        await walkTheDraftTo(doc, '2026-08-22');
-        await vscode.commands.executeCommand('markdown-org.confirmOccurrenceMove');
+        await walkTheMoveTo(doc, '2026-08-22');
 
         const text = doc.getText();
-        assert.ok(!text.includes('MOVE 2026-08-20'), 'the draft is gone');
         assert.match(text, /SCHEDULED: <2026-08-06 Thu 15:00 \+1w>/, 'the series goes on repeating');
-        assert.match(text, /\nID: [0-9a-f-]{36}\n/, 'the series is named so the replacement can point at it');
-        assert.match(text, /\n# TODO English\n`SCHEDULED: <2026-08-22 Sat 15:00>`\n/);
-        assert.match(text, /\nRECURRENCE_ID: 2026-08-20 15:00\n/);
-        assert.ok(!text.includes('EXDATE'), 'a replacement needs no EXDATE beside it');
+        assert.ok(!text.includes('RECURRENCE_ID'), 'nothing stands in for the occurrence');
+        assert.ok(!text.includes('ID: '), 'the series needs no identifier to be moved from');
+        assert.ok(!text.includes('EXDATE'), 'a moved occurrence is not a cancelled one');
+        assert.strictEqual(text.match(/^# /gm)?.length, 1, 'the file still holds one entry');
     });
 
-    test('a day already moved is drafted where it now stands, and moved again in place', async () => {
+    test('a day already moved opens where it now stands, and is moved again in place', async () => {
         const doc = await open(SERIES);
 
         pickDay(0);
         await vscode.commands.executeCommand('markdown-org.moveOccurrence', '2026-08-20');
-        await walkTheDraftTo(doc, '2026-08-22');
-        await vscode.commands.executeCommand('markdown-org.confirmOccurrenceMove');
+        await walkTheMoveTo(doc, '2026-08-22');
 
         quickPick?.restore();
         quickPick = null;
         pickDay(0);
         await vscode.commands.executeCommand('markdown-org.moveOccurrence', '2026-08-20');
 
-        const drafted = doc
-            .getText()
-            .split('\n')
-            .find((line) => line.includes('`MOVE '));
-        assert.strictEqual(drafted, '`MOVE 2026-08-20 -> <2026-08-22 Sat 15:00>`', 'the draft opens on the new day');
-
-        await walkTheDraftTo(doc, '2026-08-25');
-        await vscode.commands.executeCommand('markdown-org.confirmOccurrenceMove');
-
         const text = doc.getText();
-        assert.ok(!text.includes('`MOVE '), 'the draft is gone');
-        assert.match(text, /\n# TODO English\n`SCHEDULED: <2026-08-25 Tue 15:00>`\n/);
-        assert.strictEqual(
-            text.match(/RECURRENCE_ID: 2026-08-20 15:00/g)?.length,
-            1,
-            'the occurrence is stood in for once'
+        assert.strictEqual(text.match(/`MOVED: [^`]*`/g)?.length, 1, 'the occurrence is moved by one line, not by two');
+        assert.ok(
+            text.includes('`MOVED: 2026-08-20 -> <2026-08-22 Sat 15:00>`'),
+            `the line was: ${text.split('\n')[2] ?? ''}`
         );
-        assert.ok(!text.includes('2026-08-22'), 'nothing is left of where it stood before');
     });
 
-    test('discarding the draft leaves the series as it was', async () => {
+    test('another occurrence of the same series gets a line of its own', async () => {
         const doc = await open(SERIES);
 
         pickDay(0);
         await vscode.commands.executeCommand('markdown-org.moveOccurrence', '2026-08-20');
-        await vscode.commands.executeCommand('markdown-org.cancelOccurrenceMove');
 
-        assert.strictEqual(doc.getText(), SERIES);
-    });
-
-    test('a second draft is refused while one is standing', async () => {
-        const doc = await open(SERIES);
-
+        quickPick?.restore();
+        quickPick = null;
         pickDay(0);
-        await vscode.commands.executeCommand('markdown-org.moveOccurrence', '2026-08-20');
         await vscode.commands.executeCommand('markdown-org.moveOccurrence', '2026-08-27');
 
-        assert.strictEqual(doc.getText().match(/`MOVE /g)?.length, 1, 'one draft, not two');
+        assert.strictEqual(
+            doc.getText(),
+            [
+                '# TODO English',
+                '`SCHEDULED: <2026-08-06 Thu 15:00 +1w>`',
+                '`MOVED: 2026-08-20 -> <2026-08-20 Thu 15:00>`',
+                '`MOVED: 2026-08-27 -> <2026-08-27 Thu 15:00>`',
+                ''
+            ].join('\n')
+        );
     });
 
     test('escaping the list leaves the file alone', async () => {
@@ -269,30 +257,28 @@ suite('One occurrence, whatever the entry looks like', () => {
         quickPick = sinon.stub(vscode.window, 'showQuickPick');
         quickPick.callsFake((items: unknown) => Promise.resolve((items as unknown[])[0]));
         await vscode.commands.executeCommand('markdown-org.moveOccurrence', '2026-08-20');
-        await vscode.commands.executeCommand('markdown-org.confirmOccurrenceMove');
         return document;
     }
 
     test('a series planned with SCHEDULED', async () => {
         const doc = await moveFirstOf(['# TODO English', '`SCHEDULED: <2026-08-06 Thu 15:00 +1w>`', ''].join('\n'));
 
-        assert.match(doc.getText(), /\n`SCHEDULED: <2026-08-20 Thu 15:00>`\n/);
+        assert.match(doc.getText(), /\n`MOVED: 2026-08-20 -> <2026-08-20 Thu 15:00>`\n/);
     });
 
     test('a series that names no keyword at all', async () => {
         const doc = await moveFirstOf(['# English', '`<2026-08-06 Thu 15:00 +1w>`', ''].join('\n'));
 
-        // Written the way the series is: the replacement carries no keyword
-        // either, and the repeater is the one token that goes.
-        assert.match(doc.getText(), /\n`<2026-08-20 Thu 15:00>`\n/);
+        // The keyword belongs to the series' own line; the move carries its
+        // own and says nothing about how the series is planned.
+        assert.match(doc.getText(), /\n`MOVED: 2026-08-20 -> <2026-08-20 Thu 15:00>`\n/);
         assert.ok(!doc.getText().includes('SCHEDULED'), 'no keyword was invented');
     });
 
     test('a series kept on a DEADLINE', async () => {
         const doc = await moveFirstOf(['# TODO Report', '`DEADLINE: <2026-08-06 Thu +1w>`', ''].join('\n'));
 
-        assert.match(doc.getText(), /\n`DEADLINE: <2026-08-20 Thu>`\n/);
-        assert.match(doc.getText(), /\nRECURRENCE_ID: 2026-08-20\n/, 'a series with no hour names none');
+        assert.match(doc.getText(), /\n`MOVED: 2026-08-20 -> <2026-08-20 Thu>`\n/, 'a series with no hour names none');
     });
 
     test('a series under a creation stamp and above a property block', async () => {
@@ -310,10 +296,13 @@ suite('One occurrence, whatever the entry looks like', () => {
         );
 
         const text = doc.getText();
-        assert.match(text, /\n`SCHEDULED: <2026-08-20 Thu 15:00>`\n/);
-        // The identifier the entry already carries is the one the replacement
-        // points at; a second one would name a series that does not exist.
-        assert.match(text, /\nSERIES_ID: cfdc2b9f-2b70-4aca-b917-c13b96ca3c65\n/);
+        // Under the planning line and above the properties, which is where the
+        // dates of an entry stand.
+        assert.match(
+            text,
+            /`SCHEDULED: <2025-12-08 Mon 15:00 \+1w>`\n`MOVED: 2026-08-20 -> <2026-08-20 Thu 15:00>`\n```org-properties\n/
+        );
+        assert.ok(!text.includes('SERIES_ID'), 'a line inside the entry points at nothing');
         assert.strictEqual(text.match(/^ID: /gm)?.length, 1, 'the entry keeps its one ID');
     });
 
@@ -328,7 +317,7 @@ suite('One occurrence, whatever the entry looks like', () => {
         );
 
         const text = doc.getText();
-        assert.match(text, /\n`SCHEDULED: <2026-08-20 Thu 15:00>`\n/);
+        assert.match(text, /\n`MOVED: 2026-08-20 -> <2026-08-20 Thu 15:00>`\n/);
         assert.ok(text.includes('`SCHEDULED <2025-12-01 Mon 15:00 +1w>`'), 'the line typed by hand is untouched');
     });
 });

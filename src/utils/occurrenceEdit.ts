@@ -3,39 +3,39 @@
 // arrays of lines; the editor binding lives with the command.
 //
 // A repeating timestamp describes an endless series and has nowhere to say
-// that one of its occurrences is different. The extractor's ADR-0031 answers
-// that in the shape iCalendar settled on, written with the `org-properties`
-// keys of its ADR-0020:
+// that one of its occurrences is different. Both answers are written into the
+// entry itself, with the `org-properties` keys of the extractor's ADR-0020 and
+// the `MOVED` line of its ADR-0038:
 //
 // ````text
-// # TODO English                              <- the series, unchanged
+// # TODO English
 // `SCHEDULED: <2026-08-06 Thu 15:00 +1w>`
+// `MOVED: 2026-08-20 -> <2026-08-22 Sat 18:00>`   <- an occurrence that moved
 // ```org-properties
-// ID: 9f2c
-// EXDATE: 2026-08-13                          <- an occurrence that is gone
-// ```
-//
-// # TODO English                              <- an occurrence that moved
-// `SCHEDULED: <2026-08-20 Thu 18:00>`
-// ```org-properties
-// SERIES_ID: 9f2c
-// RECURRENCE_ID: 2026-08-20 15:00
+// EXDATE: 2026-08-13                              <- an occurrence that is gone
 // ```
 // ````
 //
 // The two are not the same operation and are not written the same way. A
-// cancelled occurrence is a date added to the series' own `EXDATE`; a moved
-// one is an entry of its own that replaces the occurrence it names, and needs
-// no `EXDATE` beside it -- that is the split RFC 5545 makes, and the extractor
-// reads it that way.
+// cancelled occurrence is a date added to the series' own `EXDATE`; a moved one
+// is a line naming the day it left and the timestamp it is held on instead, and
+// needs no `EXDATE` beside it -- an occurrence that moved is not one that is
+// gone, and the extractor reads it that way.
+//
+// The shape ADR-0031 wrote a move in -- a second entry carrying `SERIES_ID` and
+// `RECURRENCE_ID` -- is still read, because files and other tools hold it. An
+// occurrence standing in such an entry is moved where it stands rather than
+// answered with a `MOVED` line here, so that only one of the two ever speaks
+// for a day.
 //
 // The Android client writes these files too, through the Rust `occurrence`
 // module of its own crate. Both clients have to leave the same file behind, so
-// every choice below that is not forced by the format -- the replacement at
-// the end of the file, the heading copied as it stands, the planning line
+// every choice below that is not forced by the format -- where the line is
+// written, the weekday spelt as the series spells it, the planning line
 // rewritten token by token -- mirrors that module rather than the extension's
 // own habits.
 import { HEADING_REGEX, headingLevel, matchTimestampLine, type TimestampLineMatch } from '../orgPatterns';
+import { matchMovedLine, movedLine, type MovedOccurrence } from './movedLine';
 import { findOrgPropertiesBlocks } from './orgProperties';
 import { nextOccurrence, parseRepeater, type Repeater } from './repeater';
 import { getWeekdayName } from './incrementTimestamp';
@@ -275,12 +275,17 @@ function splice(text: string, range: Field, to: string): string {
     return text.slice(0, range.start) + to + text.slice(range.end);
 }
 
-/** The time the timestamp carries, as written; a range names its occurrence by where it starts. */
+/**
+ * The time the timestamp carries, as written -- a range of hours included.
+ *
+ * An occurrence held from 15:00 to 16:00 is held for an hour wherever it
+ * moves to, so the whole token travels with it rather than only its start.
+ */
 function writtenTime(line: string, span: { start: number; end: number }): string | null {
     for (const field of fields(line, span)) {
         const token = line.slice(field.start, field.end);
         if (isTime(token)) {
-            return token.split('-')[0] ?? null;
+            return token;
         }
     }
     return null;
@@ -444,80 +449,135 @@ export function replacementOf(
     headingLine: number,
     occurrence: Date
 ): StandingReplacement | null {
-    return findReplacement(lines, findProperty(lines, headingLine, ID_KEY)?.value ?? '', toIsoDate(occurrence));
+    const day = toIsoDate(occurrence);
+    const moved = movedOccurrences(lines, headingLine).find((held) => held.from === day);
+    if (moved) {
+        return { headingLine, day: moved.to, time: moved.time };
+    }
+    return findReplacement(lines, findProperty(lines, headingLine, ID_KEY)?.value ?? '', day);
 }
 
 /**
  * Move one occurrence of a repeating entry to another date, another time, or
  * both.
  *
- * The series stays as it is, save for gaining an `ID` when it has none: what
- * is written is a second entry at the end of the same file, spelled the way
- * the series is and carrying the pair that says which occurrence it stands in
- * for. The occurrence it replaces is then not drawn from the series, so
- * nothing has to be excluded as well.
+ * What is written is a `MOVED` line of the series itself, under its planning
+ * line (the extractor's ADR-0038): the day before the arrow names the
+ * occurrence, and the timestamp after it is where the occurrence is held. The
+ * series goes on repeating and needs no `EXDATE` beside it -- an occurrence
+ * that moved is not one that is gone.
  *
- * An occurrence that was moved once is moved again by rewriting the entry
- * already standing in for it rather than by writing a second one: two entries
- * naming the same `RECURRENCE_ID` are a file no reader of it could resolve.
+ * An occurrence moved a second time rewrites the line already standing for it
+ * rather than gaining another: two lines naming the same occurrence are a file
+ * with no answer for which of the two days it is on, and the reader of these
+ * notes -- this extension, the Android client, the core -- would each have to
+ * invent one.
  *
  * `time` is `HH:MM` and `null` keeps whatever time the series carries -- an
  * occurrence moved to another day is usually held at the same hour.
- * `seriesId` is the identifier to give the series when it does not already
- * have one, and is ignored when it does; it comes from the caller for the
- * reason today does, so that the same call writes the same file.
  */
 export function moveOccurrence(
     lines: readonly string[],
     headingLine: number,
     occurrence: Date,
     to: Date,
-    time: string | null,
-    seriesId: string
+    time: string | null
 ): OccurrenceEdit {
     const headingText = lines[headingLine] ?? '';
-    const repeating = findRepeatingLine(lines, headingLine, headingTitle(headingText));
-
-    const known = findProperty(lines, headingLine, ID_KEY)?.value;
-    const identifier = known !== undefined && known !== '' ? known : seriesId;
-
-    const replaced = toIsoDate(occurrence);
-    const standing = findReplacement(lines, identifier, replaced);
-    if (standing) {
-        // Moved a second time -- rescheduled again, or moved back a day --
-        // the replacement already written is the entry the notes carry for
-        // this occurrence, so it is rewritten rather than joined by a second
-        // one. `RECURRENCE_ID` stays as it is: which occurrence is being
-        // stood in for did not change, only where it now falls.
-        return rewriteReplacement(lines, standing, to, time);
-    }
+    const heading = headingTitle(headingText);
+    const repeating = findRepeatingLine(lines, headingLine, heading);
 
     const planning = lines[repeating.line] ?? '';
-    const moved = replacementLine(planning, repeating.span, to, time);
-    const held = writtenTime(planning, repeating.span);
-    const recurrence = held === null ? replaced : `${replaced} ${held}`;
-
-    const result =
-        known !== undefined && known !== '' ? [...lines] : setProperty(lines, headingLine, ID_KEY, identifier);
-
-    // A blank line between the entry and what stands above it, and none where
-    // the file already ends in one: the separator belongs between two entries,
-    // and one added on every write would open a gap that grows by a line per
-    // occurrence moved. The replacement goes at the end of the file, which is
-    // what two devices can both write without a conflict.
-    if (result.length > 0 && (result.at(-1) ?? '').trim() !== '') {
-        result.push('');
-    }
-    result.push(
-        headingText,
-        moved,
-        `\`\`\`${PROPERTIES_INFO}`,
-        `${SERIES_ID_KEY}: ${identifier}`,
-        `${RECURRENCE_ID_KEY}: ${recurrence}`,
-        '```'
+    const held = time ?? writtenTime(planning, repeating.span);
+    const written = movedLine(
+        indentation(planning),
+        toIsoDate(occurrence),
+        to,
+        held,
+        seriesWeekday(lines, headingLine, heading)
     );
 
+    const standing = findMovedLine(lines, headingLine, toIsoDate(occurrence));
+    if (standing !== null) {
+        if ((lines[standing] ?? '') === written) {
+            return { lines: [...lines], changed: false };
+        }
+        const rewritten = [...lines];
+        rewritten[standing] = written;
+        return { lines: rewritten, changed: true };
+    }
+
+    // An occurrence moved before ADR-0038 stands in an entry of its own,
+    // somewhere else in the file. It is moved again where it is rather than
+    // answered with a `MOVED` line here: the two would then both speak for the
+    // day, and the file would draw the occurrence twice.
+    const replacement = findReplacement(
+        lines,
+        findProperty(lines, headingLine, ID_KEY)?.value ?? '',
+        toIsoDate(occurrence)
+    );
+    if (replacement) {
+        return rewriteReplacement(lines, replacement, to, time);
+    }
+
+    // Under the last of the entry's planning and `MOVED` lines, so that the
+    // dates of one entry stay together and a second move does not push itself
+    // between the first one and the timestamp it belongs to.
+    const result = [...lines];
+    result.splice(lastPlanningLine(lines, headingLine, repeating.line) + 1, 0, written);
+
     return { lines: result, changed: true };
+}
+
+/**
+ * Which line of the entry already moves the occurrence of `day`, or `null`
+ * where none does.
+ */
+function findMovedLine(lines: readonly string[], headingLine: number, day: string): number | null {
+    for (let i = headingLine + 1; i < lines.length; i++) {
+        if (headingLevel(lines[i] ?? '') !== null) {
+            break;
+        }
+        if (matchMovedLine(lines[i] ?? '')?.from === day) {
+            return i;
+        }
+    }
+    return null;
+}
+
+/**
+ * The last line of the entry that carries a date -- a planning line or a
+ * `MOVED` line -- which is what a new one is written under.
+ */
+function lastPlanningLine(lines: readonly string[], headingLine: number, planning: number): number {
+    let last = planning;
+    for (let i = headingLine + 1; i < lines.length; i++) {
+        const text = lines[i] ?? '';
+        if (headingLevel(text) !== null) {
+            break;
+        }
+        if (matchMovedLine(text) || (matchTimestampLine(text) && i > last)) {
+            last = i;
+        }
+    }
+    return last;
+}
+
+/** Every occurrence the entry holds on another day, as its `MOVED` lines say. */
+export function movedOccurrences(lines: readonly string[], headingLine: number): MovedOccurrence[] {
+    const found: MovedOccurrence[] = [];
+    for (let i = headingLine + 1; i < lines.length; i++) {
+        if (headingLevel(lines[i] ?? '') !== null) {
+            break;
+        }
+        const moved = matchMovedLine(lines[i] ?? '');
+        // The first line naming an occurrence is the one that stands, which is
+        // how the core resolves a file holding two of them.
+        if (moved && !found.some((held) => held.from === moved.from)) {
+            found.push(moved);
+        }
+    }
+    return found;
 }
 
 /**
@@ -566,11 +626,6 @@ export function seriesWeekday(lines: readonly string[], headingLine: number, hea
     }
     const token = line.slice(second.start, second.end);
     return /^[А-Яа-яA-Za-z]+$/.test(token) ? token : null;
-}
-
-/** The line the series is planned on, so a caller can write beneath it. */
-export function planningLineOf(lines: readonly string[], headingLine: number, heading: string): number {
-    return findRepeatingLine(lines, headingLine, heading).line;
 }
 
 /** One day a repeating entry falls on, and what the file already says about that day. */
@@ -656,6 +711,7 @@ export function listOccurrences(
 
     const time = writtenTime(line, repeating.span);
     const series = findProperty(lines, headingLine, ID_KEY)?.value ?? '';
+    const moved = movedOccurrences(lines, headingLine);
     const excluded = new Set(
         (findProperty(lines, headingLine, EXDATE_KEY)?.value ?? '').split(/[,\s]+/).filter((day) => day !== '')
     );
@@ -674,7 +730,7 @@ export function listOccurrences(
                 day: falls,
                 time,
                 cancelled: excluded.has(falls),
-                moved: findReplacement(lines, series, falls) !== null
+                moved: moved.some((held) => held.from === falls) || findReplacement(lines, series, falls) !== null
             });
         }
         date = step(date, repeater);

@@ -4,9 +4,9 @@ import { formatError } from '../formatError';
 import type { FetchFn } from './oauth';
 import type { AccessTokenProvider } from './accessToken';
 import type { MapOptions } from './eventMapping';
-import { isSyncable, mapTaskToEvent } from './eventMapping';
+import { isSyncable, mapMovedOccurrenceToEvent, mapTaskToEvent } from './eventMapping';
 import { collectReplacedOccurrences, occurrencesMissingFrom } from './seriesExceptions';
-import { taskIdToEventId } from './eventId';
+import { movedEventId, taskIdToEventId } from './eventId';
 import { insertEvent, patchEvent, deleteEvent } from './calendarClient';
 import type { RunHandle } from './mutex';
 
@@ -196,6 +196,31 @@ export async function runSync(deps: SyncDeps): Promise<SyncSummary> {
                 // deferred write here is harmless: the next sync re-derives it and
                 // patches. Outcome intentionally ignored.
                 await deps.writer.write(task.file, task.line, task.heading, props);
+            }
+
+            // An occurrence held on another day (extractor ADR-0038) leaves as
+            // an event of its own: the day it left is already out of the rule
+            // as an EXDATE, and Google has no way to be handed an instance
+            // override on an event it has not expanded yet. Its id is derived
+            // from the series' and the day, so a later run patches this event
+            // rather than writing a second one.
+            for (const moved of task.moved_occurrences ?? []) {
+                const held = mapMovedOccurrenceToEvent(task, orgId, moved, deps.mapOptions(task));
+                const heldId = movedEventId(orgId, moved.from);
+                held.id = heldId;
+                const placed = await insertEvent(deps.fetchFn, deps.getToken, deps.calendarId, held, {
+                    signal: deps.signal
+                });
+                if (placed.status === 'conflict') {
+                    await patchEvent(deps.fetchFn, deps.getToken, deps.calendarId, heldId, held, {
+                        signal: deps.signal
+                    });
+                    summary.updated++;
+                    summary.changes.push({ action: 'updated', date: moved.to, heading: task.heading });
+                } else {
+                    summary.created++;
+                    summary.changes.push({ action: 'created', date: moved.to, heading: task.heading });
+                }
             }
         } catch (e) {
             const reason = formatError(e);

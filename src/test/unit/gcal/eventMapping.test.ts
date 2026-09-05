@@ -1,5 +1,10 @@
 import * as assert from 'node:assert/strict';
-import { isSyncable, mapTaskToEvent, addDaysToIsoDate } from '../../../utils/gcal/eventMapping';
+import {
+    isSyncable,
+    mapMovedOccurrenceToEvent,
+    mapTaskToEvent,
+    addDaysToIsoDate
+} from '../../../utils/gcal/eventMapping';
 import type { Task } from '../../../types';
 
 const base: Task = {
@@ -172,5 +177,75 @@ suite('gcal/eventMapping', () => {
         const ev = mapTaskToEvent({ ...base, timestamp_repeater: '+1w' }, 'oid', opts, []);
 
         assert.deepEqual(ev.recurrence, ['RRULE:FREQ=WEEKLY']);
+    });
+
+    const weekly: Task = { ...base, timestamp_time: '15:00', timestamp_repeater: '+1w' };
+
+    test('a moved occurrence leaves as a one-shot event on the day it went to', () => {
+        const ev = mapMovedOccurrenceToEvent(
+            weekly,
+            'oid',
+            { from: '2026-06-08', to: '2026-06-10', time: '13:00' },
+            opts
+        );
+
+        assert.deepEqual(ev.start, { dateTime: '2026-06-10T13:00:00', timeZone: 'Europe/Belgrade' });
+        // The rule belongs to the series; the occurrence would be drawn every
+        // week of its own if it carried one.
+        assert.deepEqual(ev.recurrence, []);
+        assert.equal(ev.summary, weekly.heading);
+    });
+
+    test('a move that names no hour is held at the hour the series is', () => {
+        const ev = mapMovedOccurrenceToEvent(weekly, 'oid', { from: '2026-06-08', to: '2026-06-10' }, opts);
+
+        assert.deepEqual(ev.start, { dateTime: '2026-06-10T15:00:00', timeZone: 'Europe/Belgrade' });
+    });
+
+    test("a move that names an hour does not keep the series' end", () => {
+        // 15:00-16:00 moved to 13:00 is not 13:00-16:00: an end written for
+        // one start says nothing about another, so the default length applies.
+        const ranged = { ...weekly, timestamp_end_time: '16:00' };
+        const ev = mapMovedOccurrenceToEvent(
+            ranged,
+            'oid',
+            { from: '2026-06-08', to: '2026-06-10', time: '13:00' },
+            opts
+        );
+
+        assert.deepEqual(ev.end, { dateTime: '2026-06-10T14:00:00', timeZone: 'Europe/Belgrade' });
+    });
+
+    test('a move naming a range is held over that range', () => {
+        const ev = mapMovedOccurrenceToEvent(
+            weekly,
+            'oid',
+            { from: '2026-06-08', to: '2026-06-10', time: '13:00', end_time: '14:30' },
+            opts
+        );
+
+        assert.deepEqual(ev.end, { dateTime: '2026-06-10T14:30:00', timeZone: 'Europe/Belgrade' });
+    });
+
+    test('the occurrence the event answers for travels with it', () => {
+        const ev = mapMovedOccurrenceToEvent(weekly, 'oid', { from: '2026-06-08', to: '2026-06-10' }, opts);
+
+        const carried = ev.extendedProperties?.private;
+        assert.ok(carried, 'the event carries the private properties');
+        assert.equal(carried.mdOrgOccurrence, '2026-06-08');
+        assert.equal(carried.mdOrgId, 'oid', 'the entry it comes from is still named');
+    });
+
+    test('a moved occurrence carries no exception of its own', () => {
+        // The EXDATE and the moves belong to the series' event. Carried here
+        // they would ride beside no rule at all, which Google rejects.
+        const carrying = {
+            ...weekly,
+            excluded_dates: ['2026-06-15'],
+            moved_occurrences: [{ from: '2026-06-08', to: '2026-06-10' }]
+        };
+        const ev = mapMovedOccurrenceToEvent(carrying, 'oid', { from: '2026-06-08', to: '2026-06-10' }, opts);
+
+        assert.deepEqual(ev.recurrence, []);
     });
 });
