@@ -22,7 +22,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Quick Fix -- drop the repeater, drop the hour, convert the brackets -- and
   one fix takes out one fault, so a line with two says the second once the
   first is gone. A half that is not a date, and a day already moved, carry no
-  fix: what was meant is not there to guess.
+  fix: what was meant is not there to guess. Two faults the extractor does not
+  refuse are warned about as well, because the editor cannot work with them:
+  an occurrence written as a bare date, which no date key can step, and a move
+  standing in an entry whose planning line carries no repeater, which has one
+  date and no occurrences for the line to name. The bare form converts in one
+  keystroke; the entry that does not repeat carries no fix, since a repeater
+  on the entry and an edit of the date itself are both answers and the line
+  does not say which was meant.
+- A written `MOVED` line names the weekday on both halves, always. A day
+  written as digits alone says nothing about a step that landed on the wrong
+  day, and the weekday beside the date is what makes one visible. The spelling
+  is the series' own where its planning line has a weekday, the first weekday
+  the file writes anywhere otherwise, and English where the file writes none.
 - One occurrence of a series is cancelled or moved without touching the rest of
   it. "Cancel One Occurrence" adds the day to the series' own `EXDATE`, and it
   goes on repeating around the gap; "Move One Occurrence" writes a line of the

@@ -96,6 +96,39 @@ suite('MOVED diagnostics + Quick Fix', () => {
         await waitForMovedDiagnostics(doc.uri, 0);
     });
 
+    test('a move in an entry that does not repeat is reported beside the line itself', async () => {
+        const doc = await vscode.workspace.openTextDocument({
+            language: 'markdown',
+            content: [
+                '## TODO Write the report',
+                '`SCHEDULED: <2026-08-06 Thu 15:00>`',
+                '`MOVED: [2026-08-20 Thu] -> <2026-08-22 Sat 18:00>`'
+            ].join('\n')
+        });
+        await vscode.window.showTextDocument(doc);
+        const diagnostics = await waitForMovedDiagnostics(doc.uri, 1);
+        assert.match(diagnostics[0]!.message, /does not repeat/);
+    });
+
+    test('the bare occurrence of the older form is offered the bracketed one', async () => {
+        const doc = await open('`MOVED: 2026-08-20 -> <2026-08-22 Sat 18:00>`');
+        const [diagnostic] = await waitForMovedDiagnostics(doc.uri, 1);
+
+        const actions = await vscode.commands.executeCommand<vscode.CodeAction[] | undefined>(
+            'vscode.executeCodeActionProvider',
+            doc.uri,
+            diagnostic!.range,
+            vscode.CodeActionKind.QuickFix.value
+        );
+        const ours = (actions ?? []).filter((a) => a.title === 'Convert to [2026-08-20 Thu]');
+        const edit = ours[0]?.edit;
+        assert.ok(edit, `expected the bracket fix, got: ${actions?.map((a) => a.title)}`);
+        await vscode.workspace.applyEdit(edit);
+
+        assert.strictEqual(doc.lineAt(2).text, '`MOVED: [2026-08-20 Thu] -> <2026-08-22 Sat 18:00>`');
+        await waitForMovedDiagnostics(doc.uri, 0);
+    });
+
     test('a fault with nothing to guess is reported without a fix', async () => {
         const doc = await open('`MOVED: next Thursday -> <2026-08-22 Sat 18:00>`');
         const [diagnostic] = await waitForMovedDiagnostics(doc.uri, 1);
@@ -112,7 +145,9 @@ suite('MOVED diagnostics + Quick Fix', () => {
 
     test('a warning does not stop the line from being read: the planning line keeps its own', async () => {
         // The bracket diagnostics and these run over the same document; a
-        // SCHEDULED written inactive is still reported by its own collection.
+        // SCHEDULED written inactive is still reported by its own collection,
+        // and its repeater is still read here, so the entry is not also
+        // reported as one that does not repeat.
         const doc = await vscode.workspace.openTextDocument({
             language: 'markdown',
             content: [

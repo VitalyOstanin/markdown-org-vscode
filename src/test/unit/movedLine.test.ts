@@ -1,6 +1,6 @@
 import * as assert from 'node:assert';
 import { suite, test } from 'mocha';
-import { matchMovedLine, movedDayColumn, movedLine } from '../../utils/movedLine';
+import { matchMovedLine, movedDayColumn, movedLine, weekdaySample } from '../../utils/movedLine';
 
 /** A date in local time, which is the only time these files are written in. */
 function on(text: string): Date {
@@ -27,10 +27,18 @@ suite('the line a move is written on', () => {
         assert.strictEqual(line, '`MOVED: [2026-09-08 tue] -> <2026-09-15 tue>`');
     });
 
-    test('names no weekday where the series names none, and no hour where it has none', () => {
-        const line = movedLine('    ', on('2026-09-08'), on('2026-09-15'), null, null);
+    test('names the weekday on both halves and no hour where it has none', () => {
+        const line = movedLine('    ', on('2026-09-08'), on('2026-09-15'), null, 'Mon');
 
-        assert.strictEqual(line, '    `MOVED: [2026-09-08] -> <2026-09-15>`');
+        assert.strictEqual(line, '    `MOVED: [2026-09-08 Tue] -> <2026-09-15 Tue>`');
+    });
+
+    test('the sample is the first weekday the file already writes', () => {
+        assert.strictEqual(weekdaySample(['# TODO Урок', '`SCHEDULED: <2026-09-08 Вт 15:00 +1w>`']), 'Вт');
+    });
+
+    test('a file that writes no weekday at all is answered in English', () => {
+        assert.strictEqual(weekdaySample(['# TODO Lesson', '`SCHEDULED: <2026-09-08 +1w>`']), 'Mon');
     });
 
     test('is read back as the two days and the hour', () => {

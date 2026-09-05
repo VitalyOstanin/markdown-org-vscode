@@ -50,15 +50,34 @@ export function matchMovedLine(text: string): MovedOccurrence | null {
 /**
  * The `MOVED` line for holding `from` on `to`.
  *
- * `weekday` is the weekday as the series' own timestamp spells it, so that a
- * file writing "Пн" is not answered with "Mon"; where the series names no
- * weekday, neither half of the line names one.
+ * `weekday` is a weekday spelt the way the file spells its own, so that a file
+ * writing "Пн" is not answered with "Mon". Both halves carry one: a day named
+ * by digits alone says nothing about a wrong step, and the weekday beside the
+ * date is what makes one visible. `weekdaySample` finds the sample when the
+ * series' own planning line names no weekday.
  */
-export function movedLine(indent: string, from: Date, to: Date, time: string | null, weekday: string | null): string {
-    const address = weekday === null ? toIsoDate(from) : `${toIsoDate(from)} ${spelt(from, weekday)}`;
-    const named = weekday === null ? '' : ` ${spelt(to, weekday)}`;
+export function movedLine(indent: string, from: Date, to: Date, time: string | null, weekday: string): string {
     const held = time === null ? '' : ` ${time}`;
-    return `${indent}\`MOVED: [${address}] -> <${toIsoDate(to)}${named}${held}>\``;
+    return (
+        `${indent}\`MOVED: [${toIsoDate(from)} ${spelt(from, weekday)}] -> ` +
+        `<${toIsoDate(to)} ${spelt(to, weekday)}${held}>\``
+    );
+}
+
+/**
+ * A weekday to spell new ones from: the first one the file already writes, so
+ * the language is the file's rather than this extension's. `Mon` where the
+ * file writes none at all -- a first move in a file of bare dates has to pick
+ * something, and the date beside it names the day either way.
+ */
+export function weekdaySample(lines: readonly string[]): string {
+    for (const line of lines) {
+        const weekday = /[<[]\d{4}-\d{2}-\d{2} (?<weekday>[А-Яа-яA-Za-z]+)/.exec(line)?.groups?.weekday;
+        if (weekday !== undefined) {
+            return weekday;
+        }
+    }
+    return 'Mon';
 }
 
 /** The weekday of `date`, written the way `sample` is. */

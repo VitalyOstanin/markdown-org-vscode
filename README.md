@@ -248,21 +248,26 @@ only a day, written bare or inactive; where it is held after the arrow
 is an active timestamp that may name a weekday, an hour and a range of
 hours. What the line may not carry is warned about with the reason:
 
-| Fault                                         | What the warning says                                       |
-| --------------------------------------------- | ----------------------------------------------------------- |
-| No `->`                                       | The line is read as prose and nothing moves.                |
-| The occurrence written `<...>`                | It is an address, not a time the entry is kept.             |
-| The occurrence named to the hour              | A series draws at most one occurrence a day.                |
-| A repeater on either half                     | One occurrence does not repeat; that belongs to the series. |
-| A warning cookie on either half               | How far ahead a deadline warns belongs to the series.       |
-| The target written `[...]`, bare, or unpaired | Where an occurrence is held is active.                      |
-| A day this entry already moves                | The first move stands; the second line is read as prose.    |
+| №   | Fault                                         | What the warning says                                                |
+| --- | --------------------------------------------- | -------------------------------------------------------------------- |
+| 1   | No `->`                                       | The line is read as prose and nothing moves.                         |
+| 2   | The occurrence written `<...>`                | It is an address, not a time the entry is kept.                      |
+| 3   | The occurrence written bare                   | Both halves are timestamps, and both are stepped with the date keys. |
+| 4   | The occurrence named to the hour              | A series draws at most one occurrence a day.                         |
+| 5   | A repeater on either half                     | One occurrence does not repeat; that belongs to the series.          |
+| 6   | A warning cookie on either half               | How far ahead a deadline warns belongs to the series.                |
+| 7   | The target written `[...]`, bare, or unpaired | Where an occurrence is held is active.                               |
+| 8   | A day this entry already moves                | The first move stands; the second line is read as prose.             |
+| 9   | The entry's planning line has no repeater     | An entry that does not repeat has no occurrence to move.             |
+| 10  | A half that is not a date at all              | The line is read as prose.                                           |
 
 Every fault the editor can name a correction for carries a Quick Fix
--- **Drop the repeater**, **Drop the hour**, **Convert to `[...]`**.
-A half that is not a date at all, and a day already moved, carry none:
-what was meant is not there to guess. A line with two faults reports
-the one the extractor stops at, and the next after that one is fixed.
+-- **Drop the repeater**, **Drop the hour**, **Convert to
+`[2026-08-20 Thu]`**. A half that is not a date, a day already moved,
+and an entry that does not repeat carry none: what was meant is not
+there to guess. One fix takes out one fault, so a line with two says
+the second once the first is gone, and the fault of the entry stands
+beside the fault of the line rather than hiding it.
 
 To flip a bare inline timestamp between `<...>` and `[...]`, run
 `Markdown Org: Toggle Timestamp Active/Inactive` from the Command
@@ -398,10 +403,15 @@ class moved to Wednesday is one line under the class, rather than an entry at
 the end of the file under whatever heading happens to be last. The line is
 written the way the planning lines around it are -- an inline-code span, at
 their indentation, with the weekday spelt as the file spells it. Both halves
-are timestamps, and the brackets say which is which: the occurrence is an
-address, written inactive, and the day it moves to is when the entry is kept,
-written active. What follows the arrow may name a weekday, an hour and a range
-of hours; it may not carry a repeater or a warning cookie, because one
+name a weekday, always: a day written as digits alone says nothing about a
+step that landed on the wrong day, and the weekday beside the date is what
+makes one visible. The spelling comes from the series' own planning line where
+it has a weekday, from the first weekday the file writes anywhere otherwise,
+and from English where the file writes none. Both halves are timestamps, and
+the brackets say which is which: the occurrence is an address, written
+inactive, and the day it moves to is when the entry is kept, written active.
+What follows the arrow may name an hour and a range of hours; it may not carry
+a repeater or a warning cookie, because one
 occurrence does not repeat and how far ahead a deadline warns belongs to the
 series. What stands before it is a day and only a day: an active timestamp, an
 hour, a repeater or a warning cookie there are refused. The move needs no `ID`

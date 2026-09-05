@@ -30,8 +30,34 @@ suite('movedPolicy', () => {
         );
     });
 
-    test('the bare occurrence of the older form is still accepted', () => {
-        assert.deepEqual(validateMovedLines([SERIES, PLANNING, '`MOVED: 2026-08-20 -> <2026-08-22 Sat 18:00>`']), []);
+    test('the bare occurrence of the older form is offered the bracketed one', () => {
+        const line = '`MOVED: 2026-08-20 -> <2026-08-22 Sat 18:00>`';
+        assert.equal(only(line).kind, 'occurrence-bare');
+        assert.equal(fixed(line), '`MOVED: [2026-08-20 Thu] -> <2026-08-22 Sat 18:00>`');
+    });
+
+    test('the weekday of the fix is spelt the way the series spells its own', () => {
+        const line = '`MOVED: 2026-08-20 -> <2026-08-22 сб 18:00>`';
+        const russian = ['# TODO Английский', '`SCHEDULED: <2026-08-06 чт 15:00 +1w>`', line];
+        const found = validateMovedLines(russian);
+        assert.equal(found.length, 1);
+        assert.equal(found[0]?.replacement, '[2026-08-20 чт]');
+    });
+
+    test('a file writing no weekday anywhere is answered in English', () => {
+        const found = validateMovedLines([
+            SERIES,
+            '`SCHEDULED: <2026-08-06 +1w>`',
+            '`MOVED: 2026-08-20 -> <2026-08-22 18:00>`'
+        ]);
+        assert.equal(found.length, 1);
+        assert.equal(found[0]?.replacement, '[2026-08-20 Thu]');
+    });
+
+    test('a bare occurrence that says more than a day is not a date to the extractor', () => {
+        const line = '`MOVED: 2026-08-20 Thu -> <2026-08-22 Sat 18:00>`';
+        assert.equal(only(line).kind, 'occurrence-not-a-date');
+        assert.equal(fixed(line), '`MOVED: [2026-08-20 Thu] -> <2026-08-22 Sat 18:00>`');
     });
 
     test('an occurrence held between two hours says nothing', () => {
@@ -200,6 +226,51 @@ suite('movedPolicy', () => {
                 '`MOVED: [2026-08-20 Thu] -> <2026-08-22 Sat 17:00>`'
             ]),
             []
+        );
+    });
+
+    test('a move in an entry that does not repeat is named as having no occurrence', () => {
+        const found = validateMovedLines([
+            '# TODO Write the report',
+            '`SCHEDULED: <2026-08-06 Thu 15:00>`',
+            '`MOVED: [2026-08-20 Thu] -> <2026-08-22 Sat 18:00>`'
+        ]);
+        assert.equal(found.length, 1);
+        assert.equal(found[0]?.kind, 'entry-does-not-repeat');
+        assert.equal(found[0].replacement, null);
+    });
+
+    test('an entry with no planning line at all does not repeat either', () => {
+        const found = validateMovedLines([
+            '# TODO Write the report',
+            '`MOVED: [2026-08-20 Thu] -> <2026-08-22 Sat 18:00>`'
+        ]);
+        assert.equal(found.length, 1);
+        assert.equal(found[0]?.kind, 'entry-does-not-repeat');
+    });
+
+    test('a DEADLINE that repeats is a series like any other', () => {
+        assert.deepEqual(
+            validateMovedLines([
+                '# TODO Rent',
+                '`DEADLINE: <2026-08-06 Thu ++1m -3d>`',
+                '`MOVED: [2026-09-06 Sun] -> <2026-09-04 Fri>`'
+            ]),
+            []
+        );
+    });
+
+    test('the entry fault stands beside the line fault rather than hiding it', () => {
+        // Two corrections: the entry needs a repeater, and the line needs its
+        // brackets. Reporting only the first would have the second found twice.
+        const found = validateMovedLines([
+            '# TODO Write the report',
+            '`SCHEDULED: <2026-08-06 Thu 15:00>`',
+            '`MOVED: <2026-08-20 Thu> -> <2026-08-22 Sat 18:00>`'
+        ]);
+        assert.deepEqual(
+            found.map((violation) => violation.kind),
+            ['entry-does-not-repeat', 'occurrence-active']
         );
     });
 

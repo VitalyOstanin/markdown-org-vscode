@@ -10,7 +10,10 @@
 
 ## Status
 
-Accepted, 2026-09-05.
+Accepted, 2026-09-05. Amended by
+[ADR-0028](0028-a-move-is-written-and-warned-about-in-full.md) (2026-09-05):
+an occurrence written bare and a move in an entry that does not repeat are
+warned about as well, and a written line always names the weekday.
 
 ## Context
 

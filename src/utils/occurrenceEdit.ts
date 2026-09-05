@@ -35,7 +35,7 @@
 // rewritten token by token -- mirrors that module rather than the extension's
 // own habits.
 import { HEADING_REGEX, headingLevel, matchTimestampLine, type TimestampLineMatch } from '../orgPatterns';
-import { matchMovedLine, movedLine, type MovedOccurrence } from './movedLine';
+import { matchMovedLine, movedLine, weekdaySample, type MovedOccurrence } from './movedLine';
 import { findOrgPropertiesBlocks } from './orgProperties';
 import { nextOccurrence, parseRepeater, type Repeater } from './repeater';
 import { getWeekdayName } from './incrementTimestamp';
@@ -489,7 +489,8 @@ export function moveOccurrence(
 
     const planning = lines[repeating.line] ?? '';
     const held = time ?? writtenTime(planning, repeating.span);
-    const written = movedLine(indentation(planning), occurrence, to, held, seriesWeekday(lines, headingLine, heading));
+    const spelling = seriesWeekday(lines, headingLine, heading) ?? weekdaySample(lines);
+    const written = movedLine(indentation(planning), occurrence, to, held, spelling);
 
     const standing = findMovedLine(lines, headingLine, toIsoDate(occurrence));
     if (standing !== null) {

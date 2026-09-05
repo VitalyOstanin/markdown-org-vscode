@@ -12,6 +12,8 @@
  */
 
 import { namedGroups } from '../utils/regexGroups';
+import { getWeekdayName } from '../utils/incrementTimestamp';
+import { weekdaySample } from '../utils/movedLine';
 
 /** `MOVED: <anything>` inside an inline-code span, at any indentation. */
 const MOVED_LINE_REGEX = /^(?<indent>\s*)`MOVED:(?<body>[^`]*)`\s*$/;
@@ -29,6 +31,8 @@ const HALF_REGEX =
 export type MovedViolationKind =
     | 'no-arrow'
     | 'occurrence-not-a-date'
+    | 'occurrence-bare'
+    | 'entry-does-not-repeat'
     | 'occurrence-mixed-pair'
     | 'occurrence-active'
     | 'occurrence-has-a-repeater'
@@ -68,32 +72,84 @@ export interface MovedViolation {
  */
 export function validateMovedLines(lines: string[]): MovedViolation[] {
     const violations: MovedViolation[] = [];
-    let daysMovedInThisEntry = new Set<string>();
+    const fallbackWeekday = weekdaySample(lines);
+    const fresh = (): Entry => ({ daysMoved: new Set<string>(), weekday: null, repeats: false });
+    let entry = fresh();
 
     lines.forEach((text, line) => {
         if (/^\s*#{1,6}[ \t]/.test(text)) {
-            daysMovedInThisEntry = new Set<string>();
+            entry = fresh();
             return;
         }
-        const found = validateMovedLine(text, line, daysMovedInThisEntry);
-        if (found) {
-            violations.push(found);
+        const planning = PLANNING_REGEX.exec(text);
+        if (planning) {
+            const { weekday, repeater } = planning.groups ?? {};
+            entry.weekday ??= weekday ?? null;
+            entry.repeats ||= repeater !== undefined;
         }
+        violations.push(...validateMovedLine(text, line, entry, fallbackWeekday));
     });
 
     return violations;
 }
 
-function validateMovedLine(text: string, line: number, movedDays: Set<string>): MovedViolation | null {
+/** What the lines above a `MOVED` line say about the entry it belongs to. */
+interface Entry {
+    /** Days this entry already moves, so a second answer for one is visible. */
+    daysMoved: Set<string>;
+    /**
+     * The weekday of the entry's own planning line, as that line spells it --
+     * the sample the address is written from, so a file writing "Пн" is not
+     * answered with "Mon". Null where the planning line names no weekday.
+     */
+    weekday: string | null;
+    /**
+     * A planning line of the entry carries a repeater. An entry that does not
+     * repeat has one date and no occurrences, so there is nothing for a move
+     * to name.
+     */
+    repeats: boolean;
+}
+
+/**
+ * A planning line of an entry, read for its weekday and its repeater. Both
+ * bracket forms are accepted: a planning line written inactive is a fault of
+ * its own, reported by the bracket diagnostics, and reading it as no series
+ * here would answer that one fault with a second, unrelated complaint.
+ */
+const PLANNING_REGEX =
+    /`(?:SCHEDULED|DEADLINE): [<[]\d{4}-\d{2}-\d{2}(?: (?<weekday>[А-Яа-яA-Za-z]+))?(?:[^>\]]*?(?<repeater>(?:\.\+|\+\+|\+)\d+(?:wd|[dwmyh])))?[^>\]]*[>\]]`/;
+
+function validateMovedLine(text: string, line: number, entry: Entry, fallbackWeekday: string): MovedViolation[] {
     const matched = MOVED_LINE_REGEX.exec(text);
-    if (!matched?.groups) return null;
+    if (!matched?.groups) return [];
 
     const { body } = namedGroups(matched, 'body');
     const bodyStart = text.indexOf('`') + '`MOVED:'.length;
 
+    // Reported beside whatever the line itself says, not instead of it: the
+    // entry gaining a repeater and the line being well-formed are two
+    // corrections, and hiding one behind the other means finding it twice.
+    const found: MovedViolation[] = entry.repeats
+        ? []
+        : [
+              {
+                  line,
+                  startCharacter: text.indexOf('`'),
+                  endCharacter: text.lastIndexOf('`') + 1,
+                  kind: 'entry-does-not-repeat',
+                  message:
+                      'A move names one occurrence of a series, and this entry does not repeat: its ' +
+                      'planning line carries no repeater, so it has one date and no occurrences to move. ' +
+                      'Change the date itself, or give the entry a repeater (ADR-0038).',
+                  replacement: null,
+                  fixTitle: null
+              }
+          ];
+
     const arrow = body.indexOf('->');
     if (arrow < 0) {
-        return {
+        found.push({
             line,
             startCharacter: bodyStart,
             endCharacter: bodyStart + body.length,
@@ -103,13 +159,18 @@ function validateMovedLine(text: string, line: number, movedDays: Set<string>): 
                 'The extractor reads this line as prose and leaves the occurrence where it was (ADR-0038).',
             replacement: null,
             fixTitle: null
-        };
+        });
+        return found;
     }
 
     const left = span(body, bodyStart, 0, arrow);
     const right = span(body, bodyStart, arrow + '->'.length, body.length);
 
-    return occurrenceViolation(left, line, movedDays) ?? targetViolation(right, line);
+    const half = occurrenceViolation(left, line, entry, fallbackWeekday) ?? targetViolation(right, line);
+    if (half) {
+        found.push(half);
+    }
+    return found;
 }
 
 interface Half {
@@ -138,7 +199,7 @@ function span(body: string, bodyStart: number, from: number, to: number): Half {
  * refusal, so reporting a later one first would name a fault the reader does
  * not have yet.
  */
-function occurrenceViolation(half: Half, line: number, movedDays: Set<string>): MovedViolation | null {
+function occurrenceViolation(half: Half, line: number, entry: Entry, fallbackWeekday: string): MovedViolation | null {
     const at = (kind: MovedViolationKind, message: string, replacement: string | null, fixTitle: string | null) => ({
         line,
         startCharacter: half.start,
@@ -163,6 +224,19 @@ function occurrenceViolation(half: Half, line: number, movedDays: Set<string>): 
     const { date } = namedGroups(parts, 'date');
     const { open = '', close = '', time, repeater, warning } = parts.groups ?? {};
 
+    if (open === '' && close === '' && half.text !== date) {
+        // The extractor reads a bare occurrence only as `YYYY-MM-DD` exactly:
+        // it parses the whole half as a date, and falls back to a timestamp
+        // parse that needs brackets. A weekday or a repeater written bare is
+        // therefore not a date to it, whatever it looks like.
+        return at(
+            'occurrence-not-a-date',
+            'Written without brackets, the occurrence is read only as `YYYY-MM-DD` exactly, and this one ' +
+                'says more. Anything beyond the day belongs inside an inactive timestamp (ADR-0039).',
+            `[${inner(parts)}]`,
+            `Convert to [${inner(parts)}]`
+        );
+    }
     if (!(open === '' && close === '') && !paired(open, close)) {
         return at(
             'occurrence-mixed-pair',
@@ -208,7 +282,7 @@ function occurrenceViolation(half: Half, line: number, movedDays: Set<string>): 
             'Drop the hour'
         );
     }
-    if (movedDays.has(date)) {
+    if (entry.daysMoved.has(date)) {
         return at(
             'occurrence-moved-twice',
             `This entry already moves ${date}. The extractor keeps the first move and reads this line as ` +
@@ -218,8 +292,28 @@ function occurrenceViolation(half: Half, line: number, movedDays: Set<string>): 
         );
     }
 
-    movedDays.add(date);
+    entry.daysMoved.add(date);
+
+    if (open === '') {
+        const written = address(date, entry.weekday ?? fallbackWeekday);
+        return at(
+            'occurrence-bare',
+            'The occurrence a move names is written as an inactive timestamp, so that both halves of the ' +
+                'line are timestamps and both are stepped with the date keys (ADR-0039). A bare date is ' +
+                'still read, and is what this extension wrote before.',
+            written,
+            `Convert to ${written}`
+        );
+    }
+
     return null;
+}
+
+/** The occurrence written the way this extension writes it, weekday and all. */
+function address(date: string, sample: string): string {
+    const [year, month, day] = date.split('-').map(Number);
+    const name = getWeekdayName(new Date(year ?? 0, (month ?? 1) - 1, day ?? 1), sample);
+    return `[${date} ${sample === sample.toLowerCase() ? name.toLowerCase() : name}]`;
 }
 
 /**
