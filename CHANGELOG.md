@@ -5,7 +5,7 @@ All notable changes to the "Markdown Org" extension will be documented in this f
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.20.0] - 2026-09-03
+## [0.20.0] - 2026-09-05
 
 ### Added
 
@@ -132,6 +132,12 @@ Timestamp` stays what it was, for entries typed into the editor by hand.
     apply, not a second copy of it here.
 
 ### Changed
+
+- The list of features in the README names the three the release adds. Moving
+  and cancelling one occurrence of a series, changing an entry by saying what to
+  change, and the checking of planning lines as they are written each had a
+  section of their own and no line in the list a reader starts from, so the
+  three read as absent to anyone who did not scroll past the settings.
 
 - The README names the Android client as the third project reading these files,
   with the day, week and month it draws on a phone and where its builds come
