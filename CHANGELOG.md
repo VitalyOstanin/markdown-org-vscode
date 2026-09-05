@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- A `MOVED` line the extractor would refuse is warned about in the editor,
+  where the line is written, rather than only in the `org-properties` channel
+  a reader does not look at. The rules are the extractor's own: the occurrence
+  before the arrow is a day and only a day, written bare or inactive; where it
+  is held after the arrow is an active timestamp, which may name a weekday, an
+  hour and a range of hours and may not carry a repeater or a warning cookie.
+  A missing arrow, a bracket form that says the wrong thing, an hour on the
+  occurrence, a repeater or cookie on either half, and a day the same entry
+  already moves are each reported with the reason, at the half at fault rather
+  than over the whole line. Every fault with a guessable correction carries a
+  Quick Fix -- drop the repeater, drop the hour, convert the brackets -- and
+  one fix takes out one fault, so a line with two says the second once the
+  first is gone. A half that is not a date, and a day already moved, carry no
+  fix: what was meant is not there to guess.
 - One occurrence of a series is cancelled or moved without touching the rest of
   it. "Cancel One Occurrence" adds the day to the series' own `EXDATE`, and it
   goes on repeating around the gap; "Move One Occurrence" writes a line of the

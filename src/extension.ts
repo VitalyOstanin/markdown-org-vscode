@@ -29,6 +29,7 @@ import { connectGcal, disconnectGcal, selectCalendar, syncNow, registerGcalSaveT
 import { notifyError } from './utils/notify';
 import { withErrorReporting } from './utils/orgCommandWrap';
 import { registerBracketDiagnostics } from './diagnostics/timestampBrackets';
+import { registerMovedDiagnostics } from './diagnostics/movedLineDiagnostics';
 import { registerOrgHighlight } from './decorations/orgHighlight';
 import { registerTimestampAdjustableContext } from './commands/timestampAdjustableContext';
 import { openNotesRepositories } from './utils/git/gitApi';
@@ -142,6 +143,7 @@ export function activate(context: vscode.ExtensionContext) {
     registerOrgCommand(context, 'markdown-org.gcalSync.syncNow', () => syncNow(context));
 
     registerBracketDiagnostics(context);
+    registerMovedDiagnostics(context);
     registerOrgHighlight(context);
     registerTimestampAdjustableContext(context);
     registerGcalSaveTrigger(context);

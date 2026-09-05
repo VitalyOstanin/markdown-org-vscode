@@ -1,0 +1,211 @@
+import * as assert from 'node:assert/strict';
+import { validateMovedLines } from '../../diagnostics/movedPolicy';
+import type { MovedViolation } from '../../diagnostics/movedPolicy';
+
+const SERIES = '# TODO English';
+const PLANNING = '`SCHEDULED: <2026-08-06 Thu 15:00 +1w>`';
+
+/** The one violation a document of a series and one MOVED line produces. */
+function only(moved: string): MovedViolation {
+    const found = validateMovedLines([SERIES, PLANNING, moved]);
+    assert.equal(found.length, 1, `expected one violation, got ${JSON.stringify(found)}`);
+    const violation = found[0];
+    assert.ok(violation);
+    return violation;
+}
+
+/** The text the quick fix leaves in place of what it underlined. */
+function fixed(moved: string): string {
+    const violation = only(moved);
+    const { replacement } = violation;
+    assert.ok(replacement !== null, 'the violation offers no fix');
+    return moved.slice(0, violation.startCharacter) + replacement + moved.slice(violation.endCharacter);
+}
+
+suite('movedPolicy', () => {
+    test('a line written the way the extension writes it says nothing', () => {
+        assert.deepEqual(
+            validateMovedLines([SERIES, PLANNING, '`MOVED: [2026-08-20 Thu] -> <2026-08-22 Sat 18:00>`']),
+            []
+        );
+    });
+
+    test('the bare occurrence of the older form is still accepted', () => {
+        assert.deepEqual(validateMovedLines([SERIES, PLANNING, '`MOVED: 2026-08-20 -> <2026-08-22 Sat 18:00>`']), []);
+    });
+
+    test('an occurrence held between two hours says nothing', () => {
+        assert.deepEqual(
+            validateMovedLines([SERIES, PLANNING, '`MOVED: [2026-08-20 Thu] -> <2026-08-22 Sat 15:00-16:30>`']),
+            []
+        );
+    });
+
+    test('a line at the indentation of the planning lines is read the same', () => {
+        assert.deepEqual(
+            validateMovedLines([SERIES, PLANNING, '    `MOVED: [2026-08-20 Thu] -> <2026-08-22 Sat 18:00>`']),
+            []
+        );
+    });
+
+    test('a line that is not a move is left alone', () => {
+        assert.deepEqual(validateMovedLines([SERIES, PLANNING, 'A note about the class being moved.']), []);
+    });
+
+    test('a move with no arrow names what is missing', () => {
+        const violation = only('`MOVED: [2026-08-20 Thu] <2026-08-22 Sat 18:00>`');
+        assert.equal(violation.kind, 'no-arrow');
+        assert.equal(violation.replacement, null);
+    });
+
+    test('an occurrence written active is offered the inactive form', () => {
+        const violation = only('`MOVED: <2026-08-20 Thu> -> <2026-08-22 Sat 18:00>`');
+        assert.equal(violation.kind, 'occurrence-active');
+        assert.equal(
+            fixed('`MOVED: <2026-08-20 Thu> -> <2026-08-22 Sat 18:00>`'),
+            '`MOVED: [2026-08-20 Thu] -> <2026-08-22 Sat 18:00>`'
+        );
+    });
+
+    test('an occurrence with one bracket is a mixed pair, not a missing date', () => {
+        const violation = only('`MOVED: [2026-08-20 Thu -> <2026-08-22 Sat 18:00>`');
+        assert.equal(violation.kind, 'occurrence-mixed-pair');
+        assert.equal(
+            fixed('`MOVED: [2026-08-20 Thu -> <2026-08-22 Sat 18:00>`'),
+            '`MOVED: [2026-08-20 Thu] -> <2026-08-22 Sat 18:00>`'
+        );
+    });
+
+    test('an occurrence carrying a repeater loses only the repeater', () => {
+        const violation = only('`MOVED: [2026-08-20 Thu +1w] -> <2026-08-22 Sat 18:00>`');
+        assert.equal(violation.kind, 'occurrence-has-a-repeater');
+        assert.equal(
+            fixed('`MOVED: [2026-08-20 Thu +1w] -> <2026-08-22 Sat 18:00>`'),
+            '`MOVED: [2026-08-20 Thu] -> <2026-08-22 Sat 18:00>`'
+        );
+    });
+
+    test('an occurrence carrying a warning cookie loses only the cookie', () => {
+        const violation = only('`MOVED: [2026-08-20 Thu -3d] -> <2026-08-22 Sat 18:00>`');
+        assert.equal(violation.kind, 'occurrence-has-a-warning-cookie');
+        assert.equal(
+            fixed('`MOVED: [2026-08-20 Thu -3d] -> <2026-08-22 Sat 18:00>`'),
+            '`MOVED: [2026-08-20 Thu] -> <2026-08-22 Sat 18:00>`'
+        );
+    });
+
+    test('an occurrence named to the hour loses the hour', () => {
+        const violation = only('`MOVED: [2026-08-20 Thu 15:00] -> <2026-08-22 Sat 18:00>`');
+        assert.equal(violation.kind, 'occurrence-has-an-hour');
+        assert.equal(
+            fixed('`MOVED: [2026-08-20 Thu 15:00] -> <2026-08-22 Sat 18:00>`'),
+            '`MOVED: [2026-08-20 Thu] -> <2026-08-22 Sat 18:00>`'
+        );
+    });
+
+    test('a line carrying two faults reports the one the extractor stops at', () => {
+        // The extractor refuses the repeater before it looks at the hour, so a
+        // fix that dropped both would answer a question the reader has not
+        // reached; the hour is reported on the pass after the repeater is gone.
+        const line = '`MOVED: [2026-08-20 Thu 15:00 +1w] -> <2026-08-22 Sat 18:00>`';
+        assert.equal(only(line).kind, 'occurrence-has-a-repeater');
+        assert.equal(fixed(line), '`MOVED: [2026-08-20 Thu 15:00] -> <2026-08-22 Sat 18:00>`');
+    });
+
+    test('an occurrence that is not a date at all offers no fix', () => {
+        const violation = only('`MOVED: next Thursday -> <2026-08-22 Sat 18:00>`');
+        assert.equal(violation.kind, 'occurrence-not-a-date');
+        assert.equal(violation.replacement, null);
+        assert.equal(violation.fixTitle, null);
+    });
+
+    test('a target written inactive is offered the active form', () => {
+        const violation = only('`MOVED: [2026-08-20 Thu] -> [2026-08-22 Sat 18:00]`');
+        assert.equal(violation.kind, 'target-inactive');
+        assert.equal(
+            fixed('`MOVED: [2026-08-20 Thu] -> [2026-08-22 Sat 18:00]`'),
+            '`MOVED: [2026-08-20 Thu] -> <2026-08-22 Sat 18:00>`'
+        );
+    });
+
+    test('a target with no brackets is given them', () => {
+        const violation = only('`MOVED: [2026-08-20 Thu] -> 2026-08-22 Sat 18:00`');
+        assert.equal(violation.kind, 'target-not-a-timestamp');
+        assert.equal(
+            fixed('`MOVED: [2026-08-20 Thu] -> 2026-08-22 Sat 18:00`'),
+            '`MOVED: [2026-08-20 Thu] -> <2026-08-22 Sat 18:00>`'
+        );
+    });
+
+    test('a target carrying a repeater loses it', () => {
+        const violation = only('`MOVED: [2026-08-20 Thu] -> <2026-08-22 Sat 18:00 +1w>`');
+        assert.equal(violation.kind, 'target-has-a-repeater');
+        assert.equal(
+            fixed('`MOVED: [2026-08-20 Thu] -> <2026-08-22 Sat 18:00 +1w>`'),
+            '`MOVED: [2026-08-20 Thu] -> <2026-08-22 Sat 18:00>`'
+        );
+    });
+
+    test('a target carrying a warning cookie loses it', () => {
+        const violation = only('`MOVED: [2026-08-20 Thu] -> <2026-08-22 Sat 18:00 -3d>`');
+        assert.equal(violation.kind, 'target-has-a-warning-cookie');
+        assert.equal(
+            fixed('`MOVED: [2026-08-20 Thu] -> <2026-08-22 Sat 18:00 -3d>`'),
+            '`MOVED: [2026-08-20 Thu] -> <2026-08-22 Sat 18:00>`'
+        );
+    });
+
+    test('a target that is not a timestamp offers no fix', () => {
+        const violation = only('`MOVED: [2026-08-20 Thu] -> the Saturday after`');
+        assert.equal(violation.kind, 'target-not-a-timestamp');
+        assert.equal(violation.replacement, null);
+    });
+
+    test('a day this entry already moves is named as the second answer it is', () => {
+        const found = validateMovedLines([
+            SERIES,
+            PLANNING,
+            '`MOVED: [2026-08-20 Thu] -> <2026-08-21 Fri 15:00>`',
+            '`MOVED: [2026-08-20 Thu] -> <2026-08-22 Sat 15:00>`'
+        ]);
+        assert.equal(found.length, 1);
+        const violation = found[0];
+        assert.ok(violation);
+        assert.equal(violation.kind, 'occurrence-moved-twice');
+        assert.equal(violation.line, 3);
+        assert.equal(violation.replacement, null);
+    });
+
+    test('two occurrences moved by one entry are both fine', () => {
+        assert.deepEqual(
+            validateMovedLines([
+                SERIES,
+                PLANNING,
+                '`MOVED: [2026-08-20 Thu] -> <2026-08-21 Fri 15:00>`',
+                '`MOVED: [2026-08-27 Thu] -> <2026-08-29 Sat 15:00>`'
+            ]),
+            []
+        );
+    });
+
+    test('the same day moved by a different entry is a different move', () => {
+        assert.deepEqual(
+            validateMovedLines([
+                SERIES,
+                PLANNING,
+                '`MOVED: [2026-08-20 Thu] -> <2026-08-21 Fri 15:00>`',
+                '',
+                '# TODO Spanish',
+                '`SCHEDULED: <2026-08-06 Thu 17:00 +1w>`',
+                '`MOVED: [2026-08-20 Thu] -> <2026-08-22 Sat 17:00>`'
+            ]),
+            []
+        );
+    });
+
+    test('the range underlines the half at fault, not the whole line', () => {
+        const line = '`MOVED: [2026-08-20 Thu] -> [2026-08-22 Sat 18:00]`';
+        const violation = only(line);
+        assert.equal(line.slice(violation.startCharacter, violation.endCharacter), '[2026-08-22 Sat 18:00]');
+    });
+});

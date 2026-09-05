@@ -242,6 +242,28 @@ example `CLOSED: <2025-12-03 Wed>` or a mixed pair like
 `markdown-org` diagnostic source. Press `Ctrl+.` on the warning to
 apply the **Convert to canonical bracket form** Quick Fix.
 
+A `MOVED` line is checked the same way, against the rules the
+extractor reads it by. The occurrence before the arrow is a day and
+only a day, written bare or inactive; where it is held after the arrow
+is an active timestamp that may name a weekday, an hour and a range of
+hours. What the line may not carry is warned about with the reason:
+
+| Fault                                         | What the warning says                                       |
+| --------------------------------------------- | ----------------------------------------------------------- |
+| No `->`                                       | The line is read as prose and nothing moves.                |
+| The occurrence written `<...>`                | It is an address, not a time the entry is kept.             |
+| The occurrence named to the hour              | A series draws at most one occurrence a day.                |
+| A repeater on either half                     | One occurrence does not repeat; that belongs to the series. |
+| A warning cookie on either half               | How far ahead a deadline warns belongs to the series.       |
+| The target written `[...]`, bare, or unpaired | Where an occurrence is held is active.                      |
+| A day this entry already moves                | The first move stands; the second line is read as prose.    |
+
+Every fault the editor can name a correction for carries a Quick Fix
+-- **Drop the repeater**, **Drop the hour**, **Convert to `[...]`**.
+A half that is not a date at all, and a day already moved, carry none:
+what was meant is not there to guess. A line with two faults reports
+the one the extractor stops at, and the next after that one is fixed.
+
 To flip a bare inline timestamp between `<...>` and `[...]`, run
 `Markdown Org: Toggle Timestamp Active/Inactive` from the Command
 Palette. The command refuses on keyword lines (the keyword binds the
