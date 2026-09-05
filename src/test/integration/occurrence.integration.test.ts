@@ -21,11 +21,14 @@ import { waitForAgendaRender, waitUntil } from './_helpers';
  * the open document rather than only the array of lines.
  */
 suite('One occurrence of a series', () => {
-    const originalInputBox = vscode.window.showInputBox;
+    let quickPick: sinon.SinonStub | null = null;
+    const inputBox = vscode.window.showInputBox;
     let document: vscode.TextDocument | undefined;
 
     afterEach(async () => {
-        (vscode.window as { showInputBox: unknown }).showInputBox = originalInputBox;
+        quickPick?.restore();
+        quickPick = null;
+        (vscode.window as { showInputBox: unknown }).showInputBox = inputBox;
         await vscode.commands.executeCommand('workbench.action.closeAllEditors');
     });
 
@@ -33,21 +36,18 @@ suite('One occurrence of a series', () => {
         document = undefined;
     });
 
-    /** Answer the boxes in order; `undefined` is Escape, and a missing answer is one too. */
-    function answer(...values: (string | undefined)[]): void {
-        const queue = [...values];
-        (vscode.window as { showInputBox: unknown }).showInputBox = () => Promise.resolve(queue.shift());
+    /** Pick the day at `index` of the list the command offers. */
+    function pickDay(index: number): sinon.SinonStub {
+        quickPick = sinon.stub(vscode.window, 'showQuickPick');
+        quickPick.callsFake((items: unknown) => Promise.resolve((items as unknown[])[index]));
+        return quickPick;
     }
 
-    /** What the boxes were offered, so a test can check the day it opens on. */
-    function record(values: (string | undefined)[]): string[] {
-        const seen: string[] = [];
-        const queue = [...values];
-        (vscode.window as { showInputBox: unknown }).showInputBox = (options?: { value?: string }) => {
-            seen.push(options?.value ?? '');
-            return Promise.resolve(queue.shift());
-        };
-        return seen;
+    /** Answer the list with Escape. */
+    function pickNothing(): sinon.SinonStub {
+        quickPick = sinon.stub(vscode.window, 'showQuickPick');
+        quickPick.resolves(undefined);
+        return quickPick;
     }
 
     async function open(content: string, cursorLine = 0): Promise<vscode.TextDocument> {
@@ -58,14 +58,33 @@ suite('One occurrence of a series', () => {
         return document;
     }
 
-    /** A weekly class, which is the case these operations exist for. */
+    /** Rewrite the draft line, which is what walking its date with Shift+Up leaves behind. */
+    async function walkTheDraftTo(doc: vscode.TextDocument, day: string): Promise<void> {
+        const at = doc
+            .getText()
+            .split('\n')
+            .findIndex((line) => line.includes('`MOVE '));
+        assert.ok(at >= 0, 'no draft to walk');
+        const line = doc.lineAt(at);
+        const editor = vscode.window.activeTextEditor;
+        assert.ok(editor, 'no editor');
+        await editor.edit((builder) => {
+            builder.replace(line.range, line.text.replace(/-> <\d{4}-\d{2}-\d{2}/, `-> <${day}`));
+        });
+    }
+
+    /**
+     * A weekly class, which is the case these operations exist for. Today is
+     * far behind it, so the days the picker offers are the series' own,
+     * counted from its date.
+     */
     const SERIES = ['# TODO English', '`SCHEDULED: <2026-08-06 Thu 15:00 +1w>`', ''].join('\n');
 
     test('a cancelled occurrence joins the series EXDATE', async () => {
         const doc = await open(SERIES);
 
-        answer('2026-08-20');
-        await vscode.commands.executeCommand('markdown-org.cancelOccurrence');
+        pickDay(0);
+        await vscode.commands.executeCommand('markdown-org.cancelOccurrence', '2026-08-20');
 
         assert.strictEqual(
             doc.getText(),
@@ -80,42 +99,98 @@ suite('One occurrence of a series', () => {
         );
     });
 
-    test('a moved occurrence is an entry of its own at the end of the file', async () => {
-        const doc = await open(SERIES);
+    test('the days offered are the ones the series falls on', async () => {
+        await open(SERIES);
 
-        answer('2026-08-20', '2026-08-22', '18:00');
+        const picker = pickNothing();
         await vscode.commands.executeCommand('markdown-org.moveOccurrence');
 
+        const [items] = picker.firstCall.args as [{ label: string }[]];
+        // Every day of the series ahead of today, at the hour it is held, and
+        // the way out for one the list does not reach.
+        assert.ok(items.length > 1, 'the list was empty');
+        assert.ok(
+            items.slice(0, -1).every((item) => /^\d{4}-\d{2}-\d{2} 15:00$/.test(item.label)),
+            `the list was: ${items.map((item) => item.label).join(', ')}`
+        );
+        assert.match(items.at(-1)?.label ?? '', /Another day/);
+    });
+
+    test('the day the caller names leads the list', async () => {
+        await open(SERIES);
+
+        const picker = pickNothing();
+        await vscode.commands.executeCommand('markdown-org.cancelOccurrence', '2026-08-20');
+
+        const [items] = picker.firstCall.args as [{ label: string }[]];
+        assert.strictEqual(items[0]?.label, '2026-08-20 15:00');
+    });
+
+    test('a move is drafted under the series, at the day and hour it is held', async () => {
+        const doc = await open(SERIES);
+
+        pickDay(0);
+        await vscode.commands.executeCommand('markdown-org.moveOccurrence', '2026-08-20');
+
+        assert.strictEqual(
+            doc.getText(),
+            [
+                '# TODO English',
+                '`SCHEDULED: <2026-08-06 Thu 15:00 +1w>`',
+                '`MOVE 2026-08-20 -> <2026-08-20 Thu 15:00>`',
+                ''
+            ].join('\n')
+        );
+        const caret = vscode.window.activeTextEditor?.selection.active;
+        assert.strictEqual(caret?.line, 2, 'the caret is on the draft');
+        assert.strictEqual(
+            doc.lineAt(2).text.slice(caret.character, caret.character + 10),
+            '2026-08-20',
+            'the caret is on the day it moves to'
+        );
+    });
+
+    test('confirming the draft writes the replacement and takes the draft back out', async () => {
+        const doc = await open(SERIES);
+
+        pickDay(0);
+        await vscode.commands.executeCommand('markdown-org.moveOccurrence', '2026-08-20');
+        await walkTheDraftTo(doc, '2026-08-22');
+        await vscode.commands.executeCommand('markdown-org.confirmOccurrenceMove');
+
         const text = doc.getText();
+        assert.ok(!text.includes('MOVE 2026-08-20'), 'the draft is gone');
         assert.match(text, /SCHEDULED: <2026-08-06 Thu 15:00 \+1w>/, 'the series goes on repeating');
         assert.match(text, /\nID: [0-9a-f-]{36}\n/, 'the series is named so the replacement can point at it');
-        assert.match(text, /\n# TODO English\n`SCHEDULED: <2026-08-22 Sat 18:00>`\n/);
+        assert.match(text, /\n# TODO English\n`SCHEDULED: <2026-08-22 Sat 15:00>`\n/);
         assert.match(text, /\nRECURRENCE_ID: 2026-08-20 15:00\n/);
         assert.ok(!text.includes('EXDATE'), 'a replacement needs no EXDATE beside it');
     });
 
-    test('the day of the series is what the box opens on', async () => {
-        await open(SERIES);
-
-        const seen = record(['2026-08-06', undefined]);
-        await vscode.commands.executeCommand('markdown-org.moveOccurrence');
-
-        assert.deepStrictEqual(seen, ['2026-08-06', '2026-08-06']);
-    });
-
-    test('a day the caller names is what the box opens on', async () => {
-        await open(SERIES);
-
-        const seen = record([undefined]);
-        await vscode.commands.executeCommand('markdown-org.cancelOccurrence', '2026-08-27');
-
-        assert.deepStrictEqual(seen, ['2026-08-27']);
-    });
-
-    test('escaping a box leaves the file alone', async () => {
+    test('discarding the draft leaves the series as it was', async () => {
         const doc = await open(SERIES);
 
-        answer(undefined);
+        pickDay(0);
+        await vscode.commands.executeCommand('markdown-org.moveOccurrence', '2026-08-20');
+        await vscode.commands.executeCommand('markdown-org.cancelOccurrenceMove');
+
+        assert.strictEqual(doc.getText(), SERIES);
+    });
+
+    test('a second draft is refused while one is standing', async () => {
+        const doc = await open(SERIES);
+
+        pickDay(0);
+        await vscode.commands.executeCommand('markdown-org.moveOccurrence', '2026-08-20');
+        await vscode.commands.executeCommand('markdown-org.moveOccurrence', '2026-08-27');
+
+        assert.strictEqual(doc.getText().match(/`MOVE /g)?.length, 1, 'one draft, not two');
+    });
+
+    test('escaping the list leaves the file alone', async () => {
+        const doc = await open(SERIES);
+
+        pickNothing();
         await vscode.commands.executeCommand('markdown-org.cancelOccurrence');
 
         assert.strictEqual(doc.getText(), SERIES);
@@ -125,10 +200,103 @@ suite('One occurrence of a series', () => {
         const once = ['# TODO English', '`SCHEDULED: <2026-08-06 Thu 15:00>`', ''].join('\n');
         const doc = await open(once);
 
-        answer('2026-08-06');
-        await vscode.commands.executeCommand('markdown-org.cancelOccurrence');
+        pickDay(0);
+        await vscode.commands.executeCommand('markdown-org.cancelOccurrence', '2026-08-06');
 
         assert.strictEqual(doc.getText(), once);
+    });
+});
+
+/**
+ * The entry as the notes actually hold it.
+ *
+ * A series is rarely a heading with a planning line under it and nothing
+ * else: a creation stamp stands above, a property block below, the keyword is
+ * sometimes not written at all, and the date is sometimes a deadline. Each of
+ * these hid the planning line from the operation at some point, and each is
+ * checked end to end -- through the command, into the open document.
+ */
+suite('One occurrence, whatever the entry looks like', () => {
+    let quickPick: sinon.SinonStub | null = null;
+    let document: vscode.TextDocument | undefined;
+
+    afterEach(async () => {
+        quickPick?.restore();
+        quickPick = null;
+        await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+    });
+
+    after(() => {
+        document = undefined;
+    });
+
+    async function moveFirstOf(content: string): Promise<vscode.TextDocument> {
+        document = await vscode.workspace.openTextDocument({ content, language: 'markdown' });
+        await vscode.window.showTextDocument(document, { selection: new vscode.Range(0, 0, 0, 0) });
+        quickPick = sinon.stub(vscode.window, 'showQuickPick');
+        quickPick.callsFake((items: unknown) => Promise.resolve((items as unknown[])[0]));
+        await vscode.commands.executeCommand('markdown-org.moveOccurrence', '2026-08-20');
+        await vscode.commands.executeCommand('markdown-org.confirmOccurrenceMove');
+        return document;
+    }
+
+    test('a series planned with SCHEDULED', async () => {
+        const doc = await moveFirstOf(['# TODO English', '`SCHEDULED: <2026-08-06 Thu 15:00 +1w>`', ''].join('\n'));
+
+        assert.match(doc.getText(), /\n`SCHEDULED: <2026-08-20 Thu 15:00>`\n/);
+    });
+
+    test('a series that names no keyword at all', async () => {
+        const doc = await moveFirstOf(['# English', '`<2026-08-06 Thu 15:00 +1w>`', ''].join('\n'));
+
+        // Written the way the series is: the replacement carries no keyword
+        // either, and the repeater is the one token that goes.
+        assert.match(doc.getText(), /\n`<2026-08-20 Thu 15:00>`\n/);
+        assert.ok(!doc.getText().includes('SCHEDULED'), 'no keyword was invented');
+    });
+
+    test('a series kept on a DEADLINE', async () => {
+        const doc = await moveFirstOf(['# TODO Report', '`DEADLINE: <2026-08-06 Thu +1w>`', ''].join('\n'));
+
+        assert.match(doc.getText(), /\n`DEADLINE: <2026-08-20 Thu>`\n/);
+        assert.match(doc.getText(), /\nRECURRENCE_ID: 2026-08-20\n/, 'a series with no hour names none');
+    });
+
+    test('a series under a creation stamp and above a property block', async () => {
+        const doc = await moveFirstOf(
+            [
+                '## English',
+                '`CREATED: [2025-12-08 Mon 01:06]`',
+                '`SCHEDULED: <2025-12-08 Mon 15:00 +1w>`',
+                '```org-properties',
+                'GCAL_EVENT_ID: cfdc2b9f',
+                'ID: cfdc2b9f-2b70-4aca-b917-c13b96ca3c65',
+                '```',
+                ''
+            ].join('\n')
+        );
+
+        const text = doc.getText();
+        assert.match(text, /\n`SCHEDULED: <2026-08-20 Thu 15:00>`\n/);
+        // The identifier the entry already carries is the one the replacement
+        // points at; a second one would name a series that does not exist.
+        assert.match(text, /\nSERIES_ID: cfdc2b9f-2b70-4aca-b917-c13b96ca3c65\n/);
+        assert.strictEqual(text.match(/^ID: /gm)?.length, 1, 'the entry keeps its one ID');
+    });
+
+    test('a series below a keyword written without its colon', async () => {
+        const doc = await moveFirstOf(
+            [
+                '## English',
+                '`SCHEDULED <2025-12-01 Mon 15:00 +1w>`',
+                '`SCHEDULED: <2025-12-08 Mon 15:00 +1w>`',
+                ''
+            ].join('\n')
+        );
+
+        const text = doc.getText();
+        assert.match(text, /\n`SCHEDULED: <2026-08-20 Thu 15:00>`\n/);
+        assert.ok(text.includes('`SCHEDULED <2025-12-01 Mon 15:00 +1w>`'), 'the line typed by hand is untouched');
     });
 });
 
@@ -234,20 +402,22 @@ suite('One occurrence, from the agenda', () => {
         assert.strictEqual(vscode.window.activeTextEditor?.document.uri.fsPath, notes, 'the entry is on screen');
     });
 
-    test('the day the row was drawn on is the day the box opens on', async function () {
+    test('the day the row was drawn on leads the days the choice offers', async function () {
         this.timeout(20000);
-        const offered: string[] = [];
-        (vscode.window as { showInputBox: unknown }).showInputBox = (options?: { value?: string }) => {
-            offered.push(options?.value ?? '');
-            return Promise.resolve(undefined);
-        };
-        quickPickStub.callsFake((items: { command: string }[]) => Promise.resolve(items[1]));
+        // Two lists in a row: the exceptions, then the days one of them is
+        // about. The second is the one under test, so the first is answered
+        // with "cancel" and the second with Escape.
+        const offered: string[][] = [];
+        quickPickStub.callsFake((items: { label: string }[]) => {
+            offered.push(items.map((item) => item.label));
+            return Promise.resolve(offered.length === 1 ? items[1] : undefined);
+        });
 
         await pressTheFlag();
-        await waitUntil(() => offered.length > 0, 'no box was opened');
+        await waitUntil(() => offered.length > 1, 'no days were offered');
 
         // The series is planned for 2026-08-06; the row was drawn on the 20th,
         // which is the occurrence the reader pointed at.
-        assert.deepStrictEqual(offered, ['2026-08-20']);
+        assert.strictEqual(offered[1]?.[0], '2026-08-20 15:00');
     });
 });

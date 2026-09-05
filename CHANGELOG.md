@@ -14,8 +14,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   goes on repeating around the gap; "Move One Occurrence" writes a second entry
   at the end of the same file, spelled the way the series is and naming the
   occurrence it stands in for, so the day it moved from is drawn once and at its
-  new hour. Both open on the day the entry is planned for, which makes
-  confirming a keypress.
+  new hour. Neither asks for a date to be typed: the days offered are the ones
+  the series actually falls on, counted from its own date, with the days it has
+  already lost -- cancelled, or moved elsewhere -- listed among them and marked.
+  Where a move goes is answered in the notes rather than in a box. The command
+  writes a draft line under the series, `MOVE 2026-09-08 -> <2026-09-15 Mon>`,
+  and the date is walked with the same Shift+Up and Shift+Down that walk any
+  other timestamp; Ctrl+Enter turns the draft into the replacement and Escape
+  takes the line back out. The day being moved stands
+  outside the brackets, so the arrows move only where it is going, and a draft
+  is a planning line to nobody: an unfinished one appears on no agenda.
   This is the shape the extension already reads and exports to Google Calendar
   (the extractor's ADR-0031), and the shape the Android client writes: the
   replacement goes at the end of the file, the heading is copied as it stands,
@@ -156,6 +164,20 @@ Timestamp` stays what it was, for entries typed into the editor by hand.
   centred on the line, the way the editor's own menus mark theirs.
 
 ### Fixed
+
+- The planning line of an entry is found wherever it stands in that entry. It
+  used to be looked for only in the unbroken run of lines under the heading, so
+  the first line the format does not name ended the search: a keyword typed
+  without its colon, a line of prose, a property block written above the date.
+  An entry repeating in plain sight was then reported as one that does not
+  repeat, which sends the reader looking for a repeater that is already there.
+  An entry that truly has no planning line is told apart from one whose
+  planning line carries no repeater, and each says which it is.
+
+- The day an occurrence is asked about is no longer read as the first date
+  under the heading. That date is usually the entry's `CREATED` stamp, so the
+  question about which occurrence to move opened on the day the entry was
+  written rather than on any day the series falls on.
 
 - A group action that could not write a file says so in the panel's language.
   The success and the "nothing to change" answer came from the dictionary and

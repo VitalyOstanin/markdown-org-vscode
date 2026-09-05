@@ -202,6 +202,16 @@
         "category": "Markdown Org"
       },
       {
+        "command": "markdown-org.confirmOccurrenceMove",
+        "title": "Confirm the Drafted Move",
+        "category": "Markdown Org"
+      },
+      {
+        "command": "markdown-org.cancelOccurrenceMove",
+        "title": "Discard the Drafted Move",
+        "category": "Markdown Org"
+      },
+      {
         "command": "markdown-org.cancelOccurrence",
         "title": "Cancel One Occurrence",
         "category": "Markdown Org"
@@ -433,6 +443,17 @@
         "key": "ctrl+k ctrl+k ctrl+t",
         "mac": "cmd+k cmd+k cmd+t",
         "when": "(editorTextFocus && editorLangId == markdown) || markdown-org.agendaFocused"
+      },
+      {
+        "command": "markdown-org.confirmOccurrenceMove",
+        "key": "ctrl+enter",
+        "mac": "cmd+enter",
+        "when": "editorTextFocus && editorLangId == markdown && markdown-org.occurrenceDraft"
+      },
+      {
+        "command": "markdown-org.cancelOccurrenceMove",
+        "key": "escape",
+        "when": "editorTextFocus && editorLangId == markdown && markdown-org.occurrenceDraft"
       }
     ],
     "configuration": {

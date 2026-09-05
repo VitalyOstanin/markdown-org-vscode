@@ -389,6 +389,30 @@ of a repeating row opens the entry and offers them, about the day the row was
 drawn on. A row of a repeating `DEADLINE` flies ⚑ rather than ↻ -- the flag says
 what kind of entry it is -- and its flag opens the same two.
 
+Neither command asks for a date to be typed. The occurrence is chosen from the
+days the series actually falls on, counted from its own date -- the way the
+reader knows it, "the next one" or "the one after that" -- and the days it has
+already lost are listed among them and marked `cancelled` or `already moved`,
+because seeing that is the answer to why the entry is not on the agenda. A day
+further off than the list reaches is typed instead, through the last row of it.
+
+Where a move goes is answered in the notes. The command writes a draft line
+under the series and steps aside:
+
+```markdown
+## TODO English
+`SCHEDULED: <2026-08-06 Thu 15:00 +1w>`
+`MOVE 2026-08-20 -> <2026-08-27 Thu 15:00>`
+```
+
+The date in the brackets is walked with the same **Shift+Up** and
+**Shift+Down** that walk any other timestamp -- day, hour, minute, whichever
+field the caret is on -- and **Ctrl+Enter** turns the draft into the
+replacement. **Escape** takes the line back out and leaves the series as it
+was. The day being moved stands outside the brackets, so the arrows never
+touch it, and the draft is a planning line to nobody: neither the agenda nor
+the export reads it, so an unfinished one shows up nowhere.
+
 The same two operations are in the Android client, and both write the file the
 same way, so a series edited on either side reads the same on the other.
 
@@ -613,10 +637,12 @@ left to the editor's own commands.
 
 ### Series Commands
 
-| Command                               | Hotkey | Description                                                          |
-| ------------------------------------- | ------ | -------------------------------------------------------------------- |
-| `Markdown Org: Move One Occurrence`   | --     | Move one occurrence of the repeating entry to another day or hour    |
-| `Markdown Org: Cancel One Occurrence` | --     | Take one occurrence out of the repeating entry, leaving it repeating |
+| Command                                  | Hotkey       | Description                                                          |
+| ---------------------------------------- | ------------ | -------------------------------------------------------------------- |
+| `Markdown Org: Move One Occurrence`      | --           | Draft a move of one occurrence of the repeating entry                |
+| `Markdown Org: Confirm the Drafted Move` | `Ctrl+Enter` | Write the replacement the draft under the cursor describes           |
+| `Markdown Org: Discard the Drafted Move` | `Escape`     | Take the draft line back out, leaving the series as it was           |
+| `Markdown Org: Cancel One Occurrence`    | --           | Take one occurrence out of the repeating entry, leaving it repeating |
 
 Both act on the entry the cursor stands in and ask which day they are about,
 opening on the day the entry is planned for. An entry that does not repeat has

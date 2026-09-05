@@ -35,11 +35,11 @@
 // the end of the file, the heading copied as it stands, the planning line
 // rewritten token by token -- mirrors that module rather than the extension's
 // own habits.
-import { HEADING_REGEX, headingLevel, matchTimestampLine } from '../orgPatterns';
+import { HEADING_REGEX, headingLevel, matchTimestampLine, type TimestampLineMatch } from '../orgPatterns';
 import { findOrgPropertiesBlocks } from './orgProperties';
-import { parseRepeater } from './repeater';
+import { nextOccurrence, parseRepeater, type Repeater } from './repeater';
 import { getWeekdayName } from './incrementTimestamp';
-import { toIsoDate } from './isoDate';
+import { isIsoDate, toIsoDate } from './isoDate';
 
 /** Property key listing the occurrences a series does not have. */
 export const EXDATE_KEY = 'EXDATE';
@@ -147,11 +147,30 @@ interface RepeatingLine {
 }
 
 /**
+ * Whether the line plans the entry for a day, rather than recording one.
+ *
+ * `CREATED` and `CLOSED` are stamps of what happened and are written
+ * inactive; a series is kept on a `SCHEDULED`, a `DEADLINE`, or a bare active
+ * timestamp, and those are the three a repeater can stand in.
+ */
+function plans(hit: TimestampLineMatch): boolean {
+    return hit.type === 'SCHEDULED' || hit.type === 'DEADLINE' || (hit.type === 'PLAIN' && hit.active);
+}
+
+/**
  * The one planning line of the entry that repeats.
  *
  * An entry that does not repeat has no occurrences to make an exception to:
  * what the caller means by cancelling it is the keyword, and what it means by
  * moving it is the planning date, and both have operations of their own.
+ *
+ * The whole entry is read rather than the run of lines directly under the
+ * heading. A planning line is commonly not the first of them -- `CREATED`
+ * stands above it, a property block below -- and a line the format does not
+ * name is passed over instead of ending the search: a keyword typed without
+ * its colon is a line like that, and stopping there hid a `SCHEDULED` that
+ * was in plain sight two lines down and reported the entry as one that does
+ * not repeat.
  *
  * An entry repeating on two dates at once -- a `SCHEDULED` and a `DEADLINE`
  * that both carry a repeater -- is refused rather than guessed at: which of
@@ -160,12 +179,17 @@ interface RepeatingLine {
  */
 export function findRepeatingLine(lines: readonly string[], headingLine: number, heading: string): RepeatingLine {
     const repeating: RepeatingLine[] = [];
+    let planning = 0;
     for (let i = headingLine + 1; i < lines.length; i++) {
         const text = lines[i] ?? '';
-        const hit = matchTimestampLine(text);
-        if (!hit) {
+        if (headingLevel(text) !== null) {
             break;
         }
+        const hit = matchTimestampLine(text);
+        if (!hit || !plans(hit)) {
+            continue;
+        }
+        planning += 1;
         const start = text.indexOf(hit.timestamp);
         const span = { start, end: start + hit.timestamp.length };
         if (fields(text, span).some((field) => isRepeater(text.slice(field.start, field.end)))) {
@@ -175,7 +199,15 @@ export function findRepeatingLine(lines: readonly string[], headingLine: number,
 
     const first = repeating[0];
     if (!first) {
-        throw new OccurrenceError(`${heading} does not repeat, and an entry that does not repeat has no occurrences`);
+        // Told apart, because the two are answered differently: an entry with
+        // no planning line at all is usually one whose keyword is misspelled
+        // or whose date was never written, and saying it does not repeat
+        // sends the reader looking for a repeater that is already there.
+        throw new OccurrenceError(
+            planning === 0
+                ? `${heading} carries no planning line the format names, so it has no occurrences; a planning line is written \`SCHEDULED: <YYYY-MM-DD>\``
+                : `${heading} does not repeat, and an entry that does not repeat has no occurrences`
+        );
     }
     if (repeating.length > 1) {
         throw new OccurrenceError(
@@ -422,6 +454,138 @@ export function moveOccurrence(
     );
 
     return { lines: result, changed: true };
+}
+
+/**
+ * The weekday token the series' timestamp carries, as it is spelt there.
+ *
+ * A draft and a replacement are written in the file's own language: a series
+ * reading `<2026-09-08 Пн 15:00 +1w>` is answered in Russian abbreviations,
+ * and one that names no weekday is answered without one.
+ */
+export function seriesWeekday(lines: readonly string[], headingLine: number, heading: string): string | null {
+    const repeating = findRepeatingLine(lines, headingLine, heading);
+    const line = lines[repeating.line] ?? '';
+    const second = fields(line, repeating.span)[1];
+    if (!second) {
+        return null;
+    }
+    const token = line.slice(second.start, second.end);
+    return /^[А-Яа-яA-Za-z]+$/.test(token) ? token : null;
+}
+
+/** The line the series is planned on, so a caller can write beneath it. */
+export function planningLineOf(lines: readonly string[], headingLine: number, heading: string): number {
+    return findRepeatingLine(lines, headingLine, heading).line;
+}
+
+/** One day a repeating entry falls on, and what the file already says about that day. */
+export interface SeriesOccurrence {
+    /** The day, as `YYYY-MM-DD`. */
+    day: string;
+    /** The hour the series is held at, as its timestamp writes it, or `null`. */
+    time: string | null;
+    /** An `EXDATE` of the series already leaves this day out. */
+    cancelled: boolean;
+    /** An entry of the file already stands in for this day. */
+    moved: boolean;
+}
+
+/**
+ * How many steps the walk may take before the series is treated as unreachable.
+ *
+ * A daily series whose first date is decades back is still counted out well
+ * inside this; the limit is here so that a repeater the walk cannot advance
+ * past `from` ends in a message rather than in a hung editor.
+ */
+const WALK_LIMIT = 100_000;
+
+/** The repeater the entry's planning line carries. */
+function repeaterOf(line: string, span: { start: number; end: number }): Repeater | null {
+    for (const field of fields(line, span)) {
+        const parsed = parseRepeater(line.slice(field.start, field.end));
+        if (parsed) {
+            return parsed;
+        }
+    }
+    return null;
+}
+
+/** One repeater interval after `date`, whichever of the three forms it is written in. */
+function step(date: Date, repeater: Repeater): Date {
+    // `+N` from a given date is the plain interval, and that is what a listing
+    // of the days a series falls on wants: `++N` and `.+N` differ in where
+    // they resume from when an occurrence is closed, not in the calendar the
+    // series keeps.
+    return nextOccurrence({ base: date, today: date, repeater: { ...repeater, type: 'cumulative' } });
+}
+
+/**
+ * The days a repeating entry falls on, from `from` onwards.
+ *
+ * This is what the caller offers instead of asking for a date to be typed:
+ * the occurrence an exception is made to is one of these days, and the reader
+ * knows it as "the next one" or "the one after that" rather than as a number
+ * they have to work out from the repeater.
+ *
+ * Days the series has already lost are listed with the rest and marked, not
+ * left out: seeing that the day is already cancelled -- or already moved -- is
+ * the answer to why the entry is not on the agenda, and hiding it would make
+ * the reader count the weeks again to be sure they picked the right one.
+ */
+export function listOccurrences(
+    lines: readonly string[],
+    headingLine: number,
+    heading: string,
+    from: Date,
+    count: number
+): SeriesOccurrence[] {
+    const repeating = findRepeatingLine(lines, headingLine, heading);
+    const line = lines[repeating.line] ?? '';
+    const written = fields(line, repeating.span)[0];
+    const first = written ? line.slice(written.start, written.end) : '';
+    if (!isIsoDate(first)) {
+        throw new OccurrenceError(`${heading} begins its timestamp with ${first || 'nothing'} rather than a date`);
+    }
+    const repeater = repeaterOf(line, repeating.span);
+    if (!repeater) {
+        throw new OccurrenceError(`${heading} does not repeat, and an entry that does not repeat has no occurrences`);
+    }
+    if (repeater.unit === 'workday' || repeater.unit === 'hour') {
+        // The same refusal completing a repeating task makes: working days
+        // need the public calendar, which the extension does not hold, and an
+        // hourly repeater names no day at all.
+        throw new OccurrenceError(
+            `${heading} repeats by ${repeater.unit === 'workday' ? 'working days' : 'the hour'}, which this listing cannot count out`
+        );
+    }
+
+    const time = writtenTime(line, repeating.span);
+    const series = findProperty(lines, headingLine, ID_KEY)?.value ?? '';
+    const excluded = new Set(
+        (findProperty(lines, headingLine, EXDATE_KEY)?.value ?? '').split(/[,\s]+/).filter((day) => day !== '')
+    );
+
+    const [year, month, day] = first.split('-').map((part) => parseInt(part, 10));
+    let date = new Date(year ?? 0, (month ?? 1) - 1, day ?? 1);
+    const wanted = toIsoDate(from);
+    const found: SeriesOccurrence[] = [];
+    for (let taken = 0; found.length < count; taken += 1) {
+        if (taken > WALK_LIMIT) {
+            throw new OccurrenceError(`${heading} does not reach ${wanted} in ${WALK_LIMIT} repeats`);
+        }
+        const falls = toIsoDate(date);
+        if (falls >= wanted) {
+            found.push({
+                day: falls,
+                time,
+                cancelled: excluded.has(falls),
+                moved: series !== '' && alreadyReplaced(lines, series, falls)
+            });
+        }
+        date = step(date, repeater);
+    }
+    return found;
 }
 
 /** The half-open line range that changed, and what stands there now. */

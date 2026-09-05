@@ -21,7 +21,13 @@ import { AgendaPanel } from './views/agendaPanel';
 import { adjustTimestamp, toggleTimestampActive } from './commands/timestampEdit';
 import { agendaFind } from './commands/agendaFind';
 import { moveToArchive, promoteToMaintain } from './commands/moveHeading';
-import { cancelOccurrenceCommand, moveOccurrenceCommand } from './commands/occurrence';
+import {
+    cancelOccurrenceCommand,
+    cancelOccurrenceMoveCommand,
+    confirmOccurrenceMoveCommand,
+    moveOccurrenceCommand
+} from './commands/occurrence';
+import { registerOccurrenceDraftContext } from './commands/occurrenceDraftContext';
 import { insertClockStart, insertClockFinish } from './commands/clock';
 import { insertClockTable } from './commands/clocktable';
 import { editTaskFromPhrase, insertTaskFromPhrase } from './commands/phraseTask';
@@ -128,6 +134,8 @@ export function activate(context: vscode.ExtensionContext) {
     // open on the day the series is planned for.
     registerOrgCommand(context, 'markdown-org.cancelOccurrence', (date?: string) => cancelOccurrenceCommand(date));
     registerOrgCommand(context, 'markdown-org.moveOccurrence', (date?: string) => moveOccurrenceCommand(date));
+    registerOrgCommand(context, 'markdown-org.confirmOccurrenceMove', () => confirmOccurrenceMoveCommand());
+    registerOrgCommand(context, 'markdown-org.cancelOccurrenceMove', () => cancelOccurrenceMoveCommand());
     registerOrgCommand(context, 'markdown-org.cycleTag', () => cycleTag(context));
     registerOrgCommand(context, 'markdown-org.showTagDictionary', () => showTagDictionary());
     registerOrgCommand(context, 'markdown-org.cycleAgendaHeaderMode', () => cycleAgendaHeaderMode());
@@ -144,6 +152,7 @@ export function activate(context: vscode.ExtensionContext) {
     registerBracketDiagnostics(context);
     registerOrgHighlight(context);
     registerTimestampAdjustableContext(context);
+    registerOccurrenceDraftContext(context);
     registerGcalSaveTrigger(context);
     primeNotesRepositories(context);
 }

@@ -1,6 +1,12 @@
 import * as assert from 'node:assert';
 import { suite, test } from 'mocha';
-import { OccurrenceError, cancelOccurrence, moveOccurrence } from '../../utils/occurrenceEdit';
+import {
+    OccurrenceError,
+    cancelOccurrence,
+    listOccurrences,
+    moveOccurrence,
+    seriesWeekday
+} from '../../utils/occurrenceEdit';
 
 /** A weekly series with an hour, a property block and an identifier of its own. */
 const SERIES = [
@@ -231,5 +237,172 @@ suite('the file the other client writes', () => {
         const edit = moveOccurrence(workdays, 0, on('2026-08-06'), on('2026-08-07'), null, 'x');
 
         assert.ok(edit.lines.includes('`SCHEDULED: <2026-08-07 Fri 10:00>`'));
+    });
+});
+
+/**
+ * The entry as it is actually written, rather than as the first tests wrote
+ * it: a creation stamp above the planning line, a property block below, and
+ * -- in the last of them -- a line the format does not name at all.
+ *
+ * These are the shapes the operation refused on. The planning line was looked
+ * for only in the run of lines directly under the heading, so the first line
+ * that was not a timestamp ended the search, and an entry repeating in plain
+ * sight was reported as one that does not repeat.
+ */
+suite('the planning line, in an entry that is not only a planning line', () => {
+    /** The occurrence being moved is picked by the caller, so any day of the series will do. */
+    const DAY = on('2026-08-20');
+
+    test('is found under a creation stamp', () => {
+        const entry = [
+            '## English',
+            '`CREATED: [2025-12-08 Mon 01:06]`',
+            '`SCHEDULED: <2025-12-08 Mon 15:00 +1w>`',
+            ''
+        ];
+
+        const edit = moveOccurrence(entry, 0, DAY, on('2026-08-22'), null, '9f2c');
+
+        assert.match(edit.lines.join('\n'), /`SCHEDULED: <2026-08-22 Sat 15:00>`/);
+    });
+
+    test('is found under a property block', () => {
+        const entry = [
+            '## English',
+            '```org-properties',
+            'GCAL_EVENT_ID: cfdc2b9f',
+            '```',
+            '`SCHEDULED: <2025-12-08 Mon 15:00 +1w>`',
+            ''
+        ];
+
+        const edit = moveOccurrence(entry, 0, DAY, on('2026-08-22'), null, '9f2c');
+
+        assert.match(edit.lines.join('\n'), /`SCHEDULED: <2026-08-22 Sat 15:00>`/);
+    });
+
+    test('is found past a keyword written without its colon', () => {
+        // The line the reader typed by hand. It is not a planning line to
+        // either client, and it used to hide the one below it.
+        const entry = [
+            '## English',
+            '`SCHEDULED <2025-12-01 Mon 15:00 +1w>`',
+            '`SCHEDULED: <2025-12-08 Mon 15:00 +1w>`',
+            ''
+        ];
+
+        const edit = moveOccurrence(entry, 0, DAY, on('2026-08-22'), null, '9f2c');
+
+        assert.match(edit.lines.join('\n'), /`SCHEDULED: <2026-08-22 Sat 15:00>`/);
+    });
+
+    test('is not looked for past the end of the entry', () => {
+        const entry = [
+            '## English',
+            '`CREATED: [2025-12-08 Mon 01:06]`',
+            '',
+            '## German',
+            '`SCHEDULED: <2025-12-09 Tue 15:00 +1w>`',
+            ''
+        ];
+
+        assert.throws(
+            () => moveOccurrence(entry, 0, DAY, on('2026-08-22'), null, '9f2c'),
+            (error: unknown) => error instanceof OccurrenceError && error.message.includes('carries no planning line')
+        );
+    });
+
+    test('an entry with a planning line that does not repeat is told apart from one with none', () => {
+        const once = ['## English', '`SCHEDULED: <2026-08-06 Thu 15:00>`', ''];
+        const none = ['## English', '`CREATED: [2025-12-08 Mon 01:06]`', ''];
+
+        assert.throws(
+            () => moveOccurrence(once, 0, DAY, on('2026-08-22'), null, '9f2c'),
+            (error: unknown) => error instanceof OccurrenceError && error.message.includes('does not repeat')
+        );
+        assert.throws(
+            () => moveOccurrence(none, 0, DAY, on('2026-08-22'), null, '9f2c'),
+            (error: unknown) => error instanceof OccurrenceError && error.message.includes('carries no planning line')
+        );
+    });
+});
+
+/**
+ * The days offered instead of a date to type.
+ *
+ * What the reader means by "that class" is the next one, or the one after
+ * it -- not a date they work out from a repeater. The listing is what the
+ * picker shows, so it counts from the series' own date and says which of the
+ * days ahead the file has already lost.
+ */
+suite('the days a series falls on', () => {
+    const WEEKLY = ['## English', '`SCHEDULED: <2026-08-06 Thu 15:00 +1w>`', ''];
+
+    test('are counted from the series date, at the hour it is held', () => {
+        const ahead = listOccurrences(WEEKLY, 0, 'English', on('2026-08-06'), 3);
+
+        assert.deepStrictEqual(
+            ahead.map((day) => `${day.day} ${day.time}`),
+            ['2026-08-06 15:00', '2026-08-13 15:00', '2026-08-20 15:00']
+        );
+    });
+
+    test('begin at the day asked for, not at the series date', () => {
+        const ahead = listOccurrences(WEEKLY, 0, 'English', on('2026-09-01'), 2);
+
+        assert.deepStrictEqual(
+            ahead.map((day) => day.day),
+            ['2026-09-03', '2026-09-10']
+        );
+    });
+
+    test('say which days the series has already lost', () => {
+        const cancelled = cancelOccurrence(WEEKLY, 0, 'English', on('2026-08-13'));
+        const moved = moveOccurrence(cancelled.lines, 0, on('2026-08-20'), on('2026-08-22'), null, '9f2c');
+
+        const ahead = listOccurrences(moved.lines, 0, 'English', on('2026-08-06'), 3);
+
+        assert.deepStrictEqual(
+            ahead.map((day) => `${day.day} ${day.cancelled ? 'cancelled' : ''}${day.moved ? 'moved' : ''}`.trim()),
+            ['2026-08-06', '2026-08-13 cancelled', '2026-08-20 moved']
+        );
+    });
+
+    test('follow a monthly repeater by month, not by thirty days', () => {
+        const monthly = ['## Rent', '`SCHEDULED: <2026-01-31 Sat +1m>`', ''];
+
+        const ahead = listOccurrences(monthly, 0, 'Rent', on('2026-01-31'), 3);
+
+        assert.deepStrictEqual(
+            ahead.map((day) => day.day),
+            ['2026-01-31', '2026-02-28', '2026-03-28']
+        );
+    });
+
+    test('are refused for a repeater counted in working days', () => {
+        const workdays = ['## Standup', '`SCHEDULED: <2026-08-06 Thu 09:00 +1wd>`', ''];
+
+        assert.throws(
+            () => listOccurrences(workdays, 0, 'Standup', on('2026-08-06'), 3),
+            (error: unknown) => error instanceof OccurrenceError && error.message.includes('working days')
+        );
+    });
+
+    test('carry the weekday the file spells them with', () => {
+        const russian = ['## Английский', '`SCHEDULED: <2026-08-06 Чт 15:00 +1w>`', ''];
+
+        assert.strictEqual(seriesWeekday(russian, 0, 'Английский'), 'Чт');
+        assert.strictEqual(seriesWeekday(WEEKLY, 0, 'English'), 'Thu');
+    });
+
+    test('an entry without a weekday is listed without one', () => {
+        const bare = ['## English', '`<2026-08-06 15:00 +1w>`', ''];
+
+        assert.strictEqual(seriesWeekday(bare, 0, 'English'), null);
+        assert.deepStrictEqual(
+            listOccurrences(bare, 0, 'English', on('2026-08-06'), 2).map((day) => day.day),
+            ['2026-08-06', '2026-08-13']
+        );
     });
 });
