@@ -495,9 +495,12 @@
       priorities, timestamps, repeaters, the agenda and its views, the phrase
       commands, Google Calendar sync, the git panel.
     - Must describe cancelling and moving a single occurrence of a series --
-      the question this entry started from: the model behind it (an `ID` on the
-      series, `SERIES_ID` plus `RECURRENCE_ID` on the replacement entry, an
-      `EXDATE` line for a cancelled day) and the two commands that write it.
+      the question this entry started from: the model behind it (a `MOVED` line
+      of the series for an occurrence held elsewhere, an `EXDATE` line for a
+      cancelled day) and the two commands that write it. The shape a move was
+      written in before -- an `ID` on the series and `SERIES_ID` plus
+      `RECURRENCE_ID` on a replacement entry -- is still read, and the help has
+      to say so for the files that hold it.
     - The cost of the chosen form is a second description of the same commands
       beside the README, which drifts on every edit. Answer that with a guard
       test rather than with discipline: assert that every command in
