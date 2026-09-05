@@ -100,12 +100,20 @@ suite('Demo: Screenshots', () => {
             return `<${pieces.join(' ')}>`;
         };
 
+        // The same date, written the way an expiry mark is: inactive brackets, to
+        // the minute. It is what every entry written from a phrase carries, and
+        // the highlighting steps the whole line back rather than colouring it as
+        // a date the agenda keeps -- which is what the shot of the editor shows.
+        const created = (offsetDays: number, hour: number, minute: number): string =>
+            iso(offsetDays, { hour, minute }).replace('<', '[').replace('>', ']');
+
         const planningFile = path.join(wsDir, 'planning.md');
         await fs.writeFile(
             planningFile,
             '# Sprint Plan\n' +
                 '\n' +
                 '## TODO [#A] Review pull requests\n' +
+                `\`CREATED: ${created(-3, 9, 15)}\`\n` +
                 `\`SCHEDULED: ${iso(0, { hour: 10, minute: 0 })}\`\n` +
                 '\n' +
                 '## TODO Pairing session\n' +
