@@ -51,3 +51,12 @@ updates:
       - dependency-name: 'typescript'
         versions:
           - '7.0.x'
+      # `@vscode/test-cli` depends on mocha ^11 directly, so a mocha 12 in
+      # the root tree stops being the one npm hoists: the runner gets a
+      # nested copy of its own, the suites are loaded by one instance and
+      # `suite`/`test` are imported from the other, and every integration
+      # file dies on `Cannot read properties of undefined (reading
+      # 'describe')`. Lift this once test-cli follows mocha.
+      - dependency-name: 'mocha'
+        update-types:
+          - 'version-update:semver-major'

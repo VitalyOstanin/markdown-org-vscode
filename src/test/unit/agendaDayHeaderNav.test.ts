@@ -13,7 +13,9 @@ const OPEN_DAY_TITLE = AGENDA_STRINGS.en.openDayView;
 // source of wireDayHeaderNavigation via `.toString()`, so these tests
 // transitively cover the runtime behaviour.
 suite('wireDayHeaderNavigation (jsdom)', () => {
-    function setupDom(mode: 'day' | 'week' | 'month' | 'tasks') {
+    // The mode names what the caller is exercising; the markup itself is
+    // the same for every one of them.
+    function setupDom(_mode: 'day' | 'week' | 'month' | 'tasks') {
         // Week payload: three day-headers with data-date, plus one header
         // without data-date (a Tasks-style priority label) that must be
         // ignored regardless of mode.
@@ -30,7 +32,6 @@ suite('wireDayHeaderNavigation (jsdom)', () => {
             </body></html>`,
             { pretendToBeVisual: true }
         );
-        void mode;
         return dom.window.document;
     }
 
