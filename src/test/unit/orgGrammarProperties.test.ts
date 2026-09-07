@@ -270,30 +270,80 @@ suite('org grammar properties: an edit by phrase', () => {
     });
 });
 
+/**
+ * An answer of the shape the extractor prints.
+ *
+ * Written out rather than left to `fc.jsonValue()`: a value drawn from that
+ * arbitrary carries the key `heading` about never -- 20 000 draws produced
+ * none -- so a property covering both halves of "read into fields, or refused
+ * by name" was only ever exercising the refusal. The optional fields are drawn
+ * as absent, present, or present with a value the parser has to refuse, so the
+ * same generator reaches both halves.
+ */
+const extractorAnswer = fc.record(
+    {
+        // Edges included: a heading whose spaces are at its ends is what a
+        // parser trimming "for tidiness" would quietly change.
+        heading: fc.oneof(fc.constantFrom(...TITLES, ' ', ' начало', 'конец '), fc.string({ unit: 'grapheme' })),
+        current_date: fc.constantFrom('2026-09-07', '1000-01-01', 'not a date'),
+        planning: fc.constantFrom('scheduled', 'deadline', 'weekly', undefined),
+        keyword: fc.constantFrom(...STATUSES, 'MAYBE', undefined),
+        priority: fc.constantFrom(...PRIORITIES, undefined),
+        date: fc.constantFrom('2026-09-07', '', undefined),
+        time: fc.constantFrom('15:00', '25:61', undefined),
+        repeater: fc.constantFrom(...REPEATERS),
+        cleared: fc.oneof(
+            fc.constant(undefined),
+            fc.array(fc.constantFrom('date', 'time', 'repeater', 'priority')),
+            fc.constant(['date', 7] as unknown as string[])
+        )
+    },
+    { requiredKeys: [] }
+);
+
 suite('org grammar properties: the extractor answer', () => {
     test('any answer is either read into fields or refused by name', () => {
         // The answer comes from another process, and the module is written to
         // check it rather than trust it: an unreadable answer must name itself
         // instead of surfacing later as an entry with an empty heading.
+        //
+        // Both halves are counted, and the run fails if either stayed at zero:
+        // a generator that never produces a readable answer leaves the first
+        // half of this property unproven while the test still passes.
+        let read = 0;
+        let refused = 0;
         fc.assert(
-            fc.property(fc.jsonValue(), (value) => {
+            fc.property(fc.oneof(extractorAnswer, fc.jsonValue()), (value) => {
                 try {
                     const parsed = parsePhraseFields(JSON.stringify(value));
+                    read += 1;
                     assert.equal(typeof parsed.heading, 'string');
                     assert.equal(typeof parsed.currentDate, 'string');
                     assert.ok(Array.isArray(parsed.cleared));
+                    // What was read is what was sent: the fields are copied
+                    // across, not invented.
+                    const sent = value as Record<string, unknown>;
+                    assert.equal(parsed.heading, sent.heading);
+                    assert.equal(parsed.currentDate, sent.current_date);
+                    assert.deepEqual(parsed.cleared, sent.cleared ?? []);
                 } catch (error) {
                     assert.ok(error instanceof Error);
                     assert.ok(error.message.startsWith('parse-phrase:'), `unnamed refusal: ${error.message}`);
+                    refused += 1;
                 }
             }),
             RUNS
         );
+        assert.ok(read > 0, 'no answer was ever read into fields: the generator proves only the refusal');
+        assert.ok(refused > 0, 'no answer was ever refused: the generator proves only the happy path');
     });
 
     test('an answer that is not JSON at all is refused by name too', () => {
         fc.assert(
-            fc.property(fc.string(), (text) => {
+            // `grapheme` rather than the default `grapheme-ascii`: a real
+            // answer carries Cyrillic, and 5 000 default draws produced no
+            // character outside ASCII.
+            fc.property(fc.string({ unit: 'grapheme' }), (text) => {
                 try {
                     parsePhraseFields(text);
                 } catch (error) {

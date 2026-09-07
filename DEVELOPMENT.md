@@ -117,9 +117,15 @@ npm run coverage:check:integration  # gate for the run above
 The two runs are measured separately, because they reach different code and one
 denominator would hide both. The unit profile (`.c8rc.json`) excludes what cannot
 load without a VS Code host -- `out/extension.js`, `out/commands/**`,
-`out/views/agendaPanel.js`, `out/diagnostics/**` and the few `vscode`-importing
-utils -- so its threshold measures the pure modules it actually covers instead of
-sinking every time the panel grows. Those excluded modules are covered by the
+`out/views/agendaPanel.js`, the three `vscode`-importing files of
+`out/diagnostics/` and the few `vscode`-importing utils -- so its threshold
+measures the pure modules it actually covers instead of sinking every time the
+panel grows. The exclusions are held to that reason by
+`src/test/unit/coverageProfile.test.ts`: it reads `.c8rc.json` and fails on any
+excluded source that neither reaches `vscode` through what it imports, nor
+compiles to a stub, nor belongs to the webview. A directory pattern is allowed
+-- what is not allowed is a pure module falling out of the gate behind one, the
+way `movedPolicy.ts` did under `out/diagnostics/**`. Those excluded modules are covered by the
 integration run, whose lcov is gated by `scripts/check-lcov-thresholds.js`
 (`@vscode/test-cli` emits a report but has no threshold option of its own).
 
