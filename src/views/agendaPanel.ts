@@ -78,6 +78,15 @@ import {
     renderGitChip,
     renderGitMenu
 } from '../utils/agendaGitHtml';
+import { gitActionButtons, gitActionCommands, gitActionOf } from '../utils/agendaGitAction';
+import {
+    collectClipInfo,
+    collectGitInfo,
+    collectHeaderInfo,
+    collectViewInfo,
+    measureTodayFirstRowHidden,
+    readChipCount
+} from '../utils/agendaRenderedInfo';
 import { agendaSourceFiles, agendaSourceRoots } from '../utils/git/agendaSourceFiles';
 import { buildCollectionMarks, collectionMarkHtml } from '../utils/agendaCollections';
 import { hideCollections, renderCollectionChips } from '../utils/agendaCollectionFilter';
@@ -1493,7 +1502,16 @@ export class AgendaPanel {
         gitGroup,
         gitGroups,
         gitActions,
-        renderGitMenu
+        renderGitMenu,
+        gitActionButtons,
+        gitActionCommands,
+        gitActionOf,
+        collectViewInfo,
+        collectHeaderInfo,
+        collectGitInfo,
+        collectClipInfo,
+        readChipCount,
+        measureTodayFirstRowHidden
     } satisfies AgendaClientDeps;
 
     /**

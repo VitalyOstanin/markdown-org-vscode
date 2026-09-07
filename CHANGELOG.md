@@ -42,6 +42,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   day is typed into, and every message they raise now come from the dictionary,
   and a test holds them to it.
 
+- The list of days the occurrence commands offer is worked out in one walk of
+  the file instead of one per day. Every day offered used to be answered by a
+  search of the whole document for the entry replacing it, and each heading
+  passed had its properties read through a fresh copy of the document's lines.
+  On a file of forty entries the reader now touches 482 lines whether one day
+  is asked for or eight, against 4082 for eight before. A test holds the ratio.
+
 ### Fixed
 
 - A line written past the last line of a file whose last line carries text

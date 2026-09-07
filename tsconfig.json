@@ -26,6 +26,15 @@
     "tsBuildInfoFile": "out/.tsbuildinfo-host"
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", ".vscode-test", "out", "src/webview", "src/types.ts", "src/utils/agendaI18n.ts"],
+  "exclude": [
+    "node_modules",
+    ".vscode-test",
+    "out",
+    "src/webview",
+    "src/types.ts",
+    "src/utils/agendaI18n.ts",
+    "src/utils/agendaGitAction.ts",
+    "src/utils/agendaRenderedInfo.ts"
+  ],
   "references": [{ "path": "./tsconfig.webview.json" }]
 }

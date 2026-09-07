@@ -16,6 +16,13 @@
   // a file belongs to exactly one project, and the host reads them back through
   // the declarations emitted here. Neither uses a DOM global, so building them
   // with `lib: dom` present changes nothing about them.
+  //
+  // The helper modules listed alongside them (`agendaGitAction.ts`,
+  // `agendaRenderedInfo.ts`) are inlined into the page next to the client, so
+  // they belong here for the opposite reason: they read the DOM and need
+  // `lib: dom`. The host imports them all the same -- it is the side that
+  // assembles the page -- and reaches them through the declarations emitted
+  // here.
   "compilerOptions": {
     "module": "node16",
     "moduleResolution": "node16",
@@ -36,5 +43,11 @@
     "declaration": true,
     "tsBuildInfoFile": "out/.tsbuildinfo-webview"
   },
-  "include": ["src/webview/**/*", "src/types.ts", "src/utils/agendaI18n.ts"]
+  "include": [
+    "src/webview/**/*",
+    "src/types.ts",
+    "src/utils/agendaI18n.ts",
+    "src/utils/agendaGitAction.ts",
+    "src/utils/agendaRenderedInfo.ts"
+  ]
 }
