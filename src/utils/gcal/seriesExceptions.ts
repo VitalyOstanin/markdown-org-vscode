@@ -18,16 +18,15 @@
 // of properties ADR-0031 wrote a move in is still collected beside it, for the
 // files and the other tools that hold it.
 import type { Task } from '../../types';
+import { isIsoDate } from '../isoDate';
 
 /** Series id -> the occurrence dates other entries of the run stand in for. */
 export type ReplacedOccurrences = ReadonlyMap<string, ReadonlySet<string>>;
 
-const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
-
 /** The date half of a `RECURRENCE_ID`, which is what occurrences match on. */
 function occurrenceDate(recurrenceId: string): string | undefined {
     const [date] = recurrenceId.trim().split(/\s+/, 1);
-    return date !== undefined && ISO_DATE_REGEX.test(date) ? date : undefined;
+    return date !== undefined && isIsoDate(date) ? date : undefined;
 }
 
 /**
@@ -63,14 +62,16 @@ export function collectReplacedOccurrences(tasks: readonly Task[]): ReplacedOccu
  * it holds on another day, and the ones entries of the run stand in for.
  * Sorted, one entry per date.
  *
- * A date that is not `YYYY-MM-DD` is left out rather than passed on: the value
- * is written by hand, and the calendar has no way to read what the extractor
- * could not.
+ * A date that is not a day of the calendar is left out rather than passed on:
+ * the value is written by hand, and the calendar has no way to read what the
+ * extractor could not. The same check keeps a move off the calendar entirely
+ * (`movedEventId`), so an occurrence is never taken out of the rule while the
+ * event standing in for it is written anyway.
  */
 export function occurrencesMissingFrom(task: Task, replaced: ReplacedOccurrences): string[] {
-    const missing = new Set<string>((task.excluded_dates ?? []).filter((date) => ISO_DATE_REGEX.test(date)));
+    const missing = new Set<string>((task.excluded_dates ?? []).filter((date) => isIsoDate(date)));
     for (const moved of task.moved_occurrences ?? []) {
-        if (ISO_DATE_REGEX.test(moved.from)) {
+        if (isIsoDate(moved.from)) {
             missing.add(moved.from);
         }
     }

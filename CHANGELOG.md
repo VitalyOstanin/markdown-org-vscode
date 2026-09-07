@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- A move taken back out of the notes now takes its Google Calendar event with
+  it. The days an entry has moved-occurrence events out for are written back as
+  `GCAL_MOVED` beside `GCAL_EVENT_ID`, and the next sync deletes the events for
+  the days the notes no longer name; an entry that stops being pushed at all
+  (DONE with `onDone: delete`, or CANCELLED) takes them with it as well.
+  Nothing in the calendar points back at a move -- it is a line of the series
+  -- so without those days no later run could tell an occurrence that was never
+  held elsewhere from one that stopped being, and the event stood in the
+  calendar for good.
+- A `MOVED` line whose occurrence is not a day of the calendar is refused
+  before Google is asked, with the same check that keeps that day out of the
+  `EXDATE`. It used to be answered by the API, and only after the event of the
+  series had already been written.
+
 ### Changed
 
 - The answers this extension gives once are now given in one place: the
@@ -19,17 +35,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   line names no day says so when its occurrences are listed, instead of counting
   them from an invented one.
 
+- The occurrence commands speak the language the rest of the extension does.
+  The dictionary already carried their section, and the commands were written
+  with English literals beside it -- one feature half in the language
+  `markdown-org.uiLanguage` picked and half in another. The lists, the box the
+  day is typed into, and every message they raise now come from the dictionary,
+  and a test holds them to it.
+
 ### Fixed
 
+- A line written past the last line of a file whose last line carries text
+  stands on a line of its own. It was glued onto the end of the planning line
+  before it, and neither was read as a line again.
 - A `MOVED` line is read back the way the extractor reads it: one pattern for
   the line, the halves trimmed around the arrow, and the spacing the extractor
   reads past -- several spaces, a tab, a no-break space -- accepted wherever it
   accepts it. The editor and the diagnostics held two patterns of their own and
   disagreed with the extractor and with each other.
+- A move naming a day the series does not fall on is reported in the editor,
+  the way the extractor refuses it: a move holds an occurrence the entry has,
+  and does not add one.
+- The occurrence commands write into the file as it stands when the day is
+  picked, not into the snapshot taken before the list was opened. A file edited
+  while the list was open -- a save that reformatted it, another extension,
+  a second window -- took the write to the wrong line.
 - The flag of an agenda row drawn where an occurrence is held now names the
   occurrence that moved, not the day it landed on. Moving or cancelling from
   such a row acted on the day of the landing -- a day the series does not fall
   on at all.
+- A Google Calendar refusal on one moved occurrence is that occurrence's, not
+  the entry's: the entry is no longer counted as failed on top of the created
+  it was already counted as, and the occurrences after the refused one are
+  still written.
 
 ## [0.20.0] - 2026-09-05
 

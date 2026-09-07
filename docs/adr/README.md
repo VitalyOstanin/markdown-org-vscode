@@ -56,6 +56,7 @@ was decided, and the trade-offs that came with it.
 | 0026 | [An entry is changed by saying what to change, and a leftover refuses the phrase](0026-an-entry-is-changed-by-saying-what-to-change.md) | Accepted                                                  |
 | 0027 | [A refused move is warned about where it is written](0027-a-refused-move-is-warned-about-where-it-is-written.md)                        | Accepted, amended by 0028                                 |
 | 0028 | [A move is written in full, and half a move is warned about](0028-a-move-is-written-and-warned-about-in-full.md)                        | Accepted                                                  |
+| 0029 | [A move the notes drop takes its calendar event with it](0029-a-move-the-notes-drop-takes-its-event-with-it.md)                         | Accepted                                                  |
 
 ## Adding a new ADR
 

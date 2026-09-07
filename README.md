@@ -91,7 +91,8 @@ token stays in the OS keychain via VS Code's `SecretStorage`), pick the
 target calendar, then **Sync Now** on demand or enable debounced
 **sync on save**. Marking a task DONE deletes its event (configurable);
 re-opening it (DONE → TODO) revives the event instead of leaving an
-orphan. Property write-back (`ID` / `GCAL_EVENT_ID`) is conflict-safe.
+orphan. Property write-back (`ID` / `GCAL_EVENT_ID` / `GCAL_MOVED`) is
+conflict-safe.
 See the full [Google Calendar Sync](#google-calendar-sync) section with
 connect / select / sync demos and [ADR-0010](docs/adr/0010-google-calendar-sync.md).
 
@@ -263,11 +264,13 @@ hours. What the line may not carry is warned about with the reason:
 | 8   | A day this entry already moves                | The first move stands; the second line is read as prose.             |
 | 9   | The entry keeps no repeating series           | An entry that does not repeat has no occurrence to move.             |
 | 10  | A half that is not a date at all              | The line is read as prose.                                           |
+| 11  | A day the series does not fall on             | A move holds an occurrence the entry has; it does not add one.       |
 
 Every fault the editor can name a correction for carries a Quick Fix
 -- **Drop the repeater**, **Drop the hour**, **Convert to
 `[2026-08-20 Thu]`**. A half that is not a date, a day already moved,
-and an entry that does not repeat carry none: what was meant is not
+a day outside the series, and an entry that does not repeat carry
+none: what was meant is not
 there to guess. One fix takes out one fault, so a line with two says
 the second once the first is gone, and the fault of the entry stands
 beside the fault of the line rather than hiding it.
@@ -1149,7 +1152,10 @@ Only one sync runs at a time:
 ### Property write-back is deferred, never forced
 
 To address an event by a stable key, the sync writes an `ID` (and the
-returned `GCAL_EVENT_ID`) into the task's `org-properties` block. This
+returned `GCAL_EVENT_ID`) into the task's `org-properties` block, along with
+`GCAL_MOVED` -- the days the entry has moved-occurrence events out for, which
+is what lets a later run delete the event of a move that was taken back out of
+the notes. This
 write-back is conflict-safe: if the target file currently has **unsaved
 edits**, or has **shifted on disk since the tasks were extracted**, the
 write is **deferred** rather than forced over your changes. Deferred
@@ -1187,8 +1193,13 @@ next run.
   occurrence is pushed as an event of its own, keyed by the series' event id
   and the day it left, rather than patched into the series through the
   calendar's `instances` collection -- which is what the agenda shows as well.
-  A move taken back out of the notes leaves that event behind: it is deleted
-  from the calendar by hand.
+  A move taken back out of the notes takes its event with it: the days an entry
+  has such events out for are written back as `GCAL_MOVED`, and the next sync
+  deletes the ones the notes no longer name. An entry that stops being pushed
+  at all -- marked DONE with `onDone: delete`, or CANCELLED -- takes them with
+  it too. A day that is not a day of the calendar is refused before Google is
+  asked, reported as a failed occurrence rather than as a failed entry, and the
+  occurrences after it are still written.
 - **Second-window edits are invisible.** If the same file is open in a
   second VS Code window with unsaved edits, this extension cannot see
   that other window's in-memory state. A sync writing back to disk there

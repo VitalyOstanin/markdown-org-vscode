@@ -7,7 +7,7 @@ import { suite, before, beforeEach, after, afterEach, test } from 'mocha';
 import { exec } from '../../utils/exec';
 import { extractor } from '../../utils/extractor';
 import { AgendaPanel } from '../../views/agendaPanel';
-import { AGENDA_STRINGS } from '../../utils/agendaI18n';
+import { AGENDA_STRINGS, formatString } from '../../utils/agendaI18n';
 import { makeExtractorFake } from '../_execFake';
 import { toIsoDate } from '../../utils/isoDate';
 import { waitForAgendaRender, waitUntil } from './_helpers';
@@ -48,6 +48,31 @@ suite('One occurrence of a series', () => {
         quickPick = sinon.stub(vscode.window, 'showQuickPick');
         quickPick.resolves(undefined);
         return quickPick;
+    }
+
+    /**
+     * Pick the day at `index`, having edited the file while the list is open.
+     *
+     * The box is modal to the command but not to the editor: a save that
+     * reformats, another extension, a second window. What the command writes
+     * has to land on the file as it now stands.
+     */
+    function pickDayAfterEditing(index: number, edit: () => Thenable<unknown>): sinon.SinonStub {
+        quickPick = sinon.stub(vscode.window, 'showQuickPick');
+        quickPick.callsFake(async (items: unknown) => {
+            await edit();
+            return (items as unknown[])[index];
+        });
+        return quickPick;
+    }
+
+    /** Put a heading of its own above everything, which moves every line down by one. */
+    function insertALineAbove(): Thenable<unknown> {
+        const editor = vscode.window.activeTextEditor;
+        assert.ok(editor, 'no editor');
+        return editor.edit((builder) => {
+            builder.insert(new vscode.Position(0, 0), '# Another note\n');
+        });
     }
 
     async function open(content: string, cursorLine = 0): Promise<vscode.TextDocument> {
@@ -150,6 +175,89 @@ suite('One occurrence of a series', () => {
         );
     });
 
+    test('a move written into a file with no last line stands on a line of its own', async () => {
+        // Every other fixture here ends with an empty line, and the write
+        // leaned on it: the added line was joined to the document's own line
+        // ending. A file whose last line carries text has none, so the line
+        // has to bring one -- without it the move was glued onto the end of
+        // the planning line and neither was read again.
+        const doc = await open(['# TODO English', '`SCHEDULED: <2026-08-06 Thu 15:00 +1w>`'].join('\n'));
+
+        pickDay(0);
+        await vscode.commands.executeCommand('markdown-org.moveOccurrence', '2026-08-20');
+
+        assert.strictEqual(
+            doc.getText(),
+            [
+                '# TODO English',
+                '`SCHEDULED: <2026-08-06 Thu 15:00 +1w>`',
+                '`MOVED: [2026-08-20 Thu] -> <2026-08-20 Thu 15:00>`'
+            ].join('\n'),
+            'the move is a line of its own, and no trailing line is invented'
+        );
+    });
+
+    test('a cancellation written into a file with no last line opens its own block', async () => {
+        const doc = await open(['# TODO English', '`SCHEDULED: <2026-08-06 Thu 15:00 +1w>`'].join('\n'));
+
+        pickDay(0);
+        await vscode.commands.executeCommand('markdown-org.cancelOccurrence', '2026-08-20');
+
+        assert.strictEqual(
+            doc.getText(),
+            [
+                '# TODO English',
+                '`SCHEDULED: <2026-08-06 Thu 15:00 +1w>`',
+                '```org-properties',
+                'EXDATE: 2026-08-20',
+                '```'
+            ].join('\n')
+        );
+    });
+
+    test('a cancellation lands on the file as it stands after the box, not on the snapshot', async () => {
+        const doc = await open(SERIES, 1);
+
+        pickDayAfterEditing(0, insertALineAbove);
+        await vscode.commands.executeCommand('markdown-org.cancelOccurrence', '2026-08-20');
+
+        assert.strictEqual(
+            doc.getText(),
+            [
+                '# Another note',
+                '# TODO English',
+                '`SCHEDULED: <2026-08-06 Thu 15:00 +1w>`',
+                '```org-properties',
+                'EXDATE: 2026-08-20',
+                '```',
+                ''
+            ].join('\n')
+        );
+    });
+
+    test('a move lands on the file as it stands after the box, not on the snapshot', async () => {
+        const doc = await open(SERIES, 1);
+
+        pickDayAfterEditing(0, insertALineAbove);
+        await vscode.commands.executeCommand('markdown-org.moveOccurrence', '2026-08-20');
+
+        assert.strictEqual(
+            doc.getText(),
+            [
+                '# Another note',
+                '# TODO English',
+                '`SCHEDULED: <2026-08-06 Thu 15:00 +1w>`',
+                '`MOVED: [2026-08-20 Thu] -> <2026-08-20 Thu 15:00>`',
+                ''
+            ].join('\n')
+        );
+        assert.strictEqual(
+            vscode.window.activeTextEditor?.selection.active.line,
+            3,
+            'the caret is on the line that moves it, wherever that line now is'
+        );
+    });
+
     test('the occurrence it names is walked with the date keys, like the day it moves to', async () => {
         // ADR-0039 wrote the address as an inactive timestamp for exactly
         // this: correcting which occurrence moved is a keystroke rather than
@@ -236,14 +344,25 @@ suite('One occurrence of a series', () => {
         assert.strictEqual(doc.getText(), SERIES);
     });
 
-    test('an entry that does not repeat is refused, and the file is left alone', async () => {
+    test('an entry that does not repeat is refused, and says so', async () => {
+        // The file being unchanged is half the claim: a command that silently
+        // did nothing would satisfy it. The refusal itself is what the reader
+        // gets, so it is checked -- and that it names why.
         const once = ['# TODO English', '`SCHEDULED: <2026-08-06 Thu 15:00>`', ''].join('\n');
         const doc = await open(once);
+        const warned = sinon.stub(vscode.window, 'showWarningMessage');
 
-        pickDay(0);
-        await vscode.commands.executeCommand('markdown-org.cancelOccurrence', '2026-08-06');
+        try {
+            pickDay(0);
+            await vscode.commands.executeCommand('markdown-org.cancelOccurrence', '2026-08-06');
 
-        assert.strictEqual(doc.getText(), once);
+            assert.strictEqual(doc.getText(), once, 'the file was written to');
+            assert.ok(warned.called, 'the refusal was never raised');
+            const message = warned.firstCall.args[0];
+            assert.match(message, /does not repeat/, `the refusal said: ${message}`);
+        } finally {
+            warned.restore();
+        }
     });
 });
 
@@ -445,6 +564,62 @@ suite('One occurrence, from the agenda', () => {
         );
         assert.ok(options.title.includes('2026-08-20'), `the title was: ${options.title}`);
         assert.strictEqual(vscode.window.activeTextEditor?.document.uri.fsPath, notes, 'the entry is on screen');
+    });
+
+    /**
+     * The whole press in one language (ADR-0019).
+     *
+     * The suite pins `uiLanguage` to `en`, which is the language the literals
+     * were written in: a command answering a Russian panel in English passed
+     * every test here. So this one turns the panel Russian and follows the
+     * press to its end -- the two boxes and the notice the second press
+     * raises, which is the surface that used to be spelled out in place.
+     */
+    test('a Russian panel is answered in Russian, box and notice alike', async function () {
+        this.timeout(30000);
+        const config = vscode.workspace.getConfiguration('markdown-org');
+        await config.update('uiLanguage', 'ru', vscode.ConfigurationTarget.Workspace);
+        const said = AGENDA_STRINGS.ru.occurrence;
+        const offered: string[][] = [];
+        const titles: string[] = [];
+        quickPickStub.callsFake((items: { label: string }[], options: { title: string }) => {
+            offered.push(items.map((item) => item.label));
+            titles.push(options.title);
+            // The exceptions, then the days: cancel the occurrence the row
+            // stands for, which is the first day offered.
+            return Promise.resolve(offered.length === 1 ? items[1] : items[0]);
+        });
+        const status = sinon.stub(vscode.window, 'setStatusBarMessage');
+
+        try {
+            await pressTheFlag();
+            await waitUntil(() => offered.length > 1, 'no days were offered');
+            await waitUntil(
+                () => vscode.window.activeTextEditor?.document.getText().includes('EXDATE') === true,
+                'the cancellation did not reach the document'
+            );
+
+            assert.deepStrictEqual(offered[0], [said.move, said.cancel], 'the exceptions were offered in English');
+            // The panel titles the first box, the command the second: both are
+            // one press, and this is where the two languages used to meet.
+            assert.strictEqual(titles[0], formatString(said.pick, '2026-08-20'), `the panel said: ${titles[0] ?? ''}`);
+            assert.strictEqual(titles[1], said.whichCancel, `the command said: ${titles[1] ?? ''}`);
+
+            // The same day a second time: the entry already carries the
+            // exception, and the answer to that is a notice rather than a write.
+            offered.length = 0;
+            await pressTheFlag();
+            await waitUntil(() => status.called, 'the second press said nothing');
+            const [message] = status.firstCall.args;
+            // The wording without its placeholder: the day is filled in, the
+            // language is what this asks about.
+            const wording = said.alreadyCancelled.split('}').pop()?.trim() ?? '';
+            assert.ok(message.includes(wording), `the notice was: ${message}`);
+        } finally {
+            status.restore();
+            await config.update('uiLanguage', 'en', vscode.ConfigurationTarget.Workspace);
+            fs.writeFileSync(notes, '# TODO English\n`SCHEDULED: <2026-08-06 Thu 15:00 +1w>`\n', 'utf8');
+        }
     });
 
     test('the day the row was drawn on leads the days the choice offers', async function () {

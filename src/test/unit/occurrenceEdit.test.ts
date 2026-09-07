@@ -538,3 +538,54 @@ suite('where an occurrence already stands', () => {
         assert.strictEqual(replacementOf(theirs, 0, on('2026-08-20')), null);
     });
 });
+
+/**
+ * What the listing costs, counted rather than timed.
+ *
+ * Every day the list offers used to be answered by a walk of the whole file --
+ * looking for the entry that replaces it -- so eight days cost eight walks, and
+ * each walk read two properties off every heading it passed. Counted here by
+ * handing the reader a `Proxy` over the lines: the same file, once for one day
+ * and once for eight, and the reads of the second are compared with the first.
+ *
+ * A ratio rather than an absolute: what the listing costs per day is not the
+ * point, and it will change. What must not come back is the file being walked
+ * again per day, which shows up as a count that grows with the days asked for.
+ */
+suite('what listing the days costs', () => {
+    /** A file of many entries, one of which is the series being listed. */
+    function file(entries: number): string[] {
+        const lines = ['## English', '`SCHEDULED: <2026-08-06 Thu 15:00 +1w>`', '```org-properties', 'ID: 9f2c', '```'];
+        for (let i = 0; i < entries; i++) {
+            lines.push(`## Other ${i}`, '`SCHEDULED: <2026-08-07 Fri 10:00>`', '```org-properties', `ID: o${i}`, '```');
+        }
+        return lines;
+    }
+
+    /** How many lines the reader touched. */
+    function reads(lines: string[], count: number): number {
+        let touched = 0;
+        const counted = new Proxy(lines, {
+            get(target, key, receiver) {
+                if (typeof key === 'string' && /^\d+$/.test(key)) {
+                    touched++;
+                }
+                return Reflect.get(target, key, receiver) as unknown;
+            }
+        });
+        listOccurrences(counted, 0, 'English', on('2026-08-06'), count);
+        return touched;
+    }
+
+    test('the days asked for do not each cost a walk of the file', () => {
+        const lines = file(40);
+        const one = reads(lines, 1);
+        const eight = reads(lines, 8);
+
+        assert.ok(one > 0, 'the reader touched nothing');
+        assert.ok(
+            eight < one * 2,
+            `eight days cost ${eight} line reads against ${one} for one: the file is being walked per day`
+        );
+    });
+});

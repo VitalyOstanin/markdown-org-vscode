@@ -23,16 +23,19 @@
  * the editor's own undo is what takes it back.
  */
 import * as vscode from 'vscode';
-import { HEADING_REGEX } from '../orgPatterns';
+import { headingTitle } from '../orgPatterns';
 import { findNearestHeading, requireActiveEditor } from '../utils';
 import { applyEditOrReport } from '../utils/applyEdit';
 import { queueEdit } from '../utils/editQueue';
-import { isIsoDate, toIsoDate } from '../utils/isoDate';
+import { fromIsoDate, isIsoDate, toIsoDate } from '../utils/isoDate';
+import { formatString } from '../utils/agendaI18n';
+import { currentUiStrings } from '../utils/uiStrings';
 import { formatError, notifyStatus, notifyWarn } from '../utils/notify';
-import { matchMovedLine, movedDayColumn } from '../utils/movedLine';
+import { movedDayColumn } from '../utils/movedLine';
 import {
     OccurrenceError,
     cancelOccurrence,
+    findMovedLine,
     listOccurrences,
     moveOccurrence,
     replacedRange,
@@ -48,23 +51,18 @@ const ANOTHER_DAY = Symbol('another day');
 
 /** The day an entry's exception is about, typed out. */
 async function askDay(prompt: string, preset: string): Promise<Date | null> {
+    const said = currentUiStrings().strings.occurrence;
     const answer = await vscode.window.showInputBox({
         title: prompt,
         value: preset,
         valueSelection: [0, preset.length],
-        prompt: 'YYYY-MM-DD',
-        validateInput: (value) => (isIsoDate(value.trim()) ? null : 'A day is written YYYY-MM-DD')
+        prompt: said.dayPrompt,
+        validateInput: (value) => (isIsoDate(value.trim()) ? null : said.dayInvalid)
     });
     if (answer === undefined) {
         return null;
     }
     return fromIsoDate(answer.trim());
-}
-
-/** `YYYY-MM-DD` as a local date. */
-function fromIsoDate(text: string): Date {
-    const [year, month, day] = text.split('-').map((part) => parseInt(part, 10));
-    return new Date(year ?? 0, (month ?? 1) - 1, day ?? 1);
 }
 
 /** One row of the picker: a day of the series, or the invitation to type one. */
@@ -74,11 +72,12 @@ interface DayItem extends vscode.QuickPickItem {
 
 /** What the picker says about a day the series has already lost. */
 function standing(occurrence: SeriesOccurrence): string {
+    const said = currentUiStrings().strings.occurrence;
     if (occurrence.cancelled) {
-        return 'cancelled';
+        return said.markCancelled;
     }
     if (occurrence.moved) {
-        return 'already moved';
+        return said.markMoved;
     }
     return '';
 }
@@ -115,7 +114,8 @@ async function pickOccurrence(
         description: standing(occurrence),
         day: occurrence.day
     }));
-    items.push({ label: 'Another day…', description: 'type a date the list does not reach', day: ANOTHER_DAY });
+    const said = currentUiStrings().strings.occurrence;
+    items.push({ label: said.anotherDay, description: said.anotherDayDetail, day: ANOTHER_DAY });
 
     const chosen = await vscode.window.showQuickPick(items, {
         title,
@@ -137,37 +137,78 @@ async function entryAtCursor(): Promise<{ editor: vscode.TextEditor; headingLine
     if (!editor) {
         return null;
     }
+    const entry = await entryAsItStands(editor);
+    return entry === null ? null : { editor, ...entry };
+}
+
+/**
+ * The entry and its file as the document holds them now.
+ *
+ * Both commands ask which day in a modal list, and the document goes on living
+ * while the list is open -- a save that reformats it, another extension, a
+ * second window on the same file. So the write is worked out from the file as
+ * it now stands rather than from the snapshot the command opened with, and the
+ * heading is located again for the same reason: an edit above it moves every
+ * line under it. `phraseTask` and `taskStatus` read again after their own
+ * boxes, and this is that rule.
+ */
+async function entryAsItStands(editor: vscode.TextEditor): Promise<{ headingLine: number; lines: string[] } | null> {
     const headingLine = await findNearestHeading(editor);
     if (headingLine === null) {
         return null;
     }
-    return { editor, headingLine, lines: editor.document.getText().split(/\r?\n/) };
+    return { headingLine, lines: documentLines(editor) };
+}
+
+/** The document as an array of lines, which is the shape every edit here is worked out on. */
+function documentLines(editor: vscode.TextEditor): string[] {
+    return editor.document.getText().split(/\r?\n/);
 }
 
 /**
- * Write `after` over the document, as the one range the two differ over.
+ * Write `after` over the document, as the one range it and the document differ
+ * over.
+ *
+ * What it is compared against is read here rather than passed in: a command
+ * asks which day in a modal list, and a snapshot taken before that list is not
+ * what the file holds by the time the write goes out. Taking it as an argument
+ * is how the wrong line came to be rewritten, so the argument is gone.
  *
  * A file whose last line is not empty gains no trailing newline here: the
  * range ends where the document does, and the replacement is joined with the
  * document's own line ending. A range that stands for lines removed and none
  * added is written with nothing at all, so the line ending goes with the line.
+ *
+ * Lines added past the last one are the case where the document has no line
+ * ending to lean on, and they carry their own: a file whose last line holds
+ * text ends there, and text written at that point without one lands on the end
+ * of that line. Written as a range starting on a line the document does not
+ * have, it did exactly that -- the added line was glued onto the planning line
+ * before it, and neither was read as a line again.
  */
-async function write(editor: vscode.TextEditor, before: string[], after: string[], what: string): Promise<boolean> {
-    const change = replacedRange(before, after);
+async function write(editor: vscode.TextEditor, after: string[], what: string): Promise<boolean> {
+    const change = replacedRange(documentLines(editor), after);
     if (!change) {
         return false;
     }
     const eol = editor.document.eol === vscode.EndOfLine.CRLF ? '\r\n' : '\n';
     const last = editor.document.lineCount - 1;
+    const documentEnds = new vscode.Position(last, editor.document.lineAt(last).text.length);
     const endsDocument = change.endLineExclusive > last;
-    const range = endsDocument
-        ? new vscode.Range(change.startLine, 0, last, editor.document.lineAt(last).text.length)
-        : new vscode.Range(change.startLine, 0, change.endLineExclusive, 0);
+    const startsPastTheEnd = change.startLine > last;
+    const range = startsPastTheEnd
+        ? new vscode.Range(documentEnds, documentEnds)
+        : endsDocument
+          ? new vscode.Range(new vscode.Position(change.startLine, 0), documentEnds)
+          : new vscode.Range(change.startLine, 0, change.endLineExclusive, 0);
     // Lines taken away and nothing put back -- discarding a draft -- is the one
     // case where the replacement is empty, and there the closing line ending
     // belongs to the range rather than to the text: appending one would leave
     // a blank line where the removed line stood.
-    const text = change.lines.length === 0 ? '' : change.lines.join(eol) + (endsDocument ? '' : eol);
+    const text =
+        change.lines.length === 0
+            ? ''
+            : (startsPastTheEnd ? eol : '') + change.lines.join(eol) + (endsDocument ? '' : eol);
 
     return applyEditOrReport(
         editor,
@@ -191,19 +232,24 @@ export async function cancelOccurrenceCommand(day?: string): Promise<void> {
     }
     const named = day !== undefined && isIsoDate(day) ? day : undefined;
     const title = heading(entry.lines, entry.headingLine);
-    const date = await pickOccurrence('Cancel which occurrence?', entry.lines, entry.headingLine, title, named);
+    const said = currentUiStrings().strings.occurrence;
+    const date = await pickOccurrence(said.whichCancel, entry.lines, entry.headingLine, title, named);
     if (!date) {
         return;
     }
 
     await queueEdit(async () => {
         try {
-            const edit = cancelOccurrence(entry.lines, entry.headingLine, title, date);
-            if (!edit.changed) {
-                notifyStatus(`${toIsoDate(date)} is already left out of the series`);
+            const now = await entryAsItStands(entry.editor);
+            if (now === null) {
                 return;
             }
-            await write(entry.editor, entry.lines, edit.lines, 'the cancelled occurrence');
+            const edit = cancelOccurrence(now.lines, now.headingLine, heading(now.lines, now.headingLine), date);
+            if (!edit.changed) {
+                notifyStatus(formatString(said.alreadyCancelled, toIsoDate(date)));
+                return;
+            }
+            await write(entry.editor, edit.lines, 'the cancelled occurrence');
         } catch (error) {
             report(error);
         }
@@ -226,21 +272,32 @@ export async function moveOccurrenceCommand(day?: string): Promise<void> {
     const named = day !== undefined && isIsoDate(day) ? day : undefined;
     const title = heading(entry.lines, entry.headingLine);
 
-    const occurrence = await pickOccurrence('Move which occurrence?', entry.lines, entry.headingLine, title, named);
+    const said = currentUiStrings().strings.occurrence;
+    const occurrence = await pickOccurrence(said.whichMove, entry.lines, entry.headingLine, title, named);
     if (!occurrence) {
         return;
     }
 
     await queueEdit(async () => {
         try {
+            const now = await entryAsItStands(entry.editor);
+            if (now === null) {
+                return;
+            }
             // An occurrence moved once opens on where it went rather than on
             // the day the series draws it: moving it again is answered from
             // what the notes now say, and the reader walks on from there.
-            const standing = replacementOf(entry.lines, entry.headingLine, occurrence);
-            const listed = listOccurrences(entry.lines, entry.headingLine, title, occurrence, 1)[0];
+            const standing = replacementOf(now.lines, now.headingLine, occurrence);
+            const listed = listOccurrences(
+                now.lines,
+                now.headingLine,
+                heading(now.lines, now.headingLine),
+                occurrence,
+                1
+            )[0];
             const edit = moveOccurrence(
-                entry.lines,
-                entry.headingLine,
+                now.lines,
+                now.headingLine,
                 occurrence,
                 standing ? fromIsoDate(standing.day) : occurrence,
                 (standing ? standing.time : listed?.time) ?? null
@@ -248,30 +305,17 @@ export async function moveOccurrenceCommand(day?: string): Promise<void> {
             if (!edit.changed) {
                 return;
             }
-            if (await write(entry.editor, entry.lines, edit.lines, 'the move')) {
-                const at = findMoved(edit.lines, entry.headingLine, toIsoDate(occurrence));
+            if (await write(entry.editor, edit.lines, 'the move')) {
+                const at = findMovedLine(edit.lines, now.headingLine, toIsoDate(occurrence));
                 if (at !== null) {
                     moveCaretTo(entry.editor, at);
-                    notifyStatus('Walk the day and the hour with Shift+Up and Shift+Down');
+                    notifyStatus(formatString(said.walkTheDay, 'Shift+Up', 'Shift+Down'));
                 }
             }
         } catch (error) {
             report(error);
         }
     });
-}
-
-/** Which line of the entry moves the occurrence of `day`. */
-function findMoved(lines: readonly string[], headingLine: number, day: string): number | null {
-    for (let i = headingLine + 1; i < lines.length; i++) {
-        if (HEADING_REGEX.test(lines[i] ?? '')) {
-            break;
-        }
-        if (matchMovedLine(lines[i] ?? '')?.from === day) {
-            return i;
-        }
-    }
-    return null;
 }
 
 /** Put the caret on the day the occurrence moves to, which is where the arrows start. */
@@ -288,10 +332,10 @@ function report(error: unknown): void {
         notifyWarn(error.message);
         return;
     }
-    notifyWarn(`The occurrence was not written: ${formatError(error)}`);
+    notifyWarn(formatString(currentUiStrings().strings.occurrence.notWritten, formatError(error)));
 }
 
 /** The heading text the messages name the entry by. */
 function heading(lines: readonly string[], headingLine: number): string {
-    return (lines[headingLine] ?? '').replace(/^#+\s*/, '').trim();
+    return headingTitle(lines[headingLine] ?? '');
 }

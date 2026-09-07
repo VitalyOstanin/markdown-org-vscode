@@ -1,3 +1,5 @@
+import { isIsoDate } from '../isoDate';
+
 // Google Calendar event ids use base32hex: characters 0-9 and a-v, length
 // 5..1024. A UUID with dashes removed and lowercased is 32 hex chars
 // (0-9a-f), a valid subset. See the Calendar API events.insert id rules.
@@ -23,7 +25,14 @@ export function taskIdToEventId(orgId: string): string {
  * its id is the series' with the day it left appended. That is deterministic,
  * which is what lets a second sync patch the event it wrote before instead of
  * making another, and it stays inside base32hex because the day is digits.
+ *
+ * The day is checked here rather than left to the API: a `MOVED` line is
+ * written by hand, and a day that is not one would otherwise be answered by
+ * Google -- after the event of the series had already gone out.
  */
 export function movedEventId(orgId: string, occurrence: string): string {
+    if (!isIsoDate(occurrence)) {
+        throw new Error(`the day a move names is not a day: "${occurrence}"`);
+    }
     return `${taskIdToEventId(orgId)}${occurrence.replaceAll('-', '')}`;
 }

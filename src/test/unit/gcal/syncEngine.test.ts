@@ -460,6 +460,152 @@ suite('gcal/syncEngine', () => {
         );
     });
 
+    test('a move taken out of the notes takes its event out of the calendar', async () => {
+        // The line is gone from the file, so nothing names the day any more.
+        // What the entry pushed for it is remembered in GCAL_MOVED, which is
+        // the only way a run can tell an occurrence that was never held
+        // elsewhere from one that stopped being.
+        const r = recorder((c) =>
+            c.method === 'POST' ? { status: 200, body: { id: 'x' } } : { status: 200, body: {} }
+        );
+        const w = recordingWriter();
+        const series = task({
+            properties: {
+                ID: '11111111-1111-1111-1111-111111111111',
+                GCAL_EVENT_ID: '11111111111111111111111111111111',
+                GCAL_MOVED: '2026-06-08'
+            },
+            timestamp_time: '15:00',
+            timestamp_repeater: '+1w'
+        });
+
+        const summary = await runSync(baseDeps([series], r.fn, w.writer));
+
+        const held = '11111111111111111111111111111111' + '20260608';
+        assert.ok(
+            r.calls.some((c) => c.method === 'DELETE' && c.url.includes(held)),
+            `the calls were: ${r.calls.map((c) => `${c.method} ${c.url}`).join(', ')}`
+        );
+        assert.equal(summary.deleted, 1);
+        assert.deepEqual(
+            summary.changes.map((c) => [c.action, c.date]),
+            [
+                ['deleted', '2026-06-08'],
+                ['created', '2026-06-01']
+            ]
+        );
+        const last = w.writes.at(-1);
+        assert.ok(last, 'the properties were written');
+        assert.equal(last.props.GCAL_MOVED, undefined, 'the day is no longer remembered');
+    });
+
+    test('the day a move was written for is remembered in the entry', async () => {
+        const r = recorder((c) =>
+            c.method === 'POST' ? { status: 200, body: { id: 'x' } } : { status: 200, body: {} }
+        );
+        const w = recordingWriter();
+        const series = task({
+            properties: { ID: '11111111-1111-1111-1111-111111111111' },
+            timestamp_time: '15:00',
+            timestamp_repeater: '+1w',
+            moved_occurrences: [{ from: '2026-06-08', to: '2026-06-10' }]
+        });
+
+        const summary = await runSync(baseDeps([series], r.fn, w.writer));
+
+        assert.equal(summary.created, 2);
+        const last = w.writes.at(-1);
+        assert.ok(last, 'the properties were written');
+        assert.equal(last.props.GCAL_MOVED, '2026-06-08');
+    });
+
+    test('a move naming no day of the calendar is refused before the calendar is asked', async () => {
+        // The same day is left out of the EXDATE for the same reason: what the
+        // extractor could not read, the calendar cannot either. Refused here
+        // rather than by the API, which would answer only after the event of
+        // the series had already been written.
+        const r = recorder((c) =>
+            c.method === 'POST' ? { status: 200, body: { id: 'x' } } : { status: 200, body: {} }
+        );
+        const w = recordingWriter();
+        const series = task({
+            properties: { ID: '11111111-1111-1111-1111-111111111111' },
+            timestamp_time: '15:00',
+            timestamp_repeater: '+1w',
+            moved_occurrences: [{ from: 'tomorrow', to: '2026-06-10' }]
+        });
+
+        const summary = await runSync(baseDeps([series], r.fn, w.writer));
+
+        assert.equal(r.calls.filter((c) => c.method === 'POST').length, 1, 'the series alone was written');
+        assert.equal(summary.created, 1);
+        assert.equal(summary.failed, 1);
+        const failed = summary.changes.find((c) => c.action === 'failed');
+        assert.ok(failed, 'the move was reported');
+        assert.match(failed.error ?? '', /tomorrow/);
+    });
+
+    test('a move the calendar refuses leaves the entry and the moves after it alone', async () => {
+        // The occurrences were written inside the entry's own try, so one
+        // refusal counted the entry as failed on top of the created it had
+        // already been counted as, and dropped every occurrence after it.
+        const firstHeld = '11111111111111111111111111111111' + '20260608';
+        const r = recorder((c) =>
+            c.method === 'POST' && (c.body?.id as string) === firstHeld
+                ? { status: 403, body: { error: { message: 'forbidden occurrence' } } }
+                : { status: 200, body: { id: 'x' } }
+        );
+        const w = recordingWriter();
+        const series = task({
+            properties: { ID: '11111111-1111-1111-1111-111111111111' },
+            timestamp_time: '15:00',
+            timestamp_repeater: '+1w',
+            moved_occurrences: [
+                { from: '2026-06-08', to: '2026-06-10' },
+                { from: '2026-06-15', to: '2026-06-17' }
+            ]
+        });
+
+        const summary = await runSync(baseDeps([series], r.fn, w.writer));
+
+        assert.equal(summary.created, 2, 'the series and the occurrence after the refused one');
+        assert.equal(summary.failed, 1, "the refusal is the occurrence's, not the entry's");
+        assert.deepEqual(
+            summary.changes.map((c) => [c.action, c.date]),
+            [
+                ['created', '2026-06-01'],
+                ['failed', '2026-06-10'],
+                ['created', '2026-06-17']
+            ]
+        );
+        const last = w.writes.at(-1);
+        assert.ok(last, 'the properties were written');
+        assert.equal(last.props.GCAL_MOVED, '2026-06-15', 'only the day whose event is out there');
+    });
+
+    test('an entry that stops being pushed takes its moved events with it', async () => {
+        const r = recorder(() => ({ status: 200, body: {} }));
+        const w = recordingWriter();
+        const cancelled = task({
+            task_type: 'CANCELLED',
+            properties: {
+                ID: '11111111-1111-1111-1111-111111111111',
+                GCAL_EVENT_ID: '11111111111111111111111111111111',
+                GCAL_MOVED: '2026-06-08 2026-06-15'
+            },
+            timestamp_time: '15:00',
+            timestamp_repeater: '+1w'
+        });
+
+        const summary = await runSync(baseDeps([cancelled], r.fn, w.writer));
+
+        const deleted = r.calls.filter((c) => c.method === 'DELETE').map((c) => c.url);
+        assert.equal(deleted.length, 3, `the entry and both occurrences: ${deleted.join(', ')}`);
+        assert.ok(deleted.some((url) => url.includes('1111111111111111111111111111111120260608')));
+        assert.ok(deleted.some((url) => url.includes('1111111111111111111111111111111120260615')));
+        assert.equal(summary.deleted, 3);
+    });
+
     test('a moved occurrence already in the calendar is patched, not written twice', async () => {
         const held = '11111111111111111111111111111111' + '20260608';
         const r = recorder((c) =>

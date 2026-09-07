@@ -1,5 +1,6 @@
-import type { Task } from '../../types';
+import type { Task, MovedOccurrence } from '../../types';
 import { isCancelled } from '../normalizeTaskType';
+import { isIsoDate } from '../isoDate';
 import { formatError } from '../formatError';
 import type { FetchFn } from './oauth';
 import type { AccessTokenProvider } from './accessToken';
@@ -89,6 +90,36 @@ export interface SyncSummary {
  */
 const CONSECUTIVE_FAILURES_BEFORE_STOP = 3;
 
+/**
+ * The days this entry has moved-occurrence events out in the calendar for.
+ *
+ * A move is a line of the series, so nothing in the calendar points back at
+ * it: once the line is taken out of the notes, no later run has any way to
+ * know an event was ever written for that day, and it would stand in the
+ * calendar for good. The days go beside `GCAL_EVENT_ID`, which is a cache of
+ * the same kind, and a run deletes what the notes no longer name.
+ */
+const MOVED_DAYS_PROPERTY = 'GCAL_MOVED';
+
+/** The days remembered in `GCAL_MOVED`, as written by an earlier run. */
+function movedDaysRemembered(props: Record<string, string>): string[] {
+    return (props[MOVED_DAYS_PROPERTY] ?? '').split(/\s+/).filter((day) => isIsoDate(day));
+}
+
+/** Write the days back, or take the property out where none are left. */
+function rememberMovedDays(props: Record<string, string>, days: ReadonlySet<string>): boolean {
+    const written = [...days].sort().join(' ');
+    if ((props[MOVED_DAYS_PROPERTY] ?? '') === written) {
+        return false;
+    }
+    if (written === '') {
+        delete props.GCAL_MOVED;
+    } else {
+        props.GCAL_MOVED = written;
+    }
+    return true;
+}
+
 function linkedEventId(props: Record<string, string>): string | undefined {
     if (props.ID) {
         try {
@@ -145,6 +176,9 @@ export async function runSync(deps: SyncDeps): Promise<SyncSummary> {
         // event must be deleted unconditionally -- unlike DONE, this does not
         // depend on deps.onDone (which only governs DONE).
         let failedThisTask = false;
+        // Set where an occurrence's refusal reached the run's failure limit:
+        // the entry's own loop has to end, and it is inside the `try`.
+        let stopRun = false;
         const wantDelete =
             !isSyncable(task) || isCancelled(task.task_type) || (task.task_type === 'DONE' && deps.onDone === 'delete');
 
@@ -157,6 +191,19 @@ export async function runSync(deps: SyncDeps): Promise<SyncSummary> {
                     note('deleted', task);
                 } else {
                     summary.skipped++;
+                }
+                // An entry that is no longer pushed takes its occurrences with
+                // it: each one is an event of its own, and the entry's own
+                // deletion says nothing about them.
+                const orgId = props.ID;
+                if (orgId) {
+                    for (const day of movedDaysRemembered(props)) {
+                        await deleteEvent(deps.fetchFn, deps.getToken, deps.calendarId, movedEventId(orgId, day), {
+                            signal: deps.signal
+                        });
+                        summary.deleted++;
+                        summary.changes.push({ action: 'deleted', date: day, heading: task.heading });
+                    }
                 }
                 continue;
             }
@@ -176,6 +223,26 @@ export async function runSync(deps: SyncDeps): Promise<SyncSummary> {
                     continue;
                 }
             }
+            // A day the notes no longer name has no event to stand for it:
+            // the line was taken out, and nothing else in the calendar points
+            // back at the move. Done before the series is written so the day
+            // is free again by the time the rule expands over it.
+            const named = new Set(
+                (task.moved_occurrences ?? []).map((moved) => moved.from).filter((day) => isIsoDate(day))
+            );
+            const heldDays = new Set(movedDaysRemembered(props));
+            for (const day of [...heldDays].sort()) {
+                if (named.has(day)) {
+                    continue;
+                }
+                await deleteEvent(deps.fetchFn, deps.getToken, deps.calendarId, movedEventId(orgId, day), {
+                    signal: deps.signal
+                });
+                heldDays.delete(day);
+                summary.deleted++;
+                summary.changes.push({ action: 'deleted', date: day, heading: task.heading });
+            }
+
             const eventId = taskIdToEventId(orgId);
             const event = mapTaskToEvent(task, orgId, deps.mapOptions(task), occurrencesMissingFrom(task, replaced));
             event.id = eventId;
@@ -190,13 +257,7 @@ export async function runSync(deps: SyncDeps): Promise<SyncSummary> {
                 note('created', task);
             }
 
-            if (props.GCAL_EVENT_ID !== eventId) {
-                props.GCAL_EVENT_ID = eventId;
-                // GCAL_EVENT_ID is only a cache (eventId is derived from ID), so a
-                // deferred write here is harmless: the next sync re-derives it and
-                // patches. Outcome intentionally ignored.
-                await deps.writer.write(task.file, task.line, task.heading, props);
-            }
+            props.GCAL_EVENT_ID = eventId;
 
             // An occurrence held on another day (extractor ADR-0038) leaves as
             // an event of its own: the day it left is already out of the rule
@@ -204,23 +265,54 @@ export async function runSync(deps: SyncDeps): Promise<SyncSummary> {
             // override on an event it has not expanded yet. Its id is derived
             // from the series' and the day, so a later run patches this event
             // rather than writing a second one.
+            //
+            // Each one is written inside a `try` of its own: the entry has
+            // already gone out, so a refusal here is that occurrence's rather
+            // than the entry's -- counting it against the entry would report
+            // one entry as both created and failed, and would drop every
+            // occurrence after the refused one.
             for (const moved of task.moved_occurrences ?? []) {
-                const held = mapMovedOccurrenceToEvent(task, orgId, moved, deps.mapOptions(task));
-                const heldId = movedEventId(orgId, moved.from);
-                held.id = heldId;
-                const placed = await insertEvent(deps.fetchFn, deps.getToken, deps.calendarId, held, {
-                    signal: deps.signal
-                });
-                if (placed.status === 'conflict') {
-                    await patchEvent(deps.fetchFn, deps.getToken, deps.calendarId, heldId, held, {
-                        signal: deps.signal
+                if (!isIsoDate(moved.from)) {
+                    // Refused before the calendar is asked, for the reason the
+                    // same day is left out of the EXDATE: a `MOVED` line is
+                    // written by hand, and Google would answer this only after
+                    // the entry itself had been written.
+                    summary.failed++;
+                    summary.changes.push({
+                        action: 'failed',
+                        date: moved.to,
+                        heading: task.heading,
+                        error: `the day a move names is not a day: "${moved.from}"`
                     });
-                    summary.updated++;
-                    summary.changes.push({ action: 'updated', date: moved.to, heading: task.heading });
-                } else {
-                    summary.created++;
-                    summary.changes.push({ action: 'created', date: moved.to, heading: task.heading });
+                    continue;
                 }
+                try {
+                    await writeMovedOccurrence(deps, summary, task, orgId, moved);
+                    heldDays.add(moved.from);
+                } catch (e) {
+                    const reason = formatError(e);
+                    summary.failed++;
+                    summary.changes.push({ action: 'failed', date: moved.to, heading: task.heading, error: reason });
+                    failedThisTask = true;
+                    consecutiveFailures++;
+                    if (consecutiveFailures >= CONSECUTIVE_FAILURES_BEFORE_STOP) {
+                        summary.stoppedEarly = reason;
+                        stopRun = true;
+                        break;
+                    }
+                }
+            }
+
+            // Both properties are caches -- the event id is derived from `ID`,
+            // and the days are what the calendar already holds -- so a
+            // deferred write is harmless: the next run derives the one and
+            // deletes by the other. Outcome intentionally ignored.
+            const daysChanged = rememberMovedDays(props, heldDays);
+            if (daysChanged || props.GCAL_EVENT_ID !== task.properties?.GCAL_EVENT_ID) {
+                await deps.writer.write(task.file, task.line, task.heading, props);
+            }
+            if (stopRun) {
+                break;
             }
         } catch (e) {
             const reason = formatError(e);
@@ -243,4 +335,32 @@ export async function runSync(deps: SyncDeps): Promise<SyncSummary> {
     }
 
     return summary;
+}
+
+/**
+ * Write one occurrence held on another day, as an event of its own.
+ *
+ * Insert first and patch on the conflict the deterministic id gives: a second
+ * run over an unchanged move must reach the event it wrote before rather than
+ * make another beside it.
+ */
+async function writeMovedOccurrence(
+    deps: SyncDeps,
+    summary: SyncSummary,
+    task: Task,
+    orgId: string,
+    moved: MovedOccurrence
+): Promise<void> {
+    const held = mapMovedOccurrenceToEvent(task, orgId, moved, deps.mapOptions(task));
+    const heldId = movedEventId(orgId, moved.from);
+    held.id = heldId;
+    const placed = await insertEvent(deps.fetchFn, deps.getToken, deps.calendarId, held, { signal: deps.signal });
+    if (placed.status === 'conflict') {
+        await patchEvent(deps.fetchFn, deps.getToken, deps.calendarId, heldId, held, { signal: deps.signal });
+        summary.updated++;
+        summary.changes.push({ action: 'updated', date: moved.to, heading: task.heading });
+    } else {
+        summary.created++;
+        summary.changes.push({ action: 'created', date: moved.to, heading: task.heading });
+    }
 }

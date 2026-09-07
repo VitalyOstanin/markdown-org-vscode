@@ -34,12 +34,12 @@
 // written, the weekday spelt as the series spells it, the planning line
 // rewritten token by token -- mirrors that module rather than the extension's
 // own habits.
-import { HEADING_REGEX, headingLevel, matchTimestampLine, type TimestampLineMatch } from '../orgPatterns';
-import { matchMovedLine, movedLine, weekdaySample, type MovedOccurrence } from './movedLine';
+import { headingLevel, headingTitle, isWeekdayName, matchTimestampLine, type TimestampLineMatch } from '../orgPatterns';
+import { matchMovedLine, movedLine, weekdaySample, type MovedLineFields } from './movedLine';
 import { findOrgPropertiesBlocks } from './orgProperties';
-import { nextOccurrence, parseRepeater, type Repeater } from './repeater';
+import { addMonths, nextOccurrence, parseRepeater, type Repeater } from './repeater';
 import { getWeekdayName } from './incrementTimestamp';
-import { isIsoDate, toIsoDate } from './isoDate';
+import { fromIsoDate, isIsoDate, toIsoDate } from './isoDate';
 
 /** Property key listing the occurrences a series does not have. */
 export const EXDATE_KEY = 'EXDATE';
@@ -88,7 +88,7 @@ function findProperty(
     key: string
 ): { line: number; value: string } | null {
     let found: { line: number; value: string } | null = null;
-    for (const block of findOrgPropertiesBlocks([...lines], headingLine)) {
+    for (const block of findOrgPropertiesBlocks(lines, headingLine)) {
         for (let i = block.startLine + 1; i < block.endLineExclusive - 1; i++) {
             const hit = propertyLine(lines[i] ?? '');
             if (hit?.[0] === key) {
@@ -313,7 +313,7 @@ function replacementLine(line: string, span: { start: number; end: number }, dat
     const edits: [Field, string][] = [[dateField, toIsoDate(date)]];
 
     const second = found[1];
-    const weekday = second && /^[А-Яа-яA-Za-z]+$/.test(line.slice(second.start, second.end)) ? second : null;
+    const weekday = second && isWeekdayName(line.slice(second.start, second.end)) ? second : null;
     if (weekday) {
         const written = line.slice(weekday.start, weekday.end);
         const name = getWeekdayName(date, written);
@@ -353,12 +353,6 @@ function replacementLine(line: string, span: { start: number; end: number }, dat
         rewritten = splice(rewritten, range, to);
     }
     return rewritten;
-}
-
-/** What a heading says, for a message about it: the line without its hashes and keyword markup. */
-function headingTitle(line: string): string {
-    const match = HEADING_REGEX.exec(line);
-    return (match?.groups?.title ?? line).trim();
 }
 
 /**
@@ -411,29 +405,48 @@ export interface StandingReplacement {
  * separated from the series it belongs to by everything written since.
  */
 function findReplacement(lines: readonly string[], series: string, date: string): StandingReplacement | null {
+    return replacementsOf(lines, series).get(date) ?? null;
+}
+
+/**
+ * Every entry of the file standing in for an occurrence of `series`, by the
+ * day it replaces.
+ *
+ * Built in one pass because the callers ask about several days at once: the
+ * list of days a command offers asks about eight, and a walk of the whole
+ * file per day is that walk eight times over. `RECURRENCE_ID` is read only
+ * where `SERIES_ID` already named this series, which is what most headings
+ * fail on.
+ */
+function replacementsOf(lines: readonly string[], series: string): Map<string, StandingReplacement> {
+    const found = new Map<string, StandingReplacement>();
     if (series === '') {
-        return null;
+        return found;
     }
     for (let i = 0; i < lines.length; i++) {
         if (headingLevel(lines[i] ?? '') === null) {
             continue;
         }
-        const named = findProperty(lines, i, SERIES_ID_KEY)?.value === series;
+        if (findProperty(lines, i, SERIES_ID_KEY)?.value !== series) {
+            continue;
+        }
         const replaced = findProperty(lines, i, RECURRENCE_ID_KEY)?.value.split(/\s+/)[0];
-        if (!named || replaced !== date) {
+        // The first entry replacing a day is the one that stands, the way the
+        // first `MOVED` line naming an occurrence does.
+        if (replaced === undefined || found.has(replaced)) {
             continue;
         }
         const planning = planningLines(lines, i)[0];
         const line = planning ? (lines[planning.line] ?? '') : '';
         const written = planning ? fields(line, planning.span)[0] : undefined;
 
-        return {
+        found.set(replaced, {
             headingLine: i,
-            day: written ? line.slice(written.start, written.end) : date,
+            day: written ? line.slice(written.start, written.end) : replaced,
             time: planning ? writtenTime(line, planning.span) : null
-        };
+        });
     }
-    return null;
+    return found;
 }
 
 /**
@@ -528,7 +541,7 @@ export function moveOccurrence(
  * Which line of the entry already moves the occurrence of `day`, or `null`
  * where none does.
  */
-function findMovedLine(lines: readonly string[], headingLine: number, day: string): number | null {
+export function findMovedLine(lines: readonly string[], headingLine: number, day: string): number | null {
     for (let i = headingLine + 1; i < lines.length; i++) {
         if (headingLevel(lines[i] ?? '') !== null) {
             break;
@@ -559,8 +572,8 @@ function lastPlanningLine(lines: readonly string[], headingLine: number, plannin
 }
 
 /** Every occurrence the entry holds on another day, as its `MOVED` lines say. */
-export function movedOccurrences(lines: readonly string[], headingLine: number): MovedOccurrence[] {
-    const found: MovedOccurrence[] = [];
+export function movedOccurrences(lines: readonly string[], headingLine: number): MovedLineFields[] {
+    const found: MovedLineFields[] = [];
     for (let i = headingLine + 1; i < lines.length; i++) {
         if (headingLevel(lines[i] ?? '') !== null) {
             break;
@@ -620,7 +633,7 @@ export function seriesWeekday(lines: readonly string[], headingLine: number, hea
         return null;
     }
     const token = line.slice(second.start, second.end);
-    return /^[А-Яа-яA-Za-z]+$/.test(token) ? token : null;
+    return isWeekdayName(token) ? token : null;
 }
 
 /** One day a repeating entry falls on, and what the file already says about that day. */
@@ -711,9 +724,14 @@ export function listOccurrences(
         (findProperty(lines, headingLine, EXDATE_KEY)?.value ?? '').split(/[,\s]+/).filter((day) => day !== '')
     );
 
-    const [year, month, day] = first.split('-').map((part) => parseInt(part, 10));
-    let date = new Date(year ?? 0, (month ?? 1) - 1, day ?? 1);
+    if (!isIsoDate(first)) {
+        throw new OccurrenceError(`${heading} names no day to count its occurrences from`);
+    }
+    let date = fromIsoDate(first);
     const wanted = toIsoDate(from);
+    // Once for the whole listing rather than once per day offered: the days
+    // are answered out of the map below.
+    const replaced = replacementsOf(lines, series);
     const found: SeriesOccurrence[] = [];
     for (let taken = 0; found.length < count; taken += 1) {
         if (taken > WALK_LIMIT) {
@@ -725,12 +743,64 @@ export function listOccurrences(
                 day: falls,
                 time,
                 cancelled: excluded.has(falls),
-                moved: moved.some((held) => held.from === falls) || findReplacement(lines, series, falls) !== null
+                moved: moved.some((held) => held.from === falls) || replaced.has(falls)
             });
         }
         date = step(date, repeater);
     }
     return found;
+}
+
+/**
+ * Whether the series a planning `timestamp` describes falls on `day`.
+ *
+ * What a `MOVED` line names has to be an occurrence the entry has: a move
+ * holds an occurrence on another day, and there is no line that gives a series
+ * a day it never had, so the extractor refuses one that names any other day
+ * (its ADR-0040). This is the question its reader asks, asked here so that the
+ * editor says the same thing while the line is being written.
+ *
+ * `null` where the question has no answer here: a timestamp beginning with
+ * something other than a date, an entry that does not repeat, and the two
+ * repeaters this extension does not count days for -- working days need the
+ * public calendar it does not hold, and an hourly repeater names no day of its
+ * own. `listOccurrences` refuses the same two, and a caller reports nothing
+ * rather than guessing at a series it cannot count out.
+ *
+ * Every unit is answered by arithmetic from the entry's own first day, which
+ * is how the extractor counts (`bracket_uniform_days`, `bracket_month`,
+ * `bracket_year`). Counting instead by stepping from the previous occurrence
+ * would disagree with it on a month anchored past the 28th: stepped, January
+ * 31st reaches February 28th and then March 28th; counted from the base, the
+ * series is on March 31st, and that is the day the agenda draws.
+ */
+export function seriesFallsOn(timestamp: string, day: string): boolean | null {
+    const span = { start: 0, end: timestamp.length };
+    const written = fields(timestamp, span)[0];
+    const first = written ? timestamp.slice(written.start, written.end) : '';
+    if (!isIsoDate(first) || !isIsoDate(day)) {
+        return null;
+    }
+    const repeater = repeaterOf(timestamp, span);
+    if (!repeater || repeater.unit === 'workday' || repeater.unit === 'hour') {
+        return null;
+    }
+    // A series has nothing behind the day it starts on. Written `YYYY-MM-DD`,
+    // days sort as they fall.
+    if (day < first) {
+        return false;
+    }
+
+    const base = fromIsoDate(first);
+    const wanted = fromIsoDate(day);
+    if (repeater.unit === 'day' || repeater.unit === 'week') {
+        const apart = Math.round((wanted.getTime() - base.getTime()) / 86_400_000);
+        return apart % (repeater.value * (repeater.unit === 'week' ? 7 : 1)) === 0;
+    }
+
+    const months = repeater.value * (repeater.unit === 'year' ? 12 : 1);
+    const apart = (wanted.getFullYear() - base.getFullYear()) * 12 + (wanted.getMonth() - base.getMonth());
+    return apart % months === 0 && toIsoDate(addMonths(base, apart)) === day;
 }
 
 /** The half-open line range that changed, and what stands there now. */
