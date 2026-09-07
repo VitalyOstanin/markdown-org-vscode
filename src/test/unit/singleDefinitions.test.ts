@@ -39,13 +39,33 @@ suite('one answer, one place', () => {
         return found;
     }
 
+    /**
+     * A relative path written with slashes, whatever separator produced it.
+     *
+     * The names below are written the way the imports are, and a run on
+     * Windows compares them against paths `path.relative` built with
+     * backslashes -- two spellings of the same file, and every expectation
+     * fails.
+     */
+    function slashed(relative: string): string {
+        return relative.replaceAll(/[\\/]/g, '/');
+    }
+
     /** The files whose text matches `pattern`, named the way a failure can be read. */
     function filesMatching(pattern: RegExp): string[] {
         return sources()
             .filter((file) => pattern.test(fs.readFileSync(file, 'utf8')))
-            .map((file) => path.relative(src, file))
+            .map((file) => slashed(path.relative(src, file)))
             .sort();
     }
+
+    test('the name a failure prints is written with slashes on any platform', () => {
+        // Windows hands back `utils\\isoDate.ts`, and every expectation here is
+        // written the way the imports are. Held with the Windows separator
+        // rather than the running platform's, so a Linux run says whether the
+        // rule holds where it was broken.
+        assert.strictEqual(slashed(path.win32.relative('C:\\src', 'C:\\src\\utils\\isoDate.ts')), 'utils/isoDate.ts');
+    });
 
     test('the characters a weekday is written with are named once', () => {
         assert.deepStrictEqual(
