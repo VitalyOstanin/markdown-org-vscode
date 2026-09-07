@@ -308,6 +308,44 @@ suite('a row that repeats', () => {
         assert.strictEqual(row.getAttribute('data-occurrence'), '2026-08-20');
     });
 
+    /**
+     * A row the agenda drew on the day an occurrence was held stands for the
+     * occurrence that moved, not for the day it landed on. The commands are
+     * about the occurrence: moving it again corrects the line already
+     * standing for it, and cancelling it takes that occurrence out.
+     */
+    test('a row drawn where an occurrence was held carries the day it left', () => {
+        const html = renderTaskRow(
+            task({
+                timestamp_repeater: '+1w',
+                timestamp_date: '2026-08-22',
+                moved_occurrences: [{ from: '2026-08-20', to: '2026-08-22', time: '18:00' }]
+            }),
+            0,
+            'today',
+            ctx
+        );
+        const row = parse(html).querySelector('.task-line');
+
+        assert.strictEqual(row?.getAttribute('data-occurrence'), '2026-08-20');
+    });
+
+    test('a row of a series that moves another day carries its own day', () => {
+        const html = renderTaskRow(
+            task({
+                timestamp_repeater: '+1w',
+                timestamp_date: '2026-08-27',
+                moved_occurrences: [{ from: '2026-08-20', to: '2026-08-22' }]
+            }),
+            0,
+            'today',
+            ctx
+        );
+        const row = parse(html).querySelector('.task-line');
+
+        assert.strictEqual(row?.getAttribute('data-occurrence'), '2026-08-27');
+    });
+
     test('a row that does not repeat carries no day of its own', () => {
         const html = renderTaskRow(task({ timestamp_date: '2026-08-20' }), 0, 'today', ctx);
         const row = parse(html).querySelector('.task-line');

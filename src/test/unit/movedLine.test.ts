@@ -97,6 +97,21 @@ suite('the line a move is written on', () => {
         }
     });
 
+    test('is read back with the spacing the extractor reads past', () => {
+        // The extractor trims the value after the keyword and each half of
+        // the arrow, and its timestamps hold any whitespace between fields.
+        // A line it moves an occurrence by has to be found here too, or the
+        // command writes a second move for a day the file already moves --
+        // the very fault the diagnostics report.
+        for (const line of [
+            '`MOVED:  [2026-09-08 Mon]  ->  <2026-09-15 Tue 16:30>`  ',
+            '`MOVED:[2026-09-08 Mon]-><2026-09-15 Tue 16:30>`',
+            '`MOVED: [2026-09-08\u00a0Mon] -> <2026-09-15\u00a0Tue 16:30>`'
+        ]) {
+            assert.deepStrictEqual(matchMovedLine(line), { from: '2026-09-08', to: '2026-09-15', time: '16:30' }, line);
+        }
+    });
+
     test('starts the caret on the day it moves to', () => {
         const line = '`MOVED: [2026-09-08 Mon] -> <2026-09-15 Tue 15:00>`';
 

@@ -30,6 +30,86 @@ suite('movedPolicy', () => {
         );
     });
 
+    test('the spacing the extractor reads past says nothing here either', () => {
+        // The extractor trims the value after the keyword and either half of
+        // the arrow, and its timestamps hold any whitespace between fields. A
+        // line it reads as a move must not be reported as a fault -- and it
+        // must be found by the reader that writes moves, or the two disagree
+        // about the same line.
+        for (const line of [
+            '`MOVED:  [2026-08-20 Thu]  ->  <2026-08-22 Sat 18:00>`  ',
+            '`MOVED:[2026-08-20 Thu]-><2026-08-22 Sat 18:00>`',
+            '`MOVED: [2026-08-20\u00a0Thu] -> <2026-08-22\u00a0Sat 18:00>`'
+        ]) {
+            assert.deepEqual(validateMovedLines([SERIES, PLANNING, line]), [], line);
+        }
+    });
+
+    test('a planning line spaced with a no-break space still names the weekday a fix is spelt from', () => {
+        // The entry's own line is read with the same treatment of whitespace.
+        // Read strictly it named no weekday, and the fix fell back to the
+        // first weekday anywhere in the file -- the English entry above,
+        // which answers a Russian entry with `Thu`.
+        const found = validateMovedLines([
+            '# TODO Lesson',
+            '`SCHEDULED: <2026-08-03 Mon 10:00 +1w>`',
+            '# TODO Английский',
+            '`SCHEDULED: <2026-08-06\u00a0чт 15:00 +1w>`',
+            '`MOVED: 2026-08-20 -> <2026-08-22 18:00>`'
+        ]);
+
+        assert.equal(found.length, 1);
+        assert.equal(found[0]?.kind, 'occurrence-bare');
+        // `assert.equal` narrows what it compares, so the element is known here.
+        assert.equal(found[0].replacement, '[2026-08-20 чт]');
+    });
+
+    test('an occurrence the series does not fall on is reported', () => {
+        // The series is Thursdays and the 19th is a Wednesday. Read as a move
+        // of a day the entry never had, the line gives the series an extra
+        // day -- and adding an occurrence is an operation this format does
+        // not have, so the extractor refuses the line (its ADR-0040).
+        const line = '`MOVED: [2026-08-19 Wed] -> <2026-08-27 Thu 18:00>`';
+        const violation = only(line);
+
+        assert.equal(violation.kind, 'occurrence-not-of-the-series');
+        assert.equal(violation.replacement, null, 'which day was meant cannot be guessed');
+    });
+
+    test('an occurrence before the series begins is reported', () => {
+        // A Thursday all the same, and still not an occurrence: the series
+        // starts on 2026-08-06 and has nothing behind it.
+        assert.equal(only('`MOVED: [2026-07-30 Thu] -> <2026-08-27 Thu 18:00>`').kind, 'occurrence-not-of-the-series');
+    });
+
+    test('a day a monthly series falls on is not reported', () => {
+        assert.deepEqual(
+            validateMovedLines([
+                '# TODO Rent',
+                '`SCHEDULED: <2026-01-31 Sat 10:00 +1m>`',
+                '`MOVED: [2026-03-31 Tue] -> <2026-04-02 Thu 18:00>`'
+            ]),
+            []
+        );
+    });
+
+    test('a repeater whose days this extension does not count says nothing', () => {
+        // Working days need the public calendar the extension does not hold,
+        // and an hourly repeater names no day of its own. Reporting a day as
+        // outside a series the extension cannot count out would be a guess.
+        for (const repeater of ['+1wd', '+3h']) {
+            assert.deepEqual(
+                validateMovedLines([
+                    SERIES,
+                    `\`SCHEDULED: <2026-08-06 Thu 15:00 ${repeater}>\``,
+                    '`MOVED: [2026-08-19 Wed] -> <2026-08-27 Thu 18:00>`'
+                ]),
+                [],
+                repeater
+            );
+        }
+    });
+
     test('the bare occurrence of the older form is offered the bracketed one', () => {
         const line = '`MOVED: 2026-08-20 -> <2026-08-22 Sat 18:00>`';
         assert.equal(only(line).kind, 'occurrence-bare');
@@ -159,6 +239,18 @@ suite('movedPolicy', () => {
         assert.equal(violation.kind, 'target-not-a-timestamp');
         assert.equal(
             fixed('`MOVED: [2026-08-20 Thu] -> 2026-08-22 Sat 18:00`'),
+            '`MOVED: [2026-08-20 Thu] -> <2026-08-22 Sat 18:00>`'
+        );
+    });
+
+    test('a target opened and closed by different brackets is offered the active form', () => {
+        // The one shape of a mismatched pair: `<...]`. It reads as neither an
+        // active timestamp nor an inactive one, so the rule has its own answer
+        // for it, and this is the only place that answer is checked.
+        const violation = only('`MOVED: [2026-08-20 Thu] -> <2026-08-22 Sat 18:00]`');
+        assert.equal(violation.kind, 'target-mixed-pair');
+        assert.equal(
+            fixed('`MOVED: [2026-08-20 Thu] -> <2026-08-22 Sat 18:00]`'),
             '`MOVED: [2026-08-20 Thu] -> <2026-08-22 Sat 18:00>`'
         );
     });

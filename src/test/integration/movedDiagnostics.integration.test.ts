@@ -2,31 +2,42 @@ import * as vscode from 'vscode';
 import * as assert from 'node:assert';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { suite, test, teardown } from 'mocha';
-import { MOVED_POLICY_CODE } from '../../diagnostics/movedLineDiagnostics';
+import { MOVED_COLLECTION, MOVED_POLICY_CODE } from '../../diagnostics/movedLineDiagnostics';
 import { DIAGNOSTIC_SOURCE } from '../../diagnostics/timestampBrackets';
+import { walkedVersionForTesting } from '../../diagnostics/registerDiagnostics';
 
 /**
  * The collection is filled asynchronously when a document is opened or edited.
  * Wait for the expected number of `MOVED` diagnostics, or fail after a budget.
+ *
+ * A wait for none also waits for the rules to have walked the document at
+ * least once. Without that, "no diagnostics" is answered by a collection that
+ * has not been filled yet: the rule could stop reporting entirely and every
+ * such wait would still return, at once and green.
  */
 async function waitForMovedDiagnostics(
-    uri: vscode.Uri,
+    doc: vscode.TextDocument,
     expected: number,
     timeoutMs = 3000
 ): Promise<vscode.Diagnostic[]> {
     const ours = () =>
         vscode.languages
-            .getDiagnostics(uri)
+            .getDiagnostics(doc.uri)
             .filter((d) => d.source === DIAGNOSTIC_SOURCE && d.code === MOVED_POLICY_CODE);
+    const walked = () => walkedVersionForTesting(MOVED_COLLECTION, doc.uri) === doc.version;
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
         const all = ours();
-        if (all.length === expected) {
+        if (all.length === expected && walked()) {
             return all;
         }
         await sleep(50);
     }
-    throw new Error(`expected ${expected} moved-policy diagnostics, observed ${ours().length}`);
+    throw new Error(
+        `expected ${expected} moved-policy diagnostics, observed ${ours().length}; ` +
+            `the rules last walked version ${String(walkedVersionForTesting(MOVED_COLLECTION, doc.uri))} ` +
+            `of ${doc.version}`
+    );
 }
 
 const SERIES = ['## TODO English', '`SCHEDULED: <2026-08-06 Thu 15:00 +1w>`'];
@@ -47,19 +58,19 @@ suite('MOVED diagnostics + Quick Fix', () => {
 
     test('the line the extension writes produces no diagnostic', async () => {
         const doc = await open('`MOVED: [2026-08-20 Thu] -> <2026-08-22 Sat 18:00>`');
-        await waitForMovedDiagnostics(doc.uri, 0);
+        await waitForMovedDiagnostics(doc, 0);
     });
 
     test('a repeater on the occurrence is reported as a Warning naming the series', async () => {
         const doc = await open('`MOVED: [2026-08-20 Thu +1w] -> <2026-08-22 Sat 18:00>`');
-        const diagnostics = await waitForMovedDiagnostics(doc.uri, 1);
+        const diagnostics = await waitForMovedDiagnostics(doc, 1);
         assert.strictEqual(diagnostics[0]!.severity, vscode.DiagnosticSeverity.Warning);
         assert.match(diagnostics[0]!.message, /repeater \+1w/);
     });
 
     test('Quick Fix drops the repeater and the warning goes away', async () => {
         const doc = await open('`MOVED: [2026-08-20 Thu +1w] -> <2026-08-22 Sat 18:00>`');
-        const [diagnostic] = await waitForMovedDiagnostics(doc.uri, 1);
+        const [diagnostic] = await waitForMovedDiagnostics(doc, 1);
 
         const actions = await vscode.commands.executeCommand<vscode.CodeAction[] | undefined>(
             'vscode.executeCodeActionProvider',
@@ -74,12 +85,12 @@ suite('MOVED diagnostics + Quick Fix', () => {
         await vscode.workspace.applyEdit(edit);
 
         assert.strictEqual(doc.lineAt(2).text, '`MOVED: [2026-08-20 Thu] -> <2026-08-22 Sat 18:00>`');
-        await waitForMovedDiagnostics(doc.uri, 0);
+        await waitForMovedDiagnostics(doc, 0);
     });
 
     test('Quick Fix writes the occurrence inactive when it was written active', async () => {
         const doc = await open('`MOVED: <2026-08-20 Thu> -> <2026-08-22 Sat 18:00>`');
-        const [diagnostic] = await waitForMovedDiagnostics(doc.uri, 1);
+        const [diagnostic] = await waitForMovedDiagnostics(doc, 1);
 
         const actions = await vscode.commands.executeCommand<vscode.CodeAction[] | undefined>(
             'vscode.executeCodeActionProvider',
@@ -93,7 +104,7 @@ suite('MOVED diagnostics + Quick Fix', () => {
         await vscode.workspace.applyEdit(edit);
 
         assert.strictEqual(doc.lineAt(2).text, '`MOVED: [2026-08-20 Thu] -> <2026-08-22 Sat 18:00>`');
-        await waitForMovedDiagnostics(doc.uri, 0);
+        await waitForMovedDiagnostics(doc, 0);
     });
 
     test('a move in an entry that does not repeat is reported beside the line itself', async () => {
@@ -106,13 +117,13 @@ suite('MOVED diagnostics + Quick Fix', () => {
             ].join('\n')
         });
         await vscode.window.showTextDocument(doc);
-        const diagnostics = await waitForMovedDiagnostics(doc.uri, 1);
+        const diagnostics = await waitForMovedDiagnostics(doc, 1);
         assert.match(diagnostics[0]!.message, /does not repeat/);
     });
 
     test('the bare occurrence of the older form is offered the bracketed one', async () => {
         const doc = await open('`MOVED: 2026-08-20 -> <2026-08-22 Sat 18:00>`');
-        const [diagnostic] = await waitForMovedDiagnostics(doc.uri, 1);
+        const [diagnostic] = await waitForMovedDiagnostics(doc, 1);
 
         const actions = await vscode.commands.executeCommand<vscode.CodeAction[] | undefined>(
             'vscode.executeCodeActionProvider',
@@ -126,12 +137,12 @@ suite('MOVED diagnostics + Quick Fix', () => {
         await vscode.workspace.applyEdit(edit);
 
         assert.strictEqual(doc.lineAt(2).text, '`MOVED: [2026-08-20 Thu] -> <2026-08-22 Sat 18:00>`');
-        await waitForMovedDiagnostics(doc.uri, 0);
+        await waitForMovedDiagnostics(doc, 0);
     });
 
     test('a fault with nothing to guess is reported without a fix', async () => {
         const doc = await open('`MOVED: next Thursday -> <2026-08-22 Sat 18:00>`');
-        const [diagnostic] = await waitForMovedDiagnostics(doc.uri, 1);
+        const [diagnostic] = await waitForMovedDiagnostics(doc, 1);
 
         const actions = await vscode.commands.executeCommand<vscode.CodeAction[] | undefined>(
             'vscode.executeCodeActionProvider',
@@ -157,7 +168,7 @@ suite('MOVED diagnostics + Quick Fix', () => {
             ].join('\n')
         });
         await vscode.window.showTextDocument(doc);
-        const moved = await waitForMovedDiagnostics(doc.uri, 1);
+        const moved = await waitForMovedDiagnostics(doc, 1);
         assert.strictEqual(moved[0]!.range.start.line, 2);
         const brackets = vscode.languages
             .getDiagnostics(doc.uri)

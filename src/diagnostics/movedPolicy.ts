@@ -11,14 +11,13 @@
  * says the same thing at the moment the line is written.
  */
 
-import { headingLevel, matchTimestampLine } from '../orgPatterns';
+import { WEEKDAY_SOURCE, headingLevel, matchTimestampLine } from '../orgPatterns';
+import { fromIsoDate } from '../utils/isoDate';
 import { namedGroups } from '../utils/regexGroups';
 import { getWeekdayName } from '../utils/incrementTimestamp';
-import { weekdaySample } from '../utils/movedLine';
+import { MOVED_LINE_REGEX, weekdaySample } from '../utils/movedLine';
 import { parseRepeater } from '../utils/repeater';
-
-/** `MOVED: <anything>` inside an inline-code span, at any indentation. */
-const MOVED_LINE_REGEX = /^(?<indent>\s*)`MOVED:(?<body>[^`]*)`\s*$/;
+import { seriesFallsOn } from '../utils/occurrenceEdit';
 
 /**
  * One half of the line, read as leniently as the diagnostics need: brackets
@@ -27,8 +26,9 @@ const MOVED_LINE_REGEX = /^(?<indent>\s*)`MOVED:(?<body>[^`]*)`\s*$/;
  * warning cookie) mirrors `TIMESTAMP_REGEX` in `../utils/timestampParts.ts`,
  * which in turn mirrors the extractor's.
  */
-const HALF_REGEX =
-    /^(?<open>[<[])?(?<date>\d{4}-\d{2}-\d{2})(?: (?<weekday>[А-Яа-яA-Za-z]+))?(?: (?<time>\d{2}:\d{2}(?:-\d{2}:\d{2})?))?(?: (?<repeater>(?:\.\+|\+\+|\+)\d+(?:wd|[dwmyh])))?(?: (?<warning>-\d+[dwmyh]))?(?<close>[>\]])?$/;
+const HALF_REGEX = new RegExp(
+    `^(?<open>[<[])?(?<date>\\d{4}-\\d{2}-\\d{2})(?:\\s+(?<weekday>${WEEKDAY_SOURCE}))?(?:\\s+(?<time>\\d{2}:\\d{2}(?:-\\d{2}:\\d{2})?))?(?:\\s+(?<repeater>(?:\\.\\+|\\+\\+|\\+)\\d+(?:wd|[dwmyh])))?(?:\\s+(?<warning>-\\d+[dwmyh]))?(?<close>[>\\]])?$`
+);
 
 export type MovedViolationKind =
     | 'no-arrow'
@@ -41,6 +41,7 @@ export type MovedViolationKind =
     | 'occurrence-has-a-warning-cookie'
     | 'occurrence-has-an-hour'
     | 'occurrence-moved-twice'
+    | 'occurrence-not-of-the-series'
     | 'target-not-a-timestamp'
     | 'target-mixed-pair'
     | 'target-inactive'
@@ -107,14 +108,17 @@ function entryRanges(lines: readonly string[]): [number, number][] {
 
 /** What the entry's own lines say about the moves standing in it. */
 function readEntry(lines: readonly string[], from: number, to: number): Entry {
-    const entry: Entry = { daysMoved: new Set<string>(), weekday: null, repeats: false };
+    const entry: Entry = { daysMoved: new Set<string>(), weekday: null, repeats: false, series: null };
     for (let line = from; line < to; line++) {
         const planning = planningTimestamp(lines[line] ?? '');
         if (planning === null) {
             continue;
         }
         entry.weekday ??= weekdayOf(planning);
-        entry.repeats ||= carriesRepeater(planning);
+        if (carriesRepeater(planning)) {
+            entry.repeats = true;
+            entry.series ??= planning;
+        }
     }
     return entry;
 }
@@ -135,13 +139,19 @@ interface Entry {
      * to name.
      */
     repeats: boolean;
+    /**
+     * The first planning timestamp of the entry that carries a repeater --
+     * the series the days a move names have to belong to. Null where the
+     * entry does not repeat, and there is no series to weigh them against.
+     */
+    series: string | null;
 }
 
 /** A keyword written in the inactive brackets, timestamp and all. */
 const KEYWORD_INACTIVE_REGEX = /`(?:SCHEDULED|DEADLINE): (?<timestamp>\[[^\]]*\])`/;
 
 /** The weekday a timestamp spells, so a fix offers the entry's own language. */
-const WEEKDAY_REGEX = /^[<[]\d{4}-\d{2}-\d{2} (?<weekday>[А-Яа-яA-Za-z]+)/;
+const WEEKDAY_REGEX = new RegExp(`^[<[]\\d{4}-\\d{2}-\\d{2}\\s+(?<weekday>${WEEKDAY_SOURCE})`);
 
 /**
  * The timestamp of a line that plans the entry for a day, or null.
@@ -347,6 +357,19 @@ function occurrenceViolation(half: Half, line: number, entry: Entry, fallbackWee
 
     entry.daysMoved.add(date);
 
+    // Weighed after the shape of the half and before the nudge to bracket it:
+    // a day off the series is a refusal, and a bare date is read either way.
+    if (entry.series !== null && seriesFallsOn(entry.series, date) === false) {
+        return at(
+            'occurrence-not-of-the-series',
+            `This entry does not fall on ${date}, so the line names no occurrence of it. A move holds an ` +
+                'occurrence the series has on another day; read as written it would give the series a day ' +
+                'it never had, which no line of this format does, so the extractor refuses it (ADR-0040).',
+            null,
+            null
+        );
+    }
+
     if (open === '') {
         const written = address(date, entry.weekday ?? fallbackWeekday);
         return at(
@@ -364,8 +387,7 @@ function occurrenceViolation(half: Half, line: number, entry: Entry, fallbackWee
 
 /** The occurrence written the way this extension writes it, weekday and all. */
 function address(date: string, sample: string): string {
-    const [year, month, day] = date.split('-').map(Number);
-    const name = getWeekdayName(new Date(year ?? 0, (month ?? 1) - 1, day ?? 1), sample);
+    const name = getWeekdayName(fromIsoDate(date), sample);
     return `[${date} ${sample === sample.toLowerCase() ? name.toLowerCase() : name}]`;
 }
 

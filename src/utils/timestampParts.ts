@@ -1,3 +1,4 @@
+import { WEEKDAY_SOURCE } from '../orgPatterns';
 import { group, namedGroups } from './regexGroups';
 import { at } from './exactIndex';
 
@@ -53,8 +54,9 @@ export interface ClockTimestampPartHit {
 // Exported so the editor highlighter (`orgHighlightSpans`) paints exactly the
 // parts this cursor engine can shift: one pattern, so a timestamp that Shift+Up
 // can edit is never left uncoloured, and vice versa.
-export const TIMESTAMP_REGEX =
-    /(?<open>[<[])(?<year>\d{4})-(?<month>\d{2})-(?<day>\d{2})(?: (?<weekday>[А-Яа-яA-Za-z]+))?(?: (?<hour>\d{2}):(?<minute>\d{2}))?(?: (?<repeater>(?:\.\+|\+\+|\+)\d+(?:wd|[dwmyh])))?(?: (?<warning>-\d+[dwmyh]))?(?<close>[>\]])/;
+export const TIMESTAMP_REGEX = new RegExp(
+    `(?<open>[<[])(?<year>\\d{4})-(?<month>\\d{2})-(?<day>\\d{2})(?: (?<weekday>${WEEKDAY_SOURCE}))?(?: (?<hour>\\d{2}):(?<minute>\\d{2}))?(?: (?<repeater>(?:\\.\\+|\\+\\+|\\+)\\d+(?:wd|[dwmyh])))?(?: (?<warning>-\\d+[dwmyh]))?(?<close>[>\\]])`
+);
 
 export function isPairedBracket(open: string, close: string): boolean {
     return (open === '<' && close === '>') || (open === '[' && close === ']');
@@ -63,8 +65,15 @@ export function isPairedBracket(open: string, close: string): boolean {
 // Named CLOCK_PARTS_REGEX (not CLOCK_REGEX) to avoid clashing with the public
 // orgPatterns.CLOCK_REGEX: that one captures the body as a single `startBody`,
 // whereas this cursor-aware variant splits weekday/hour/minute into groups.
-const CLOCK_PARTS_REGEX =
-    /^(?<indent>\s*)`CLOCK: (?<startOpenBracket>[[<])(?<startYear>\d{4})-(?<startMonth>\d{2})-(?<startDay>\d{2}) (?<startWeekday>[А-Яа-яA-Za-z]+) (?<startHour>\d{2}):(?<startMinute>\d{2})(?<startCloseBracket>[\]>])(?:--(?<endOpenBracket>[[<])(?<endYear>\d{4})-(?<endMonth>\d{2})-(?<endDay>\d{2}) (?<endWeekday>[А-Яа-яA-Za-z]+) (?<endHour>\d{2}):(?<endMinute>\d{2})(?<endCloseBracket>[\]>]) => +(?<durationHours>-?\d+):(?<durationMinutes>-?\d+))?`$/;
+const CLOCK_PARTS_REGEX = new RegExp(
+    '^(?<indent>\\s*)`CLOCK: (?<startOpenBracket>[[<])(?<startYear>\\d{4})-(?<startMonth>\\d{2})-(?<startDay>\\d{2}) ' +
+        `(?<startWeekday>${WEEKDAY_SOURCE})` +
+        ' (?<startHour>\\d{2}):(?<startMinute>\\d{2})(?<startCloseBracket>[\\]>])' +
+        '(?:--(?<endOpenBracket>[[<])(?<endYear>\\d{4})-(?<endMonth>\\d{2})-(?<endDay>\\d{2}) ' +
+        `(?<endWeekday>${WEEKDAY_SOURCE})` +
+        ' (?<endHour>\\d{2}):(?<endMinute>\\d{2})(?<endCloseBracket>[\\]>])' +
+        ' => +(?<durationHours>-?\\d+):(?<durationMinutes>-?\\d+))?`$'
+);
 
 interface Span {
     part: TimestampPart | ClockTimestampPart;
@@ -167,7 +176,7 @@ export function getClockTimestampPartAt(lineText: string, character: number): Cl
     const match = CLOCK_PARTS_REGEX.exec(lineText);
     if (match?.index === undefined || !match.groups) return null;
 
-    const timestampRegex = /(\d{4})-(\d{2})-(\d{2}) ([А-Яа-яA-Za-z]+) (\d{2}):(\d{2})/g;
+    const timestampRegex = new RegExp(`(\\d{4})-(\\d{2})-(\\d{2}) (${WEEKDAY_SOURCE}) (\\d{2}):(\\d{2})`, 'g');
     const timestamps = [...match[0].matchAll(timestampRegex)];
     if (timestamps.length === 0) return null;
 

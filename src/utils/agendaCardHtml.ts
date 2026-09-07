@@ -125,10 +125,17 @@ export function renderTaskRow(
         : '';
 
     // A repeating row stands for one occurrence of a series, and the two things
-    // that can be done to that one occurrence are reached through its flag. The
-    // day is the row's own: the agenda rewrites `timestamp_date` to the day it
-    // drew the occurrence on, so this is the day the exception is about.
-    const occurrence = task.timestamp_repeater && task.timestamp_date ? task.timestamp_date : '';
+    // that can be done to that one occurrence are reached through its flag.
+    //
+    // The agenda rewrites `timestamp_date` to the day it drew the row on, which
+    // for a moved occurrence is where the occurrence is held rather than the
+    // day of the series it answers for. The commands are about the latter: a
+    // move corrects the line already standing for that occurrence, and a
+    // cancellation takes that occurrence out of the series. So a row drawn on
+    // the day a move went to carries the day it left instead.
+    const drawnOn = task.timestamp_date ?? '';
+    const held = (task.moved_occurrences ?? []).find((moved) => moved.to === drawnOn);
+    const occurrence = task.timestamp_repeater && drawnOn ? (held?.from ?? drawnOn) : '';
     const occurrenceAttr = occurrence ? ` data-occurrence="${ctx.escapeHtml(occurrence)}"` : '';
     const flagTitle = ctx.flagTooltip(flag, ctx.tooltips, ctx.formatString, ctx.formatDate, task);
     const flagHint = occurrence ? `${flagTitle} — ${ctx.tooltips.occurrenceMenu}` : flagTitle;

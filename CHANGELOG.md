@@ -19,6 +19,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   line names no day says so when its occurrences are listed, instead of counting
   them from an invented one.
 
+### Fixed
+
+- A `MOVED` line is read back the way the extractor reads it: one pattern for
+  the line, the halves trimmed around the arrow, and the spacing the extractor
+  reads past -- several spaces, a tab, a no-break space -- accepted wherever it
+  accepts it. The editor and the diagnostics held two patterns of their own and
+  disagreed with the extractor and with each other.
+- The flag of an agenda row drawn where an occurrence is held now names the
+  occurrence that moved, not the day it landed on. Moving or cancelling from
+  such a row acted on the day of the landing -- a day the series does not fall
+  on at all.
+
 ## [0.20.0] - 2026-09-05
 
 ### Added

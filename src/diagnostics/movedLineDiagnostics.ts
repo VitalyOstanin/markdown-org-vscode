@@ -1,15 +1,8 @@
 import * as vscode from 'vscode';
-import type { DebouncedFunction } from '../utils/debounce';
-import { debounce } from '../utils/debounce';
+import { documentLines, registerDocumentDiagnostics } from './registerDiagnostics';
 import type { MovedViolation } from './movedPolicy';
 import { validateMovedLines } from './movedPolicy';
 import { DIAGNOSTIC_SOURCE } from './timestampBrackets';
-
-/**
- * Debounce window for re-validating a document after an edit, the same one the
- * bracket diagnostics use: a typing burst collapses into one pass.
- */
-const REFRESH_DEBOUNCE_MS = 300;
 
 /**
  * Diagnostic code attached to `MOVED` warnings. The quick-fix provider filters
@@ -27,11 +20,7 @@ interface DiagnosticWithViolation extends vscode.Diagnostic {
  * here: the extractor reports them where a reader does not look.
  */
 export function validateDocument(doc: vscode.TextDocument): vscode.Diagnostic[] {
-    const lines: string[] = [];
-    for (let i = 0; i < doc.lineCount; i++) {
-        lines.push(doc.lineAt(i).text);
-    }
-    return validateMovedLines(lines).map(toDiagnostic);
+    return validateMovedLines(documentLines(doc)).map(toDiagnostic);
 }
 
 function toDiagnostic(violation: MovedViolation): vscode.Diagnostic {
@@ -81,53 +70,18 @@ export class MovedPolicyCodeActionProvider implements vscode.CodeActionProvider 
     }
 }
 
+/** Name of the collection these rules fill, as the Problems panel shows it. */
+export const MOVED_COLLECTION = 'markdown-org-moved';
+
 /**
- * Wire the diagnostic collection and the code action provider into the
- * extension lifecycle. Returns a `Disposable` aggregating everything -- the
- * caller pushes it into `context.subscriptions`.
+ * Wire the `MOVED` diagnostics into the editor, on the terms every diagnostic
+ * of this extension lives by (`registerDocumentDiagnostics`).
  */
-export function registerMovedDiagnostics(context: vscode.ExtensionContext): vscode.Disposable {
-    const collection = vscode.languages.createDiagnosticCollection('markdown-org-moved');
-    context.subscriptions.push(collection);
-
-    const refresh = (doc: vscode.TextDocument) => {
-        if (doc.languageId !== 'markdown') {
-            collection.delete(doc.uri);
-            return;
-        }
-        collection.set(doc.uri, validateDocument(doc));
-    };
-
-    for (const doc of vscode.workspace.textDocuments) {
-        refresh(doc);
-    }
-
-    const debouncedByUri = new Map<string, DebouncedFunction<[vscode.TextDocument]>>();
-    const scheduleRefresh = (doc: vscode.TextDocument) => {
-        const key = doc.uri.toString();
-        let pending = debouncedByUri.get(key);
-        if (!pending) {
-            pending = debounce(refresh, REFRESH_DEBOUNCE_MS);
-            debouncedByUri.set(key, pending);
-        }
-        pending(doc);
-    };
-
-    context.subscriptions.push(
-        vscode.workspace.onDidOpenTextDocument(refresh),
-        vscode.workspace.onDidChangeTextDocument((e) => {
-            scheduleRefresh(e.document);
-        }),
-        vscode.workspace.onDidCloseTextDocument((doc) => {
-            const key = doc.uri.toString();
-            debouncedByUri.get(key)?.cancel();
-            debouncedByUri.delete(key);
-            collection.delete(doc.uri);
-        }),
-        vscode.languages.registerCodeActionsProvider({ language: 'markdown' }, new MovedPolicyCodeActionProvider(), {
-            providedCodeActionKinds: MovedPolicyCodeActionProvider.providedCodeActionKinds
-        })
-    );
-
-    return collection;
+export function registerMovedDiagnostics(context: vscode.ExtensionContext): vscode.DiagnosticCollection {
+    return registerDocumentDiagnostics(context, {
+        name: MOVED_COLLECTION,
+        validate: validateDocument,
+        provider: new MovedPolicyCodeActionProvider(),
+        providedCodeActionKinds: MovedPolicyCodeActionProvider.providedCodeActionKinds
+    });
 }

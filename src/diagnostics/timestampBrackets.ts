@@ -1,15 +1,7 @@
 import * as vscode from 'vscode';
-import type { DebouncedFunction } from '../utils/debounce';
-import { debounce } from '../utils/debounce';
 import type { BracketViolation } from './bracketPolicy';
 import { validateLines } from './bracketPolicy';
-
-/**
- * Debounce window for re-validating a document after an edit. Without it the
- * whole document is re-scanned synchronously on every keystroke; 300ms
- * collapses a typing burst into one pass (the agenda debounces similarly).
- */
-const REFRESH_DEBOUNCE_MS = 300;
+import { documentLines, registerDocumentDiagnostics } from './registerDiagnostics';
 
 /** Source string surfaced on every diagnostic this module produces. */
 export const DIAGNOSTIC_SOURCE = 'markdown-org';
@@ -29,11 +21,7 @@ interface DiagnosticWithViolation extends vscode.Diagnostic {
  * the ADR-0014 bracket policy. See `bracketPolicy.ts` for the pure rule.
  */
 export function validateDocument(doc: vscode.TextDocument): vscode.Diagnostic[] {
-    const lines: string[] = [];
-    for (let i = 0; i < doc.lineCount; i++) {
-        lines.push(doc.lineAt(i).text);
-    }
-    return validateLines(lines).map(toDiagnostic);
+    return validateLines(documentLines(doc)).map(toDiagnostic);
 }
 
 function toDiagnostic(violation: BracketViolation): vscode.Diagnostic {
@@ -85,54 +73,14 @@ export class BracketPolicyCodeActionProvider implements vscode.CodeActionProvide
 }
 
 /**
- * Wire the diagnostic collection and the code action provider into the
- * extension lifecycle. Returns a `Disposable` aggregating everything --
- * the caller pushes it into `context.subscriptions`.
+ * Wire the bracket-policy diagnostics into the editor, on the terms every
+ * diagnostic of this extension lives by (`registerDocumentDiagnostics`).
  */
-export function registerBracketDiagnostics(context: vscode.ExtensionContext): vscode.Disposable {
-    const collection = vscode.languages.createDiagnosticCollection('markdown-org-brackets');
-    context.subscriptions.push(collection);
-
-    const refresh = (doc: vscode.TextDocument) => {
-        if (doc.languageId !== 'markdown') {
-            collection.delete(doc.uri);
-            return;
-        }
-        collection.set(doc.uri, validateDocument(doc));
-    };
-
-    for (const doc of vscode.workspace.textDocuments) {
-        refresh(doc);
-    }
-
-    // Edits are debounced per-document so a typing burst triggers one re-scan,
-    // not one per keystroke. Open/close stay immediate (they are not bursty).
-    const debouncedByUri = new Map<string, DebouncedFunction<[vscode.TextDocument]>>();
-    const scheduleRefresh = (doc: vscode.TextDocument) => {
-        const key = doc.uri.toString();
-        let pending = debouncedByUri.get(key);
-        if (!pending) {
-            pending = debounce(refresh, REFRESH_DEBOUNCE_MS);
-            debouncedByUri.set(key, pending);
-        }
-        pending(doc);
-    };
-
-    context.subscriptions.push(
-        vscode.workspace.onDidOpenTextDocument(refresh),
-        vscode.workspace.onDidChangeTextDocument((e) => {
-            scheduleRefresh(e.document);
-        }),
-        vscode.workspace.onDidCloseTextDocument((doc) => {
-            const key = doc.uri.toString();
-            debouncedByUri.get(key)?.cancel();
-            debouncedByUri.delete(key);
-            collection.delete(doc.uri);
-        }),
-        vscode.languages.registerCodeActionsProvider({ language: 'markdown' }, new BracketPolicyCodeActionProvider(), {
-            providedCodeActionKinds: BracketPolicyCodeActionProvider.providedCodeActionKinds
-        })
-    );
-
-    return collection;
+export function registerBracketDiagnostics(context: vscode.ExtensionContext): vscode.DiagnosticCollection {
+    return registerDocumentDiagnostics(context, {
+        name: 'markdown-org-brackets',
+        validate: validateDocument,
+        provider: new BracketPolicyCodeActionProvider(),
+        providedCodeActionKinds: BracketPolicyCodeActionProvider.providedCodeActionKinds
+    });
 }

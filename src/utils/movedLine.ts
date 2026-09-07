@@ -18,11 +18,20 @@
  * ADR-0038 first had it, the address is still read -- files hold it -- but it
  * is not what this extension writes.
  */
+import { WEEKDAY_SOURCE } from '../orgPatterns';
 import { getWeekdayName } from './incrementTimestamp';
 import { toIsoDate } from './isoDate';
 
-/** What a `MOVED` line says: which occurrence moves, and where to. */
-export interface MovedOccurrence {
+/**
+ * What a `MOVED` line says, as the line itself writes it.
+ *
+ * Not `MovedOccurrence` of `types.ts`, which is the same move as the extractor
+ * reports it over JSON: there the hour and its end are two fields, absent
+ * where the move names none, because that is the shape the wire has. Here the
+ * hour is the text between the arrow and the closing bracket, range and all,
+ * because that is what the editor writes back into the line unchanged.
+ */
+export interface MovedLineFields {
     /** The day the series draws the occurrence on, as `YYYY-MM-DD`. */
     from: string;
     /** The day it is held on instead. */
@@ -31,18 +40,48 @@ export interface MovedOccurrence {
     time: string | null;
 }
 
-// The address is read in both forms: the inactive timestamp written since
-// ADR-0039 and the bare date of ADR-0038, which files already hold.
-const MOVED_REGEX =
-    /^(?<indent>\s*)`MOVED: (?:\[(?<held>\d{4}-\d{2}-\d{2})[^\]]*\]|(?<bare>\d{4}-\d{2}-\d{2})) -> <(?<to>\d{4}-\d{2}-\d{2})(?<rest>[^>]*)>`$/;
+/**
+ * `MOVED: <anything>` inside an inline-code span, at any indentation.
+ *
+ * The one shape of the line everything here agrees on -- what is written, what
+ * is read back, and what the diagnostics judge. Reading it more strictly in
+ * one place than in another is what let a line the extractor moves an
+ * occurrence by go unfound: the command then wrote a second move for a day the
+ * file already moves, which is the fault the diagnostics report.
+ */
+export const MOVED_LINE_REGEX = /^(?<indent>\s*)`MOVED:(?<body>[^`]*)`\s*$/;
 
-/** Read a `MOVED` line; `null` for any other line. */
-export function matchMovedLine(text: string): MovedOccurrence | null {
-    const match = MOVED_REGEX.exec(text);
-    if (!match?.groups) {
+// The address is read in both forms: the inactive timestamp written since
+// ADR-0039 and the bare date of ADR-0038, which files already hold. Both are
+// matched against the half with its surrounding whitespace gone, the way the
+// extractor trims either side of the arrow.
+const ADDRESS_REGEX = /^(?:\[(?<held>\d{4}-\d{2}-\d{2})[^\]]*\]|(?<bare>\d{4}-\d{2}-\d{2}))$/;
+const TARGET_REGEX = /^<(?<to>\d{4}-\d{2}-\d{2})(?<rest>[^>]*)>$/;
+
+/**
+ * Read a `MOVED` line; `null` for any other line.
+ *
+ * Whitespace is read the way the extractor reads it: the value after the
+ * keyword and each half of the arrow are trimmed, and a timestamp holds
+ * whatever whitespace stands between its fields. The arrow is the first `->`
+ * of the body, which is where the extractor splits.
+ */
+export function matchMovedLine(text: string): MovedLineFields | null {
+    const body = MOVED_LINE_REGEX.exec(text)?.groups?.body;
+    if (body === undefined) {
         return null;
     }
-    const { held, bare, to, rest } = match.groups;
+    const arrow = body.indexOf('->');
+    if (arrow < 0) {
+        return null;
+    }
+    const address = ADDRESS_REGEX.exec(body.slice(0, arrow).trim());
+    const target = TARGET_REGEX.exec(body.slice(arrow + '->'.length).trim());
+    if (!address?.groups || !target?.groups) {
+        return null;
+    }
+    const { held, bare } = address.groups;
+    const { to, rest } = target.groups;
     const time = /(?<time>\d{2}:\d{2}(?:-\d{2}:\d{2})?)/.exec(rest ?? '')?.groups?.time ?? null;
     return { from: held ?? bare ?? '', to: to ?? '', time };
 }
@@ -72,7 +111,8 @@ export function movedLine(indent: string, from: Date, to: Date, time: string | n
  */
 export function weekdaySample(lines: readonly string[]): string {
     for (const line of lines) {
-        const weekday = /[<[]\d{4}-\d{2}-\d{2} (?<weekday>[А-Яа-яA-Za-z]+)/.exec(line)?.groups?.weekday;
+        const weekday = new RegExp(`[<[]\\d{4}-\\d{2}-\\d{2}\\s+(?<weekday>${WEEKDAY_SOURCE})`).exec(line)?.groups
+            ?.weekday;
         if (weekday !== undefined) {
             return weekday;
         }
