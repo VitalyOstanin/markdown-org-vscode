@@ -5,6 +5,20 @@ All notable changes to the "Markdown Org" extension will be documented in this f
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- The answers this extension gives once are now given in one place: the
+  characters a weekday is written with, reading a `YYYY-MM-DD` into a day,
+  turning a heading into its text, finding the line that moves an occurrence,
+  and wiring a diagnostic collection into the editor. Copies of each had drifted
+  apart -- a weekday class in nine patterns, a day parsed three ways with
+  fallbacks that turned a malformed value into a date a year off. A test now
+  holds the rule, naming the file each answer lives in. An entry whose planning
+  line names no day says so when its occurrences are listed, instead of counting
+  them from an invented one.
+
 ## [0.20.0] - 2026-09-05
 
 ### Added

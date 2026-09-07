@@ -3,6 +3,7 @@ import type { TaskStatus } from '../types';
 import { TIMESTAMP_REGEX } from './timestampParts';
 import { buildHeading } from './buildHeading';
 import { buildOrgTimestamp } from './orgTimestamp';
+import { fromIsoDate } from './isoDate';
 import { getWeekdayName } from './incrementTimestamp';
 import { isCancelled } from './normalizeTaskType';
 import { withoutPriorityCookie } from './priorityToggle';
@@ -337,10 +338,7 @@ function editedPlanning(
 /** The day the timestamp lands on: the one the phrase named, or the one it had. */
 function dateOf(fields: PhraseFields, current: TimestampParts | undefined): Date | undefined {
     if (fields.date !== undefined) {
-        const [year, month, day] = fields.date.split('-').map(Number);
-        // Built field by field rather than parsed: `new Date('...')` reads a
-        // bare date as UTC, which lands on the previous day west of Greenwich.
-        return new Date(year ?? 0, (month ?? 1) - 1, day ?? 1);
+        return fromIsoDate(fields.date);
     }
     return current ? new Date(current.date.getTime()) : undefined;
 }

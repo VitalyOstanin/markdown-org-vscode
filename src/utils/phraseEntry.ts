@@ -1,6 +1,8 @@
 import type { TaskStatus } from '../types';
 import { buildHeading } from './buildHeading';
 import { formatError } from './formatError';
+import { fromIsoDate } from './isoDate';
+import { splitInto } from './regexGroups';
 import { buildOrgTimestamp } from './orgTimestamp';
 
 /**
@@ -157,12 +159,10 @@ function hasTimestamp(fields: PhraseFields): boolean {
  * has no way to say an hour without a date to hang it on.
  */
 function timestampDate(fields: PhraseFields): Date {
-    const [year, month, day] = (fields.date ?? fields.currentDate).split('-').map(Number);
-    const [hour, minute] = (fields.time ?? '00:00').split(':').map(Number);
-    // Built field by field rather than parsed from the string: `new Date('...')`
-    // reads a bare date as UTC, which lands on the previous day west of
-    // Greenwich, and the weekday would then be the wrong one.
-    return new Date(year ?? 0, (month ?? 1) - 1, day ?? 1, hour ?? 0, minute ?? 0);
+    const day = fromIsoDate(fields.date ?? fields.currentDate);
+    const [hour, minute] = splitInto(fields.time ?? '00:00', ':', 2);
+    day.setHours(Number(hour), Number(minute));
+    return day;
 }
 
 /**

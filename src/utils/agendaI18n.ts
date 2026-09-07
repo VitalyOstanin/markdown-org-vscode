@@ -232,6 +232,25 @@ export interface AgendaStrings {
         moveDetail: string;
         cancel: string;
         cancelDetail: string;
+        /** Title of the list of days the cancel command opens. */
+        whichCancel: string;
+        /** Title of the same list, opened by the move command. */
+        whichMove: string;
+        /** The row that leads out of the list, for a day it does not reach. */
+        anotherDay: string;
+        anotherDayDetail: string;
+        /** The box that day is typed into: what it wants, and what it says about a value it cannot read. */
+        dayPrompt: string;
+        dayInvalid: string;
+        /** Said once a move is written, about the keys that walk the day it names. `{0}`/`{1}` are those keys. */
+        walkTheDay: string;
+        /** Said where the day is already out of the series. `{0}` is that day. */
+        alreadyCancelled: string;
+        /** Said where the write itself failed. `{0}` is the reason. */
+        notWritten: string;
+        /** What the list says beside a day the entry already cancels, or already moves. */
+        markCancelled: string;
+        markMoved: string;
     };
     /**
      * Git status of the agenda's source files: the header chip, the list it
@@ -590,7 +609,18 @@ const EN: AgendaStrings = {
         move: 'Move this occurrence',
         moveDetail: 'Write it at another day or hour; the series goes on repeating',
         cancel: 'Cancel this occurrence',
-        cancelDetail: 'Leave the day out of the series; nothing is owed for it'
+        cancelDetail: 'Leave the day out of the series; nothing is owed for it',
+        whichCancel: 'Cancel which occurrence?',
+        whichMove: 'Move which occurrence?',
+        anotherDay: 'Another day…',
+        anotherDayDetail: 'type a date the list does not reach',
+        dayPrompt: 'YYYY-MM-DD',
+        dayInvalid: 'A day is written YYYY-MM-DD',
+        walkTheDay: 'Walk the day and the hour with {0} and {1}',
+        alreadyCancelled: '{0} is already left out of the series',
+        notWritten: 'The occurrence was not written: {0}',
+        markCancelled: 'cancelled',
+        markMoved: 'already moved'
     },
     git: {
         caption: 'Source files',
@@ -802,7 +832,18 @@ const RU: AgendaStrings = {
         move: 'Перенести это занятие',
         moveDetail: 'Записать его на другой день или час; серия продолжает повторяться',
         cancel: 'Отменить это занятие',
-        cancelDetail: 'Исключить день из серии; за него ничего не числится'
+        cancelDetail: 'Исключить день из серии; за него ничего не числится',
+        whichCancel: 'Какое занятие отменить?',
+        whichMove: 'Какое занятие перенести?',
+        anotherDay: 'Другой день…',
+        anotherDayDetail: 'ввести дату, до которой список не доходит',
+        dayPrompt: 'ГГГГ-ММ-ДД',
+        dayInvalid: 'День пишется как ГГГГ-ММ-ДД',
+        walkTheDay: 'День и час переставляются клавишами {0} и {1}',
+        alreadyCancelled: '{0} уже исключён из серии',
+        notWritten: 'Занятие не записано: {0}',
+        markCancelled: 'отменено',
+        markMoved: 'уже перенесено'
     },
     git: {
         caption: 'Файлы-источники',

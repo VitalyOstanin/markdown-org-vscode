@@ -76,7 +76,7 @@ function closesFence(line: string, marker: string): boolean {
  * as any reader is concerned, and a caller must not edit a range it had to
  * guess at.
  */
-export function findOrgPropertiesBlocks(lines: string[], headingLine: number): OrgPropertiesRange[] {
+export function findOrgPropertiesBlocks(lines: readonly string[], headingLine: number): OrgPropertiesRange[] {
     const found: OrgPropertiesRange[] = [];
     let i = headingLine + 1;
     while (i < lines.length) {
@@ -110,7 +110,7 @@ export function findOrgPropertiesBlocks(lines: string[], headingLine: number): O
  * one of the section, because that is the one the extractor's reader ends up
  * keeping when a key appears twice. `null` when the section holds none.
  */
-export function findOrgPropertiesBlock(lines: string[], headingLine: number): OrgPropertiesRange | null {
+export function findOrgPropertiesBlock(lines: readonly string[], headingLine: number): OrgPropertiesRange | null {
     const blocks = findOrgPropertiesBlocks(lines, headingLine);
     return blocks.at(-1) ?? null;
 }
@@ -120,7 +120,7 @@ export function findOrgPropertiesBlock(lines: string[], headingLine: number): Or
  * heading (so the block aligns with SCHEDULED/DEADLINE/...), or '' if there
  * are no planning lines.
  */
-function deriveIndent(lines: string[], headingLine: number): string {
+function deriveIndent(lines: readonly string[], headingLine: number): string {
     const next = lines[headingLine + 1];
     const hit = next ? matchTimestampLine(next) : null;
     return hit ? hit.indent : '';
@@ -148,7 +148,7 @@ export interface OrgPropertiesEdit {
  * planning-line run (the same insertion point `upsertOrgProperties` uses).
  */
 export function computeOrgPropertiesEdit(
-    lines: string[],
+    lines: readonly string[],
     headingLine: number,
     props: Record<string, string>
 ): OrgPropertiesEdit {
@@ -172,7 +172,11 @@ export function computeOrgPropertiesEdit(
  * heading's planning-line run. Pure: `lines` is not mutated. Designed to be
  * adapted to a `WorkspaceEdit` by the calendar-sync consumer.
  */
-export function upsertOrgProperties(lines: string[], headingLine: number, props: Record<string, string>): string[] {
+export function upsertOrgProperties(
+    lines: readonly string[],
+    headingLine: number,
+    props: Record<string, string>
+): string[] {
     const e = computeOrgPropertiesEdit(lines, headingLine, props);
     const result = [...lines];
     result.splice(e.startLine, e.endLineExclusive - e.startLine, ...e.blockLines);

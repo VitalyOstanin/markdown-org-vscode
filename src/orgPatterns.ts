@@ -116,6 +116,38 @@ export function headingLevel(text: string): number | null {
     return HEADING_REGEX.exec(text)?.groups?.hashes?.length ?? null;
 }
 
+/**
+ * The characters a weekday name inside a timestamp is written with.
+ *
+ * The single answer to "what does a weekday look like", for the patterns that
+ * read a timestamp and the checks that ask whether a token is one. Both
+ * alphabets, because the extractor writes the weekday in the language of the
+ * file and a note carries either. Kept as a source fragment rather than a
+ * pattern of its own: the timestamp patterns need it inside a group of theirs,
+ * and a second literal beside them is how the two alphabets came to disagree
+ * across the project in the first place.
+ */
+export const WEEKDAY_SOURCE = '[А-Яа-яA-Za-z]+';
+
+/** Whether `token` is a weekday name and nothing else. */
+export function isWeekdayName(token: string): boolean {
+    return new RegExp(`^${WEEKDAY_SOURCE}$`).test(token);
+}
+
+/**
+ * What a heading says, without the markup that is not its text: the hashes,
+ * the status keyword and the priority cookie.
+ *
+ * The single answer to "what is this entry called", for every message that
+ * names an entry and every check that compares one heading with another. A
+ * line that is not a heading is its own text, trimmed -- the callers are
+ * naming a line they already hold, not deciding whether it is a heading, and
+ * `headingLevel` is the question for that.
+ */
+export function headingTitle(text: string): string {
+    return (HEADING_REGEX.exec(text)?.groups?.title ?? text).trim();
+}
+
 // Where a section stops, which is the other question: an ATX heading as
 // CommonMark defines one -- up to three spaces of indent, one to six hashes,
 // and either whitespace or the end of the line after them. The extractor reads
