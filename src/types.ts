@@ -63,6 +63,12 @@ export interface Task {
     // `timestamp_next` and leave this out. A reader looking at one day asks
     // "and after this one?", which is what the repeat tooltip answers with it.
     timestamp_next_after?: string;
+    // How long before its date the entry asks to be reminded, from the
+    // `REMINDER` key of its property block (extractor ADR-0041, read from
+    // 0.24.0). A count and a unit rather than a number of minutes: a month and
+    // a year have no fixed length. Absent when the entry names none, when what
+    // it names is unreadable, and from an older extractor.
+    reminder?: { value: number; unit: string };
     // Per-task key/value pairs parsed by markdown-org-extract from an
     // `org-properties` fenced code block. Absent when the task has no such
     // block. Optional and additive on the wire (extractor ADR-0015), so an

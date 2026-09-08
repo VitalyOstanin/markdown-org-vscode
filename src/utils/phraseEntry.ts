@@ -39,11 +39,32 @@ export interface PhraseFields {
      */
     keyword?: TaskStatus | undefined;
     /**
+     * How long before its date the entry asks to be reminded, when the phrase
+     * said so. A count and a unit rather than a number of minutes: a month and
+     * a year have no fixed length, and what goes into the note is the pair.
+     */
+    reminder?: ReminderLead | undefined;
+    /**
      * The fields the phrase said to empty, by the names the extractor prints:
-     * `date`, `time`, `repeater`, `priority`. Empty for a phrase that emptied
-     * nothing, which is every phrase that creates an entry.
+     * `date`, `time`, `repeater`, `priority`, `reminder`. Empty for a phrase
+     * that emptied nothing, which is every phrase that creates an entry.
      */
     cleared: readonly string[];
+}
+
+/** A lead time, as the extractor prints it and as a note writes it. */
+export interface ReminderLead {
+    value: number;
+    /** `min`, `h`, `d`, `w`, `m` for a calendar month, `y`. */
+    unit: string;
+}
+
+/** The property key a lead time is written under (extractor's ADR-0041). */
+export const REMINDER_KEY = 'REMINDER';
+
+/** The lead time as a note spells it: the count and the unit, no space. */
+export function writtenLead(lead: ReminderLead): string {
+    return `${lead.value}${lead.unit}`;
 }
 
 /** The keywords a phrase can name, which are the ones a heading can carry. */
@@ -105,8 +126,31 @@ export function parsePhraseFields(stdout: string): PhraseFields {
         time: optional(raw.time, 'time'),
         repeater: optional(raw.repeater, 'repeater'),
         keyword: keyword as TaskStatus | undefined,
+        reminder: reminderLead(raw.reminder),
         cleared: clearedFields(raw.cleared)
     };
+}
+
+/**
+ * The lead time the phrase named, as a count and a unit.
+ *
+ * Checked rather than trusted, as every other field is: a binary older than
+ * the one that prints it leaves the key out, which reads as a phrase that
+ * said nothing about a reminder, and anything else is an answer this version
+ * cannot write.
+ */
+function reminderLead(value: unknown): ReminderLead | undefined {
+    if (value === null || value === undefined) {
+        return undefined;
+    }
+    if (typeof value !== 'object') {
+        throw new Error(`parse-phrase: reminder is ${typeof value}, expected an object or null`);
+    }
+    const raw = value as Record<string, unknown>;
+    if (typeof raw.value !== 'number' || typeof raw.unit !== 'string') {
+        throw new Error('parse-phrase: reminder is not a count and a unit');
+    }
+    return { value: raw.value, unit: raw.unit };
 }
 
 /**
@@ -206,8 +250,15 @@ function entryLines(fields: PhraseFields, options: PhraseEntryOptions, marked: b
         includeTime: true
     })}\``;
     const above = marked ? [heading, created] : [heading];
+    const properties = fields.reminder
+        ? [
+              `${options.indent}\`\`\`org-properties`,
+              `${options.indent}${REMINDER_KEY}: ${writtenLead(fields.reminder)}`,
+              `${options.indent}\`\`\``
+          ]
+        : [];
     if (!hasTimestamp(fields)) {
-        return above;
+        return [...above, ...properties];
     }
     const date = timestampDate(fields);
     const timestamp = buildOrgTimestamp({
@@ -218,7 +269,9 @@ function entryLines(fields: PhraseFields, options: PhraseEntryOptions, marked: b
         repeater: fields.repeater
     });
     const keyword = fields.planning === 'deadline' ? 'DEADLINE' : 'SCHEDULED';
-    return [...above, `${options.indent}\`${keyword}: ${timestamp}\``];
+    // Under the planning line, which is where the extractor reads a property
+    // block of an entry from and where both clients write one.
+    return [...above, `${options.indent}\`${keyword}: ${timestamp}\``, ...properties];
 }
 
 /**

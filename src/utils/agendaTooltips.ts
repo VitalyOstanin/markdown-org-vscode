@@ -168,11 +168,22 @@ export function priorityTooltip(letter: string, strings: TooltipStrings, fill: F
  * reads as a statement rather than as a gap, and where the end of a timed
  * entry — which the column has no room for — is named.
  */
-export function timeTooltip(time: string, endTime: string, strings: TooltipStrings, fill: FormatString): string {
-    if (!time) {
-        return strings.timeAllDay;
-    }
-    return endTime ? fill(strings.timeRange, time, endTime) : fill(strings.timeAt, time);
+export function timeTooltip(
+    time: string,
+    endTime: string,
+    strings: TooltipStrings,
+    fill: FormatString,
+    lead = ''
+): string {
+    const when = time
+        ? endTime
+            ? fill(strings.timeRange, time, endTime)
+            : fill(strings.timeAt, time)
+        : strings.timeAllDay;
+    // Spelled the way the note spells it (`1h`, `30min`): what is shown is
+    // what the `REMINDER` key holds, and a reader comparing the two is
+    // comparing the same string.
+    return lead ? fill(strings.timeReminder, when, lead) : when;
 }
 
 /**

@@ -171,6 +171,18 @@ suite('Insert Task from Phrase', () => {
         );
     });
 
+    test('a lead time said in the phrase is written as a property of the entry', async () => {
+        const doc = await open('# Notes\n\n## Errands\ntext\n', 3);
+
+        say('позвонить врачу завтра в 15:00, напомни за час');
+        await vscode.commands.executeCommand('markdown-org.insertTaskFromPhrase');
+
+        const written = doc.getText();
+        // The verb goes with the lead time rather than into the heading.
+        assert.match(written, /### TODO позвонить врачу\n/);
+        assert.match(written, /```org-properties\n {4}REMINDER: 1h\n {4}```/);
+    });
+
     test('a second phrase refines the first rather than starting over', async () => {
         const doc = await open('## Errands\ntext\n', 1);
 

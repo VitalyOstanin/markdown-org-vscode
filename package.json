@@ -692,12 +692,12 @@
     "brace-expansion": "^5.0.8"
   },
   "x-markdown-org": {
-    "extractorVersion": "0.23.0",
+    "extractorVersion": "0.24.1",
     "extractorSha256": {
-      "x86_64-unknown-linux-gnu": "8c9d26d4890209b4b95fb295359ff864520984dc67b7be8838c0c6041ea6af94",
-      "x86_64-apple-darwin": "d58bf4269445e959eed0c3b4628ebdf3bde64f07a52cc3c39b1e2763664e43d4",
-      "aarch64-apple-darwin": "5376c02d455ed6c94c58eaf6db5e6706f549de3ed20a09ebd9fa0c0027e57c6c",
-      "x86_64-pc-windows-msvc": "5536a6fcc188e7cdf3ccb5245b7bc5f49dde5e5b6496e0e59238aa259b9086f8"
+      "x86_64-unknown-linux-gnu": "9a68a652eca358d31d90c3f1bb2912ec3fa168a91b952b7411f6edef0f15c570",
+      "x86_64-apple-darwin": "95b2dceddc650bb9ddf8c1246eb779c490ec72c8559054e090a2476de8a38841",
+      "aarch64-apple-darwin": "bce3866cc0286cb08c66b065f2ca8c31d0d1716251e13db7e7f92173f7f5fad4",
+      "x86_64-pc-windows-msvc": "ae7a690778f4cb51dc27a7b075d9a0d48a8bb6807c36b315743f8f0a6b0ded10"
     }
   },
   "devDependencies": {

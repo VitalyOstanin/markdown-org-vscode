@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- An entry can say how long before its date it wants to be reminded, and a
+  phrase both writes that and takes it back. "позвонить врачу завтра в 15:00,
+  напомни за час" writes `REMINDER: 1h` into the entry's `org-properties`
+  block, `Edit Task from Phrase` rewrites the key on an entry that already
+  carries one, and "убрать напоминание" takes the key out -- with the block,
+  when it held nothing else. The value is a count and a unit (`30min`, `2h`,
+  `3d`, `1m` for a calendar month), read by the extractor rather than by this
+  extension, and the agenda names it in the tooltip of the time column. The
+  Android client reads and writes the same key, so an entry says the same
+  thing on both.
+
 - A move taken back out of the notes now takes its Google Calendar event with
   it. The days an entry has moved-occurrence events out for are written back as
   `GCAL_MOVED` beside `GCAL_EVENT_ID`, and the next sync deletes the events for

@@ -189,6 +189,8 @@ export interface AgendaStrings {
         timeAt: string;
         timeRange: string;
         timeAllDay: string;
+        /** The lead time the entry asks for; `{0}` is the hour, `{1}` the lead. */
+        timeReminder: string;
         /**
          * The heading: what it says and where it is written, because the row
          * shows the first and the file only through `data-file` / `data-line`.
@@ -464,6 +466,7 @@ export interface AgendaStrings {
             date: string;
             time: string;
             repeater: string;
+            reminder: string;
         };
         /** The phrase named nothing the entry has room for. */
         nothingSaid: string;
@@ -595,6 +598,7 @@ const EN: AgendaStrings = {
         timeAt: 'Starts at {0}',
         timeRange: 'From {0} to {1}',
         timeAllDay: 'All day — the entry names no time',
+        timeReminder: '{0} — reminder {1} ahead',
         headingSource: '{0} — {1}, line {2}',
         offsetOverdue: 'Overdue by {0}',
         offsetUpcoming: 'Due in {0}',
@@ -706,7 +710,8 @@ const EN: AgendaStrings = {
             priority: 'priority',
             date: 'date',
             time: 'hour',
-            repeater: 'repeater'
+            repeater: 'repeater',
+            reminder: 'reminder'
         },
         nothingSaid: 'The phrase named nothing to change',
         unchanged: 'The entry already says that',
@@ -818,6 +823,7 @@ const RU: AgendaStrings = {
         timeAt: 'Начало в {0}',
         timeRange: 'С {0} до {1}',
         timeAllDay: 'Весь день — время в записи не указано',
+        timeReminder: '{0} — напоминание за {1}',
         headingSource: '{0} — {1}, строка {2}',
         offsetOverdue: 'Просрочено на {0}',
         offsetUpcoming: 'Осталось {0}',
@@ -930,7 +936,8 @@ const RU: AgendaStrings = {
             priority: 'приоритет',
             date: 'дата',
             time: 'время',
-            repeater: 'повтор'
+            repeater: 'повтор',
+            reminder: 'напоминание'
         },
         nothingSaid: 'Во фразе нечего менять',
         unchanged: 'В записи уже так и есть',

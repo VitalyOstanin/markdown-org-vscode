@@ -486,6 +486,22 @@ Ctrl+K Ctrl+N   →   позвонить врачу завтра в 15:00, ка�
     `SCHEDULED: <2026-09-01 Вт 15:00 +1w>`
 ```
 
+A sentence saying how long before its date the entry wants to be told writes
+that as a property of the entry — the `REMINDER` key of its `org-properties`
+block, which is where the extractor reads it from and where the Android client
+writes it. "позвонить врачу завтра в 15:00, напомни за час" adds:
+
+````markdown
+    ```org-properties
+    REMINDER: 1h
+    ```
+````
+
+The value is a count and a unit — `30min` for minutes, `2h`, `3d`, `1w`, `1m`
+for a calendar month, `1y` — and the agenda names it in the tooltip of the time
+column. Reading a lead time needs extractor 0.24.0, and the verb it is said
+with ("напомни", "remind me") is read together with it from 0.24.1.
+
 The rules that read the sentence are the extractor's (`parse-phrase`, added in
 0.20.0), so this extension and the Android client understand a phrase the same
 way, and both grammars — Russian and English — are consulted whatever language
@@ -501,7 +517,8 @@ the editor is set to. What the rules understand, and what they do not, is the
 | 5   | A file with no heading      | The entry is written at the cursor, as a top-level heading                                                  |
 | 6   | A phrase with no date in it | A heading and the creation mark — a task for the Tasks view                                                 |
 | 7   | What the rules did not read | Stays in the heading; nothing said is dropped, only unsorted                                                |
-| 8   | A muted microphone          | Named under the box, before every phrase: a sentence said into a muted input is never heard                 |
+| 8   | A lead time in the phrase   | "напомни за час" writes `REMINDER: 1h` into the entry's property block; the verb goes with it               |
+| 9   | A muted microphone          | Named under the box, before every phrase: a sentence said into a muted input is never heard                 |
 
 The phrase is meant to be said rather than typed, and a speech extension hears
 nothing from a muted microphone while showing every sign of listening. The
@@ -533,14 +550,15 @@ on. "перенеси на пятницу в 16:00 и сделай срочно�
 the priority in one write, where the commands for them are three invocations
 and two dialogs of choice.
 
-| №   | What                          | How it behaves                                                                        |
-| --- | ----------------------------- | ------------------------------------------------------------------------------------- |
-| 1   | Which entry is changed        | The one the cursor stands in, as `Set TODO` and the timestamp commands find it        |
-| 2   | The keyword                   | Said in the phrase as well: "отметь выполненной", "в работу"                          |
-| 3   | Emptying a field              | "убрать дату", "убрать время", "без повтора", "без приоритета"                        |
-| 4   | A word the rules did not read | Nothing is changed and the word is named: an edit has no heading to put a leftover in |
-| 5   | An hour with no day           | Refused: an org timestamp has no way to write an hour without a date                  |
-| 6   | Taking it back                | The editor's own undo — the entry is written into the open document                   |
+| №   | What                          | How it behaves                                                                          |
+| --- | ----------------------------- | --------------------------------------------------------------------------------------- |
+| 1   | Which entry is changed        | The one the cursor stands in, as `Set TODO` and the timestamp commands find it          |
+| 2   | The keyword                   | Said in the phrase as well: "отметь выполненной", "в работу"                            |
+| 3   | Emptying a field              | "убрать дату", "убрать время", "без повтора", "без приоритета", "убрать напоминание"    |
+| 4   | A word the rules did not read | Nothing is changed and the word is named: an edit has no heading to put a leftover in   |
+| 5   | An hour with no day           | Refused: an org timestamp has no way to write an hour without a date                    |
+| 6   | The reminder lead time        | "напомни за час" writes `REMINDER: 1h`; the key is rewritten, and emptying takes it out |
+| 7   | Taking it back                | The editor's own undo — the entry is written into the open document                     |
 
 The rules are the extractor's, and reading a phrase this way needs 0.21.0: the
 release that answers with the keyword a phrase named and with the fields it

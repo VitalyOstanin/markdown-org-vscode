@@ -31,8 +31,33 @@ suite('parsePhraseFields', () => {
             time: '15:00',
             repeater: '+1w',
             keyword: undefined,
+            reminder: undefined,
             cleared: []
         });
+    });
+
+    test('the lead time comes back as the count and the unit the entry writes', () => {
+        // A pair rather than a number of minutes: a month and a year have no
+        // fixed length, and what goes into the note is what was said.
+        const parsed = parsePhraseFields(
+            '{"current_date":"2026-08-31","heading":"позвонить врачу","priority":null,' +
+                '"planning":null,"date":null,"time":null,"repeater":null,' +
+                '"reminder":{"value":30,"unit":"min"},"cleared":[]}'
+        );
+
+        assert.deepStrictEqual(parsed.reminder, { value: 30, unit: 'min' });
+    });
+
+    test('a lead time that is not a count and a unit is refused by name', () => {
+        assert.throws(
+            () =>
+                parsePhraseFields('{"current_date":"2026-08-31","heading":"x","reminder":{"value":"30","unit":"min"}}'),
+            /reminder/
+        );
+        assert.throws(
+            () => parsePhraseFields('{"current_date":"2026-08-31","heading":"x","reminder":{"value":30}}'),
+            /reminder/
+        );
     });
 
     test('a null field is absent rather than empty', () => {
@@ -110,6 +135,28 @@ suite('phraseEntryLines', () => {
             '    `CREATED: [2026-08-31 пн 14:01]`',
             '    `SCHEDULED: <2026-09-01 вт 15:00 +1w>`'
         ]);
+    });
+
+    test('a lead time is written as a property under the planning line', () => {
+        const lines = phraseEntryLines(
+            fields({ planning: 'scheduled', date: '2026-09-01', reminder: { value: 1, unit: 'h' } }),
+            OPTIONS
+        );
+
+        assert.deepStrictEqual(lines, [
+            '## TODO позвонить врачу',
+            '    `CREATED: [2026-08-31 пн 14:01]`',
+            '    `SCHEDULED: <2026-09-01 вт>`',
+            '    ```org-properties',
+            '    REMINDER: 1h',
+            '    ```'
+        ]);
+    });
+
+    test('an entry that named no lead time carries no property block', () => {
+        const lines = phraseEntryLines(fields({ planning: 'scheduled', date: '2026-09-01' }), OPTIONS);
+
+        assert.ok(!lines.some((line) => line.includes('org-properties')));
     });
 
     test('a deadline is written on its own keyword', () => {

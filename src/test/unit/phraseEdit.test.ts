@@ -225,6 +225,65 @@ suite('planPhraseEdit', () => {
         assert.strictEqual(result.lines[4], '    `SCHEDULED: <2026-09-04 Пт 15:00 +1w>`');
     });
 
+    suite("the lead time of the entry's own reminder", () => {
+        test('a lead time the phrase named is written as a property of the entry', () => {
+            const result = plan(ENTRY, { reminder: { value: 1, unit: 'h' } });
+
+            assert.deepStrictEqual(result.changed, ['reminder']);
+            assert.deepStrictEqual(result.lines.slice(2, 8), [
+                '## TODO [#B] позвонить врачу',
+                '    `CREATED: [2026-08-31 пн 14:01]`',
+                '    `SCHEDULED: <2026-09-01 Вт 15:00 +1w>`',
+                '```org-properties',
+                'REMINDER: 1h',
+                '```'
+            ]);
+        });
+
+        test('the key the entry already carries is rewritten rather than doubled', () => {
+            const carrying = [...ENTRY.slice(0, 5), '```org-properties', 'REMINDER: 1h', '```', ...ENTRY.slice(5)];
+
+            const result = plan(carrying, { reminder: { value: 30, unit: 'min' } });
+
+            assert.deepStrictEqual(result.changed, ['reminder']);
+            assert.strictEqual(result.lines[6], 'REMINDER: 30min');
+            assert.strictEqual(result.lines.filter((line) => line.startsWith('REMINDER')).length, 1);
+        });
+
+        test('a lead time said to the value the entry carries writes nothing', () => {
+            const carrying = [...ENTRY.slice(0, 5), '```org-properties', 'REMINDER: 1h', '```', ...ENTRY.slice(5)];
+
+            const result = plan(carrying, { reminder: { value: 1, unit: 'h' } });
+
+            assert.deepStrictEqual(result.changed, []);
+            assert.deepStrictEqual(result.lines, carrying);
+        });
+
+        test('a phrase that emptied it takes the key out, and the block with the last key', () => {
+            const carrying = [...ENTRY.slice(0, 5), '```org-properties', 'REMINDER: 1h', '```', ...ENTRY.slice(5)];
+
+            const result = plan(carrying, { cleared: ['reminder'] });
+
+            assert.deepStrictEqual(result.changed, ['reminder']);
+            assert.deepStrictEqual(result.lines, ENTRY);
+        });
+
+        test('emptying a lead time an entry does not carry changes nothing', () => {
+            const result = plan(ENTRY, { cleared: ['reminder'] });
+
+            assert.deepStrictEqual(result.changed, []);
+            assert.deepStrictEqual(result.lines, ENTRY);
+        });
+
+        test('a lead time travels with the fields said beside it', () => {
+            const result = plan(ENTRY, { date: '2026-09-04', reminder: { value: 1, unit: 'd' } });
+
+            assert.deepStrictEqual(result.changed, ['date', 'reminder']);
+            assert.strictEqual(result.lines[4], '    `SCHEDULED: <2026-09-04 Пт 15:00 +1w>`');
+            assert.strictEqual(result.lines[6], 'REMINDER: 1d');
+        });
+    });
+
     suite('the heading is read the way the extractor reads it', () => {
         test('a cookie away from the canonical place is replaced, not doubled', () => {
             // The extractor counts a cookie wherever it was typed (its

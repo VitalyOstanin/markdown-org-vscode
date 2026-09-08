@@ -370,7 +370,8 @@ export interface AgendaClientDeps {
         time: string,
         endTime: string,
         strings: TooltipStrings,
-        fill: (template: string, ...values: string[]) => string
+        fill: (template: string, ...values: string[]) => string,
+        lead?: string
     ) => string;
     headingTooltip: (
         heading: string,
@@ -589,7 +590,8 @@ export interface AgendaClientDeps {
                 time: string,
                 endTime: string,
                 strings: TooltipStrings,
-                fill: (template: string, ...values: string[]) => string
+                fill: (template: string, ...values: string[]) => string,
+                lead?: string
             ) => string;
             headingTooltip: (
                 heading: string,

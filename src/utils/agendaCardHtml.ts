@@ -48,7 +48,7 @@ export interface TaskRowContext {
         task?: TaskWithOffset
     ) => string;
     priorityTooltip: (letter: string, strings: TooltipStrings, fill: FormatString) => string;
-    timeTooltip: (time: string, endTime: string, strings: TooltipStrings, fill: FormatString) => string;
+    timeTooltip: (time: string, endTime: string, strings: TooltipStrings, fill: FormatString, lead?: string) => string;
     headingTooltip: (
         heading: string,
         file: string,
@@ -137,6 +137,10 @@ export function renderTaskRow(
     const held = (task.moved_occurrences ?? []).find((moved) => moved.to === drawnOn);
     const occurrence = task.timestamp_repeater && drawnOn ? (held?.from ?? drawnOn) : '';
     const occurrenceAttr = occurrence ? ` data-occurrence="${ctx.escapeHtml(occurrence)}"` : '';
+    // The entry's own lead time, spelled the way its `REMINDER` key spells it.
+    // Composed here rather than read out of the properties, so a key the
+    // extractor could not read is left unsaid instead of shown back as typed.
+    const lead = task.reminder ? `${task.reminder.value}${task.reminder.unit}` : '';
     const flagTitle = ctx.flagTooltip(flag, ctx.tooltips, ctx.formatString, ctx.formatDate, task);
     const flagHint = occurrence ? `${flagTitle} — ${ctx.tooltips.occurrenceMenu}` : flagTitle;
 
@@ -149,7 +153,7 @@ export function renderTaskRow(
         // tooltip is what says so in words, and what names the end of a timed
         // entry, for which the column has no room.
         `<span class="time-plain"` +
-        ` title="${ctx.escapeHtml(ctx.timeTooltip(task.timestamp_time ?? '', task.timestamp_end_time ?? '', ctx.tooltips, ctx.formatString))}">` +
+        ` title="${ctx.escapeHtml(ctx.timeTooltip(task.timestamp_time ?? '', task.timestamp_end_time ?? '', ctx.tooltips, ctx.formatString, lead))}">` +
         `${ctx.escapeHtml(task.timestamp_time ?? '')}</span>` +
         `<span class="status" data-status="${statusKind}" data-attention="${attention}"` +
         ` title="${ctx.escapeHtml(ctx.attentionTooltip(attention, ctx.tooltips))}">${ctx.escapeHtml(status)}</span>` +

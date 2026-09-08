@@ -19,7 +19,12 @@
  * the series (`MOVED:`) is reported from 0.22.0, and an older binary passes the
  * line over as prose; the occurrence it names is written as an inactive
  * timestamp, which is read from 0.23.0, and 0.22.0 passes such a line over as
- * prose too.
+ * prose too. An entry's own reminder lead time -- the `REMINDER` key of its
+ * property block -- is read from 0.24.0, and `parse-phrase` prints it from the
+ * same version; an older binary leaves the field out, so a phrase naming a
+ * lead time changes nothing and the agenda says nothing about one. A verb of
+ * reminding said in front of it ("напомни за час") is read together with the
+ * lead time from 0.24.1, and 0.24.0 leaves the verb in the heading.
  *
  * Pure and vscode-free so it can be unit-tested; the wiring lives in
  * `extractor.ts`.
@@ -74,7 +79,10 @@ export function extractorVersionWarning(actual: string | undefined, required: st
         'the series (MOVED:) reaches the agenda from 0.22.0, and the form written now -- ' +
         'the occurrence in brackets -- from 0.23.0; an older binary reads the line as ' +
         'prose, so the occurrence is still drawn on the day it was moved away from and ' +
-        'a Google Calendar export sends the series over it. Clear the setting to use ' +
-        'the bundled binary.'
+        'a Google Calendar export sends the series over it. An entry that says how long ' +
+        'before its date it wants to be reminded (the REMINDER key) is read from 0.24.0, ' +
+        'and a phrase naming a lead time changes nothing on an older one; the verb such a ' +
+        'phrase is said with is read with it from 0.24.1, and 0.24.0 leaves it in the ' +
+        'heading. Clear the setting to use the bundled binary.'
     );
 }

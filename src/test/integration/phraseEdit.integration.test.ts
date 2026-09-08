@@ -163,6 +163,34 @@ suite('Edit Task from Phrase', () => {
         assert.match(doc.getText(), /Текст под записью\./);
     });
 
+    test('a lead time said in words is written as a property of the entry', async () => {
+        const doc = await open(ENTRY, 2);
+
+        say('напомни за час');
+        await vscode.commands.executeCommand('markdown-org.editTaskFromPhrase');
+
+        assert.match(doc.getText(), /```org-properties\nREMINDER: 1h\n```/);
+        // The verb goes with the lead time rather than into the heading, and
+        // the planning line is left as it was.
+        assert.match(doc.getText(), /## TODO \[#B] позвонить врачу/);
+        assert.match(doc.getText(), /SCHEDULED: <2026-09-01 Вт 15:00>/);
+    });
+
+    test('emptying the lead time takes the key and its block out', async () => {
+        const carrying = ENTRY.replace(
+            '    `SCHEDULED: <2026-09-01 Вт 15:00>`\n',
+            '    `SCHEDULED: <2026-09-01 Вт 15:00>`\n```org-properties\nREMINDER: 1h\n```\n'
+        );
+        const doc = await open(carrying, 2);
+
+        say('убрать напоминание');
+        await vscode.commands.executeCommand('markdown-org.editTaskFromPhrase');
+
+        assert.doesNotMatch(doc.getText(), /REMINDER/);
+        assert.doesNotMatch(doc.getText(), /org-properties/);
+        assert.match(doc.getText(), /Текст под записью\./);
+    });
+
     test('two instructions in one phrase are both applied', async () => {
         const doc = await open(ENTRY, 2);
 

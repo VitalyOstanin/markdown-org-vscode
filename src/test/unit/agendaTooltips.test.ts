@@ -218,6 +218,24 @@ suite('agenda tooltips', () => {
         assert.strictEqual(timeTooltip('', '11:00', EN, formatString), 'All day — the entry names no time');
     });
 
+    test('timeTooltip names the lead time the entry asks to be reminded by', () => {
+        // What the entry itself says, not the reader's setting: the key is
+        // written per entry, and the column has no room to show it.
+        assert.strictEqual(timeTooltip('09:30', '', EN, formatString, '1h'), 'Starts at 09:30 — reminder 1h ahead');
+        assert.strictEqual(
+            timeTooltip('09:30', '11:00', RU, formatString, '30min'),
+            'С 09:30 до 11:00 — напоминание за 30min'
+        );
+    });
+
+    test('timeTooltip says the lead time of an entry that names no hour too', () => {
+        assert.strictEqual(
+            timeTooltip('', '', EN, formatString, '1d'),
+            'All day — the entry names no time — reminder 1d ahead'
+        );
+        assert.strictEqual(timeTooltip('09:30', '', EN, formatString, ''), 'Starts at 09:30');
+    });
+
     test('headingTooltip names what the entry says and where it is written', () => {
         assert.strictEqual(
             headingTooltip('Write the report', '/w/notes.md', 12, EN, formatString),

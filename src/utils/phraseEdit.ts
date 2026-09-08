@@ -7,7 +7,9 @@ import { fromIsoDate } from './isoDate';
 import { getWeekdayName } from './incrementTimestamp';
 import { isCancelled } from './normalizeTaskType';
 import { withoutPriorityCookie } from './priorityToggle';
+import { REMINDER_KEY, writtenLead } from './phraseEntry';
 import type { PhraseFields } from './phraseEntry';
+import { findOrgProperty, removeOrgProperty, setOrgProperty } from './orgProperties';
 
 /**
  * Changing an entry that exists by saying what to change.
@@ -36,7 +38,7 @@ export type PhraseEditRefusal =
     | 'no-date-to-put-it-on';
 
 /** What the edit touched, for the line that says what happened. */
-export type PhraseEditField = 'keyword' | 'priority' | 'date' | 'time' | 'repeater';
+export type PhraseEditField = 'keyword' | 'priority' | 'date' | 'time' | 'repeater' | 'reminder';
 
 export interface PhraseEditOptions {
     /** The whole file, as lines. */
@@ -95,6 +97,7 @@ function saysSomething(fields: PhraseFields): boolean {
         fields.date !== undefined ||
         fields.time !== undefined ||
         fields.repeater !== undefined ||
+        fields.reminder !== undefined ||
         fields.cleared.length > 0
     );
 }
@@ -137,12 +140,54 @@ export function planPhraseEdit(options: PhraseEditOptions): PhraseEditPlan {
         writes.insert = outcome.insert;
     }
 
+    // The property block is written to the file as the other fields left it:
+    // it stands under the planning line, which this same edit may have just
+    // written, and its own line numbers have to be the ones after that.
+    const written = changed.length === 0 ? [...lines] : rebuild(lines, writes);
+    const withReminder = editedReminder(written, heading, fields, cleared, changed);
+
     if (changed.length === 0) {
         // Every field the phrase named already said what the entry says: the
         // file is left alone rather than rewritten byte for byte.
         return { lines: [...lines], changed };
     }
-    return { lines: rebuild(lines, writes), changed };
+    return { lines: withReminder, changed };
+}
+
+/**
+ * The lead time of the entry's own reminder, written as a property.
+ *
+ * Not part of the timestamp the fields above belong to: what carries a lead
+ * time is the `REMINDER` key of the entry's property block, which is where
+ * the extractor reads it from and where the phone writes it.
+ *
+ * A phrase naming what the entry already says writes nothing, as every other
+ * field here does: an edit that rewrote the line byte for byte would report a
+ * change nobody made.
+ */
+function editedReminder(
+    lines: readonly string[],
+    heading: number,
+    fields: PhraseFields,
+    cleared: ReadonlySet<string>,
+    changed: PhraseEditField[]
+): string[] {
+    if (fields.reminder) {
+        const value = writtenLead(fields.reminder);
+        if (findOrgProperty(lines, heading, REMINDER_KEY)?.value === value) {
+            return [...lines];
+        }
+        changed.push('reminder');
+        return setOrgProperty(lines, heading, REMINDER_KEY, value);
+    }
+    if (!cleared.has('reminder')) {
+        return [...lines];
+    }
+    const removed = removeOrgProperty(lines, heading, REMINDER_KEY);
+    if (removed.changed) {
+        changed.push('reminder');
+    }
+    return removed.lines;
 }
 
 /** Whether anything the phrase said belongs on the planning line. */
