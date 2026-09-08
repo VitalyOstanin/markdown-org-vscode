@@ -10,6 +10,9 @@ import { isSectionBreak, matchTimestampLine } from '../orgPatterns';
 /** Info string that marks a property block. Exact match, no extra attrs. */
 const ORG_PROPERTIES_INFO = 'org-properties';
 
+/** The opening fence a block is written with when the entry gains one. */
+const ORG_PROPERTIES_FENCE = `\`\`\`${ORG_PROPERTIES_INFO}`;
+
 /**
  * Build the lines of an `org-properties` block for `props`, keys sorted
  * ascending (matches the extractor's BTreeMap ordering for stable diffs).
@@ -181,4 +184,109 @@ export function upsertOrgProperties(
     const result = [...lines];
     result.splice(e.startLine, e.endLineExclusive - e.startLine, ...e.blockLines);
     return result;
+}
+
+/** The key and the value a property line holds (ADR-0020: split on the first colon). */
+function propertyLine(line: string): [string, string] | null {
+    const at = line.indexOf(':');
+    if (at < 0) {
+        return null;
+    }
+    const key = line.slice(0, at).trim();
+    if (key === '') {
+        return null;
+    }
+    return [key, line.slice(at + 1).trim()];
+}
+
+/** The whitespace a line begins with. */
+export function indentation(line: string): string {
+    return line.slice(0, line.length - line.trimStart().length);
+}
+
+/**
+ * Which line of the section holds `key`, and what it says.
+ *
+ * The last one wins, as the extractor merges the blocks of a section: a key
+ * written twice reads as what the second one says, and an edit that rewrote
+ * the first would leave the entry saying what it said before.
+ */
+export function findOrgProperty(
+    lines: readonly string[],
+    headingLine: number,
+    key: string
+): { line: number; value: string } | null {
+    let found: { line: number; value: string } | null = null;
+    for (const block of findOrgPropertiesBlocks(lines, headingLine)) {
+        for (let i = block.startLine + 1; i < block.endLineExclusive - 1; i++) {
+            const hit = propertyLine(lines[i] ?? '');
+            if (hit?.[0] === key) {
+                found = { line: i, value: hit[1] };
+            }
+        }
+    }
+    return found;
+}
+
+/**
+ * Write `key` into the property block of the entry at `headingLine`.
+ *
+ * The line the key is already on is rewritten where there is one; otherwise it
+ * joins the last property block the entry has, and an entry with no block gets
+ * one under its planning lines -- which is where the extractor's ADR-0020 puts
+ * it. Pure: `lines` is not mutated.
+ */
+export function setOrgProperty(lines: readonly string[], headingLine: number, key: string, value: string): string[] {
+    const result = [...lines];
+    const written = findOrgProperty(result, headingLine, key);
+    if (written) {
+        result[written.line] = `${indentation(result[written.line] ?? '')}${key}: ${value}`;
+        return result;
+    }
+
+    const blocks = findOrgPropertiesBlocks(result, headingLine);
+    const last = blocks.at(-1);
+    if (last) {
+        // Written the way the block's other lines are; a block holding none yet
+        // is followed by its closing fence, which carries the block's indent.
+        const closing = last.endLineExclusive - 1;
+        const sample = Math.min(last.startLine + 1, closing);
+        result.splice(closing, 0, `${indentation(result[sample] ?? '')}${key}: ${value}`);
+        return result;
+    }
+
+    let at = headingLine + 1;
+    while (at < result.length && matchTimestampLine(result[at] ?? '')) {
+        at++;
+    }
+    result.splice(at, 0, ORG_PROPERTIES_FENCE, `${key}: ${value}`, '```');
+    return result;
+}
+
+/**
+ * Take `key` out of the entry at `headingLine`.
+ *
+ * The block goes with the last key it held: a fence around nothing is a line
+ * of noise in a file people read, and the extractor reads an entry without a
+ * block the same way it reads one whose block says nothing.
+ */
+export function removeOrgProperty(
+    lines: readonly string[],
+    headingLine: number,
+    key: string
+): { lines: string[]; changed: boolean } {
+    const written = findOrgProperty(lines, headingLine, key);
+    if (!written) {
+        return { lines: [...lines], changed: false };
+    }
+    const block = findOrgPropertiesBlocks(lines, headingLine).find(
+        (range) => written.line > range.startLine && written.line < range.endLineExclusive - 1
+    );
+    const result = [...lines];
+    if (block && block.endLineExclusive - block.startLine === 3) {
+        result.splice(block.startLine, 3);
+        return { lines: result, changed: true };
+    }
+    result.splice(written.line, 1);
+    return { lines: result, changed: true };
 }

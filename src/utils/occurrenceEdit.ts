@@ -36,7 +36,7 @@
 // own habits.
 import { headingLevel, headingTitle, isWeekdayName, matchTimestampLine, type TimestampLineMatch } from '../orgPatterns';
 import { matchMovedLine, movedLine, weekdaySample, type MovedLineFields } from './movedLine';
-import { findOrgPropertiesBlocks } from './orgProperties';
+import { findOrgProperty, indentation, setOrgProperty } from './orgProperties';
 import { addMonths, nextOccurrence, parseRepeater, type Repeater } from './repeater';
 import { getWeekdayName } from './incrementTimestamp';
 import { fromIsoDate, isIsoDate, toIsoDate } from './isoDate';
@@ -49,9 +49,6 @@ export const RECURRENCE_ID_KEY = 'RECURRENCE_ID';
 export const SERIES_ID_KEY = 'SERIES_ID';
 /** Property key holding an entry's own stable identifier. */
 export const ID_KEY = 'ID';
-
-/** The info string of the fenced block these keys are written in. */
-const PROPERTIES_INFO = 'org-properties';
 
 /**
  * What the operation could not do, in words meant for a notification.
@@ -66,77 +63,6 @@ export class OccurrenceError extends Error {}
 export interface OccurrenceEdit {
     lines: string[];
     changed: boolean;
-}
-
-/** The key and the value a property line holds (ADR-0020: split on the first colon). */
-function propertyLine(line: string): [string, string] | null {
-    const at = line.indexOf(':');
-    if (at < 0) {
-        return null;
-    }
-    const key = line.slice(0, at).trim();
-    if (key === '') {
-        return null;
-    }
-    return [key, line.slice(at + 1).trim()];
-}
-
-/** Which line of the section holds `key`, and what it says. The last one wins, as the extractor merges. */
-function findProperty(
-    lines: readonly string[],
-    headingLine: number,
-    key: string
-): { line: number; value: string } | null {
-    let found: { line: number; value: string } | null = null;
-    for (const block of findOrgPropertiesBlocks(lines, headingLine)) {
-        for (let i = block.startLine + 1; i < block.endLineExclusive - 1; i++) {
-            const hit = propertyLine(lines[i] ?? '');
-            if (hit?.[0] === key) {
-                found = { line: i, value: hit[1] };
-            }
-        }
-    }
-    return found;
-}
-
-/** The whitespace a line begins with. */
-function indentation(line: string): string {
-    return line.slice(0, line.length - line.trimStart().length);
-}
-
-/**
- * Write `key` into the property block of the entry at `headingLine`.
- *
- * The line the key is already on is rewritten where there is one; otherwise it
- * joins the last property block the entry has, and an entry with no block gets
- * one under its planning lines -- which is where the extractor's ADR-0020 puts
- * it.
- */
-function setProperty(lines: readonly string[], headingLine: number, key: string, value: string): string[] {
-    const result = [...lines];
-    const written = findProperty(result, headingLine, key);
-    if (written) {
-        result[written.line] = `${indentation(result[written.line] ?? '')}${key}: ${value}`;
-        return result;
-    }
-
-    const blocks = findOrgPropertiesBlocks(result, headingLine);
-    const last = blocks.at(-1);
-    if (last) {
-        // Written the way the block's other lines are; a block holding none yet
-        // is followed by its closing fence, which carries the block's indent.
-        const closing = last.endLineExclusive - 1;
-        const sample = Math.min(last.startLine + 1, closing);
-        result.splice(closing, 0, `${indentation(result[sample] ?? '')}${key}: ${value}`);
-        return result;
-    }
-
-    let at = headingLine + 1;
-    while (at < result.length && matchTimestampLine(result[at] ?? '')) {
-        at++;
-    }
-    result.splice(at, 0, `\`\`\`${PROPERTIES_INFO}`, `${key}: ${value}`, '```');
-    return result;
 }
 
 /** The one planning line of the entry that repeats, and the timestamp on it. */
@@ -376,7 +302,7 @@ export function cancelOccurrence(
 ): OccurrenceEdit {
     findRepeatingLine(lines, headingLine, heading);
 
-    const written = findProperty(lines, headingLine, EXDATE_KEY);
+    const written = findOrgProperty(lines, headingLine, EXDATE_KEY);
     const dates = (written?.value ?? '').split(/[,\s]+/).filter((field) => field !== '');
     const text = toIsoDate(date);
     if (dates.includes(text)) {
@@ -384,7 +310,7 @@ export function cancelOccurrence(
     }
     dates.push(text);
 
-    return { lines: setProperty(lines, headingLine, EXDATE_KEY, dates.join(', ')), changed: true };
+    return { lines: setOrgProperty(lines, headingLine, EXDATE_KEY, dates.join(', ')), changed: true };
 }
 
 /** The entry of the file that already stands in for one occurrence of a series. */
@@ -427,10 +353,10 @@ function replacementsOf(lines: readonly string[], series: string): Map<string, S
         if (headingLevel(lines[i] ?? '') === null) {
             continue;
         }
-        if (findProperty(lines, i, SERIES_ID_KEY)?.value !== series) {
+        if (findOrgProperty(lines, i, SERIES_ID_KEY)?.value !== series) {
             continue;
         }
-        const replaced = findProperty(lines, i, RECURRENCE_ID_KEY)?.value.split(/\s+/)[0];
+        const replaced = findOrgProperty(lines, i, RECURRENCE_ID_KEY)?.value.split(/\s+/)[0];
         // The first entry replacing a day is the one that stands, the way the
         // first `MOVED` line naming an occurrence does.
         if (replaced === undefined || found.has(replaced)) {
@@ -467,7 +393,7 @@ export function replacementOf(
     if (moved) {
         return { headingLine, day: moved.to, time: moved.time };
     }
-    return findReplacement(lines, findProperty(lines, headingLine, ID_KEY)?.value ?? '', day);
+    return findReplacement(lines, findOrgProperty(lines, headingLine, ID_KEY)?.value ?? '', day);
 }
 
 /**
@@ -521,7 +447,7 @@ export function moveOccurrence(
     // day, and the file would draw the occurrence twice.
     const replacement = findReplacement(
         lines,
-        findProperty(lines, headingLine, ID_KEY)?.value ?? '',
+        findOrgProperty(lines, headingLine, ID_KEY)?.value ?? '',
         toIsoDate(occurrence)
     );
     if (replacement) {
@@ -718,10 +644,10 @@ export function listOccurrences(
     }
 
     const time = writtenTime(line, repeating.span);
-    const series = findProperty(lines, headingLine, ID_KEY)?.value ?? '';
+    const series = findOrgProperty(lines, headingLine, ID_KEY)?.value ?? '';
     const moved = movedOccurrences(lines, headingLine);
     const excluded = new Set(
-        (findProperty(lines, headingLine, EXDATE_KEY)?.value ?? '').split(/[,\s]+/).filter((day) => day !== '')
+        (findOrgProperty(lines, headingLine, EXDATE_KEY)?.value ?? '').split(/[,\s]+/).filter((day) => day !== '')
     );
 
     if (!isIsoDate(first)) {

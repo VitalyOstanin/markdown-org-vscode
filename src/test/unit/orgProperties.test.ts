@@ -1,8 +1,11 @@
 import * as assert from 'node:assert/strict';
 import {
     buildOrgPropertiesBlock,
+    findOrgProperty,
     findOrgPropertiesBlock,
     findOrgPropertiesBlocks,
+    removeOrgProperty,
+    setOrgProperty,
     upsertOrgProperties,
     computeOrgPropertiesEdit
 } from '../../utils/orgProperties';
@@ -201,5 +204,88 @@ suite('orgProperties.computeOrgPropertiesEdit', () => {
         assert.equal(e.startLine, 1);
         assert.equal(e.endLineExclusive, 4);
         assert.deepEqual(e.blockLines, ['```org-properties', 'ID: new', '```']);
+    });
+});
+
+suite('orgProperties.findOrgProperty', () => {
+    test('answers with the line the key stands on and what it says', () => {
+        const lines = ['### TODO Foo', '```org-properties', 'REMINDER: 1h', '```'];
+        assert.deepEqual(findOrgProperty(lines, 0, 'REMINDER'), { line: 2, value: '1h' });
+    });
+
+    test('the last block wins on a repeated key, as the extractor merges them', () => {
+        const lines = [
+            '### TODO Foo',
+            '```org-properties',
+            'REMINDER: 1h',
+            '```',
+            'Body.',
+            '```org-properties',
+            'REMINDER: 30min',
+            '```'
+        ];
+        assert.deepEqual(findOrgProperty(lines, 0, 'REMINDER'), { line: 6, value: '30min' });
+    });
+
+    test('a key the entry does not carry is absent rather than empty', () => {
+        assert.equal(findOrgProperty(['### TODO Foo'], 0, 'REMINDER'), null);
+    });
+});
+
+suite('orgProperties.setOrgProperty', () => {
+    test('rewrites the line the key already stands on, keeping its indent', () => {
+        const lines = ['### TODO Foo', '  ```org-properties', '  REMINDER: 1h', '  ```'];
+        assert.deepEqual(setOrgProperty(lines, 0, 'REMINDER', '30min'), [
+            '### TODO Foo',
+            '  ```org-properties',
+            '  REMINDER: 30min',
+            '  ```'
+        ]);
+    });
+
+    test('joins the block the entry has rather than opening a second one', () => {
+        const lines = ['### TODO Foo', '```org-properties', 'ID: x', '```'];
+        assert.deepEqual(setOrgProperty(lines, 0, 'REMINDER', '1h'), [
+            '### TODO Foo',
+            '```org-properties',
+            'ID: x',
+            'REMINDER: 1h',
+            '```'
+        ]);
+    });
+
+    test('an entry with no block gets one under its planning lines', () => {
+        const lines = ['### TODO Foo', '`SCHEDULED: <2026-06-01 Mon>`', 'Body.'];
+        assert.deepEqual(setOrgProperty(lines, 0, 'REMINDER', '1h'), [
+            '### TODO Foo',
+            '`SCHEDULED: <2026-06-01 Mon>`',
+            '```org-properties',
+            'REMINDER: 1h',
+            '```',
+            'Body.'
+        ]);
+    });
+});
+
+suite('orgProperties.removeOrgProperty', () => {
+    test('takes the line out and leaves the rest of the block standing', () => {
+        const lines = ['### TODO Foo', '```org-properties', 'ID: x', 'REMINDER: 1h', '```'];
+        assert.deepEqual(removeOrgProperty(lines, 0, 'REMINDER'), {
+            lines: ['### TODO Foo', '```org-properties', 'ID: x', '```'],
+            changed: true
+        });
+    });
+
+    test('the last key goes with the block: an empty fence is noise in a file people read', () => {
+        const lines = ['### TODO Foo', '```org-properties', 'REMINDER: 1h', '```', 'Body.'];
+        assert.deepEqual(removeOrgProperty(lines, 0, 'REMINDER'), {
+            lines: ['### TODO Foo', 'Body.'],
+            changed: true
+        });
+    });
+
+    test('a key that is not there changes nothing', () => {
+        const lines = ['### TODO Foo', '```org-properties', 'ID: x', '```'];
+        assert.deepEqual(removeOrgProperty(lines, 0, 'REMINDER'), { lines, changed: false });
     });
 });
