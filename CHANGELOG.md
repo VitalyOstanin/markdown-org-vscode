@@ -36,6 +36,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The Android client is named where a reader of the marketplace page reaches it
+  without scrolling: its section, with the day, week and month it draws on a
+  phone, now sits under the table of the three projects and above the table of
+  contents. It used to stand between the settings and the dependencies, past
+  the point at which a page that long is read, so the client a phone needs was
+  the part least likely to be seen.
+
 - The answers this extension gives once are now given in one place: the
   characters a weekday is written with, reading a `YYYY-MM-DD` into a day,
   turning a heading into its text, finding the line that moves an occurrence,
