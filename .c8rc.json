@@ -9,6 +9,7 @@
     "out/extension.js",
     "out/commands/**",
     "out/views/agendaPanel.js",
+    "out/views/docsPanel.js",
     "out/diagnostics/movedLineDiagnostics.js",
     "out/diagnostics/registerDiagnostics.js",
     "out/diagnostics/timestampBrackets.js",
