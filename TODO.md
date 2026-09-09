@@ -459,20 +459,25 @@
       and driving it from xdotool is what made the query drop characters on a
       loaded machine (DEVELOPMENT.md).
 
-- [ ] Announce the Android client (`markdown-org-android`) in the extension
-    - Blocked until two things hold, both outside this repository: the
-      `markdown-org-extract` refactor is finished (the wire contract stops
-      moving) and the Android client has a release a reader can install. The
-      gate itself is tracked in the ecosystem coordinator's TODO (section
-      "Announce the Android client from the extension"), which is where the
-      state of all three projects is visible.
-    - What this repository then carries: a README section presenting the mobile
-      client next to the existing views (screenshots in BOTH themes, per the
-      capture rules above), a CHANGELOG entry, and a link to the client's
-      repository. Worth deciding at that point whether the extension should
-      also surface it once in the UI (a one-time notification on update) or
-      leave it to the README -- a notification is more visible and more
-      intrusive, so it is a decision, not a detail.
+- [x] Announce the Android client (`markdown-org-android`) in the extension
+    - Was blocked until two things held, both outside this repository: the
+      `markdown-org-extract` refactor being finished (the wire contract stops
+      moving) and the Android client having a release a reader can install.
+      Both hold.
+    - What this repository carries: a README section presenting the mobile
+      client next to the existing views, screenshots of the three agenda views
+      in both themes (`media/android-{day,week,month}-{light,dark}.png`), a
+      CHANGELOG entry, and a link to the client's repository and its releases
+      page. The section sits above the table of contents, where a reader of the
+      marketplace page reaches it without scrolling. The help panel names the
+      client too, on the opening page and where the phrase grammar and the
+      agenda are described.
+    - Decided against surfacing it once in the UI. A notification is more
+      visible, but the extension shows nothing the reader did not ask for and
+      keeps no state between sessions; a one-time notice would have to
+      introduce both -- a `globalState` key and an activation-time check -- for
+      a single sentence, and the reader meets the same sentence in the README,
+      on the marketplace page and in the help panel.
 
 - [x] A help panel of the extension's own
     - Not before the release: the ecosystem ships first, the panel comes after.
