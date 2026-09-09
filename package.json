@@ -255,6 +255,11 @@
         "command": "markdown-org.gcalSync.syncNow",
         "title": "Sync Now (Google Calendar)",
         "category": "Markdown Org"
+      },
+      {
+        "command": "markdown-org.showHelp",
+        "title": "Help",
+        "category": "Markdown Org"
       }
     ],
     "menus": {

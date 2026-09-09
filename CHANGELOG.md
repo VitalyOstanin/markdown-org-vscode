@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Help of the extension's own, in the editor: `Markdown Org: Help` opens a
+  panel with the documentation as pages, a table of contents over them and a
+  search box that answers with the lines it found and the heading each one sits
+  under. The pages ship as markdown inside the VSIX, one directory per
+  language, and the panel speaks the language `markdown-org.uiLanguage` picks
+  rather than the editor's display language -- which is what ruled out a VS
+  Code walkthrough, whose cards are declared in `package.json` and follow the
+  editor. Nine sections: where to start, tasks and priorities, timestamps,
+  repeating tasks, the agenda, writing by phrase, Google Calendar, the git chip
+  and the whole list of settings. Among them is the one this started from --
+  what a moved or cancelled occurrence of a series is written as, and that an
+  occurrence moved the older way is still read. A guard test asserts that every
+  contributed command and every `markdown-org.*` setting is named in the help
+  of both languages, so the second description of a feature cannot drift out of
+  step with the first in silence.
+
 - An entry can say how long before its date it wants to be reminded, and a
   phrase both writes that and takes it back. "позвонить врачу завтра в 15:00,
   напомни за час" writes `REMINDER: 1h` into the entry's `org-properties`

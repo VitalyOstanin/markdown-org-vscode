@@ -18,6 +18,7 @@ import {
     showTagDictionary
 } from './commands/agenda';
 import { AgendaPanel } from './views/agendaPanel';
+import { DocsPanel } from './views/docsPanel';
 import { adjustTimestamp, toggleTimestampActive } from './commands/timestampEdit';
 import { agendaFind } from './commands/agendaFind';
 import { moveToArchive, promoteToMaintain } from './commands/moveHeading';
@@ -137,6 +138,11 @@ export function activate(context: vscode.ExtensionContext) {
     // package.json contributes.commands, so it stays out of the command palette
     // (it is meaningless without the tag argument).
     registerOrgCommand(context, 'markdown-org.setTag', (tag?: string) => setTag(context, tag ?? 'ALL'));
+    // The help panel: the only documentation inside the editor, and the one
+    // place a reader who never opens the marketplace page can be sent to.
+    registerOrgCommand(context, 'markdown-org.showHelp', () => {
+        DocsPanel.show(context);
+    });
     registerOrgCommand(context, 'markdown-org.gcalSync.connect', () => connectGcal(context));
     registerOrgCommand(context, 'markdown-org.gcalSync.disconnect', () => disconnectGcal(context));
     registerOrgCommand(context, 'markdown-org.gcalSync.selectCalendar', () => selectCalendar(context));

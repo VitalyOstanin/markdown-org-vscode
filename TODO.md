@@ -474,7 +474,7 @@
       leave it to the README -- a notification is more visible and more
       intrusive, so it is a decision, not a detail.
 
-- [ ] A help panel of the extension's own
+- [x] A help panel of the extension's own
     - Not before the release: the ecosystem ships first, the panel comes after.
     - There is no in-editor help at all today. `contributes` declares commands,
       configuration, grammars, keybindings and menus -- no `walkthroughs`, and

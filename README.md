@@ -72,6 +72,7 @@ reasons are in that repository's README.
         - [One occurrence that differs](#one-occurrence-that-differs)
 - [Writing a task by saying it](#writing-a-task-by-saying-it)
 - [Changing an entry by saying what to change](#changing-an-entry-by-saying-what-to-change)
+- [Help inside the editor](#help-inside-the-editor)
 - [Commands](#commands)
     - [Task Status Commands](#task-status-commands)
     - [Phrase Commands](#phrase-commands)
@@ -596,6 +597,18 @@ said to empty, beside the fields it filled. An older binary configured through
 the version warning names it. The decision is in
 [ADR-0026](docs/adr/0026-an-entry-is-changed-by-saying-what-to-change.md).
 
+## Help inside the editor
+
+`Markdown Org: Help` opens a panel of the extension's own: the sections below
+as pages, with a table of contents and a search box over them, in the language
+[`markdown-org.uiLanguage`](#markdown-orguilanguage) picks. The pages ship
+inside the VSIX, so the help answers without a network and without this page.
+
+A guard test keeps it honest: every command in `package.json` and every
+`markdown-org.*` setting has to be named in the help text of both languages, so
+a feature added without a line in the help fails the build rather than the
+reader.
+
 ## Commands
 
 Hotkeys below match the bindings declared in `package.json`. They are
@@ -660,6 +673,7 @@ for `Set TODO` (the `Shift+Up`/`Shift+Down` bindings are unchanged).
 | `Markdown Org: Cycle Tag Filter`           | `Ctrl+K Ctrl+K Ctrl+T` | Cycle the active file tag filter (e.g. ALL/WORK/PRIVATE)                |
 | `Markdown Org: Cycle Agenda Header Layout` | --                     | Step the header layout: auto -> full -> compact                         |
 | `Markdown Org: Toggle Agenda Day Sections` | --                     | Switch a day between named sections and one flat list                   |
+| `Markdown Org: Help`                       | --                     | Open the built-in help: the sections of this page, searchable, offline  |
 
 All four view commands work both in a Markdown editor and while the agenda panel has focus, so you can switch views from the panel with the keyboard as well as with the mode buttons.
 
