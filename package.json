@@ -692,8 +692,6 @@
   "overrides": {
     "diff": "^9.0.0",
     "serialize-javascript": "^7.0.5",
-    "qs": "^6.16.0",
-    "fast-uri": "^3.1.6",
     "brace-expansion": "^5.0.8"
   },
   "x-markdown-org": {
