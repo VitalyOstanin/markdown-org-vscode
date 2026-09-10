@@ -93,6 +93,22 @@ suite('movedPolicy', () => {
         );
     });
 
+    // A yearly series is walked year by year and keeps only the years that
+    // have the day it is written on (extractor `bracket_year`), so February
+    // 29th does not stand on the 28th in the years between leap ones. Read the
+    // other way, a move of 2025-02-28 would give the series a day it never
+    // had.
+    test('a yearly series on the 29th of February has no day in the years without one', () => {
+        const lines = (moved: string): string[] => [
+            '# TODO Leap',
+            '`SCHEDULED: <2024-02-29 Thu 10:00 +1y>`',
+            `\`MOVED: [${moved}] -> <2028-03-02 Thu 18:00>\``
+        ];
+
+        assert.deepEqual(validateMovedLines(lines('2028-02-29 Tue')), []);
+        assert.equal(validateMovedLines(lines('2025-02-28 Fri'))[0]?.kind, 'occurrence-not-of-the-series');
+    });
+
     test('a repeater whose days this extension does not count says nothing', () => {
         // Working days need the public calendar the extension does not hold,
         // and an hourly repeater names no day of its own. Reporting a day as

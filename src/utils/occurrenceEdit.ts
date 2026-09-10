@@ -37,7 +37,7 @@
 import { headingLevel, headingTitle, isWeekdayName, matchTimestampLine, type TimestampLineMatch } from '../orgPatterns';
 import { matchMovedLine, movedLine, weekdaySample, type MovedLineFields } from './movedLine';
 import { findOrgProperty, indentation, setOrgProperty } from './orgProperties';
-import { addMonths, nextOccurrence, parseRepeater, type Repeater } from './repeater';
+import { addMonths, parseRepeater, type Repeater } from './repeater';
 import { getWeekdayName } from './incrementTimestamp';
 import { fromIsoDate, isIsoDate, toIsoDate } from './isoDate';
 
@@ -594,13 +594,39 @@ function repeaterOf(line: string, span: { start: number; end: number }): Repeate
     return null;
 }
 
-/** One repeater interval after `date`, whichever of the three forms it is written in. */
-function step(date: Date, repeater: Repeater): Date {
-    // `+N` from a given date is the plain interval, and that is what a listing
-    // of the days a series falls on wants: `++N` and `.+N` differ in where
-    // they resume from when an occurrence is closed, not in the calendar the
-    // series keeps.
-    return nextOccurrence({ base: date, today: date, repeater: { ...repeater, type: 'cumulative' } });
+/**
+ * The `index`-th period of the series, counted from the day it starts on, or
+ * `null` for a period a yearly series skips.
+ *
+ * Counted from the base rather than stepped from the day before, because that
+ * is how the extractor counts (`bracket_month` adds whole periods to the base
+ * and truncates the day to the destination month). Stepping loses a day the
+ * calendar has to shorten and never gets it back: from January 31st, a step
+ * reaches February 28th and then March 28th, while the entry the agenda draws
+ * is on March 31st.
+ *
+ * A year is not a run of twelve months here, and the difference is visible on
+ * one day of the calendar: a monthly series written on the 31st is truncated
+ * into February and stands on the 31st again in March, while a yearly series
+ * written on February 29th skips every year that has no such day rather than
+ * moving to the 28th (`bracket_month` against `bracket_year`).
+ *
+ * `+N`, `++N` and `.+N` fall on the same days here: the three differ in where
+ * a series resumes when an occurrence is closed, not in the calendar it keeps.
+ */
+function occurrenceAt(base: Date, repeater: Repeater, index: number): Date | null {
+    if (repeater.unit === 'year') {
+        const date = new Date(base.getFullYear() + index * repeater.value, base.getMonth(), base.getDate());
+        // February 29th in a year that has none rolls into March, and that is
+        // the year the series has no occurrence in at all.
+        return date.getMonth() === base.getMonth() ? date : null;
+    }
+    if (repeater.unit === 'month') {
+        return addMonths(base, index * repeater.value);
+    }
+    const date = new Date(base.getTime());
+    date.setDate(date.getDate() + index * repeater.value * (repeater.unit === 'week' ? 7 : 1));
+    return date;
 }
 
 /**
@@ -653,7 +679,7 @@ export function listOccurrences(
     if (!isIsoDate(first)) {
         throw new OccurrenceError(`${heading} names no day to count its occurrences from`);
     }
-    let date = fromIsoDate(first);
+    const base = fromIsoDate(first);
     const wanted = toIsoDate(from);
     // Once for the whole listing rather than once per day offered: the days
     // are answered out of the map below.
@@ -663,7 +689,12 @@ export function listOccurrences(
         if (taken > WALK_LIMIT) {
             throw new OccurrenceError(`${heading} does not reach ${wanted} in ${WALK_LIMIT} repeats`);
         }
-        const falls = toIsoDate(date);
+        const at = occurrenceAt(base, repeater, taken);
+        if (!at) {
+            // A year the series skips is not one of its occurrences.
+            continue;
+        }
+        const falls = toIsoDate(at);
         if (falls >= wanted) {
             found.push({
                 day: falls,
@@ -672,7 +703,6 @@ export function listOccurrences(
                 moved: moved.some((held) => held.from === falls) || replaced.has(falls)
             });
         }
-        date = step(date, repeater);
     }
     return found;
 }
@@ -699,6 +729,12 @@ export function listOccurrences(
  * would disagree with it on a month anchored past the 28th: stepped, January
  * 31st reaches February 28th and then March 28th; counted from the base, the
  * series is on March 31st, and that is the day the agenda draws.
+ *
+ * A year is counted apart from the months for the one case the two differ on:
+ * `bracket_month` truncates the day into a shorter month, while `bracket_year`
+ * walks whole years and keeps only those that have the day the series is
+ * written on -- so February 29th repeats every fourth year rather than
+ * standing on the 28th in between.
  */
 export function seriesFallsOn(timestamp: string, day: string): boolean | null {
     const span = { start: 0, end: timestamp.length };
@@ -724,9 +760,15 @@ export function seriesFallsOn(timestamp: string, day: string): boolean | null {
         return apart % (repeater.value * (repeater.unit === 'week' ? 7 : 1)) === 0;
     }
 
-    const months = repeater.value * (repeater.unit === 'year' ? 12 : 1);
+    if (repeater.unit === 'year') {
+        const apart = wanted.getFullYear() - base.getFullYear();
+        return (
+            apart % repeater.value === 0 && wanted.getMonth() === base.getMonth() && wanted.getDate() === base.getDate()
+        );
+    }
+
     const apart = (wanted.getFullYear() - base.getFullYear()) * 12 + (wanted.getMonth() - base.getMonth());
-    return apart % months === 0 && toIsoDate(addMonths(base, apart)) === day;
+    return apart % repeater.value === 0 && toIsoDate(addMonths(base, apart)) === day;
 }
 
 /** The half-open line range that changed, and what stands there now. */

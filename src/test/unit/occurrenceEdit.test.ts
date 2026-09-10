@@ -453,7 +453,64 @@ suite('the days a series falls on', () => {
 
         assert.deepStrictEqual(
             ahead.map((day) => day.day),
-            ['2026-01-31', '2026-02-28', '2026-03-28']
+            ['2026-01-31', '2026-02-28', '2026-03-31']
+        );
+    });
+
+    // The extractor counts a series from the day it starts on and truncates
+    // the day to the destination month (`bracket_month`), so a month it had to
+    // shorten is given back the month after. Counting by steps instead loses
+    // the 31st at February and never returns to it, and the days offered here
+    // would then name occurrences the agenda does not draw. Checked against
+    // markdown-org-extract 0.24.1: 2026-01-31 +1m falls on 2026-02-28,
+    // 2026-03-31 and 2026-04-30, and nothing sits on 2026-03-28.
+    test('a month the calendar had to shorten is given back the month after', () => {
+        const monthly = ['## Rent', '`SCHEDULED: <2026-01-31 Sat +1m>`', ''];
+
+        const ahead = listOccurrences(monthly, 0, 'Rent', on('2026-02-01'), 3);
+
+        assert.deepStrictEqual(
+            ahead.map((day) => day.day),
+            ['2026-02-28', '2026-03-31', '2026-04-30']
+        );
+    });
+
+    // A year is not twelve months here. The extractor walks whole years and
+    // keeps only those that have the day the series is written on
+    // (`bracket_year`), so a series on February 29th skips the three years in
+    // between rather than standing on the 28th. Checked against
+    // markdown-org-extract 0.24.1: 2024-02-29 +1y is absent from 2025-02-28,
+    // 2026-02-28 and 2027-02-28, and present on 2028-02-29.
+    test('a yearly series on the 29th of February skips the years that have none', () => {
+        const yearly = ['## Leap', '`SCHEDULED: <2024-02-29 Thu +1y>`', ''];
+
+        const ahead = listOccurrences(yearly, 0, 'Leap', on('2025-01-01'), 2);
+
+        assert.deepStrictEqual(
+            ahead.map((day) => day.day),
+            ['2028-02-29', '2032-02-29']
+        );
+    });
+
+    test('a yearly series on any other day falls every year', () => {
+        const yearly = ['## Birthday', '`SCHEDULED: <2024-03-01 Fri +1y>`', ''];
+
+        const ahead = listOccurrences(yearly, 0, 'Birthday', on('2025-01-01'), 3);
+
+        assert.deepStrictEqual(
+            ahead.map((day) => day.day),
+            ['2025-03-01', '2026-03-01', '2027-03-01']
+        );
+    });
+
+    test('a two-month series counts whole periods from its first day', () => {
+        const monthly = ['## Report', '`SCHEDULED: <2026-01-31 Sat +2m>`', ''];
+
+        const ahead = listOccurrences(monthly, 0, 'Report', on('2026-01-31'), 3);
+
+        assert.deepStrictEqual(
+            ahead.map((day) => day.day),
+            ['2026-01-31', '2026-03-31', '2026-05-31']
         );
     });
 

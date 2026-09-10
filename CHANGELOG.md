@@ -85,6 +85,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The days a repeating entry is said to fall on are the days the agenda draws
+  them on. Both the occurrences offered when one of them is moved or cancelled
+  and the rule that refuses a `MOVED` line naming a day outside the series were
+  counted here rather than read from the extractor, and the two counts drifted
+  apart on the calendar's edges. A monthly series was stepped from the previous
+  occurrence, so a day the calendar had to shorten was lost for good: written
+  on January 31st, it reached February 28th and then stayed on the 28th, while
+  the agenda has it on March 31st. A yearly series was treated as twelve
+  months, so February 29th was offered on the 28th in the years that have no
+  29th, where the agenda draws nothing at all. Both now count the way the
+  extractor does, and a test puts the days of thirteen series beside the days
+  the binary itself reports.
+
 - A line written past the last line of a file whose last line carries text
   stands on a line of its own. It was glued onto the end of the planning line
   before it, and neither was read as a line again.
