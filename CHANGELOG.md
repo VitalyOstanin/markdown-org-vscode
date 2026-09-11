@@ -5,7 +5,7 @@ All notable changes to the "Markdown Org" extension will be documented in this f
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.21.0] - 2026-09-11
 
 ### Added
 
@@ -1945,7 +1945,8 @@ and repeating tasks that move forward when marked DONE instead of closing.
 
 - Requires [markdown-org-extract](https://crates.io/crates/markdown-org-extract) utility
 
-[Unreleased]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.20.0...HEAD
+[Unreleased]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.21.0...HEAD
+[0.21.0]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.20.0...v0.21.0
 [0.20.0]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.19.0...v0.20.0
 [0.19.0]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/VitalyOstanin/markdown-org-vscode/compare/v0.17.0...v0.18.0
