@@ -230,6 +230,26 @@ export interface AgendaGitStatus {
 }
 
 /**
+ * A source file open with edits the editor has not written to disk yet.
+ *
+ * The extractor reads the agenda's line numbers off disk, and `openTask`
+ * applies that number to whatever document the host already holds for the
+ * path -- the live, dirty one when there is one open. A file listed here is a
+ * file where the two can disagree, and a click on one of its tasks can land on
+ * the wrong row until it is saved.
+ */
+export interface DirtyFileState {
+    /** Path exactly as the extractor reported it. */
+    file: string;
+    /** Path relative to the repository root, or the bare name outside git. */
+    label: string;
+}
+
+export interface AgendaDirtyStatus {
+    files: DirtyFileState[];
+}
+
+/**
  * What the page reports about the view it has just rendered.
  *
  * Declared here because both projects need it: the page builds it
@@ -279,6 +299,12 @@ export interface AgendaRenderedInfo {
     gitGroups: string[];
     /** Whether the chip's dropdown stands open. */
     gitMenuOpen: boolean;
+    /** Text of the dirty chip, or empty when nothing in view is unsaved. */
+    dirtyChip: string;
+    /** `data-file` of each row the dropdown lists, in document order. */
+    dirtyFiles: string[];
+    /** Whether the dirty chip's dropdown stands open. */
+    dirtyMenuOpen: boolean;
     /** Rows hidden above/below per day header, aligned with `dayHeaders`. */
     clipAbove: number[];
     clipBelow: number[];

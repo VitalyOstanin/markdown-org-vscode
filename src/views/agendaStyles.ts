@@ -560,6 +560,18 @@ export const AGENDA_STYLES = `
                 animation: none;
             }
         }
+        /* The "unsaved" chip: same shell as .git-chip (.tag-menu-btn), its own
+           colour -- warning rather than the conflict red, since being dirty is
+           the ordinary state of a file mid-edit, not a fault. */
+        .dirty-chip {
+            color: var(--vscode-editorWarning-foreground, var(--accent-yellow));
+        }
+        .dirty-menu-list {
+            min-width: 200px;
+            max-width: 420px;
+            max-height: 60vh;
+            overflow-y: auto;
+        }
         .day-header {
             color: var(--vscode-textLink-foreground);
             font-weight: normal;

@@ -419,6 +419,21 @@ export interface AgendaStrings {
         syncFailed: string;
     };
     /**
+     * The "unsaved" chip: a source file open with edits not yet on disk, which
+     * a click can navigate wrong (see collectDirtyStatus.ts).
+     */
+    dirty: {
+        /** Chip tooltip and dropdown caption; `{0}` is a counted noun from `files`. */
+        title: string;
+        /** Counted nouns, in the order `pluralIndex` returns. */
+        files: string[];
+        /** Row tooltip: `{0}` is the path. */
+        openFileTitle: string;
+        /** The one action the dropdown offers; `{0}` is the same counted noun. */
+        saveButton: string;
+        saveButtonTitle: string;
+    };
+    /**
      * The phrase box raised by `Insert Task from Phrase`. Host UI, and in the
      * same language as everything else the feature says; the phrase itself is
      * read by both grammars whichever language this is.
@@ -686,6 +701,14 @@ const EN: AgendaStrings = {
             'Nothing done: "{0}" and "{1}" have both moved. Merge or rebase in Source Control, then sync again.',
         syncFailed: 'Sync failed: {0}'
     },
+    dirty: {
+        title: 'Unsaved: {0}',
+        files: ['file', 'files'],
+        openFileTitle: 'Open {0}',
+        saveButton: 'Save {0}',
+        saveButtonTitle:
+            'Save the agenda source files with unsaved changes -- until then a click may land on the wrong line'
+    },
     phrasePrompt: {
         title: 'New task from a phrase',
         prompt: 'Say the task in one sentence',
@@ -911,6 +934,14 @@ const RU: AgendaStrings = {
         syncDiverged:
             'Ничего не сделано: «{0}» и «{1}» разошлись. Сведите их (merge или rebase) в Source Control и синхронизируйте снова.',
         syncFailed: 'Синхронизация не выполнена: {0}'
+    },
+    dirty: {
+        title: 'Не сохранено: {0}',
+        files: ['файл', 'файла', 'файлов'],
+        openFileTitle: 'Открыть {0}',
+        saveButton: 'Сохранить {0}',
+        saveButtonTitle:
+            'Сохранить файлы-источники агенды с несохранёнными изменениями -- иначе переход по клику может попасть не в ту строку'
     },
     phrasePrompt: {
         title: 'Новая задача фразой',

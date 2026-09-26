@@ -19,6 +19,7 @@
     "out/utils/git/gitApi.js",
     "out/utils/git/gitApiTypes.js",
     "out/utils/git/collectGitStatus.js",
+    "out/utils/collectDirtyStatus.js",
     "out/utils/notify.js",
     "out/utils/configTarget.js",
     "out/utils/logChannel.js",
