@@ -1,6 +1,6 @@
 import * as vscode from 'vscode';
 import { randomBytes } from 'node:crypto';
-import type { AgendaData, AgendaDirtyStatus, AgendaGitStatus, AgendaRenderedInfo } from '../types';
+import type { AgendaData, AgendaGitStatus, AgendaRenderedInfo } from '../types';
 import {
     isMeaningfulSelection,
     resolveOccurrenceClickIntent,
@@ -78,11 +78,10 @@ import {
     renderGitChip,
     renderGitMenu
 } from '../utils/agendaGitHtml';
-import { dirtyChipTitle, dirtyCount, dirtyFileRow, renderDirtyMenu } from '../utils/agendaDirtyHtml';
 import { gitActionButtons, gitActionCommands, gitActionOf } from '../utils/agendaGitAction';
+import type { GitAction } from '../utils/agendaGitAction';
 import {
     collectClipInfo,
-    collectDirtyInfo,
     collectGitInfo,
     collectHeaderInfo,
     collectViewInfo,
@@ -93,7 +92,6 @@ import { agendaSourceFiles, agendaSourceRoots } from '../utils/git/agendaSourceF
 import { buildCollectionMarks, collectionMarkHtml } from '../utils/agendaCollections';
 import { hideCollections, renderCollectionChips } from '../utils/agendaCollectionFilter';
 import { collectGitStatus } from '../utils/git/collectGitStatus';
-import { collectDirtyStatus } from '../utils/collectDirtyStatus';
 import { pathKey } from '../utils/git/gitPathMatch';
 import { resolveRealPath } from '../utils/git/realPath';
 import { forgetResolvedRepositories, getGitApi } from '../utils/git/gitApi';
@@ -140,12 +138,6 @@ const REFRESH_DEBOUNCE_MS = 500;
  * long enough that one user action costs one recomputation.
  */
 const GIT_STATUS_DEBOUNCE_MS = 300;
-/**
- * A keystroke fires `onDidChangeTextDocument` on every character; this reads
- * as immediate the same way GIT_STATUS_DEBOUNCE_MS does, without recomputing
- * the status once per character typed.
- */
-const DIRTY_STATUS_DEBOUNCE_MS = 300;
 // Window of time after createWebviewPanel within which the webview is expected
 // to send back its `ready` handshake. VS Code's webview host registers a
 // ServiceWorker on first use, and on a freshly opened window that registration
@@ -190,8 +182,6 @@ interface AgendaWebviewMessage {
     hidden?: unknown;
     /** Set on `renderError`: what the page failed at. */
     message?: string;
-    /** `saveDirtyFiles`: the paths the chip's dropdown listed. */
-    files?: unknown;
 }
 
 /** Everything an `init` message needs, so a panel can be (re)populated from it. */
@@ -322,20 +312,13 @@ export class AgendaPanel {
     // asserting. Set through `pauseGitStatusForTesting`, which also retires the
     // in-flight request so an answer already on its way is dropped as stale.
     private static gitStatusPausedForTesting = false;
-    // Test-only, mirroring gitStatusPausedForTesting: a real document held
-    // dirty by the test harness itself would otherwise chase a status posted
-    // for the test to assert on.
-    private static dirtyStatusPausedForTesting = false;
     // Subscriptions to the editor's own document lifecycle: a change, a save,
-    // a close. Unlike gitListeners these need no rebuilding -- they are
-    // workspace-wide from the moment the panel opens, not scoped to a set of
-    // repositories that can change -- so they are registered once and disposed
-    // with the panel.
-    private static dirtyListeners: vscode.Disposable[] = [];
-    private static dirtyDebounceTimer?: NodeJS.Timeout | undefined;
-    // Monotonic id of the in-flight computation, same reason as gitRequestSeq:
-    // resolving a symlinked path is async, so a later request can finish first.
-    private static dirtyRequestSeq = 0;
+    // a close -- what moves the "not saved" counter of the git chip, which no
+    // repository event reports. Unlike gitListeners these need no rebuilding:
+    // they are workspace-wide from the moment the panel opens, not scoped to a
+    // set of repositories that can change, so they are registered once and
+    // disposed with the panel.
+    private static documentListeners: vscode.Disposable[] = [];
     // Whether a render failure inside the webview has already been reported for
     // the open panel. A broken payload fails on every refresh, and the
     // file-watcher refreshes on each save, so the report is once per panel.
@@ -442,12 +425,11 @@ export class AgendaPanel {
         if (AgendaPanel.watchers.length === 0 && refreshCallback) {
             AgendaPanel.ensureWatcher(config);
         }
-        AgendaPanel.ensureDirtyWatch();
+        AgendaPanel.ensureDocumentWatch();
 
         // Every render can change which files the view is built from, so the
         // status is recomputed per render as well as on repository events.
         AgendaPanel.requestGitStatus();
-        AgendaPanel.requestDirtyStatus();
 
         if (!AgendaPanel.dayCheckTimer && refreshCallback) {
             AgendaPanel.scheduleNextDayCheck();
@@ -697,7 +679,6 @@ export class AgendaPanel {
         // receive it (the panel posts `init` and the status independently), so
         // it is recomputed once the page says it is listening.
         AgendaPanel.requestGitStatus();
-        AgendaPanel.requestDirtyStatus();
         if (AgendaPanel.readyTimeout) {
             clearTimeout(AgendaPanel.readyTimeout);
             AgendaPanel.readyTimeout = undefined;
@@ -731,12 +712,7 @@ export class AgendaPanel {
         }
         // Anything still awaiting will find a newer id and drop its result.
         AgendaPanel.gitRequestSeq += 1;
-        AgendaPanel.disposeDirtyListeners();
-        if (AgendaPanel.dirtyDebounceTimer) {
-            clearTimeout(AgendaPanel.dirtyDebounceTimer);
-            AgendaPanel.dirtyDebounceTimer = undefined;
-        }
-        AgendaPanel.dirtyRequestSeq += 1;
+        AgendaPanel.disposeDocumentListeners();
         // The next agenda open must rebuild its anchor date from
         // initialDate/toIsoDate(today). Keeping a stale shiftedToday from a
         // previous session around would leak into AgendaPanel.refresh()
@@ -928,72 +904,60 @@ export class AgendaPanel {
     }
 
     /**
-     * Debounced the same way {@link requestGitStatus} is, and for the same
-     * reason: a keystroke fires `onDidChangeTextDocument` on every character,
-     * and one status per render or per save is enough.
-     */
-    private static requestDirtyStatus(): void {
-        if (AgendaPanel.dirtyDebounceTimer) {
-            clearTimeout(AgendaPanel.dirtyDebounceTimer);
-        }
-        AgendaPanel.dirtyDebounceTimer = setTimeout(() => {
-            AgendaPanel.dirtyDebounceTimer = undefined;
-            void AgendaPanel.pushDirtyStatus();
-        }, DIRTY_STATUS_DEBOUNCE_MS);
-    }
-
-    /**
-     * Compute the status and send it to the page as its own message, mirroring
-     * {@link pushGitStatus}: a separate message so a document merely being
-     * edited does not re-render the task list under the user's cursor.
-     */
-    private static async pushDirtyStatus(): Promise<void> {
-        const panel = AgendaPanel.currentPanel;
-        const args = AgendaPanel.lastRenderArgs;
-        if (!panel || !args || AgendaPanel.dirtyStatusPausedForTesting) {
-            return;
-        }
-        const seq = ++AgendaPanel.dirtyRequestSeq;
-        try {
-            const status = await collectDirtyStatus(agendaSourceFiles(args.data));
-            // A newer request started while this one was awaiting (resolving a
-            // symlinked path is async): its answer is the current one.
-            if (seq !== AgendaPanel.dirtyRequestSeq || AgendaPanel.currentPanel !== panel) {
-                return;
-            }
-            void panel.webview.postMessage({ command: 'dirtyStatus', status });
-        } catch (error) {
-            // Nothing here is worth a toast: the agenda itself rendered fine and
-            // the only casualty is a header chip.
-            logDiagnostic(`agenda dirty status failed: ${formatError(error)}`);
-        }
-    }
-
-    /**
+     * Keep the "not saved" counter of the git chip current: no repository
+     * event fires when a buffer turns dirty, so the editor's own events ask
+     * for the status instead.
+     *
      * Registered once and left alone for the life of the panel: unlike git's
      * repositories, the set of documents a change/save/close event can name is
      * the whole workspace from the start, so there is nothing here that a
      * later event would need to add.
+     *
+     * A change only asks when it flips the document's dirty flag. Every
+     * keystroke fires `onDidChangeTextDocument`, and so does every line written
+     * to an output channel -- the diagnostic log this panel itself writes to
+     * among them, which would otherwise answer each status pass with the next.
+     * A save does ask for a fresh read: the file on disk just changed, and
+     * outside the workspace folders nothing else tells the Git extension so.
      */
-    private static ensureDirtyWatch(): void {
-        if (AgendaPanel.dirtyListeners.length > 0) {
+    private static ensureDocumentWatch(): void {
+        if (AgendaPanel.documentListeners.length > 0) {
             return;
         }
-        const onChange = (): void => {
-            AgendaPanel.requestDirtyStatus();
-        };
-        AgendaPanel.dirtyListeners.push(
-            vscode.workspace.onDidChangeTextDocument(onChange),
-            vscode.workspace.onDidSaveTextDocument(onChange),
-            vscode.workspace.onDidCloseTextDocument(onChange)
+        const dirtyState = new Map<string, boolean>();
+        for (const doc of vscode.workspace.textDocuments) {
+            dirtyState.set(doc.uri.toString(), doc.isDirty);
+        }
+        AgendaPanel.documentListeners.push(
+            vscode.workspace.onDidChangeTextDocument((event) => {
+                const key = event.document.uri.toString();
+                const dirty = event.document.isDirty;
+                if (event.document.uri.scheme !== 'file' || dirtyState.get(key) === dirty) {
+                    return;
+                }
+                dirtyState.set(key, dirty);
+                AgendaPanel.requestGitStatus(false);
+            }),
+            vscode.workspace.onDidSaveTextDocument((doc) => {
+                dirtyState.set(doc.uri.toString(), false);
+                AgendaPanel.requestGitStatus();
+            }),
+            vscode.workspace.onDidCloseTextDocument((doc) => {
+                const key = doc.uri.toString();
+                const wasDirty = dirtyState.get(key) === true;
+                dirtyState.delete(key);
+                if (wasDirty) {
+                    AgendaPanel.requestGitStatus(false);
+                }
+            })
         );
     }
 
-    private static disposeDirtyListeners(): void {
-        for (const listener of AgendaPanel.dirtyListeners) {
+    private static disposeDocumentListeners(): void {
+        for (const listener of AgendaPanel.documentListeners) {
             listener.dispose();
         }
-        AgendaPanel.dirtyListeners = [];
+        AgendaPanel.documentListeners = [];
     }
 
     /** Re-send a header mode the page never received (see {@link pushHeaderMode}). */
@@ -1090,12 +1054,8 @@ export class AgendaPanel {
             if (typeof message.file === 'string') {
                 await AgendaPanel.openTaskInEditor(message.file, 1);
             }
-        } else if (message.command === 'saveDirtyFiles') {
-            const files = Array.isArray(message.files)
-                ? message.files.filter((file): file is string => typeof file === 'string')
-                : [];
-            await AgendaPanel.saveDirtyFiles(files);
         } else if (
+            message.command === 'gitSave' ||
             message.command === 'gitCommit' ||
             message.command === 'gitCommitSync' ||
             message.command === 'gitPush' ||
@@ -1108,7 +1068,9 @@ export class AgendaPanel {
             const { language, strings } = AgendaPanel.uiStrings();
             const files = agendaSourceFiles(args.data);
             try {
-                if (message.command === 'gitCommit') {
+                if (message.command === 'gitSave') {
+                    await AgendaPanel.saveDirtyFiles(files);
+                } else if (message.command === 'gitCommit') {
                     await commitAgendaSources(files, strings, language);
                 } else if (message.command === 'gitCommitSync') {
                     await commitAndSyncAgendaSources(files, strings, language);
@@ -1301,9 +1263,6 @@ export class AgendaPanel {
                         gitActions: m.gitActions ?? [],
                         gitGroups: m.gitGroups ?? [],
                         gitMenuOpen: m.gitMenuOpen ?? false,
-                        dirtyChip: m.dirtyChip ?? '',
-                        dirtyFiles: m.dirtyFiles ?? [],
-                        dirtyMenuOpen: m.dirtyMenuOpen ?? false,
                         clipAbove: m.clipAbove ?? [],
                         clipBelow: m.clipBelow ?? [],
                         todayFirstRowHidden: m.todayFirstRowHidden ?? false,
@@ -1402,7 +1361,7 @@ export class AgendaPanel {
      * the host handler directly would step over exactly the part under test.
      * Resolves to false when no panel is open.
      */
-    public static clickGitActionForTesting(action: 'commit' | 'push' | 'sync'): Thenable<boolean> {
+    public static clickGitActionForTesting(action: GitAction): Thenable<boolean> {
         return AgendaPanel.postToPage({ command: 'clickGitActionForTesting', action });
     }
 
@@ -1451,32 +1410,6 @@ export class AgendaPanel {
         return AgendaPanel.postToPage({ command: 'gitStatus', status });
     }
 
-    /** Test-only helper: press the dirty chip, mirroring {@link clickGitChipForTesting}. */
-    public static clickDirtyChipForTesting(): Thenable<boolean> {
-        return AgendaPanel.postToPage({ command: 'clickDirtyChipForTesting' });
-    }
-
-    /** Test-only helper: press its Save button. */
-    public static clickDirtySaveForTesting(): Thenable<boolean> {
-        return AgendaPanel.postToPage({ command: 'clickDirtySaveForTesting' });
-    }
-
-    /** Test-only helper, mirroring {@link pauseGitStatusForTesting}. */
-    public static pauseDirtyStatusForTesting(paused: boolean): void {
-        AgendaPanel.dirtyStatusPausedForTesting = paused;
-        AgendaPanel.dirtyRequestSeq += 1;
-    }
-
-    /**
-     * Test-only helper: hand the page a dirty status of the test's own making,
-     * mirroring {@link postGitStatusForTesting} for the same reason -- a real
-     * unsaved document belongs to whoever is editing the test workspace, not to
-     * the test asserting on the chip.
-     */
-    public static postDirtyStatusForTesting(status: AgendaDirtyStatus | null): Thenable<boolean> {
-        return AgendaPanel.postToPage({ command: 'dirtyStatus', status });
-    }
-
     /**
      * Open a file at the given 1-based line in an editor. The path is expected
      * to be absolute (the agenda passes `--absolute-paths` to
@@ -1499,15 +1432,13 @@ export class AgendaPanel {
     }
 
     /**
-     * Write every listed file's live buffer to disk.
+     * Write the live buffer of every listed file that has one to disk.
      *
-     * `files` are the paths the dirty chip's own dropdown carried, which
-     * `collectDirtyStatus` only put there because a document open on that path
-     * was dirty -- so a document is looked up by the same real-path match
-     * rather than trusted to still be exactly one of `vscode.workspace.textDocuments`
-     * by identity. `TextDocument.save()` on a document that is no longer dirty
-     * (already saved, or closed) resolves without writing anything, so a stale
-     * entry here is a no-op rather than a second write.
+     * `files` are all the source files of the current view, not only the
+     * dirty ones: the documents to save are picked here, by the same real-path
+     * match `collectGitStatus` counts them with, so a file opened through a
+     * symlink is found under the path the agenda knows it by. A file with no
+     * dirty buffer is simply not among the matches.
      */
     private static async saveDirtyFiles(files: readonly string[]): Promise<void> {
         if (files.length === 0) {
@@ -1536,7 +1467,6 @@ export class AgendaPanel {
                     }
                 })
         );
-        AgendaPanel.requestDirtyStatus();
     }
 
     /** Reload data into the panel without re-focusing it. Re-reads settings (including tag filter). */
@@ -1683,20 +1613,12 @@ export class AgendaPanel {
         gitGroups,
         gitActions,
         renderGitMenu,
-        // The dirty chip's markup, same rule as the git chip above: every
-        // function `renderDirtyMenu` and `dirtyChipTitle` reach by a bare name
-        // has to be inlined here too.
-        dirtyCount,
-        dirtyChipTitle,
-        dirtyFileRow,
-        renderDirtyMenu,
         gitActionButtons,
         gitActionCommands,
         gitActionOf,
         collectViewInfo,
         collectHeaderInfo,
         collectGitInfo,
-        collectDirtyInfo,
         collectClipInfo,
         readChipCount,
         measureTodayFirstRowHidden

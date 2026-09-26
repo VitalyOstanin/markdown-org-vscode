@@ -38,7 +38,7 @@ const REPO: GitRepoState = {
 };
 
 function file(partial: Partial<GitFileState> & { file: string; label: string }): GitFileState {
-    return { repoRoot: '/repo', uncommitted: false, unpushed: false, conflicted: false, ...partial };
+    return { repoRoot: '/repo', dirty: false, uncommitted: false, unpushed: false, conflicted: false, ...partial };
 }
 
 /**
@@ -47,7 +47,7 @@ function file(partial: Partial<GitFileState> & { file: string; label: string }):
  * exactOptionalPropertyTypes tells the two apart, and the model omits the key.
  */
 function outsideFile(path: string, label: string): GitFileState {
-    return { file: path, label, uncommitted: false, unpushed: false, conflicted: false };
+    return { file: path, label, dirty: false, uncommitted: false, unpushed: false, conflicted: false };
 }
 
 function status(partial: Partial<AgendaGitStatus> = {}): AgendaGitStatus {
@@ -55,6 +55,7 @@ function status(partial: Partial<AgendaGitStatus> = {}): AgendaGitStatus {
     return {
         repos: [REPO],
         files,
+        dirtyCount: files.filter((f) => f.dirty).length,
         uncommittedCount: files.filter((f) => f.uncommitted).length,
         unpushedCount: files.filter((f) => f.unpushed).length,
         outsideGitCount: files.filter((f) => f.repoRoot === undefined).length,
@@ -78,6 +79,45 @@ suite('renderGitChip', () => {
         assert.ok(html.includes('data-kind="uncommitted"'), 'uncommitted stat missing');
         assert.ok(html.includes('data-kind="unpushed"'), 'unpushed stat missing');
         assert.ok(!html.includes('data-kind="clean"'), 'clean marker must not appear alongside counters');
+    });
+
+    test('counts unsaved files first of the three stages: not saved, not committed, not pushed', () => {
+        const s = status({
+            files: [
+                file({ file: '/repo/work.md', label: 'work.md', dirty: true, uncommitted: true }),
+                file({ file: '/repo/home.md', label: 'home.md', unpushed: true })
+            ]
+        });
+        assert.deepStrictEqual(
+            gitCounters(s, CTX).map((c) => c.kind),
+            ['dirty', 'uncommitted', 'unpushed']
+        );
+        assert.strictEqual(gitChipTitle(s, CTX), '1 file unsaved, 1 file not committed, 1 file not pushed');
+        assert.ok(renderGitChip(s, CTX).includes('data-kind="dirty"'));
+    });
+
+    test('an unsaved file keeps the chip from reading clean', () => {
+        const s = status({
+            unpushedCommits: 0,
+            files: [file({ file: '/repo/work.md', label: 'work.md', dirty: true })]
+        });
+        const html = renderGitChip(s, CTX);
+        assert.ok(!html.includes('data-kind="clean"'), html);
+        assert.ok(html.includes('✎'), html);
+    });
+
+    test('russian names the unsaved stage in its own words', () => {
+        const ru: GitHtmlContext = { ...CTX, git: AGENDA_STRINGS.ru.git, locale: 'ru-RU', uiLang: 'ru' };
+        const s = status({
+            unpushedCommits: 0,
+            files: [
+                file({ file: '/repo/a.md', label: 'a.md', dirty: true }),
+                file({ file: '/repo/b.md', label: 'b.md', dirty: true })
+            ]
+        });
+        assert.strictEqual(gitChipTitle(s, ru), 'не сохранено: 2 файла');
+        assert.ok(renderGitMenu(s, ru).includes('Не сохранено: 2 файла'));
+        assert.ok(renderGitMenu(s, ru).includes('>Сохранить 2</button>'));
     });
 
     test('shows only the uncommitted counter when nothing is waiting to be pushed', () => {
@@ -502,6 +542,62 @@ suite('renderGitMenu', () => {
         assert.ok(html.includes('title="Real path: /repo/work.md"'), html);
         assert.ok(html.includes('data-file="/home/user/notes/work.md"'), 'the row must open the path the user knows');
     });
+
+    test('an unsaved file is its own group, ahead of the commit, and not listed again under it', () => {
+        const html = renderGitMenu(
+            status({
+                repos: [LEVEL_REPO],
+                unpushedCommits: 0,
+                files: [
+                    file({ file: '/repo/work.md', label: 'work.md', dirty: true, uncommitted: true }),
+                    file({ file: '/repo/home.md', label: 'home.md', uncommitted: true })
+                ]
+            }),
+            CTX
+        );
+        assert.ok(html.includes('Not saved: 1 file'), html);
+        assert.ok(html.indexOf('data-group="dirty"') < html.indexOf('data-group="uncommitted"'));
+        assert.strictEqual(html.split('data-file="/repo/work.md"').length - 1, 1);
+    });
+
+    test('a file saved but uncommitted is not in the unsaved group', () => {
+        const html = renderGitMenu(
+            status({ files: [file({ file: '/repo/work.md', label: 'work.md', uncommitted: true })] }),
+            CTX
+        );
+        assert.ok(!html.includes('data-group="dirty"'));
+        assert.ok(!html.includes('id="gitSaveBtn"'));
+    });
+
+    test('the save button counts the unsaved files and comes before the commit', () => {
+        const html = renderGitMenu(
+            status({
+                files: [
+                    file({ file: '/repo/a.md', label: 'a.md', dirty: true, uncommitted: true }),
+                    file({ file: '/repo/b.md', label: 'b.md', dirty: true })
+                ]
+            }),
+            CTX
+        );
+        assert.ok(html.includes('>Save 2</button>'), html);
+        const save = html.indexOf('id="gitSaveBtn"');
+        assert.ok(save > html.indexOf('id="gitSyncBtn"'), 'Sync stays first, where it does not move');
+        assert.ok(save < html.indexOf('id="gitCommitBtn"'), 'saving comes before committing');
+    });
+
+    test('the save button is offered during a merge, when commit is not', () => {
+        const html = renderGitMenu(
+            status({
+                files: [
+                    file({ file: '/repo/a.md', label: 'a.md', conflicted: true, uncommitted: true }),
+                    file({ file: '/repo/b.md', label: 'b.md', dirty: true, uncommitted: true })
+                ]
+            }),
+            CTX
+        );
+        assert.ok(html.includes('id="gitSaveBtn"'));
+        assert.ok(!html.includes('id="gitCommitBtn"'));
+    });
 });
 
 /**
@@ -522,6 +618,7 @@ suite('one set of state marks', () => {
         // row marked "⚠" was a valid state of the code.
         const cases: { file: GitFileState; kind: string }[] = [
             { file: file({ file: '/repo/c.md', label: 'c.md', conflicted: true }), kind: 'conflicted' },
+            { file: file({ file: '/repo/s.md', label: 's.md', dirty: true }), kind: 'dirty' },
             { file: file({ file: '/repo/u.md', label: 'u.md', uncommitted: true }), kind: 'uncommitted' },
             { file: file({ file: '/repo/p.md', label: 'p.md', unpushed: true }), kind: 'unpushed' },
             { file: outsideFile('/loose/o.md', 'o.md'), kind: 'outside' }
@@ -531,6 +628,7 @@ suite('one set of state marks', () => {
                 status({
                     files: [state],
                     conflictCount: state.conflicted ? 1 : 0,
+                    dirtyCount: state.dirty ? 1 : 0,
                     uncommittedCount: state.uncommitted ? 1 : 0,
                     unpushedCount: state.unpushed ? 1 : 0,
                     outsideGitCount: state.repoRoot === undefined ? 1 : 0
@@ -555,6 +653,10 @@ suite('one set of state marks', () => {
             g.markConflicted
         );
         assert.strictEqual(
+            gitFileMarkTitle(file({ file: '/repo/s.md', label: 's.md', dirty: true, uncommitted: true }), CTX),
+            g.markDirty
+        );
+        assert.strictEqual(
             gitFileMarkTitle(file({ file: '/repo/b.md', label: 'b.md', uncommitted: true }), CTX),
             g.markUncommitted
         );
@@ -572,6 +674,19 @@ suite('one set of state marks', () => {
         const both = file({ file: '/repo/f.md', label: 'f.md', conflicted: true, uncommitted: true });
         assert.strictEqual(gitFileMark(both), gitGlyph('conflicted'));
         assert.strictEqual(gitFileMarkTitle(both, CTX), AGENDA_STRINGS.en.git.markConflicted);
+    });
+
+    test('unsaved outranks every git state but a conflict, in the order the edit travels', () => {
+        const dirtyAndMore = file({
+            file: '/repo/g.md',
+            label: 'g.md',
+            dirty: true,
+            uncommitted: true,
+            unpushed: true
+        });
+        assert.strictEqual(gitFileMark(dirtyAndMore), gitGlyph('dirty'));
+        const dirtyConflict = file({ file: '/repo/h.md', label: 'h.md', dirty: true, conflicted: true });
+        assert.strictEqual(gitFileMark(dirtyConflict), gitGlyph('conflicted'));
     });
 
     test('the row carries both tooltips: the path on the button, the state on the mark', () => {

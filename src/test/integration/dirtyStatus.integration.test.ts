@@ -9,16 +9,17 @@ import { exec } from '../../utils/exec';
 import { extractor } from '../../utils/extractor';
 import { toIsoDate } from '../../utils/isoDate';
 import { AgendaPanel } from '../../views/agendaPanel';
-import { collectDirtyStatus } from '../../utils/collectDirtyStatus';
+import { collectGitStatus } from '../../utils/git/collectGitStatus';
 import { makeExtractorFake } from '../_execFake';
 import { waitForAgendaRender, waitUntil } from './_helpers';
 
 /**
- * The bug this chip exists for: a file open with unsaved edits has its own
- * line numbering, and the extractor's is off it by however many lines the
- * unsaved edit added or removed above the target. `collectGitStatus.ts` has
- * the equivalent suite against a real repository; this is the equivalent
- * against a real, edited-but-unsaved document.
+ * The "not saved" stage of the git chip. The bug it exists for: a file open
+ * with unsaved edits has its own line numbering, and the extractor's is off it
+ * by however many lines the unsaved edit added or removed above the target.
+ * `gitStatus.integration.test.ts` covers the git stages against a real
+ * repository; this covers the first stage against a real, edited-but-unsaved
+ * document.
  */
 suite('agenda dirty status against a real document', () => {
     const testWorkspaceDir = path.join(__dirname, '../../test-workspace');
@@ -76,7 +77,7 @@ suite('agenda dirty status against a real document', () => {
         }
     });
 
-    test('the chip carries an open document once it holds unsaved edits, and clears once it is saved', async function () {
+    test('the git chip counts an open document once it holds unsaved edits, and stops once it is saved', async function () {
         this.timeout(30000);
         await vscode.commands.executeCommand('markdown-org.showAgendaDay');
         await waitForAgendaRender('day');
@@ -93,22 +94,23 @@ suite('agenda dirty status against a real document', () => {
 
         await waitUntil(async () => {
             const info = await AgendaPanel.queryRenderedInfoForTesting();
-            return info !== null && info.dirtyChip !== '';
-        }, 'the header to carry a dirty chip once the edit reaches it');
+            return info?.gitGroups.includes('dirty') === true;
+        }, 'the git dropdown to carry a "not saved" group once the edit reaches it');
 
         const info = await AgendaPanel.queryRenderedInfoForTesting();
         assert.ok(info);
-        assert.ok(
-            info.dirtyFiles.some((file) => path.resolve(file) === path.resolve(testFile)),
-            `the dropdown did not list ${testFile}: ${JSON.stringify(info.dirtyFiles)}`
-        );
+        assert.ok(info.gitChip.includes('✎'), `the chip does not count the unsaved file: ${info.gitChip}`);
+        assert.ok(info.gitActions.includes('save'), `no Save button: ${JSON.stringify(info.gitActions)}`);
 
-        await AgendaPanel.clickDirtySaveForTesting();
+        await AgendaPanel.clickGitActionForTesting('save');
         await waitUntil(() => !doc.isDirty, 'the document to be saved');
         await waitUntil(async () => {
             const after = await AgendaPanel.queryRenderedInfoForTesting();
-            return after !== null && after.dirtyChip === '';
-        }, 'the chip to clear once nothing in view is unsaved');
+            return after !== null && !after.gitGroups.includes('dirty') && !after.gitChip.includes('✎');
+        }, 'the "not saved" counter to go once nothing in view is unsaved');
+        const done = await AgendaPanel.queryRenderedInfoForTesting();
+        assert.ok(done);
+        assert.ok(!done.gitActions.includes('save'), 'the Save button outlived the unsaved file');
 
         assert.match(
             fs.readFileSync(testFile, 'utf-8'),
@@ -117,7 +119,7 @@ suite('agenda dirty status against a real document', () => {
         );
     });
 
-    test('a document with no unsaved edits carries no chip', async function () {
+    test('a document with no unsaved edits is not counted as unsaved', async function () {
         this.timeout(30000);
         await vscode.commands.executeCommand('markdown-org.showAgendaDay');
         await waitForAgendaRender('day');
@@ -125,15 +127,16 @@ suite('agenda dirty status against a real document', () => {
 
         const info = await AgendaPanel.queryRenderedInfoForTesting();
         assert.ok(info);
-        assert.strictEqual(info.dirtyChip, '', 'a clean document must not raise the chip');
+        assert.ok(!info.gitChip.includes('✎'), `a clean document was counted as unsaved: ${info.gitChip}`);
+        assert.ok(!info.gitGroups.includes('dirty'));
     });
 
     /**
-     * `collectDirtyStatus` on its own, through a symlink -- the exact shape of
+     * `collectGitStatus` on its own, through a symlink -- the exact shape of
      * the reported bug: the note reached through a link the agenda's own
      * `workspaceDir` does not use, opened and edited without being saved.
      */
-    suite('collectDirtyStatus through a symlink', () => {
+    suite('the unsaved stage of collectGitStatus through a symlink', () => {
         let workDir: string;
         let realFile: string;
         let linkedFile: string;
@@ -164,17 +167,24 @@ suite('agenda dirty status against a real document', () => {
                 builder.insert(new vscode.Position(0, 0), 'edited\n');
             });
             try {
-                const status = await collectDirtyStatus([linkedFile]);
-                assert.strictEqual(status.files.length, 1);
-                assert.strictEqual(status.files[0]?.file, linkedFile);
+                const status = await collectGitStatus([linkedFile]);
+                assert.ok(status, 'no status: the Git extension is not available');
+                const [only, ...rest] = status.files;
+                assert.ok(only);
+                assert.deepStrictEqual(rest, []);
+                assert.strictEqual(only.file, linkedFile);
+                assert.strictEqual(only.dirty, true);
+                assert.strictEqual(status.dirtyCount, 1);
             } finally {
                 await vscode.commands.executeCommand('workbench.action.closeAllEditors');
             }
         });
 
-        test('a document that is not open, or not dirty, reports no files', async () => {
-            const status = await collectDirtyStatus([linkedFile]);
-            assert.deepStrictEqual(status.files, []);
+        test('a document that is not open, or not dirty, is not counted', async () => {
+            const status = await collectGitStatus([linkedFile]);
+            assert.ok(status, 'no status: the Git extension is not available');
+            assert.strictEqual(status.dirtyCount, 0);
+            assert.strictEqual(status.files[0]?.dirty, false);
         });
     });
 });

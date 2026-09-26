@@ -285,9 +285,18 @@ export interface AgendaStrings {
          * button is refused for the repository.
          */
         conflictedTitle: string;
+        /**
+         * Open in an editor with edits not yet written to disk -- a click on
+         * one of this file's own tasks can land on the wrong line until it is
+         * saved (see collectGitStatus.ts). Ranked ahead of "not committed":
+         * git only ever sees disk, so a dirty file is always also one of the
+         * states below, and naming both would say the same thing twice.
+         */
+        dirtyTitle: string;
         /** Joins the parts above, in the order `gitCounters` lists them. */
         titleSeparator: string;
         /** Group headings; `{0}` is a counted noun from `files`. */
+        dirtyGroup: string;
         uncommittedGroup: string;
         conflictedGroup: string;
         /** Row under the conflict group: where they are resolved instead. */
@@ -311,6 +320,8 @@ export interface AgendaStrings {
         files: string[];
         commits: string[];
         /** Action buttons; `{0}` is the count each acts on. */
+        saveButton: string;
+        saveButtonTitle: string;
         commitButton: string;
         commitButtonTitle: string;
         /**
@@ -332,6 +343,7 @@ export interface AgendaStrings {
          * what is wrong with that path -- unexplained.
          */
         markConflicted: string;
+        markDirty: string;
         markUncommitted: string;
         markUnpushed: string;
         markOutside: string;
@@ -417,21 +429,6 @@ export interface AgendaStrings {
          */
         syncDiverged: string;
         syncFailed: string;
-    };
-    /**
-     * The "unsaved" chip: a source file open with edits not yet on disk, which
-     * a click can navigate wrong (see collectDirtyStatus.ts).
-     */
-    dirty: {
-        /** Chip tooltip and dropdown caption; `{0}` is a counted noun from `files`. */
-        title: string;
-        /** Counted nouns, in the order `pluralIndex` returns. */
-        files: string[];
-        /** Row tooltip: `{0}` is the path. */
-        openFileTitle: string;
-        /** The one action the dropdown offers; `{0}` is the same counted noun. */
-        saveButton: string;
-        saveButtonTitle: string;
     };
     /**
      * The phrase box raised by `Insert Task from Phrase`. Host UI, and in the
@@ -649,7 +646,9 @@ const EN: AgendaStrings = {
         unpushedTitle: '{0} not pushed',
         outsideTitle: '{0} outside git, or in a repository VS Code has not opened',
         conflictedTitle: '{0} with unresolved conflicts',
+        dirtyTitle: '{0} unsaved',
         titleSeparator: ', ',
+        dirtyGroup: 'Not saved: {0}',
         uncommittedGroup: 'Not committed: {0}',
         conflictedGroup: 'Conflicts: {0}',
         conflictedHint: 'Resolve them in Source Control, then commit from here',
@@ -660,6 +659,9 @@ const EN: AgendaStrings = {
         moreCommits: 'and {0} more',
         files: ['file', 'files'],
         commits: ['commit', 'commits'],
+        saveButton: 'Save {0}',
+        saveButtonTitle:
+            'Save the agenda source files with unsaved changes -- until then a click may land on the wrong line',
         commitButton: 'Commit {0}',
         commitButtonTitle: 'Stage and commit the changed source files of this view',
         commitSyncButton: 'Commit and sync {0}',
@@ -669,6 +671,7 @@ const EN: AgendaStrings = {
         openFileTitle: 'Open {0}',
         realPathTitle: 'Real path: {0}',
         markConflicted: 'A merge left this file unresolved',
+        markDirty: 'Open with unsaved edits',
         markUncommitted: 'Changed and not committed',
         markUnpushed: 'Committed and not pushed',
         markOutside: 'Outside git, or in a repository that could not be read',
@@ -700,14 +703,6 @@ const EN: AgendaStrings = {
         syncDiverged:
             'Nothing done: "{0}" and "{1}" have both moved. Merge or rebase in Source Control, then sync again.',
         syncFailed: 'Sync failed: {0}'
-    },
-    dirty: {
-        title: 'Unsaved: {0}',
-        files: ['file', 'files'],
-        openFileTitle: 'Open {0}',
-        saveButton: 'Save {0}',
-        saveButtonTitle:
-            'Save the agenda source files with unsaved changes -- until then a click may land on the wrong line'
     },
     phrasePrompt: {
         title: 'New task from a phrase',
@@ -882,7 +877,9 @@ const RU: AgendaStrings = {
         unpushedTitle: 'не отправлено: {0}',
         outsideTitle: 'вне git или в репозитории, который VS Code не открыл: {0}',
         conflictedTitle: 'с неразрешёнными конфликтами: {0}',
+        dirtyTitle: 'не сохранено: {0}',
         titleSeparator: ', ',
+        dirtyGroup: 'Не сохранено: {0}',
         uncommittedGroup: 'Без коммита: {0}',
         conflictedGroup: 'Конфликты: {0}',
         conflictedHint: 'Разрешите их в Source Control, затем создайте коммит отсюда',
@@ -893,6 +890,9 @@ const RU: AgendaStrings = {
         moreCommits: 'и ещё {0}',
         files: ['файл', 'файла', 'файлов'],
         commits: ['коммит', 'коммита', 'коммитов'],
+        saveButton: 'Сохранить {0}',
+        saveButtonTitle:
+            'Сохранить файлы-источники агенды с несохранёнными изменениями -- иначе переход по клику может попасть не в ту строку',
         commitButton: 'Создать коммит для {0}',
         commitButtonTitle: 'Добавить в индекс изменённые файлы-источники этого показа и создать коммит',
         commitSyncButton: 'Коммит и синхронизация: {0}',
@@ -903,6 +903,7 @@ const RU: AgendaStrings = {
         openFileTitle: 'Открыть {0}',
         realPathTitle: 'Реальный путь: {0}',
         markConflicted: 'Merge оставил файл неразрешённым',
+        markDirty: 'Открыт с несохранёнными правками',
         markUncommitted: 'Изменён, коммита нет',
         markUnpushed: 'В коммите, но не отправлен',
         markOutside: 'Вне git или в репозитории, который не удалось прочитать',
@@ -934,14 +935,6 @@ const RU: AgendaStrings = {
         syncDiverged:
             'Ничего не сделано: «{0}» и «{1}» разошлись. Сведите их (merge или rebase) в Source Control и синхронизируйте снова.',
         syncFailed: 'Синхронизация не выполнена: {0}'
-    },
-    dirty: {
-        title: 'Не сохранено: {0}',
-        files: ['файл', 'файла', 'файлов'],
-        openFileTitle: 'Открыть {0}',
-        saveButton: 'Сохранить {0}',
-        saveButtonTitle:
-            'Сохранить файлы-источники агенды с несохранёнными изменениями -- иначе переход по клику может попасть не в ту строку'
     },
     phrasePrompt: {
         title: 'Новая задача фразой',

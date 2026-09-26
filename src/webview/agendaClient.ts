@@ -20,10 +20,8 @@
 
 import type {
     AgendaData,
-    AgendaDirtyStatus,
     AgendaGitStatus,
     DayAgenda,
-    DirtyFileState,
     GitFileState,
     GitRepoState,
     Task,
@@ -59,17 +57,6 @@ interface GitCounter {
 
 interface GitHtmlContext {
     git: AgendaStrings['git'];
-    locale: string;
-    uiLang: string;
-    escapeHtml: (text: string | number | boolean | undefined | null) => string;
-    formatString: (template: string, ...values: string[]) => string;
-    formatNumber: (value: number, locale: string) => string;
-    pluralIndex: (n: number, lang: string) => number;
-}
-
-/** Structural mirror of `DirtyHtmlContext` (agendaDirtyHtml.ts) -- see the note above. */
-interface DirtyHtmlContext {
-    dirty: AgendaStrings['dirty'];
     locale: string;
     uiLang: string;
     escapeHtml: (text: string | number | boolean | undefined | null) => string;
@@ -694,7 +681,6 @@ export interface AgendaClientDeps {
     collectViewInfo: () => ReturnType<typeof RenderedInfo.collectViewInfo>;
     collectHeaderInfo: () => ReturnType<typeof RenderedInfo.collectHeaderInfo>;
     collectGitInfo: (actionOf: (id: string) => GitAction) => ReturnType<typeof RenderedInfo.collectGitInfo>;
-    collectDirtyInfo: () => ReturnType<typeof RenderedInfo.collectDirtyInfo>;
     collectClipInfo: () => ReturnType<typeof RenderedInfo.collectClipInfo>;
     /**
      * Reads one clipping chip. Named here because `collectClipInfo` calls it by
@@ -734,16 +720,6 @@ export interface AgendaClientDeps {
     gitFileMark: (file: GitFileState) => string;
     gitFileMarkTitle: (file: GitFileState, ctx: GitHtmlContext) => string;
     gitActions: (status: AgendaGitStatus, ctx: GitHtmlContext) => string;
-    /**
-     * The "unsaved" chip -- see agendaDirtyHtml.ts. `dirtyCount` and
-     * `dirtyFileRow` are called only from `renderDirtyMenu` and `dirtyChipTitle`
-     * once inlined, not by the client, but the page cannot resolve a bare name
-     * this module does not also define.
-     */
-    dirtyCount: (n: number, ctx: DirtyHtmlContext) => string;
-    dirtyChipTitle: (status: AgendaDirtyStatus, ctx: DirtyHtmlContext) => string;
-    dirtyFileRow: (file: DirtyFileState, ctx: DirtyHtmlContext) => string;
-    renderDirtyMenu: (status: AgendaDirtyStatus, ctx: DirtyHtmlContext) => string;
 }
 
 /**
@@ -791,11 +767,6 @@ type HostMessage =
     // `null` is "there is no git here", which removes the chip; it is distinct
     // from a status whose counters are zero, which shows the clean marker.
     | { command: 'gitStatus'; status?: AgendaGitStatus | null }
-    // Files of this view open with unsaved edits, refreshed on the editor's own
-    // schedule (a keystroke, a save, an open or close) rather than the
-    // agenda's -- see AgendaPanel.ensureDirtyWatch. `null`/absent is "nothing
-    // dirty in view", which removes the chip.
-    | { command: 'dirtyStatus'; status?: AgendaDirtyStatus | null }
     // The commit or push the page started has finished, one way or another.
     // Sent by the host itself rather than inferred from a status: staging
     // alone moves the repository's resource groups, so a status arrives
@@ -824,11 +795,7 @@ type HostMessage =
     // behind -- the rest out of service, the pressed one spinning -- exists
     // only in the page, and only a real click puts it there.
     | { command: 'clickGitActionForTesting'; action?: string }
-    | { command: 'clickGitChipForTesting' }
-    // Integration-test hook: the dirty chip and its Save button, mirroring the
-    // two git hooks above.
-    | { command: 'clickDirtyChipForTesting' }
-    | { command: 'clickDirtySaveForTesting' };
+    | { command: 'clickGitChipForTesting' };
 
 /** The payload that fills a page built from nothing. */
 type InitMessage = Extract<HostMessage, { command: 'init' }>;
@@ -907,14 +874,12 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         taskDateDirection,
         renderCard,
         renderGitMenu,
-        renderDirtyMenu,
         gitActionButtons,
         gitActionCommands,
         gitActionOf,
         collectViewInfo,
         collectHeaderInfo,
         collectGitInfo,
-        collectDirtyInfo,
         collectClipInfo,
         measureTodayFirstRowHidden
     } = deps;
@@ -987,15 +952,6 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
     // Kept outside the chip's markup because the chip is replaced wholesale on
     // every status, and a status arrives while the action is still running.
     let gitBusyAction: GitAction | null = null;
-
-    // Source files of this view open with edits not yet on disk, or null
-    // before the host's first `dirtyStatus` message -- the header renders
-    // without the chip until then, same as gitStatus above.
-    let dirtyStatus: AgendaDirtyStatus | null = null;
-
-    // The markup of the chip as it stands on the page, mirroring
-    // lastGitMenuHtml -- see refreshDirtyMenu.
-    let lastDirtyMenuHtml: string | undefined;
 
     // Header layout: 'auto' | 'full' | 'compact' (markdown-org.agendaHeaderMode).
     // Only the resolved outcome reaches the DOM, as a class on <body>.
@@ -1314,15 +1270,6 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
     }
 
     /**
-     * Editor events arrive on their own schedule too, for the same reason:
-     * a keystroke or a save must not move the task list.
-     */
-    function applyDirtyStatus(status: AgendaDirtyStatus | null): void {
-        dirtyStatus = status;
-        refreshDirtyMenu();
-    }
-
-    /**
      * Click a directory chip by its root, as `clickCollectionChipForTesting` asks.
      *
      * The chip is looked up by comparing the attribute rather than by putting
@@ -1394,16 +1341,6 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         document.getElementById(buttons[action as GitAction])?.click();
     }
 
-    /** Press the dirty chip, opening or closing its dropdown. */
-    function clickDirtyChip(): void {
-        document.getElementById('dirtyMenuBtn')?.click();
-    }
-
-    /** Press its Save button. */
-    function clickDirtySave(): void {
-        document.getElementById('dirtySaveBtn')?.click();
-    }
-
     function handleHostMessage(message: HostMessage): void {
         if (message.command === 'init') {
             applyStatePayload(message, 'init');
@@ -1415,8 +1352,6 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             applyHeaderModeMessage(message.headerMode);
         } else if (message.command === 'gitStatus') {
             applyGitStatus(message.status ?? null);
-        } else if (message.command === 'dirtyStatus') {
-            applyDirtyStatus(message.status ?? null);
         } else if (message.command === 'gitActionDone') {
             applyGitActionDone();
         } else if (message.command === 'getRenderedInfo') {
@@ -1438,13 +1373,9 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             clickSectionFold(message.section ?? '');
         } else if (message.command === 'clickGitChipForTesting') {
             clickGitChip();
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- spelled out rather than a bare `else`, so the branch says which command it serves
         } else if (message.command === 'clickGitActionForTesting') {
             clickGitAction(message.action ?? '');
-        } else if (message.command === 'clickDirtyChipForTesting') {
-            clickDirtyChip();
-            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- spelled out rather than a bare `else`, so the branch says which command it serves
-        } else if (message.command === 'clickDirtySaveForTesting') {
-            clickDirtySave();
         }
     }
 
@@ -1470,7 +1401,6 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
             ...collectViewInfo(),
             ...collectHeaderInfo(),
             ...collectGitInfo(gitActionOf),
-            ...collectDirtyInfo(),
             ...collectClipInfo()
         });
     }
@@ -2274,70 +2204,6 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         applyGitBusy();
     }
 
-    /** The dirty chip's markup for the current status, or nothing without one. */
-    function renderDirtyMenuHtml(): string {
-        if (!dirtyStatus) {
-            return '';
-        }
-        return renderDirtyMenu(dirtyStatus, {
-            dirty: UI.dirty,
-            locale,
-            uiLang,
-            escapeHtml,
-            formatString,
-            formatNumber,
-            pluralIndex
-        });
-    }
-
-    /** Note the chip markup the page now carries, mirroring rememberGitMenuHtml. */
-    function rememberDirtyMenuHtml(html: string): string {
-        lastDirtyMenuHtml = html || undefined;
-        return html;
-    }
-
-    /**
-     * Swap the dirty chip in place, the same way {@link refreshGitMenu} does
-     * for the git one -- including carrying an open dropdown across the
-     * rebuild, and leaving the header alone when nothing changed.
-     */
-    function refreshDirtyMenu(): void {
-        const existing = document.getElementById('dirtyMenu');
-        const html = renderDirtyMenuHtml();
-        if (!html) {
-            existing?.remove();
-            lastDirtyMenuHtml = undefined;
-            return;
-        }
-        if (existing && html === lastDirtyMenuHtml) {
-            return;
-        }
-        const wrapper = document.createElement('div');
-        wrapper.innerHTML = html;
-        const fresh = wrapper.firstElementChild;
-        if (!fresh) {
-            return;
-        }
-        rememberDirtyMenuHtml(html);
-        if (existing) {
-            if (existing.classList.contains('open')) {
-                fresh.classList.add('open');
-            }
-            existing.replaceWith(fresh);
-        } else {
-            const controlRow = document.querySelector('.control-row');
-            if (!controlRow) {
-                return;
-            }
-            // Ahead of the git chip: an unsaved file is the more urgent of the
-            // two facts a header chip can report here -- it is what a click is
-            // about to get wrong, not what a later push would fix -- so it
-            // reads first.
-            controlRow.prepend(fresh);
-        }
-        attachDirtyMenuListeners();
-    }
-
     function attachGitMenuListeners(): void {
         document.getElementById('gitMenuBtn')?.addEventListener('click', (ev) => {
             toggleMenu(ev, 'gitMenu');
@@ -2365,28 +2231,8 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         document.getElementById('gitSyncBtn')?.addEventListener('click', (ev) => {
             startGitAction('sync', ev.currentTarget);
         });
-    }
-
-    /** Mirrors {@link attachGitMenuListeners} for the dirty chip's own menu. */
-    function attachDirtyMenuListeners(): void {
-        document.getElementById('dirtyMenuBtn')?.addEventListener('click', (ev) => {
-            toggleMenu(ev, 'dirtyMenu');
-        });
-        document.querySelectorAll('#dirtyMenu .git-file').forEach((el) => {
-            el.addEventListener('click', () => {
-                const file = el.getAttribute('data-file');
-                if (file) {
-                    vscode.postMessage({ command: 'openSourceFile', file });
-                }
-            });
-        });
-        document.getElementById('dirtySaveBtn')?.addEventListener('click', () => {
-            const files = [...document.querySelectorAll('#dirtyMenu .git-file')]
-                .map((el) => el.getAttribute('data-file'))
-                .filter((file): file is string => Boolean(file));
-            if (files.length > 0) {
-                vscode.postMessage({ command: 'saveDirtyFiles', files });
-            }
+        document.getElementById('gitSaveBtn')?.addEventListener('click', (ev) => {
+            startGitAction('save', ev.currentTarget);
         });
     }
 
@@ -2582,7 +2428,6 @@ export function agendaClientMain(boot: AgendaClientBootstrap, deps: AgendaClient
         attachModeSwitchListeners();
         attachTagMenuListeners();
         attachGitMenuListeners();
-        attachDirtyMenuListeners();
         renderCollectionRow();
     }
 

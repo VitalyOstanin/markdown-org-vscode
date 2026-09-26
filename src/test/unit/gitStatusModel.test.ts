@@ -68,6 +68,44 @@ suite('buildGitStatus', () => {
         assert.strictEqual(file.label, 'work.md');
     });
 
+    test('a file open with unsaved edits is marked dirty by its real path, beside its git state', () => {
+        const status = buildGitStatus(
+            [source('/home/user/notes/work.md', '/repo/work.md'), source('/repo/home.md')],
+            [REPO],
+            'linux',
+            new Set(['/repo/work.md'])
+        );
+        assert.strictEqual(status.dirtyCount, 1);
+        assert.deepStrictEqual(
+            status.files.map((f) => [f.label, f.dirty, f.uncommitted]),
+            [
+                ['work.md', true, true],
+                ['home.md', false, false]
+            ]
+        );
+    });
+
+    test('a dirty file outside every repository is still counted as unsaved', () => {
+        const status = buildGitStatus([outside('/loose/todo.md')], [REPO], 'linux', new Set(['/loose/todo.md']));
+        assert.strictEqual(status.dirtyCount, 1);
+        assert.strictEqual(status.outsideGitCount, 1);
+    });
+
+    test('a dirty document that is not a source of the view is not counted', () => {
+        const status = buildGitStatus([source('/repo/work.md')], [REPO], 'linux', new Set(['/repo/other.md']));
+        assert.strictEqual(status.dirtyCount, 0);
+    });
+
+    test('dirty keys are matched case-insensitively on windows', () => {
+        const status = buildGitStatus(
+            [{ file: 'C:\\Notes\\Work.md', realPath: 'C:\\Notes\\Work.md' }],
+            [],
+            'win32',
+            new Set(['c:\\notes\\work.md'])
+        );
+        assert.strictEqual(status.dirtyCount, 1);
+    });
+
     test('realPath is omitted when the source is not a symlink', () => {
         const status = buildGitStatus([source('/repo/work.md')], [REPO], 'linux');
         assert.strictEqual(status.files[0]?.realPath, undefined);

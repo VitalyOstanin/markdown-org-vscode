@@ -177,14 +177,15 @@ suite('agenda counters share one numbering system', () => {
     });
 
     test('the git menu -- the densest numbers in the header -- follows it too', () => {
-        // Four chip counters, five group headings, the commit count and the
-        // "and N more" line: the surface where a new counter written as `${n}`
-        // would slip through unnoticed.
+        // Five chip counters, six group headings, the Save and commit counts
+        // and the "and N more" line: the surface where a new counter written
+        // as `${n}` would slip through unnoticed.
         const files = [
             {
                 file: '/repo/a.md',
                 label: 'a.md',
                 repoRoot: '/repo',
+                dirty: false,
                 uncommitted: true,
                 unpushed: false,
                 conflicted: false
@@ -193,6 +194,7 @@ suite('agenda counters share one numbering system', () => {
                 file: '/repo/b.md',
                 label: 'b.md',
                 repoRoot: '/repo',
+                dirty: false,
                 uncommitted: false,
                 unpushed: true,
                 conflicted: false
@@ -201,6 +203,7 @@ suite('agenda counters share one numbering system', () => {
                 file: '/repo/c.md',
                 label: 'c.md',
                 repoRoot: '/repo',
+                dirty: false,
                 uncommitted: false,
                 unpushed: false,
                 conflicted: true
@@ -209,11 +212,12 @@ suite('agenda counters share one numbering system', () => {
                 file: '/repo/d.md',
                 label: 'd.md',
                 repoRoot: '/repo',
+                dirty: true,
                 uncommitted: false,
                 unpushed: false,
                 conflicted: false
             },
-            { file: '/loose/e.md', label: 'e.md', uncommitted: false, unpushed: false, conflicted: false }
+            { file: '/loose/e.md', label: 'e.md', dirty: false, uncommitted: false, unpushed: false, conflicted: false }
         ];
         const html = renderGitMenu(
             {
@@ -231,6 +235,7 @@ suite('agenda counters share one numbering system', () => {
                     }
                 ],
                 files,
+                dirtyCount: 1,
                 uncommittedCount: 1,
                 unpushedCount: 1,
                 outsideGitCount: 1,

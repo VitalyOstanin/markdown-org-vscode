@@ -9,13 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- A second header chip, beside the git one: it names the agenda's source files
-  open with edits not yet on disk. The agenda's line numbers come from the
-  extractor reading the file on disk, and a click on a task opens whatever
-  document is already there -- the unsaved one when the file is open with
-  edits -- so an edit above the task can leave the click short of its target
-  until the file is saved. The chip's one action, Save, writes every file it
-  lists.
+- The git chip of the agenda header counts one more stage of an edit on its
+  way to the server, ahead of "not committed" and "not pushed": source files
+  open with edits not yet saved to disk (`✎`). The agenda's line numbers come
+  from the extractor reading the file on disk, and a click on a task opens
+  whatever document is already there -- the unsaved one when the file is open
+  with edits -- so an edit above the task can leave the click short of its
+  target until the file is saved. The dropdown lists those files in a group of
+  their own and offers Save, which writes every one of them.
 
 ## [0.21.0] - 2026-09-11
 

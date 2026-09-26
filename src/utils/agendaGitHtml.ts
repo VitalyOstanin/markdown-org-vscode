@@ -63,6 +63,7 @@ export function gitCounters(status: AgendaGitStatus, ctx: GitHtmlContext): GitCo
     const g = ctx.git;
     return [
         { kind: 'conflicted', mark: gitGlyph('conflicted'), count: status.conflictCount, title: g.conflictedTitle },
+        { kind: 'dirty', mark: gitGlyph('dirty'), count: status.dirtyCount, title: g.dirtyTitle },
         {
             kind: 'uncommitted',
             mark: gitGlyph('uncommitted'),
@@ -86,6 +87,9 @@ export function gitGlyph(kind: string): string {
     if (kind === 'conflicted') {
         return '!';
     }
+    if (kind === 'dirty') {
+        return '✎';
+    }
     if (kind === 'uncommitted') {
         return '●';
     }
@@ -100,12 +104,16 @@ export function gitGlyph(kind: string): string {
 
 /**
  * Which state a file row shows, in the order the panel ranks them: what blocks
- * the commit, then what is waiting for one, then what is waiting for a push,
- * then what could not be read at all.
+ * the commit, then what a click on this file's own tasks could still land on
+ * the wrong line (dirty -- see collectGitStatus.ts), then what is waiting for a
+ * commit, then what is waiting for a push, then what could not be read at all.
  */
 export function gitFileMark(file: GitFileState): string {
     if (file.conflicted) {
         return gitGlyph('conflicted');
+    }
+    if (file.dirty) {
+        return gitGlyph('dirty');
     }
     if (file.uncommitted) {
         return gitGlyph('uncommitted');
@@ -132,6 +140,9 @@ export function gitFileMarkTitle(file: GitFileState, ctx: GitHtmlContext): strin
     const g = ctx.git;
     if (file.conflicted) {
         return g.markConflicted;
+    }
+    if (file.dirty) {
+        return g.markDirty;
     }
     if (file.uncommitted) {
         return g.markUncommitted;
@@ -201,6 +212,7 @@ export function gitChipStats(status: AgendaGitStatus, ctx: GitHtmlContext): stri
  */
 export function isGitClean(status: AgendaGitStatus): boolean {
     return (
+        status.dirtyCount === 0 &&
         status.uncommittedCount === 0 &&
         status.unpushedCount === 0 &&
         status.outsideGitCount === 0 &&
@@ -236,19 +248,21 @@ export function renderGitMenu(status: AgendaGitStatus, ctx: GitHtmlContext): str
     );
 }
 
-/** The five groups, each omitted when empty. */
+/** The six groups, each omitted when empty. */
 export function gitGroups(status: AgendaGitStatus, ctx: GitHtmlContext): string {
     const g = ctx.git;
     const conflicted = status.files.filter((f) => f.conflicted);
-    const uncommitted = status.files.filter((f) => f.uncommitted && !f.conflicted);
-    const unpushed = status.files.filter((f) => f.unpushed && !f.uncommitted && !f.conflicted);
+    const dirty = status.files.filter((f) => f.dirty && !f.conflicted);
+    const uncommitted = status.files.filter((f) => f.uncommitted && !f.dirty && !f.conflicted);
+    const unpushed = status.files.filter((f) => f.unpushed && !f.dirty && !f.uncommitted && !f.conflicted);
     const clean = status.files.filter(
-        (f) => f.repoRoot !== undefined && !f.uncommitted && !f.unpushed && !f.conflicted
+        (f) => f.repoRoot !== undefined && !f.dirty && !f.uncommitted && !f.unpushed && !f.conflicted
     );
     const outside = status.files.filter((f) => f.repoRoot === undefined);
 
     return (
         gitConflictedGroup(conflicted, status, ctx) +
+        gitGroup('dirty', ctx.formatString(g.dirtyGroup, gitCount(dirty.length, g.files, ctx)), dirty, status, ctx) +
         gitGroup(
             'uncommitted',
             ctx.formatString(g.uncommittedGroup, gitCount(uncommitted.length, g.files, ctx)),
@@ -496,6 +510,12 @@ export function gitActions(status: AgendaGitStatus, ctx: GitHtmlContext): string
         html +=
             `<button type="button" class="git-action" id="gitSyncBtn" title="${ctx.escapeHtml(g.syncButtonTitle)}">` +
             `${ctx.escapeHtml(g.syncButton)}</button>`;
+    }
+    if (status.dirtyCount > 0) {
+        const label = ctx.formatString(g.saveButton, ctx.formatNumber(status.dirtyCount, ctx.locale));
+        html +=
+            `<button type="button" class="git-action" id="gitSaveBtn" title="${ctx.escapeHtml(g.saveButtonTitle)}">` +
+            `${ctx.escapeHtml(label)}</button>`;
     }
     if (status.uncommittedCount > 0 && status.conflictCount === 0) {
         const count = ctx.formatNumber(status.uncommittedCount, ctx.locale);

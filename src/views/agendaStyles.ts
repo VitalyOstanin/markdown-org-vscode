@@ -386,6 +386,14 @@ export const AGENDA_STYLES = `
         .git-chip-stat[data-kind='conflicted'] {
             color: var(--vscode-gitDecoration-conflictingResourceForeground, var(--accent-red));
         }
+        /* "✎ N": open with edits not yet on disk. Git has no colour for a
+           buffer, so the editor's warning colour: being dirty is the ordinary
+           state of a file mid-edit, not a fault, but until it is saved a click
+           on one of its tasks can land on the wrong line. */
+        .git-chip-stat[data-kind='dirty'],
+        .git-file[data-kind='dirty'] .git-file-mark {
+            color: var(--vscode-editorWarning-foreground, var(--accent-yellow));
+        }
         /* The clean state spells itself out ("✓ clean") instead of leaving a
            bare checkmark to be guessed at. It is not dropped in the compact
            header: that layout is a size change, not a different header (see the
@@ -559,18 +567,6 @@ export const AGENDA_STYLES = `
             .git-action[data-busy='true']::before {
                 animation: none;
             }
-        }
-        /* The "unsaved" chip: same shell as .git-chip (.tag-menu-btn), its own
-           colour -- warning rather than the conflict red, since being dirty is
-           the ordinary state of a file mid-edit, not a fault. */
-        .dirty-chip {
-            color: var(--vscode-editorWarning-foreground, var(--accent-yellow));
-        }
-        .dirty-menu-list {
-            min-width: 200px;
-            max-width: 420px;
-            max-height: 60vh;
-            overflow-y: auto;
         }
         .day-header {
             color: var(--vscode-textLink-foreground);

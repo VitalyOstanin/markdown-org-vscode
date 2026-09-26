@@ -7,13 +7,15 @@
  * counting rules -- which are the part that can be quietly wrong -- are unit
  * testable without a host.
  *
- * Four counters, each answering a different question about the files on screen:
- * how many carry unresolved conflicts (from the repository's `mergeChanges`,
- * and counted over the whole repository -- what they block is the commit
- * button, which is refused for the repository), how many are not saved to git,
- * how many are saved but not sent, and how many have no repository at all (no
- * `repoRoot`: outside git, or in a repository VS Code declined to open --
- * "clean" would be a claim about a file nothing looked at).
+ * Five counters, each answering a different question about the files on
+ * screen: how many are open with edits not yet on disk (independent of git --
+ * see the module comment of `collectGitStatus.ts`), how many carry unresolved
+ * conflicts (from the repository's `mergeChanges`, and counted over the whole
+ * repository -- what they block is the commit button, which is refused for
+ * the repository), how many are not saved to git, how many are saved but not
+ * sent, and how many have no repository at all (no `repoRoot`: outside git, or
+ * in a repository VS Code declined to open -- "clean" would be a claim about a
+ * file nothing looked at).
  *
  * The commit count and the list of commits are carried alongside for the
  * wording of the expanded list, not for the header chip.
@@ -72,11 +74,15 @@ export interface GitSourceFile {
  * the same source file across a dozen tasks, and the counters are about files,
  * not tasks. Repositories that hold none of the view's files are dropped, so
  * `unpushedCommits` never counts a repository the user is not looking at.
+ *
+ * `dirtyKeys` are the `pathKey`s of the real paths of documents open with
+ * unsaved edits; a source file is dirty when its own real path is among them.
  */
 export function buildGitStatus(
     sources: readonly GitSourceFile[],
     repos: readonly GitRepoSnapshot[],
-    platform: NodeJS.Platform = process.platform
+    platform: NodeJS.Platform = process.platform,
+    dirtyKeys: ReadonlySet<string> = new Set()
 ): AgendaGitStatus {
     const byRoot = new Map<string, GitRepoSnapshot>();
     const uncommittedSets = new Map<string, Set<string>>();
@@ -102,6 +108,7 @@ export function buildGitStatus(
 
         const rootKey = source.repoRoot === undefined ? undefined : pathKey(source.repoRoot, platform);
         const realKey = pathKey(source.realPath, platform);
+        const dirty = dirtyKeys.has(realKey);
         const uncommitted = rootKey !== undefined && (uncommittedSets.get(rootKey)?.has(realKey) ?? false);
         const unpushed = rootKey !== undefined && (unpushedSets.get(rootKey)?.has(realKey) ?? false);
         const conflicted = rootKey !== undefined && (conflictSets.get(rootKey)?.has(realKey) ?? false);
@@ -114,6 +121,7 @@ export function buildGitStatus(
             ...(source.realPath === source.file ? {} : { realPath: source.realPath }),
             label: fileLabel(source, platform),
             ...(source.repoRoot === undefined ? {} : { repoRoot: source.repoRoot }),
+            dirty,
             uncommitted,
             unpushed,
             conflicted
@@ -137,6 +145,7 @@ export function buildGitStatus(
     return {
         repos: activeRepos,
         files,
+        dirtyCount: files.filter((f) => f.dirty).length,
         uncommittedCount: files.filter((f) => f.uncommitted).length,
         unpushedCount: files.filter((f) => f.unpushed).length,
         outsideGitCount: files.filter((f) => f.repoRoot === undefined).length,

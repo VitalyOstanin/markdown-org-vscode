@@ -1063,11 +1063,13 @@ function pendingStatus(): AgendaGitStatus {
                 file: '/tmp/panel-repo/notes.md',
                 label: 'notes.md',
                 repoRoot: '/tmp/panel-repo',
+                dirty: false,
                 uncommitted: true,
                 unpushed: false,
                 conflicted: false
             }
         ],
+        dirtyCount: 0,
         uncommittedCount: 1,
         unpushedCount: 0,
         outsideGitCount: 0,

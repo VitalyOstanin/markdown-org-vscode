@@ -9,10 +9,19 @@
  * unresolved, and -- through `repository.log` -- what those unpushed commits
  * are, so the panel can list them above the files they touched.
  *
+ * A fifth question -- which are open in an editor with edits not yet on disk --
+ * is not git's at all: it reads `vscode.workspace.textDocuments`. It is the
+ * first stage of the same "not yet on the server" line the other counters
+ * continue (not saved, not committed, not pushed), and the edits a dirty
+ * buffer holds are what makes a click on one of its tasks land on the wrong
+ * line: the extractor numbers lines off disk. Answered here because it needs
+ * the same `realPath` of each source file this module resolves anyway.
+ *
  * Path canonicalisation -- the rule that makes a symlinked root and a real one
  * meet in one alphabet -- lives in `repositoryPaths.ts`, because the commit
  * action narrows its file list by the same rule.
  */
+import * as vscode from 'vscode';
 import type { AgendaGitStatus, GitCommitState } from '../../types';
 import { formatError } from '../formatError';
 import { logDiagnostic } from '../logChannel';
@@ -100,7 +109,24 @@ export async function collectGitStatus(
         await Promise.all([...contexts.values()].map((context) => refreshRepositoryState(context.repository)));
     }
     const snapshots = await Promise.all([...contexts.values()].map((context) => snapshotRepository(context)));
-    return buildGitStatus(sources, snapshots);
+    const dirtyKeys = await dirtyRealPathKeys(realPathCache);
+    return buildGitStatus(sources, snapshots, process.platform, dirtyKeys);
+}
+
+/**
+ * Real-path keys of every document open with edits not yet on disk.
+ *
+ * `realPathCache` is the same one the caller resolved every source file
+ * against, so a document that is also one of them costs no second `realpath`
+ * call -- only documents new to this pass (open, but not among the agenda's
+ * own sources) pay for one.
+ */
+async function dirtyRealPathKeys(realPathCache: Map<string, string>): Promise<Set<string>> {
+    const dirtyDocs = vscode.workspace.textDocuments.filter((doc) => doc.isDirty);
+    const keys = await Promise.all(
+        dirtyDocs.map(async (doc) => pathKey(await resolveRealPath(doc.uri.fsPath, realPathCache)))
+    );
+    return new Set(keys);
 }
 
 /** Preserve the order of first appearance; the page lists files in view order. */

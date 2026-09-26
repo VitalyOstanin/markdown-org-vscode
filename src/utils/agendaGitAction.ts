@@ -12,11 +12,12 @@
  * function calling another function of this same file compiles to a bare name
  * that the page has (see inlinedHelpers.test.ts).
  */
-export type GitAction = 'commit' | 'commitSync' | 'push' | 'sync';
+export type GitAction = 'save' | 'commit' | 'commitSync' | 'push' | 'sync';
 
 /** The id of the button each action is pressed by. */
 export function gitActionButtons(): Record<GitAction, string> {
     return {
+        save: 'gitSaveBtn',
         commit: 'gitCommitBtn',
         commitSync: 'gitCommitSyncBtn',
         push: 'gitPushBtn',
@@ -27,6 +28,7 @@ export function gitActionButtons(): Record<GitAction, string> {
 /** The message each action posts back to the extension. */
 export function gitActionCommands(): Record<GitAction, string> {
     return {
+        save: 'gitSave',
         commit: 'gitCommit',
         commitSync: 'gitCommitSync',
         push: 'gitPush',

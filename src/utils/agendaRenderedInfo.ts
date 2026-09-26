@@ -139,22 +139,6 @@ export function collectGitInfo(actionOf: (id: string) => GitAction) {
 }
 
 /**
- * The dirty chip and its dropdown, mirroring {@link collectGitInfo} -- there is
- * only the one action here, so no `actionOf` argument is needed.
- */
-export function collectDirtyInfo() {
-    // Same reasoning as gitChip: this arrives on its own message, after the
-    // render, and its text is how a test sees the whole path -- open
-    // documents, the status message, the markup -- reached the page.
-    const dirtyChip = document.getElementById('dirtyMenuBtn')?.textContent ?? '';
-    const dirtyFiles = [...document.querySelectorAll('#dirtyMenu .git-file')].map(
-        (el) => el.getAttribute('data-file') ?? ''
-    );
-    const dirtyMenuOpen = document.getElementById('dirtyMenu')?.classList.contains('open') ?? false;
-    return { dirtyChip, dirtyFiles, dirtyMenuOpen };
-}
-
-/**
  * Clipping chips per day header, in the same order as `dayHeaders`.
  *
  * A hidden chip reports 0 rather than its stale text, which is what the

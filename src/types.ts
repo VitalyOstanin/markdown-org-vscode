@@ -169,6 +169,14 @@ export interface GitFileState {
     label: string;
     /** Root of the repository holding it; absent when it is outside git. */
     repoRoot?: string;
+    /**
+     * Open in an editor with edits not yet written to disk. Independent of the
+     * three states below -- git only ever sees disk -- and ranked ahead of all
+     * of them: the extractor's line numbers are read off disk, and a dirty
+     * document is exactly the case where a click on one of its tasks can land
+     * on the wrong line (see collectGitStatus.ts).
+     */
+    dirty: boolean;
     uncommitted: boolean;
     unpushed: boolean;
     /**
@@ -213,6 +221,8 @@ export interface GitRepoState {
 export interface AgendaGitStatus {
     repos: GitRepoState[];
     files: GitFileState[];
+    /** Source files open with edits not yet written to disk. */
+    dirtyCount: number;
     /** Source files with uncommitted changes. */
     uncommittedCount: number;
     /** Source files touched by unpushed commits. */
@@ -227,26 +237,6 @@ export interface AgendaGitStatus {
      * the view happens to show.
      */
     conflictCount: number;
-}
-
-/**
- * A source file open with edits the editor has not written to disk yet.
- *
- * The extractor reads the agenda's line numbers off disk, and `openTask`
- * applies that number to whatever document the host already holds for the
- * path -- the live, dirty one when there is one open. A file listed here is a
- * file where the two can disagree, and a click on one of its tasks can land on
- * the wrong row until it is saved.
- */
-export interface DirtyFileState {
-    /** Path exactly as the extractor reported it. */
-    file: string;
-    /** Path relative to the repository root, or the bare name outside git. */
-    label: string;
-}
-
-export interface AgendaDirtyStatus {
-    files: DirtyFileState[];
 }
 
 /**
@@ -299,12 +289,6 @@ export interface AgendaRenderedInfo {
     gitGroups: string[];
     /** Whether the chip's dropdown stands open. */
     gitMenuOpen: boolean;
-    /** Text of the dirty chip, or empty when nothing in view is unsaved. */
-    dirtyChip: string;
-    /** `data-file` of each row the dropdown lists, in document order. */
-    dirtyFiles: string[];
-    /** Whether the dirty chip's dropdown stands open. */
-    dirtyMenuOpen: boolean;
     /** Rows hidden above/below per day header, aligned with `dayHeaders`. */
     clipAbove: number[];
     clipBelow: number[];
