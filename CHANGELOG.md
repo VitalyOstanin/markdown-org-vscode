@@ -18,6 +18,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   target until the file is saved. The dropdown lists those files in a group of
   their own and offers Save, which writes every one of them.
 
+### Changed
+
+- Commit and sync saves the view's unsaved source files first, so one press
+  takes an edit still in the editor all the way to the remote; while something
+  is unsaved the button reads "Save, commit and sync". It is now the last
+  button of the git dropdown, and the buttons stand in a column: four of them
+  side by side no longer fit the dropdown's width.
+
 ## [0.21.0] - 2026-09-11
 
 ### Added

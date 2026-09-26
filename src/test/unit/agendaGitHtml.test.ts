@@ -407,6 +407,46 @@ suite('renderGitMenu', () => {
         assert.ok(!clean.includes('id="gitCommitSyncBtn"'), clean);
     });
 
+    test('with an unsaved file the combined button saves too, and counts what the commit will take', () => {
+        const html = renderGitMenu(
+            status({
+                repos: [LEVEL_REPO],
+                unpushedCommits: 0,
+                files: [
+                    file({ file: '/repo/a.md', label: 'a.md', dirty: true }),
+                    file({ file: '/repo/b.md', label: 'b.md', uncommitted: true }),
+                    file({ file: '/repo/c.md', label: 'c.md', dirty: true, uncommitted: true }),
+                    { ...outsideFile('/loose/d.md', 'd.md'), dirty: true }
+                ]
+            }),
+            CTX
+        );
+        assert.ok(html.includes('>Save, commit and sync 3</button>'), html);
+        assert.ok(html.includes('>Commit 2</button>'), 'the commit alone keeps counting what is on disk');
+    });
+
+    test('an unsaved file alone is enough for the combined button', () => {
+        const html = renderGitMenu(
+            status({
+                repos: [LEVEL_REPO],
+                unpushedCommits: 0,
+                files: [file({ file: '/repo/a.md', label: 'a.md', dirty: true })]
+            }),
+            CTX
+        );
+        assert.ok(html.includes('id="gitCommitSyncBtn"'), html);
+        assert.ok(!html.includes('id="gitCommitBtn"'), 'nothing on disk to commit yet');
+    });
+
+    test('the combined button is the last one, under push', () => {
+        const html = renderGitMenu(
+            status({ files: [file({ file: '/repo/a.md', label: 'a.md', uncommitted: true })] }),
+            CTX
+        );
+        assert.ok(html.indexOf('id="gitPushBtn"') > 0, html);
+        assert.ok(html.indexOf('id="gitCommitSyncBtn"') > html.indexOf('id="gitPushBtn"'), html);
+    });
+
     // Sync answers for the side no counter here can see, so it is offered
     // wherever there is a repository -- including the state where the other
     // two buttons are both gone because this side has nothing outstanding.

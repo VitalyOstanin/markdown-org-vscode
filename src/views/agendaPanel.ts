@@ -92,13 +92,12 @@ import { agendaSourceFiles, agendaSourceRoots } from '../utils/git/agendaSourceF
 import { buildCollectionMarks, collectionMarkHtml } from '../utils/agendaCollections';
 import { hideCollections, renderCollectionChips } from '../utils/agendaCollectionFilter';
 import { collectGitStatus } from '../utils/git/collectGitStatus';
-import { pathKey } from '../utils/git/gitPathMatch';
-import { resolveRealPath } from '../utils/git/realPath';
 import { forgetResolvedRepositories, getGitApi } from '../utils/git/gitApi';
 import {
     commitAgendaSources,
     commitAndSyncAgendaSources,
     pushAgendaSources,
+    saveAgendaSources,
     syncAgendaSources
 } from '../commands/gitActions';
 import { isCancelled } from '../utils/normalizeTaskType';
@@ -1069,7 +1068,7 @@ export class AgendaPanel {
             const files = agendaSourceFiles(args.data);
             try {
                 if (message.command === 'gitSave') {
-                    await AgendaPanel.saveDirtyFiles(files);
+                    await saveAgendaSources(files, strings);
                 } else if (message.command === 'gitCommit') {
                     await commitAgendaSources(files, strings, language);
                 } else if (message.command === 'gitCommitSync') {
@@ -1429,44 +1428,6 @@ export class AgendaPanel {
         } catch (err) {
             notifyError(`failed to open ${file}: ${formatError(err)}`);
         }
-    }
-
-    /**
-     * Write the live buffer of every listed file that has one to disk.
-     *
-     * `files` are all the source files of the current view, not only the
-     * dirty ones: the documents to save are picked here, by the same real-path
-     * match `collectGitStatus` counts them with, so a file opened through a
-     * symlink is found under the path the agenda knows it by. A file with no
-     * dirty buffer is simply not among the matches.
-     */
-    private static async saveDirtyFiles(files: readonly string[]): Promise<void> {
-        if (files.length === 0) {
-            return;
-        }
-        const realPathCache = new Map<string, string>();
-        const wanted = new Set(
-            await Promise.all(files.map(async (file) => pathKey(await resolveRealPath(file, realPathCache))))
-        );
-        const matches = await Promise.all(
-            vscode.workspace.textDocuments
-                .filter((doc) => doc.isDirty)
-                .map(async (doc) => ({
-                    doc,
-                    key: pathKey(await resolveRealPath(doc.uri.fsPath, realPathCache))
-                }))
-        );
-        await Promise.all(
-            matches
-                .filter(({ key }) => wanted.has(key))
-                .map(async ({ doc }) => {
-                    try {
-                        await doc.save();
-                    } catch (error) {
-                        logDiagnostic(`agenda: could not save ${doc.uri.fsPath}: ${formatError(error)}`);
-                    }
-                })
-        );
     }
 
     /** Reload data into the panel without re-focusing it. Re-reads settings (including tag filter). */

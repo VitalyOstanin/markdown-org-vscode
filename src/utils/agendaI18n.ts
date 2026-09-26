@@ -325,12 +325,15 @@ export interface AgendaStrings {
         commitButton: string;
         commitButtonTitle: string;
         /**
-         * The two presses as one: commit what this view changed, then sync the
-         * repositories it spans. Committing and then syncing is what a note
+         * The presses as one: save what is unsaved, commit what this view
+         * changed, then sync the repositories it spans. That is what a note
          * written on one machine and read on another takes, and asking for it
-         * twice made the second half easy to forget.
+         * step by step made the later steps easy to forget. The `save` variant
+         * of the label is shown while something is unsaved, so the button says
+         * that it will write the files as well.
          */
         commitSyncButton: string;
+        saveCommitSyncButton: string;
         commitSyncButtonTitle: string;
         pushButton: string;
         pushButtonTitle: string;
@@ -385,6 +388,8 @@ export interface AgendaStrings {
          */
         commitFailed: string;
         pushFailed: string;
+        /** A document refused the save; `{0}` names the files. */
+        saveFailed: string;
         /** Push from a detached HEAD: there is no branch to send anywhere. */
         pushDetachedHead: string;
         /**
@@ -665,7 +670,9 @@ const EN: AgendaStrings = {
         commitButton: 'Commit {0}',
         commitButtonTitle: 'Stage and commit the changed source files of this view',
         commitSyncButton: 'Commit and sync {0}',
-        commitSyncButtonTitle: 'Commit the changed source files of this view, then sync every repository it spans',
+        saveCommitSyncButton: 'Save, commit and sync {0}',
+        commitSyncButtonTitle:
+            'Save the unsaved source files of this view, commit the changed ones, then sync every repository it spans',
         pushButton: 'Push {0}',
         pushButtonTitle: 'Push the current branch to its upstream',
         openFileTitle: 'Open {0}',
@@ -688,6 +695,7 @@ const EN: AgendaStrings = {
         pushRejected:
             'Push rejected: "{1}" has commits "{0}" does not. Fetch and merge (or rebase) them, then push again.',
         commitFailed: 'Commit failed: {0}',
+        saveFailed: 'Could not save {0}',
         pushFailed: 'Push failed: {0}',
         pushDetachedHead: 'Push cancelled: HEAD is not on a branch',
         setUpstreamPrompt: '"{0}": branch "{1}" has no upstream. Push it and set "{2}"?',
@@ -896,8 +904,9 @@ const RU: AgendaStrings = {
         commitButton: 'Создать коммит для {0}',
         commitButtonTitle: 'Добавить в индекс изменённые файлы-источники этого показа и создать коммит',
         commitSyncButton: 'Коммит и синхронизация: {0}',
+        saveCommitSyncButton: 'Сохранить, коммит и синхронизация: {0}',
         commitSyncButtonTitle:
-            'Создать коммит для изменённых файлов-источников этого показа, затем синхронизировать все репозитории показа',
+            'Сохранить несохранённые файлы-источники этого показа, создать коммит для изменённых, затем синхронизировать все репозитории показа',
         pushButton: 'Отправить {0}',
         pushButtonTitle: 'Отправить текущую ветку в upstream',
         openFileTitle: 'Открыть {0}',
@@ -920,6 +929,7 @@ const RU: AgendaStrings = {
         pushRejected:
             'Отправка отклонена: в «{1}» есть коммиты, которых нет в «{0}». Получите их (merge или rebase) и отправьте снова.',
         commitFailed: 'Коммит не выполнен: {0}',
+        saveFailed: 'Не удалось сохранить {0}',
         pushFailed: 'Отправка не выполнена: {0}',
         pushDetachedHead: 'Отправка отменена: HEAD не на ветке',
         setUpstreamPrompt: 'В «{0}» у ветки «{1}» нет upstream. Отправить и установить «{2}»?',

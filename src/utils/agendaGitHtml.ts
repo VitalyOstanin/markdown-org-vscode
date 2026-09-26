@@ -486,13 +486,13 @@ export function gitFileRows(files: readonly GitFileState[], kind: string, ctx: G
 }
 
 /**
- * Sync, commit, commit-and-sync, and push. The counted ones are dropped when
- * their counter is zero -- an always-visible "Commit 0 files" invites a click
- * that can only fail -- and sync is offered wherever there is a repository at
- * all, because what it is for is the commits on the other side, which no
- * counter here can see.
+ * Sync, save, commit, push, and save-commit-and-sync in one press. The counted
+ * ones are dropped when their counter is zero -- an always-visible "Commit 0
+ * files" invites a click that can only fail -- and sync is offered wherever
+ * there is a repository at all, because what it is for is the commits on the
+ * other side, which no counter here can see.
  *
- * Sync comes first so that it stays put: the other two appear and vanish with
+ * Sync comes first so that it stays put: the others appear and vanish with
  * the state of the view, and a button that moves under the pointer between one
  * render and the next is a button pressed by accident.
  *
@@ -523,12 +523,6 @@ export function gitActions(status: AgendaGitStatus, ctx: GitHtmlContext): string
         html +=
             `<button type="button" class="git-action" id="gitCommitBtn" title="${ctx.escapeHtml(g.commitButtonTitle)}">` +
             `${ctx.escapeHtml(label)}</button>`;
-        // Under the commit it extends, and gated on the same counters: what it
-        // adds is the sync, and a sync alone is already the button above them.
-        const both = ctx.formatString(g.commitSyncButton, count);
-        html +=
-            '<button type="button" class="git-action" id="gitCommitSyncBtn" ' +
-            `title="${ctx.escapeHtml(g.commitSyncButtonTitle)}">${ctx.escapeHtml(both)}</button>`;
     }
     // Gated on the commits, not on the files: the button pushes commits, and a
     // branch can be ahead by a commit that touched no file of this view.
@@ -537,6 +531,19 @@ export function gitActions(status: AgendaGitStatus, ctx: GitHtmlContext): string
         html +=
             `<button type="button" class="git-action" id="gitPushBtn" title="${ctx.escapeHtml(g.pushButtonTitle)}">` +
             `${ctx.escapeHtml(label)}</button>`;
+    }
+    // Last, under the single steps it combines: the whole way to the server
+    // in one press -- save, commit, sync. Offered for an unsaved file too,
+    // which is uncommitted the moment it is saved, and counted over the files
+    // the commit will take: those not committed and those about to be written,
+    // inside a repository.
+    const toCommit = status.files.filter((f) => f.repoRoot !== undefined && (f.dirty || f.uncommitted)).length;
+    if (toCommit > 0 && status.conflictCount === 0) {
+        const template = status.dirtyCount > 0 ? g.saveCommitSyncButton : g.commitSyncButton;
+        const all = ctx.formatString(template, ctx.formatNumber(toCommit, ctx.locale));
+        html +=
+            '<button type="button" class="git-action" id="gitCommitSyncBtn" ' +
+            `title="${ctx.escapeHtml(g.commitSyncButtonTitle)}">${ctx.escapeHtml(all)}</button>`;
     }
     return html ? `<div class="git-actions">${html}</div>` : '';
 }

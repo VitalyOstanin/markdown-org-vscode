@@ -403,7 +403,11 @@ export const AGENDA_STYLES = `
             margin-left: 0.25em;
         }
         /* Wider than the tag list: these rows carry paths, not one-word tags. */
+        /* As wide as its longest line up to the cap: the list hangs off the
+           chip, and without a width of its own it shrinks to the narrowest
+           it can be, wrapping every button label in the column below. */
         .git-menu-list {
+            width: max-content;
             min-width: 220px;
             max-width: 420px;
             max-height: 60vh;
@@ -510,8 +514,12 @@ export const AGENDA_STYLES = `
             direction: rtl;
             text-align: left;
         }
+        /* A column: up to four buttons do not fit side by side in a list at
+           most 420px wide, and one that did not fit was clipped by the list's
+           own overflow. One button per line also keeps each label on one line. */
         .git-actions {
             display: flex;
+            flex-direction: column;
             gap: var(--space-2);
             padding: var(--space-2) var(--space-3);
             border-top: 1px solid var(--vscode-panel-border);

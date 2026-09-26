@@ -993,6 +993,32 @@ suite('agenda git status against a real repository', () => {
         assert.ok(repo.run(['log', '-1', '--format=%s']).includes('agenda: commit and sync'));
     });
 
+    // The whole way in one press: an edit still in the editor is written, and
+    // the commit carries the text on screen rather than the disk's older one.
+    // The file is clean in git when the press starts -- the Git extension has
+    // not seen the write yet -- which is what the status pass before the
+    // commit is for.
+    test('commit and sync saves an unsaved edit first and sends that', async function () {
+        this.timeout(30000);
+        const repo = syncFixture('save-commit-sync');
+        const doc = await vscode.workspace.openTextDocument(repo.source);
+        const editor = await vscode.window.showTextDocument(doc);
+        await editor.edit((builder) => {
+            builder.insert(new vscode.Position(doc.lineCount, 0), 'typed, not saved\n');
+        });
+        assert.ok(doc.isDirty);
+        try {
+            await runCommitSync(repo.source, 'agenda: save, commit and sync');
+
+            assert.ok(!doc.isDirty, 'the edit was not saved');
+            await waitUntil(() => repo.remoteHead() === repo.head(), 'the commit to reach the remote');
+            assert.ok(repo.run(['log', '-1', '--format=%s']).includes('agenda: save, commit and sync'));
+            assert.match(repo.run(['show', 'HEAD:diary.md']), /typed, not saved/);
+        } finally {
+            await vscode.commands.executeCommand('workbench.action.closeAllEditors');
+        }
+    });
+
     // A dismissed message box is a "not now" about the whole press: syncing
     // around it would move the branch the user just declined to add to.
     test('a dismissed message box stops the round before the sync', async function () {
@@ -1211,7 +1237,7 @@ suite('agenda panel git chip', () => {
         await AgendaPanel.postGitStatusForTesting(pendingStatus());
         await waitUntil(async () => {
             const info = await AgendaPanel.queryRenderedInfoForTesting();
-            return info?.gitActions.join(' | ') === 'sync | commit | commitSync | push';
+            return info?.gitActions.join(' | ') === 'sync | commit | push | commitSync';
         }, 'all three actions to be offered');
 
         // The commit flow is held at its message prompt, which is what makes
@@ -1230,7 +1256,7 @@ suite('agenda panel git chip', () => {
             assert.ok(info);
             assert.deepStrictEqual(
                 info.gitActions,
-                ['sync (off)', 'commit (off, busy)', 'commitSync (off)', 'push (off)'],
+                ['sync (off)', 'commit (off, busy)', 'push (off)', 'commitSync (off)'],
                 'the other buttons must be out of service too, and without a spinner of their own'
             );
         } finally {
@@ -1258,7 +1284,7 @@ suite('agenda panel git chip', () => {
         await AgendaPanel.postGitStatusForTesting(pendingStatus());
         await waitUntil(async () => {
             const info = await AgendaPanel.queryRenderedInfoForTesting();
-            return info?.gitActions.join(' | ') === 'sync | commit | commitSync | push';
+            return info?.gitActions.join(' | ') === 'sync | commit | push | commitSync';
         }, 'all three actions to be offered');
 
         await AgendaPanel.clickGitChipForTesting();
@@ -1301,7 +1327,7 @@ suite('agenda panel git chip', () => {
         await AgendaPanel.postGitStatusForTesting(pendingStatus());
         await waitUntil(async () => {
             const info = await AgendaPanel.queryRenderedInfoForTesting();
-            return info?.gitActions.join(' | ') === 'sync | commit | commitSync | push';
+            return info?.gitActions.join(' | ') === 'sync | commit | push | commitSync';
         }, 'all three actions to be offered');
 
         const prompt = Promise.withResolvers<string | undefined>();
@@ -1320,7 +1346,7 @@ suite('agenda panel git chip', () => {
             const info = await AgendaPanel.queryRenderedInfoForTesting();
             assert.deepStrictEqual(
                 info?.gitActions,
-                ['sync (off)', 'commit (off, busy)', 'commitSync (off)', 'push (off)'],
+                ['sync (off)', 'commit (off, busy)', 'push (off)', 'commitSync (off)'],
                 'a status is not the end of the action and must not re-enable the buttons'
             );
         } finally {

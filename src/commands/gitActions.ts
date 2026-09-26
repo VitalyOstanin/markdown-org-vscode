@@ -1,5 +1,6 @@
 /**
- * Commit, push and sync the agenda's source files, from the panel's git dropdown.
+ * Save, commit, push and sync the agenda's source files, from the panel's git
+ * dropdown.
  *
  * Scope is the point of the first two: the commit stages exactly the changed files
  * the current view is built from, so an unrelated edit elsewhere in the same
@@ -22,6 +23,7 @@ import * as path from 'node:path';
 import { getGitApi, resolveRepositoryFor } from '../utils/git/gitApi';
 import type { GitBranch, GitRepository } from '../utils/git/gitApiTypes';
 import { pathKey } from '../utils/git/gitPathMatch';
+import { resolveRealPath } from '../utils/git/realPath';
 import { isPushRejected } from '../utils/git/pushRejection';
 import { canonicalPath, changeKeys, repositoryRoots } from '../utils/git/repositoryPaths';
 import { formatError, notifyError, notifyStatus } from '../utils/notify';
@@ -136,25 +138,76 @@ export async function commitAgendaSources(
 }
 
 /**
- * One press for what used to be two: commit, then sync.
+ * Write the live buffer of every listed file that has one to disk, and say
+ * whether all of them were written.
  *
- * A note written here is read on the phone, and that takes both halves -- the
- * commit alone leaves the note on this machine. Pressing them separately meant
- * the second was easy to forget, and the notes then sat committed and unsent
- * until the next time the panel was opened.
+ * `files` are all the source files of the current view, not only the dirty
+ * ones: the documents to save are picked here, by the same real-path match
+ * `collectGitStatus` counts them with, so a file opened through a symlink is
+ * found under the path the agenda knows it by. A file with no dirty buffer is
+ * simply not among the matches. A document that refuses the save is named in
+ * an error, and `false` tells a caller with more to do not to go on as if the
+ * edit had reached the disk.
+ */
+export async function saveAgendaSources(files: readonly string[], strings: AgendaStrings): Promise<boolean> {
+    const realPathCache = new Map<string, string>();
+    const wanted = new Set(
+        await Promise.all(files.map(async (file) => pathKey(await resolveRealPath(file, realPathCache))))
+    );
+    const matches = await Promise.all(
+        vscode.workspace.textDocuments
+            .filter((doc) => doc.isDirty)
+            .map(async (doc) => ({ doc, key: pathKey(await resolveRealPath(doc.uri.fsPath, realPathCache)) }))
+    );
+    const unsaved: string[] = [];
+    for (const { doc } of matches.filter(({ key }) => wanted.has(key))) {
+        try {
+            if (!(await doc.save())) {
+                unsaved.push(path.basename(doc.uri.fsPath));
+            }
+        } catch (error) {
+            logDiagnostic(`agenda: could not save ${doc.uri.fsPath}: ${formatError(error)}`);
+            unsaved.push(path.basename(doc.uri.fsPath));
+        }
+    }
+    if (unsaved.length > 0) {
+        notifyError(formatString(strings.git.saveFailed, unsaved.join(strings.git.titleSeparator)));
+        return false;
+    }
+    return true;
+}
+
+/**
+ * One press for everything an edit needs to reach the server: save, commit,
+ * then sync.
  *
- * The sync is skipped when the commit did not happen by the user's choice or by
- * a failure: an escaped message box is a "not now" about the whole press, and a
- * commit that failed is news to read rather than something to build on. A round
- * that found nothing to commit still syncs -- the counters the button was drawn
- * from are a snapshot, and what the remote holds is the other half of the
- * question anyway.
+ * A note written here is read on the phone, and that takes all three -- the
+ * commit alone leaves the note on this machine, and a commit taken over an
+ * unsaved buffer carries the disk's older text rather than the one on screen.
+ * Pressing them separately meant the later ones were easy to forget.
+ *
+ * After a save the repositories are asked for their state before the commit
+ * reads it: the file just written is what the commit is for, and the Git
+ * extension learns of the write only when its watcher gets round to it -- or,
+ * outside the workspace folders, not at all.
+ *
+ * The rest is skipped when a step did not happen by the user's choice or by a
+ * failure: an escaped message box is a "not now" about the whole press, and a
+ * save or a commit that failed is news to read rather than something to build
+ * on. A round that found nothing to commit still syncs -- the counters the
+ * button was drawn from are a snapshot, and what the remote holds is the other
+ * half of the question anyway.
  */
 export async function commitAndSyncAgendaSources(
     files: readonly string[],
     strings: AgendaStrings,
     language: UiLanguage
 ): Promise<void> {
+    if (!(await saveAgendaSources(files, strings))) {
+        return;
+    }
+    const grouped = await groupByRepository(files, new Map());
+    await Promise.all([...grouped.keys()].map((repository) => repository.status()));
     const outcome = await commitAgendaSources(files, strings, language);
     if (outcome === 'cancelled' || outcome === 'failed') {
         return;
