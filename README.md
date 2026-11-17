@@ -121,8 +121,9 @@ token stays in the OS keychain via VS Code's `SecretStorage`), pick the
 target calendar, then **Sync Now** on demand or enable debounced
 **sync on save**. Marking a task DONE deletes its event (configurable);
 re-opening it (DONE → TODO) revives the event instead of leaving an
-orphan. Property write-back (`ID` / `GCAL_EVENT_ID` / `GCAL_MOVED`) is
-conflict-safe.
+orphan. Changing a task between an all-day date and a timed appointment
+updates the existing event without leaving stale date fields. Property
+write-back (`ID` / `GCAL_EVENT_ID` / `GCAL_MOVED`) is conflict-safe.
 See the full [Google Calendar Sync](#google-calendar-sync) section with
 connect / select / sync demos and [ADR-0010](docs/adr/0010-google-calendar-sync.md).
 

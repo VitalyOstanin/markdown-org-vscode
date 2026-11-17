@@ -271,12 +271,24 @@ export async function patchEvent(
     event: GcalEventResource,
     opts: CallOptions = {}
 ): Promise<void> {
+    // PATCH keeps omitted fields. Clear the previous date representation when
+    // a task switches between all-day and timed, otherwise Google rejects an
+    // event that ends up with both `date` and `dateTime`.
+    const start =
+        event.start.dateTime !== undefined
+            ? { ...event.start, date: null }
+            : { ...event.start, dateTime: null, timeZone: null };
+    const end =
+        event.end.dateTime !== undefined
+            ? { ...event.end, date: null }
+            : { ...event.end, dateTime: null, timeZone: null };
+    const patch = { ...event, start, end };
     const { status, json } = await call(
         fetchFn,
         getToken,
         'PATCH',
         `/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`,
-        event,
+        patch,
         opts
     );
     if (status < 200 || status >= 300) {

@@ -44,6 +44,27 @@ function recorder(responder: (call: Call) => { status: number; body: unknown; re
 
 const token = async () => 'AT';
 
+function applyGooglePatch(stored: Record<string, unknown>, patch: Record<string, unknown>): Record<string, unknown> {
+    const result = { ...stored };
+    for (const [key, value] of Object.entries(patch)) {
+        if (key === 'start' || key === 'end') {
+            const nestedPatch = value as Record<string, unknown>;
+            const nested = Object.fromEntries(
+                Object.entries(result[key] as Record<string, unknown>).filter(
+                    ([nestedKey]) => nestedPatch[nestedKey] !== null
+                )
+            );
+            for (const [nestedKey, nestedValue] of Object.entries(nestedPatch)) {
+                if (nestedValue !== null) nested[nestedKey] = nestedValue;
+            }
+            result[key] = nested;
+        } else {
+            result[key] = value;
+        }
+    }
+    return result;
+}
+
 suite('gcal/calendarClient', () => {
     test('listWritableCalendars filters by accessRole', async () => {
         const r = recorder(() => ({
@@ -364,6 +385,74 @@ suite('gcal/calendarClient', () => {
         assert.equal(r.calls.length, 1);
         assert.equal(r.calls[0]!.method, 'PATCH');
         assert.ok(r.calls[0]!.url.endsWith('/calendars/cal/events/eid'), `unexpected PATCH url: ${r.calls[0]!.url}`);
+    });
+
+    test('patchEvent clears all-day dates when changing an event to timed', async () => {
+        const stored = {
+            id: 'eid',
+            start: { date: '2026-06-01' },
+            end: { date: '2026-06-02' },
+            recurrence: ['RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR']
+        };
+        let afterPatch: Record<string, unknown> = stored;
+        const r = recorder((call) => {
+            afterPatch = applyGooglePatch(stored, call.body as Record<string, unknown>);
+            return { status: 200, body: { id: 'eid' } };
+        });
+        const event = {
+            summary: 'S',
+            start: { dateTime: '2026-06-01T18:00:00', timeZone: 'Europe/Moscow' },
+            end: { dateTime: '2026-06-01T19:00:00', timeZone: 'Europe/Moscow' },
+            recurrence: ['RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR']
+        };
+
+        await patchEvent(r.fn, token, 'cal', 'eid', event);
+
+        assert.deepEqual(r.calls[0]!.body, {
+            ...event,
+            start: { ...event.start, date: null },
+            end: { ...event.end, date: null }
+        });
+        assert.deepEqual(event.start, { dateTime: '2026-06-01T18:00:00', timeZone: 'Europe/Moscow' });
+        assert.deepEqual(event.end, { dateTime: '2026-06-01T19:00:00', timeZone: 'Europe/Moscow' });
+        assert.deepEqual(event.recurrence, ['RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR']);
+        assert.deepEqual(afterPatch.start, { dateTime: '2026-06-01T18:00:00', timeZone: 'Europe/Moscow' });
+        assert.deepEqual(afterPatch.end, { dateTime: '2026-06-01T19:00:00', timeZone: 'Europe/Moscow' });
+        assert.deepEqual(afterPatch.recurrence, stored.recurrence);
+    });
+
+    test('patchEvent clears timed fields when changing an event to all-day', async () => {
+        const stored = {
+            id: 'eid',
+            start: { dateTime: '2026-06-01T18:00:00', timeZone: 'Europe/Moscow' },
+            end: { dateTime: '2026-06-01T19:00:00', timeZone: 'Europe/Moscow' },
+            recurrence: ['RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR']
+        };
+        let afterPatch: Record<string, unknown> = stored;
+        const r = recorder((call) => {
+            afterPatch = applyGooglePatch(stored, call.body as Record<string, unknown>);
+            return { status: 200, body: { id: 'eid' } };
+        });
+        const event = {
+            summary: 'S',
+            start: { date: '2026-06-01' },
+            end: { date: '2026-06-02' },
+            recurrence: ['RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR']
+        };
+
+        await patchEvent(r.fn, token, 'cal', 'eid', event);
+
+        assert.deepEqual(r.calls[0]!.body, {
+            ...event,
+            start: { date: '2026-06-01', dateTime: null, timeZone: null },
+            end: { date: '2026-06-02', dateTime: null, timeZone: null }
+        });
+        assert.deepEqual(event.start, { date: '2026-06-01' });
+        assert.deepEqual(event.end, { date: '2026-06-02' });
+        assert.deepEqual(event.recurrence, ['RRULE:FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR']);
+        assert.deepEqual(afterPatch.start, { date: '2026-06-01' });
+        assert.deepEqual(afterPatch.end, { date: '2026-06-02' });
+        assert.deepEqual(afterPatch.recurrence, stored.recurrence);
     });
 
     test('a pinned calendar that is gone is reported rather than replaced', async () => {
